@@ -4080,33 +4080,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rhema"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "crossbeam-channel",
- "dotenvy",
- "log",
- "rhema-api",
- "rhema-audio",
- "rhema-bible",
- "rhema-broadcast",
- "rhema-detection",
- "rhema-stt",
- "serde",
- "serde_json",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-log",
- "tauri-plugin-store",
- "tokio",
-]
-
-[[package]]
 name = "rhema-api"
 version = "0.1.0"
 dependencies = [
@@ -4171,16 +4144,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokenizers",
-]
-
-[[package]]
-name = "rhema-notes"
-version = "0.1.0"
-dependencies = [
- "log",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4358,6 +4321,33 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
+name = "sabbathcue"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "crossbeam-channel",
+ "dotenvy",
+ "log",
+ "rhema-api",
+ "rhema-audio",
+ "rhema-bible",
+ "rhema-broadcast",
+ "rhema-detection",
+ "rhema-stt",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-log",
+ "tauri-plugin-store",
+ "tokio",
+]
 
 [[package]]
 name = "same-file"
