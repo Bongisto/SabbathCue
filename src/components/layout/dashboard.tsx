@@ -15,7 +15,6 @@ import { QueuePanel } from "@/components/panels/queue-panel"
 import { SearchPanel } from "@/components/panels/search-panel"
 import { DetectionsPanel } from "@/components/panels/detections-panel"
 import {
-  DASHBOARD_LAYOUT_PRESETS,
   clampNumber,
   layoutStateFromPreset,
   loadDashboardLayoutState,
