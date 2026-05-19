@@ -11,8 +11,18 @@ pub struct AudioLevelPayload {
 }
 
 #[derive(Clone, serde::Serialize)]
+pub struct WordPayload {
+    pub text: String,
+    pub start: f64,
+    pub end: f64,
+    pub confidence: f64,
+    pub punctuated: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 pub struct TranscriptPayload {
     pub text: String,
     pub is_final: bool,
     pub confidence: f64,
+    pub words: Vec<WordPayload>,
 }

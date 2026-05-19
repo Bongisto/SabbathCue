@@ -8,7 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::asset_paths;
 use crate::events::{
-    AudioLevelPayload, TranscriptPayload, EVENT_AUDIO_LEVEL, EVENT_AUDIO_SOURCE_LOST,
+    AudioLevelPayload, TranscriptPayload, WordPayload, EVENT_AUDIO_LEVEL, EVENT_AUDIO_SOURCE_LOST,
     EVENT_AUDIO_SOURCE_RECOVERED, EVENT_TRANSCRIPT_FINAL, EVENT_TRANSCRIPT_PARTIAL,
 };
 use crate::state::AppState;
@@ -31,7 +31,26 @@ fn truncate_safe(s: &str, max_bytes: usize) -> &str {
     &s[..end]
 }
 use rhema_audio::{AudioConfig, AudioFrame};
-use rhema_stt::{DeepgramClient, SttConfig, SttProvider, TranscriptEvent};
+use rhema_stt::{DeepgramClient, SttConfig, SttProvider, TranscriptEvent, Word};
+
+fn to_word_payloads(words: Vec<Word>) -> Vec<WordPayload> {
+    words
+        .into_iter()
+        .map(|word| {
+            let punctuated = word
+                .punctuated_word
+                .clone()
+                .unwrap_or_else(|| word.text.clone());
+            WordPayload {
+                text: word.text,
+                start: word.start,
+                end: word.end,
+                confidence: word.confidence,
+                punctuated,
+            }
+        })
+        .collect()
+}
 
 /// Start the full audio-capture-to-transcription pipeline.
 ///
@@ -354,7 +373,7 @@ pub async fn start_transcription(
             }
 
             match event {
-                TranscriptEvent::Partial { transcript, .. } => {
+                TranscriptEvent::Partial { transcript, words } => {
                     if !transcript.is_empty() {
                         let t0 = std::time::Instant::now();
                         let _ = event_app.emit(
@@ -363,6 +382,7 @@ pub async fn start_transcription(
                                 text: transcript.clone(),
                                 is_final: false,
                                 confidence: 0.0,
+                                words: to_word_payloads(words),
                             },
                         );
 
@@ -374,9 +394,9 @@ pub async fn start_transcription(
                 }
                 TranscriptEvent::Final {
                     transcript,
+                    words,
                     confidence,
                     speech_final: _,
-                    ..
                 } => {
                     if !transcript.is_empty() {
                         let t0 = std::time::Instant::now();
@@ -388,6 +408,7 @@ pub async fn start_transcription(
                                 text: transcript.clone(),
                                 is_final: true,
                                 confidence,
+                                words: to_word_payloads(words),
                             },
                         );
 

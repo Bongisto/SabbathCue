@@ -10,6 +10,13 @@ interface TranscriptPartialPayload {
   text: string
   is_final: boolean
   confidence: number
+  words: Array<{
+    text: string
+    start: number
+    end: number
+    confidence: number
+    punctuated: string
+  }>
 }
 
 interface UseTranscriptionOptions {
@@ -112,7 +119,7 @@ export function useTranscription(options?: UseTranscriptionOptions) {
       text: payload.text,
       is_final: true,
       confidence: payload.confidence,
-      words: [],
+      words: payload.words,
       timestamp: Date.now(),
     })
   })
