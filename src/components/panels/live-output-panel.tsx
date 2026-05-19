@@ -2,16 +2,36 @@ import { PanelHeader } from "@/components/ui/panel-header"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { useBroadcastStore } from "@/stores"
+import { useBibleStore, useBroadcastStore } from "@/stores"
+import { toVerseRenderData } from "@/hooks/use-broadcast"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const liveVerse = useBroadcastStore((s) => s.liveVerse)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const selectedVerse = useBibleStore((s) => s.selectedVerse)
+  const translations = useBibleStore((s) => s.translations)
+  const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
 
   const activeTheme = themes.find((t) => t.id === activeThemeId) ?? themes[0]
   const visibleVerse = isLive ? liveVerse : null
+  const translation =
+    translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
+
+  const handleLiveChange = (checked: boolean) => {
+    const broadcast = useBroadcastStore.getState()
+
+    if (checked) {
+      useBroadcastStore.setState({
+        liveVerse: selectedVerse
+          ? toVerseRenderData(selectedVerse, translation)
+          : null,
+      })
+    }
+
+    broadcast.setLive(checked)
+  }
 
   return (
     <div
@@ -33,9 +53,7 @@ export function LiveOutputPanel() {
           </span>
           <Switch
             checked={isLive}
-            onCheckedChange={(checked) =>
-              useBroadcastStore.getState().setLive(checked)
-            }
+            onCheckedChange={handleLiveChange}
             className="data-[state=checked]:bg-emerald-500"
           />
         </label>
