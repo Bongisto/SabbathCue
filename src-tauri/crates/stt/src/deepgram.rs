@@ -531,3 +531,102 @@ impl SttProvider for DeepgramClient {
         "deepgram"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn parse_one(payload: &str) -> Option<TranscriptEvent> {
+        let (tx, mut rx) = mpsc::channel(4);
+        parse_and_send(payload, &tx).await.unwrap();
+        rx.try_recv().ok()
+    }
+
+    #[tokio::test]
+    async fn parses_speech_started_event() {
+        let event = parse_one(r#"{"type":"SpeechStarted"}"#).await;
+
+        assert!(matches!(event, Some(TranscriptEvent::SpeechStarted)));
+    }
+
+    #[tokio::test]
+    async fn parses_utterance_end_event() {
+        let event = parse_one(r#"{"type":"UtteranceEnd"}"#).await;
+
+        assert!(matches!(event, Some(TranscriptEvent::UtteranceEnd)));
+    }
+
+    #[tokio::test]
+    async fn parses_interim_result_as_partial() {
+        let event = parse_one(
+            r#"{
+                "type":"Results",
+                "is_final":false,
+                "speech_final":false,
+                "channel":{
+                    "alternatives":[{
+                        "transcript":"John three sixteen",
+                        "confidence":0.81,
+                        "words":[{
+                            "word":"john",
+                            "start":0.0,
+                            "end":0.4,
+                            "confidence":0.9,
+                            "punctuated_word":"John"
+                        }]
+                    }]
+                }
+            }"#,
+        )
+        .await;
+
+        match event {
+            Some(TranscriptEvent::Partial { transcript, words }) => {
+                assert_eq!(transcript, "John three sixteen");
+                assert_eq!(words.len(), 1);
+                assert_eq!(words[0].punctuated_word.as_deref(), Some("John"));
+            }
+            other => panic!("expected partial, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn parses_final_result_with_confidence_and_speech_final() {
+        let event = parse_one(
+            r#"{
+                "type":"Results",
+                "is_final":true,
+                "speech_final":true,
+                "channel":{
+                    "alternatives":[{
+                        "transcript":"John 3:16",
+                        "confidence":0.97,
+                        "words":[]
+                    }]
+                }
+            }"#,
+        )
+        .await;
+
+        match event {
+            Some(TranscriptEvent::Final {
+                transcript,
+                confidence,
+                speech_final,
+                ..
+            }) => {
+                assert_eq!(transcript, "John 3:16");
+                assert_eq!(confidence, 0.97);
+                assert!(speech_final);
+            }
+            other => panic!("expected final, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn ignores_metadata_messages() {
+        let event = parse_one(r#"{"type":"Metadata","request_id":"abc"}"#).await;
+
+        assert!(event.is_none());
+    }
+}
