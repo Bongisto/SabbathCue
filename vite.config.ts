@@ -17,6 +17,15 @@ export default defineConfig({
         main: path.resolve(__dirname, "index.html"),
         broadcast: path.resolve(__dirname, "broadcast-output.html"),
       },
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return
+          if (id.includes("fabric")) return "canvas"
+          if (id.includes("lucide-react")) return "icons"
+          if (id.includes("radix-ui") || id.includes("cmdk")) return "ui"
+          return "vendor"
+        },
+      },
     },
   },
   resolve: {
