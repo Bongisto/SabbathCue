@@ -18,7 +18,12 @@ impl std::fmt::Debug for BibleDb {
 impl BibleDb {
     pub fn open(path: &Path) -> Result<Self, BibleError> {
         let conn = Connection::open(path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+        conn.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA temp_store=MEMORY;
+             PRAGMA cache_size=-64000;
+             PRAGMA mmap_size=268435456;",
+        )?;
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -29,7 +34,12 @@ impl BibleDb {
             path,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
         )?;
-        conn.execute_batch("PRAGMA query_only = ON;")?;
+        conn.execute_batch(
+            "PRAGMA query_only = ON;
+             PRAGMA temp_store=MEMORY;
+             PRAGMA cache_size=-64000;
+             PRAGMA mmap_size=268435456;",
+        )?;
         Ok(Self {
             conn: Mutex::new(conn),
         })

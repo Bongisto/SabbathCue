@@ -11,7 +11,7 @@ impl BibleDb {
     /// while holding the database lock). This applies to all `BibleDb` methods.
     pub fn get_verse_by_id(&self, id: i64) -> Result<Option<Verse>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses WHERE id = ?1",
         )?;
@@ -41,7 +41,7 @@ impl BibleDb {
         verse: i32,
     ) -> Result<Option<Verse>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses \
              WHERE translation_id = ?1 AND book_number = ?2 AND chapter = ?3 AND verse = ?4",
@@ -74,7 +74,7 @@ impl BibleDb {
         chapter: i32,
     ) -> Result<Vec<Verse>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses \
              WHERE translation_id = ?1 AND book_number = ?2 AND chapter = ?3 \
@@ -107,7 +107,7 @@ impl BibleDb {
         verse_end: i32,
     ) -> Result<Vec<Verse>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT id, translation_id, book_number, book_name, book_abbreviation, chapter, verse, text \
              FROM verses \
              WHERE translation_id = ?1 AND book_number = ?2 AND chapter = ?3 \
@@ -138,7 +138,7 @@ impl BibleDb {
         translation_id: i64,
     ) -> Result<Vec<SearchVerse>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT book_number, book_name, chapter, verse, text \
              FROM verses \
              WHERE translation_id = ?1 \
@@ -158,7 +158,7 @@ impl BibleDb {
 
     pub fn list_translations(&self) -> Result<Vec<Translation>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT id, abbreviation, title, language, is_copyrighted, is_downloaded \
              FROM translations",
         )?;
@@ -177,7 +177,7 @@ impl BibleDb {
 
     pub fn list_books(&self, translation_id: i64) -> Result<Vec<Book>, BibleError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
+        let mut stmt = conn.prepare_cached(
             "SELECT id, translation_id, book_number, name, abbreviation, testament \
              FROM books \
              WHERE translation_id = ?1 \

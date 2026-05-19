@@ -19,6 +19,10 @@ const FTS5_MIN_CONFIDENCE: f64 = 0.50;
 /// Minimum word count for vector embedding search (short text lacks semantic signal).
 const MIN_WORDS_FOR_VECTOR: usize = 5;
 
+fn has_min_words(text: &str, min_words: usize) -> bool {
+    text.split_whitespace().nth(min_words.saturating_sub(1)).is_some()
+}
+
 /// The main detection pipeline that runs on each transcript segment.
 ///
 /// Orchestrates direct reference detection, semantic search, and merging
@@ -58,7 +62,7 @@ impl DetectionPipeline {
     pub fn process(&mut self, text: &str) -> Vec<MergedDetection> {
         let direct_results = self.direct.detect(text);
 
-        let semantic_results = if text.split_whitespace().count() >= MIN_WORDS_FOR_VECTOR {
+        let semantic_results = if has_min_words(text, MIN_WORDS_FOR_VECTOR) {
             self.semantic.detect(text)
         } else {
             vec![]
@@ -77,7 +81,7 @@ impl DetectionPipeline {
     /// Run only semantic (ONNX embedding) detection. Slow, 50-400ms.
     /// Used on `speech_final` only, in a background task.
     pub fn process_semantic(&mut self, text: &str) -> Vec<MergedDetection> {
-        if text.split_whitespace().count() < MIN_WORDS_FOR_VECTOR {
+        if !has_min_words(text, MIN_WORDS_FOR_VECTOR) {
             return vec![];
         }
         let semantic_results = self.semantic.detect(text);
@@ -112,7 +116,7 @@ impl DetectionPipeline {
     ) -> Vec<MergedDetection> {
         // Vector search needs enough words for meaningful embeddings;
         // FTS5 keyword matching works with fewer words.
-        let mut vector_detections = if text.split_whitespace().count() >= MIN_WORDS_FOR_VECTOR {
+        let mut vector_detections = if has_min_words(text, MIN_WORDS_FOR_VECTOR) {
             self.semantic.detect(text)
         } else {
             vec![]
