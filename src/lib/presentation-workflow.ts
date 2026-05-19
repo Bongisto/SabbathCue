@@ -71,9 +71,11 @@ export function previewVerseAndMaybeAutoLive(
 ) {
   selectPreviewVerse(verse, { navigate: options?.navigate })
 
+  const broadcast = useBroadcastStore.getState()
   if (
     options?.autoLiveWhenAlreadyOn &&
-    useBroadcastStore.getState().isLive
+    broadcast.isLive &&
+    broadcast.readingModeAutoLive
   ) {
     commitVerseToLive(verse, { makeLive: false })
   }

@@ -14,7 +14,7 @@ export function Dashboard() {
         position: "fixed",
         inset: "0px",
         display: "grid",
-        gridTemplateRows: "56px 32px minmax(0, 2fr) minmax(0, 3fr)",
+        gridTemplateRows: "56px 32px minmax(300px, 1.05fr) minmax(0, 1fr)",
         overflow: "hidden",
       }}
       className="bg-background"

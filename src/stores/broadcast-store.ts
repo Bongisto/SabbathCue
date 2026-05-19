@@ -12,6 +12,7 @@ interface BroadcastState {
   altActiveThemeId: string
   isLive: boolean
   liveVerse: VerseRenderData | null
+  readingModeAutoLive: boolean
 
   // Designer state
   isDesignerOpen: boolean
@@ -32,6 +33,7 @@ interface BroadcastState {
   setAltActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
   setLiveVerse: (verse: VerseRenderData | null) => void
+  setReadingModeAutoLive: (enabled: boolean) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
 
@@ -100,6 +102,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   altActiveThemeId: BUILTIN_THEMES[0].id,
   isLive: false,
   liveVerse: null,
+  readingModeAutoLive: true,
   isDesignerOpen: false,
   editingThemeId: null,
   renamingThemeId: null,
@@ -197,6 +200,9 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   setLiveVerse: (liveVerse) => {
     set({ liveVerse })
     get().syncBroadcastOutput()
+  },
+  setReadingModeAutoLive: (readingModeAutoLive) => {
+    set({ readingModeAutoLive })
   },
 
   // Designer

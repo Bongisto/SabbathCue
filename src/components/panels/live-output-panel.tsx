@@ -11,6 +11,7 @@ import { EyeIcon, EyeOffIcon, RadioIcon, SendIcon } from "lucide-react"
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const liveVerse = useBroadcastStore((s) => s.liveVerse)
+  const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
@@ -39,7 +40,7 @@ export function LiveOutputPanel() {
         </Badge>
       </PanelHeader>
 
-      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+      <div className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
         <Button
           size="sm"
           disabled={!canCommitPreview}
@@ -74,6 +75,19 @@ export function LiveOutputPanel() {
         </label>
       </div>
 
+      <div className="flex min-h-9 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+        <span className="truncate text-xs text-muted-foreground">
+          Auto-live reading mode
+        </span>
+        <Switch
+          checked={readingModeAutoLive}
+          onCheckedChange={(checked) =>
+            useBroadcastStore.getState().setReadingModeAutoLive(checked)
+          }
+          className="data-[state=checked]:bg-emerald-500"
+        />
+      </div>
+
       <div
         className={cn(
           "flex min-h-0 flex-1 items-center justify-center p-3 transition-opacity",
@@ -83,7 +97,7 @@ export function LiveOutputPanel() {
         <CanvasVerse theme={activeTheme} verse={visibleVerse} />
       </div>
 
-      <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+      <div className="truncate border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
         {liveVerse
           ? liveVerse.reference
           : "Nothing has been sent to the live output yet."}

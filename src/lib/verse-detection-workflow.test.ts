@@ -96,6 +96,11 @@ describe("verse detection workflow", () => {
       activeIndex: null,
       highlightedId: null,
     })
+    useBroadcastStore.setState({
+      isLive: false,
+      liveVerse: null,
+      readingModeAutoLive: true,
+    })
   })
 
   afterEach(() => {
@@ -226,6 +231,7 @@ describe("verse detection workflow", () => {
   it("auto-updates live output for reading mode when already live", () => {
     useBroadcastStore.setState({
       isLive: true,
+      readingModeAutoLive: true,
       liveVerse: {
         reference: "John 3:16 (KJV)",
         segments: [{ verseNumber: 16, text: "For God so loved the world." }],
@@ -248,6 +254,34 @@ describe("verse detection workflow", () => {
       verse: 17,
     })
     expect(useBroadcastStore.getState().liveVerse?.reference).toBe("John 3:17 (KJV)")
+  })
+
+  it("does not auto-update live output for reading mode when the toggle is off", () => {
+    useBroadcastStore.setState({
+      isLive: true,
+      readingModeAutoLive: false,
+      liveVerse: {
+        reference: "John 3:16 (KJV)",
+        segments: [{ verseNumber: 16, text: "For God so loved the world." }],
+      },
+    })
+
+    handleReadingAdvance({
+      book_number: 43,
+      book_name: "John",
+      chapter: 3,
+      verse: 17,
+      verse_text: "For God sent not his Son into the world to condemn the world.",
+      reference: "John 3:17",
+      confidence: 0.9,
+    })
+
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_name: "John",
+      chapter: 3,
+      verse: 17,
+    })
+    expect(useBroadcastStore.getState().liveVerse?.reference).toBe("John 3:16 (KJV)")
   })
 
   it("does not turn live output on for reading mode when hidden", () => {
