@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest",
+    "test:unit": "vitest --run",
+    "test:stt:whisper": "cd src-tauri && cargo test -p rhema-stt --features whisper -j 1",
     "test:e2e": "playwright test",
     "download:bible-data": "bun run data/download-sources.ts",
     "build:bible": "bun run data/build-bible-db.ts",
