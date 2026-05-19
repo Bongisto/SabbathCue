@@ -564,7 +564,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
             })
             .collect();
         for r in &results {
-            log::debug!("[DET-DIRECT] Found: {} ({:.0}%) (no DB)", r.verse_ref, r.confidence * 100.0);
+            log::info!("[DET-DIRECT] Found: {} ({:.0}%) (no DB)", r.verse_ref, r.confidence * 100.0);
         }
         let _ = app.emit("verse_detections", &results);
         return has_high_confidence;
@@ -580,11 +580,11 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
         .collect();
 
     for r in &results {
-        log::debug!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
+        log::info!("[DET-DIRECT] Found: {} ({:.0}%)", r.verse_ref, r.confidence * 100.0);
     }
     drop(app_state);
     let _ = app.emit("verse_detections", &results);
-    log::debug!("[DET-DIRECT] Detection took {:?} for {:?}", t0.elapsed(), truncate_safe(transcript, 50));
+    log::info!("[DET-DIRECT] Detection took {:?} for {:?}", t0.elapsed(), truncate_safe(transcript, 50));
     has_high_confidence
 }
 
@@ -593,7 +593,7 @@ fn run_direct_detection(app: &AppHandle, transcript: &str) -> bool {
 /// verse references; ONNX can be re-enabled later with parallelized vector search.
 fn run_semantic_detection(app: &AppHandle, transcript: &str) {
     let t0 = std::time::Instant::now();
-    log::debug!("[DET-SEMANTIC] Running on: {:?}", truncate_safe(transcript, 80));
+    log::info!("[DET-SEMANTIC] Running on: {:?}", truncate_safe(transcript, 80));
 
     // FTS5 BM25 phrase search (~5ms)
     let fts_results = {
@@ -608,11 +608,11 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
     };
 
     let Some(fts) = fts_results else {
-        log::debug!("[DET-SEMANTIC] No FTS5 results");
+        log::info!("[DET-SEMANTIC] No FTS5 results");
         return;
     };
     if fts.is_empty() {
-        log::debug!("[DET-SEMANTIC] No FTS5 results");
+        log::info!("[DET-SEMANTIC] No FTS5 results");
         return;
     }
 
@@ -666,19 +666,19 @@ fn run_semantic_detection(app: &AppHandle, transcript: &str) {
         .collect();
 
     if results.is_empty() {
-        log::debug!("[DET-SEMANTIC] No detections");
+        log::info!("[DET-SEMANTIC] No detections");
         return;
     }
 
     for r in &results {
-        log::debug!(
+        log::info!(
             "[DET-SEMANTIC] Found: {} ({:.0}% {}) auto_q={}",
             r.verse_ref, r.confidence * 100.0, r.source, r.auto_queued
         );
     }
     drop(app_state);
     let _ = app.emit("verse_detections", &results);
-    log::debug!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
+    log::info!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
 }
 
 /// Check reading mode: if active, test transcript against expected verse.

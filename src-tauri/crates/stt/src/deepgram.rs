@@ -19,8 +19,6 @@ const MAX_RECONNECT_ATTEMPTS: u32 = 5;
 const RECONNECT_DELAY: Duration = Duration::from_secs(1);
 /// Batch up to 100ms of audio before sending (at 16kHz, that is 1600 samples).
 const BATCH_SAMPLES: usize = 1600;
-const DEEPGRAM_KEEPALIVE: &str = r#"{"type":"KeepAlive"}"#;
-const DEEPGRAM_CLOSE_STREAM: &str = r#"{"type":"CloseStream"}"#;
 
 pub struct DeepgramClient {
     config: SttConfig,
@@ -283,14 +281,16 @@ impl DeepgramClient {
                         }
                     }
                     WsCommand::KeepAlive => {
-                        if let Err(e) = write.send(Message::Text(DEEPGRAM_KEEPALIVE.into())).await {
+                        let ka = serde_json::json!({"type": "KeepAlive"}).to_string();
+                        if let Err(e) = write.send(Message::Text(ka.into())).await {
                             log::error!("DeepgramClient ws_writer: keepalive error: {e}");
                             send_err.store(true, Ordering::SeqCst);
                             break;
                         }
                     }
                     WsCommand::Close => {
-                        let _ = write.send(Message::Text(DEEPGRAM_CLOSE_STREAM.into())).await;
+                        let close_msg = serde_json::json!({"type": "CloseStream"}).to_string();
+                        let _ = write.send(Message::Text(close_msg.into())).await;
                         let _ = write.close().await;
                         break;
                     }

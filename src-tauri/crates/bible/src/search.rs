@@ -113,7 +113,7 @@ fn run_fts_query(
     if fts_query.is_empty() {
         return Ok(vec![]);
     }
-    let mut stmt = conn.prepare_cached(
+    let mut stmt = conn.prepare(
         "SELECT bm25(verses_fts) as rank, v.book_number, v.book_name, v.chapter, v.verse \
          FROM verses_fts fts \
          JOIN verses v ON v.rowid = fts.rowid \
@@ -169,7 +169,7 @@ impl BibleDb {
         limit: usize,
     ) -> Result<Vec<Verse>, BibleError> {
         let conn = self.conn.lock().map_err(|e| BibleError::Internal(e.to_string()))?;
-        let mut stmt = conn.prepare_cached(
+        let mut stmt = conn.prepare(
             "SELECT v.id, v.translation_id, v.book_number, v.book_name, v.book_abbreviation, v.chapter, v.verse, v.text \
              FROM verses_fts fts \
              JOIN verses v ON v.rowid = fts.rowid \
@@ -217,14 +217,14 @@ impl BibleDb {
 
         // Tier 1: Exact phrase match
         let phrase = build_phrase_query(query);
-        log::debug!("[FTS5-BM25] Phrase: {phrase:?}");
+        log::info!("[FTS5-BM25] Phrase: {phrase:?}");
         let mut all_results = run_fts_query(&conn, &phrase, fetch_limit)?;
 
         // Tier 2: AND with stop words filtered (~5-20ms)
         if dedup_count(&all_results) < limit {
             let and_q = build_and_query(query);
             if !and_q.is_empty() {
-                log::debug!("[FTS5-BM25] AND: {and_q:?}");
+                log::info!("[FTS5-BM25] AND: {and_q:?}");
                 all_results.extend(run_fts_query(&conn, &and_q, fetch_limit)?);
             }
         }
@@ -233,20 +233,20 @@ impl BibleDb {
         if dedup_count(&all_results) < limit {
             let or_q = build_or_query(query);
             if !or_q.is_empty() {
-                log::debug!("[FTS5-BM25] OR: {or_q:?}");
+                log::info!("[FTS5-BM25] OR: {or_q:?}");
                 all_results.extend(run_fts_query(&conn, &or_q, fetch_limit)?);
             }
         }
 
         let results = dedup_results(all_results, limit);
-        log::debug!("[FTS5-BM25] Found {} unique verses", results.len());
+        log::info!("[FTS5-BM25] Found {} unique verses", results.len());
         Ok(results)
     }
 
     pub fn search_books(&self, query: &str) -> Result<Vec<Book>, BibleError> {
         let conn = self.conn.lock().map_err(|e| BibleError::Internal(e.to_string()))?;
         let pattern = format!("{query}%");
-        let mut stmt = conn.prepare_cached(
+        let mut stmt = conn.prepare(
             "SELECT id, translation_id, book_number, name, abbreviation, testament \
              FROM books \
              WHERE name LIKE ?1 OR abbreviation LIKE ?1 \
