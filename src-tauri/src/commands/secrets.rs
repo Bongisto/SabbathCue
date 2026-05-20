@@ -59,7 +59,12 @@ pub fn normalize_deepgram_api_key(api_key: &str) -> String {
 
 #[command]
 pub fn has_deepgram_api_key() -> Result<bool, String> {
-    match entry("deepgram_api_key").get_password() {
+    has_deepgram_api_key_with_store(&DEFAULT_STORE)
+}
+
+/// Testable version that accepts a KeychainStore implementation.
+pub fn has_deepgram_api_key_with_store(store: &dyn KeychainStore) -> Result<bool, String> {
+    match store.get_password("deepgram_api_key") {
         Ok(pw) => Ok(!pw.trim().is_empty()),
         Err(keyring::Error::NoEntry) => Ok(false),
         Err(e) => Err(format!("Could not read Deepgram API key from OS keychain: {e}")),
@@ -68,19 +73,34 @@ pub fn has_deepgram_api_key() -> Result<bool, String> {
 
 #[command]
 pub fn set_deepgram_api_key(api_key: String) -> Result<(), String> {
+    set_deepgram_api_key_with_store(&DEFAULT_STORE, api_key)
+}
+
+/// Testable version that accepts a KeychainStore implementation.
+pub fn set_deepgram_api_key_with_store(
+    store: &dyn KeychainStore,
+    api_key: String,
+) -> Result<(), String> {
     let normalized = normalize_deepgram_api_key(&api_key);
     if normalized.is_empty() {
         return Err("API key cannot be empty".into());
     }
-    entry("deepgram_api_key")
-        .set_password(&normalized)
-        .map_err(|e| format!("Could not store Deepgram API key in OS keychain: {e}"))?;
-    match entry("deepgram_api_key").get_password() {
+    store
+        .set_password("deepgram_api_key", &normalized)
+        .map_err(|e| {
+            log::error!("[KEYCHAIN] Failed to store Deepgram API key: {e}");
+            format!("Could not store Deepgram API key in OS keychain: {e}")
+        })?;
+    match store.get_password("deepgram_api_key") {
         Ok(pw) if !pw.trim().is_empty() => Ok(()),
         Ok(_) | Err(keyring::Error::NoEntry) => {
+            log::error!("[KEYCHAIN] Deepgram API key read-back failed: stored value empty or missing after write");
             Err("Deepgram API key was not saved in OS keychain".into())
         }
-        Err(e) => Err(format!("Could not verify Deepgram API key in OS keychain: {e}")),
+        Err(e) => {
+            log::error!("[KEYCHAIN] Deepgram API key read-back failed: {e}");
+            Err(format!("Could not verify Deepgram API key in OS keychain: {e}"))
+        }
     }
 }
 
@@ -153,8 +173,13 @@ pub fn get_remote_http_token() -> Result<String, String> {
 }
 
 pub fn get_deepgram_api_key() -> Result<String, String> {
-    entry("deepgram_api_key")
-        .get_password()
+    get_deepgram_api_key_with_store(&DEFAULT_STORE)
+}
+
+/// Testable version that accepts a KeychainStore implementation.
+pub fn get_deepgram_api_key_with_store(store: &dyn KeychainStore) -> Result<String, String> {
+    store
+        .get_password("deepgram_api_key")
         .map(|key| normalize_deepgram_api_key(&key))
         .map_err(|e| format!("Could not read Deepgram API key from OS keychain: {e}"))
 }
@@ -275,6 +300,92 @@ mod tests {
             "abc"
         );
         assert_eq!(normalize_deepgram_api_key("\"abc\""), "abc");
+    }
+
+    #[test]
+    fn has_deepgram_api_key_returns_false_when_not_set() {
+        let store = MockKeychainStore::new();
+        let result = has_deepgram_api_key_with_store(&store);
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn has_deepgram_api_key_returns_true_when_set() {
+        let store = MockKeychainStore::new();
+        store
+            .set_password("deepgram_api_key", "test-key")
+            .unwrap();
+        let result = has_deepgram_api_key_with_store(&store);
+        assert_eq!(result.unwrap(), true);
+    }
+
+    #[test]
+    fn has_deepgram_api_key_returns_false_when_empty() {
+        let store = MockKeychainStore::new();
+        store
+            .set_password("deepgram_api_key", "   ")
+            .unwrap();
+        let result = has_deepgram_api_key_with_store(&store);
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn set_deepgram_api_key_saves_and_reads_back() {
+        let store = MockKeychainStore::new();
+        set_deepgram_api_key_with_store(&store, "my-api-key".to_string())
+            .unwrap();
+        let stored = store.get_password("deepgram_api_key").unwrap();
+        assert_eq!(stored, "my-api-key");
+    }
+
+    #[test]
+    fn set_deepgram_api_key_normalizes_input() {
+        let store = MockKeychainStore::new();
+        set_deepgram_api_key_with_store(&store, "  Token abc  ".to_string())
+            .unwrap();
+        let stored = store.get_password("deepgram_api_key").unwrap();
+        assert_eq!(stored, "abc");
+    }
+
+    #[test]
+    fn set_deepgram_api_key_rejects_empty() {
+        let store = MockKeychainStore::new();
+        let result = set_deepgram_api_key_with_store(&store, "".to_string());
+        assert_eq!(result, Err("API key cannot be empty".into()));
+    }
+
+    #[test]
+    fn set_deepgram_api_key_rejects_whitespace() {
+        let store = MockKeychainStore::new();
+        let result = set_deepgram_api_key_with_store(&store, "   ".to_string());
+        assert_eq!(result, Err("API key cannot be empty".into()));
+    }
+
+    #[test]
+    fn get_deepgram_api_key_returns_stored_value() {
+        let store = MockKeychainStore::new();
+        store
+            .set_password("deepgram_api_key", "my-key")
+            .unwrap();
+        let result = get_deepgram_api_key_with_store(&store).unwrap();
+        assert_eq!(result, "my-key");
+    }
+
+    #[test]
+    fn get_deepgram_api_key_normalizes_output() {
+        let store = MockKeychainStore::new();
+        store
+            .set_password("deepgram_api_key", "  Token abc  ")
+            .unwrap();
+        let result = get_deepgram_api_key_with_store(&store).unwrap();
+        assert_eq!(result, "abc");
+    }
+
+    #[test]
+    fn get_deepgram_api_key_returns_error_when_not_set() {
+        let store = MockKeychainStore::new();
+        let result = get_deepgram_api_key_with_store(&store);
+        assert!(result.is_err());
     }
 }
 
