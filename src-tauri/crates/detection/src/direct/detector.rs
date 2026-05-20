@@ -7,6 +7,12 @@ use super::fuzzy;
 use super::parser;
 use crate::types::{Detection, DetectionSource, VerseRef};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SttVoiceCommand {
+    Start,
+    Stop,
+}
+
 /// Translation command patterns — maps spoken phrases to translation abbreviations.
 const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
     // NIV
@@ -224,6 +230,22 @@ const TRANSLATION_COMMANDS: &[(&str, &str)] = &[
     ("good news translation", "GNT"),
     ("good news bible", "GNT"),
     ("in good news", "GNT"),
+];
+
+const STT_STOP_COMMANDS: &[&str] = &[
+    "stop transcribing",
+    "stop transcription",
+    "stop the transcription",
+    "stop listening",
+    "stop recording",
+];
+
+const STT_START_COMMANDS: &[&str] = &[
+    "start transcribing",
+    "start transcription",
+    "start the transcription",
+    "start listening",
+    "start recording",
 ];
 
 /// Maximum chapter count per book (`book_number` 1-66).
@@ -498,6 +520,30 @@ impl DirectDetector {
                 log::info!("[DET-DIRECT] Translation abbreviation detected: {abbrev}");
                 return Some(abbrev.to_string());
             }
+        }
+
+        None
+    }
+
+    /// Check for STT lifecycle voice commands.
+    ///
+    /// Stop can be acted on by the running transcription pipeline. Start is
+    /// only detectable while a pipeline is already listening; waking from a
+    /// fully stopped state requires a separate always-listening command path.
+    pub fn detect_stt_voice_command(&self, text: &str) -> Option<SttVoiceCommand> {
+        let lower = text.to_lowercase();
+
+        if STT_STOP_COMMANDS.iter().any(|pattern| lower.contains(pattern)) {
+            log::info!("[DET-DIRECT] STT stop voice command detected");
+            return Some(SttVoiceCommand::Stop);
+        }
+
+        if STT_START_COMMANDS
+            .iter()
+            .any(|pattern| lower.contains(pattern))
+        {
+            log::info!("[DET-DIRECT] STT start voice command detected");
+            return Some(SttVoiceCommand::Start);
         }
 
         None
@@ -1224,6 +1270,41 @@ mod tests {
         assert_eq!(
             detector.detect_translation_command("could you show me that verse in the niv translation"),
             Some("NIV".to_string())
+        );
+    }
+
+    #[test]
+    fn test_stt_voice_command_stop() {
+        let detector = DirectDetector::new();
+        assert_eq!(
+            detector.detect_stt_voice_command("please stop transcribing"),
+            Some(SttVoiceCommand::Stop)
+        );
+        assert_eq!(
+            detector.detect_stt_voice_command("stop listening now"),
+            Some(SttVoiceCommand::Stop)
+        );
+    }
+
+    #[test]
+    fn test_stt_voice_command_start() {
+        let detector = DirectDetector::new();
+        assert_eq!(
+            detector.detect_stt_voice_command("start transcribing"),
+            Some(SttVoiceCommand::Start)
+        );
+        assert_eq!(
+            detector.detect_stt_voice_command("please start listening"),
+            Some(SttVoiceCommand::Start)
+        );
+    }
+
+    #[test]
+    fn test_stt_voice_command_no_match() {
+        let detector = DirectDetector::new();
+        assert_eq!(
+            detector.detect_stt_voice_command("let us keep listening to the sermon"),
+            None
         );
     }
 

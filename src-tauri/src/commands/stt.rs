@@ -435,6 +435,11 @@ pub async fn start_transcription(
                             },
                         );
 
+                        // Check for voice control commands before normal detection work.
+                        if check_stt_voice_command(&event_app, &transcript) {
+                            continue;
+                        }
+
                         // Check for translation commands on partials too (cheap string matching)
                         // This makes translation switching feel instant without waiting for speech_final
                         check_translation_command(&event_app, &transcript);
@@ -469,6 +474,11 @@ pub async fn start_transcription(
                                 words: to_word_payloads(words),
                             },
                         );
+
+                        // Check for voice control commands before normal detection work.
+                        if check_stt_voice_command(&event_app, &transcript) {
+                            continue;
+                        }
 
                         // Check for translation commands (cheap, <1ms, stays inline)
                         check_translation_command(&event_app, &transcript);
@@ -1052,6 +1062,37 @@ fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> 
     }
 
     false
+}
+
+/// Check for voice commands like "stop transcribing" and "start transcribing".
+fn check_stt_voice_command(app: &AppHandle, transcript: &str) -> bool {
+    let detector_state: State<'_, Mutex<rhema_detection::DirectDetector>> = app.state();
+    let Ok(detector) = detector_state.lock() else { return false };
+    let command = detector.detect_stt_voice_command(transcript);
+    drop(detector);
+
+    match command {
+        Some(rhema_detection::direct::detector::SttVoiceCommand::Stop) => {
+            let managed: State<'_, Mutex<AppState>> = app.state();
+            let Ok(app_state) = managed.lock() else { return true };
+            if app_state.stt_active.load(Ordering::Relaxed) {
+                app_state.stt_active.store(false, Ordering::SeqCst);
+                app_state.audio_active.store(false, Ordering::SeqCst);
+                log::info!("[STT] Voice command: stop transcribing");
+                let _ = app.emit("stt_voice_control", "stop");
+                let _ = app.emit("stt_disconnected", ());
+            }
+            true
+        }
+        Some(rhema_detection::direct::detector::SttVoiceCommand::Start) => {
+            // This can only be heard while STT is already running. A true
+            // wake-from-stopped command needs a separate always-listening path.
+            log::info!("[STT] Voice command: start transcribing ignored; STT is already listening");
+            let _ = app.emit("stt_voice_control", "start_ignored");
+            true
+        }
+        None => false,
+    }
 }
 
 /// Check for voice translation commands like "read in NIV", "switch to ESV".

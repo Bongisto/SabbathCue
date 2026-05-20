@@ -94,6 +94,14 @@ export function useTranscription(options?: UseTranscriptionOptions) {
   useTauriEvent("stt_disconnected", () => {
     useTranscriptStore.getState().setConnectionStatus("disconnected")
   })
+  useTauriEvent<string>("stt_voice_control", (command) => {
+    if (command === "stop") {
+      const transcript = useTranscriptStore.getState()
+      transcript.setTranscribing(false)
+      transcript.setPartial("")
+      transcript.setConnectionStatus("disconnected")
+    }
+  })
   useTauriEvent<string>("stt_error", (msg) => {
     useTranscriptStore.getState().setConnectionStatus("error")
     toast.error("Transcription error", { description: msg })
