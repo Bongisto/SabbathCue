@@ -61,7 +61,6 @@ async function main() {
 
   console.log("  Files created:")
   console.log("  - onnx/model.onnx (FP32, sentence-transformers feature output)")
-  console.log("  - onnx/model.onnx_data (external ONNX weights)")
   console.log("  - onnx/model_quantized.onnx (INT8)")
   console.log("  - tokenizer.json")
 }

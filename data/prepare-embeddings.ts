@@ -43,7 +43,6 @@ const EMB_BIN = join(PROJECT_ROOT, "embeddings", "kjv-minilm-l6-v2.bin")
 const IDS_BIN = join(PROJECT_ROOT, "embeddings", "kjv-minilm-l6-v2-ids.bin")
 const WHISPER_MODEL = join(PROJECT_ROOT, "models", "whisper", "ggml-base.en.bin")
 const MODEL_ONNX = join(MODELS_DIR, "onnx", "model.onnx")
-const MODEL_ONNX_DATA = join(MODELS_DIR, "onnx", "model.onnx_data")
 const MODEL_INT8 = join(MODELS_DIR_INT8, "onnx", "model_quantized.onnx")
 
 const force = process.argv.includes("--force")
@@ -116,7 +115,7 @@ async function main() {
 
   // ── Phase 4: ONNX model download + quantize ────────────────────
   console.log("\n━━━ Phase 4/7: ONNX model download & quantize ━━━")
-  if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_ONNX_DATA, MODEL_INT8)) {
+  if (!shouldSkip("ONNX models", MODEL_ONNX, MODEL_INT8)) {
     const venvPython = getVenvBin(
       process.platform === "win32" ? "python" : "python3"
     )

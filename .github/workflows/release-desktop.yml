@@ -41,6 +41,23 @@ jobs:
       - name: Download Whisper model
         run: bun run download:whisper
 
+      - name: Cache MiniLM models
+        uses: actions/cache@v4
+        with:
+          path: |
+            models/minilm-l6-v2
+            models/minilm-l6-v2-int8
+          key: minilm-models-${{ hashFiles('data/export-minilm-onnx.py') }}
+
+      - name: Cache embeddings
+        uses: actions/cache@v4
+        with:
+          path: embeddings
+          key: minilm-embeddings-${{ hashFiles('data/precompute-embeddings.py') }}
+
+      - name: Prepare MiniLM semantic assets
+        run: bun run download:model
+
       - name: Build Tauri installer
         run: bun run tauri build
 

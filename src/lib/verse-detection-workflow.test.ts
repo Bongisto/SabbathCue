@@ -6,7 +6,9 @@ import { useDetectionStore } from "@/stores/detection-store"
 import { useQueueStore } from "@/stores/queue-store"
 import type { DetectionResult, QueueItem, ReadingAdvance } from "@/types"
 
-const emitToMock = vi.fn()
+const { emitToMock } = vi.hoisted(() => ({
+  emitToMock: vi.fn(),
+}))
 
 vi.mock("@tauri-apps/api/event", () => ({
   emitTo: emitToMock,
