@@ -431,6 +431,14 @@ pub async fn start_transcription(
                         // Check for translation commands (cheap, <1ms, stays inline)
                         check_translation_command(&event_app, &transcript);
 
+                        log::info!(
+                            "[PIPELINE] final_transcript provider={} conf={:.2} chars={} event_ms={:?}",
+                            provider_log_name,
+                            confidence,
+                            transcript.chars().count(),
+                            t0.elapsed()
+                        );
+
                         // Fire-and-forget: detection runs in background thread pool.
                         // Event consumer proceeds immediately to next transcript.
                         if let Ok(()) = detect_tx.try_send(transcript.clone()) {

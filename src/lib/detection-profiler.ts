@@ -15,8 +15,6 @@ export function profileDetectionEvent<T>(
   itemCount: number,
   run: () => T,
 ): T {
-  if (!import.meta.env.DEV) return run()
-
   const startedAt = performance.now()
   try {
     return run()
@@ -41,7 +39,7 @@ export function profileDetectionEvent<T>(
 
     if (now - current.lastAt >= LOG_INTERVAL_MS) {
       current.lastAt = now
-      console.debug("[detection-profiler]", {
+      console.info("[detection-profiler]", {
         eventName: current.eventName,
         events: current.count,
         avgItems: Number((current.totalItems / current.count).toFixed(2)),

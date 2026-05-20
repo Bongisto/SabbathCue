@@ -6,6 +6,12 @@ import { useDetectionStore } from "@/stores/detection-store"
 import { useQueueStore } from "@/stores/queue-store"
 import type { DetectionResult, QueueItem, ReadingAdvance } from "@/types"
 
+const emitToMock = vi.fn()
+
+vi.mock("@tauri-apps/api/event", () => ({
+  emitTo: emitToMock,
+}))
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }))
@@ -77,6 +83,8 @@ describe("verse detection workflow", () => {
     vi.stubGlobal("crypto", {
       randomUUID: vi.fn(() => "detection-id"),
     })
+    emitToMock.mockReset()
+    emitToMock.mockResolvedValue(undefined)
 
     useBibleStore.setState({
       translations: [],
@@ -257,6 +265,11 @@ describe("verse detection workflow", () => {
       verse: 17,
     })
     expect(useBroadcastStore.getState().liveVerse?.reference).toBe("John 3:17 (KJV)")
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({ verse: expect.objectContaining({ reference: "John 3:17 (KJV)" }) }),
+    )
   })
 
   it("does not auto-update live output for reading mode when the toggle is off", () => {

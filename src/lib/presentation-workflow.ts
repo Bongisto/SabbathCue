@@ -41,6 +41,7 @@ export function commitVerseToLive(verse: Verse, options?: { makeLive?: boolean }
   const renderData = toVerseRenderData(verse, activeTranslationLabel())
   const broadcast = useBroadcastStore.getState()
 
+  console.info("[pipeline] commit_live", { reference: renderData.reference })
   useBroadcastStore.setState({ liveVerse: renderData })
 
   if (options?.makeLive ?? true) {
@@ -71,6 +72,7 @@ export function previewVerseAndMaybeAutoLive(
   },
 ) {
   selectPreviewVerse(verse, { navigate: options?.navigate })
+  console.info("[pipeline] preview", { reference: `${verse.book_name} ${verse.chapter}:${verse.verse}` })
 
   const broadcast = useBroadcastStore.getState()
   if (
