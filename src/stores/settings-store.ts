@@ -49,7 +49,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 }))
 
 const PERSISTED_KEYS = [
-  "hasDeepgramApiKey",
   "audioDeviceId",
   "gain",
   "autoMode",

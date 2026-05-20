@@ -212,6 +212,13 @@ function SpeechSection() {
   const [saved, setSaved] = useState(false)
   const [keyError, setKeyError] = useState<string | null>(null)
   const { status: assetStatus, loading: assetsLoading, refresh: refreshAssets } = useAssets()
+  const keyActionLabel = keyValue.trim()
+    ? hasDeepgramApiKey
+      ? "Update"
+      : "Save"
+    : hasDeepgramApiKey
+      ? "Saved"
+      : "Save"
 
   const handleSaveKey = async () => {
     try {
@@ -220,6 +227,7 @@ function SpeechSection() {
       const hasKey = await invoke<boolean>("has_deepgram_api_key")
       setHasDeepgramApiKey(hasKey)
       if (hasKey) {
+        setKeyValue("")
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
       } else {
@@ -378,7 +386,7 @@ function SpeechSection() {
                   Saved
                 </>
               ) : (
-                "Save"
+                keyActionLabel
               )}
             </Button>
             {hasDeepgramApiKey && (

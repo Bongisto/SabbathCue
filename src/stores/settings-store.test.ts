@@ -65,6 +65,19 @@ describe("settings store", () => {
     expect(after.autoMode).toBe(false)
   })
 
+  it("does not trust persisted Deepgram key status when keychain status is unavailable", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "hasDeepgramApiKey") return true
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    await hydrateSettings()
+
+    expect(useSettingsStore.getState().hasDeepgramApiKey).toBe(false)
+    expect(mockGet).not.toHaveBeenCalledWith("hasDeepgramApiKey")
+  })
+
   it("hydrate maps removed accurate whisper profile to balanced", async () => {
     mockGet.mockImplementation(async (key: string) => {
       if (key === "whisperProfile") return "accurate"
