@@ -217,9 +217,14 @@ function SpeechSection() {
     try {
       setKeyError(null)
       await invoke("set_deepgram_api_key", { apiKey: keyValue })
-      setHasDeepgramApiKey(true)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      const hasKey = await invoke<boolean>("has_deepgram_api_key")
+      setHasDeepgramApiKey(hasKey)
+      if (hasKey) {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      } else {
+        setKeyError("Deepgram API key was not saved")
+      }
     } catch (e) {
       setKeyError(String(e))
     }

@@ -74,7 +74,14 @@ pub fn set_deepgram_api_key(api_key: String) -> Result<(), String> {
     }
     entry("deepgram_api_key")
         .set_password(&normalized)
-        .map_err(|e| format!("Could not store Deepgram API key in OS keychain: {e}"))
+        .map_err(|e| format!("Could not store Deepgram API key in OS keychain: {e}"))?;
+    match entry("deepgram_api_key").get_password() {
+        Ok(pw) if !pw.trim().is_empty() => Ok(()),
+        Ok(_) | Err(keyring::Error::NoEntry) => {
+            Err("Deepgram API key was not saved in OS keychain".into())
+        }
+        Err(e) => Err(format!("Could not verify Deepgram API key in OS keychain: {e}")),
+    }
 }
 
 #[command]
