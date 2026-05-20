@@ -46,7 +46,9 @@ import {
 } from "lucide-react"
 import { useBibleStore } from "@/stores/bible-store"
 import { useSettingsStore } from "@/stores/settings-store"
+import { useTranscriptStore } from "@/stores/transcript-store"
 import { useAssets } from "@/hooks/use-assets"
+import { transcriptionActions } from "@/hooks/use-transcription"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
@@ -212,6 +214,7 @@ function SpeechSection() {
   const [editingSavedKey, setEditingSavedKey] = useState(false)
   const [saved, setSaved] = useState(false)
   const [keyError, setKeyError] = useState<string | null>(null)
+  const [switchingStt, setSwitchingStt] = useState(false)
   const { status: assetStatus, loading: assetsLoading, refresh: refreshAssets } = useAssets()
   const savedKeyDisplay = "Saved in secure keychain"
   const displayedKeyValue =
@@ -224,6 +227,31 @@ function SpeechSection() {
       return
     }
     await handleSaveKey()
+  }
+
+  const restartActiveTranscription = async () => {
+    if (!useTranscriptStore.getState().isTranscribing) return
+
+    setSwitchingStt(true)
+    try {
+      await transcriptionActions.stop()
+      await new Promise((resolve) => setTimeout(resolve, 350))
+      await transcriptionActions.start()
+    } finally {
+      setSwitchingStt(false)
+    }
+  }
+
+  const handleProviderChange = (provider: "deepgram" | "whisper") => {
+    if (provider === sttProvider || switchingStt) return
+    setSttProvider(provider)
+    void restartActiveTranscription()
+  }
+
+  const handleWhisperProfileChange = (profile: "fast" | "balanced") => {
+    if (profile === whisperProfile || switchingStt) return
+    setWhisperProfile(profile)
+    void restartActiveTranscription()
   }
 
   const handleSaveKey = async () => {
@@ -267,7 +295,8 @@ function SpeechSection() {
 
         <RadioGroup
           value={sttProvider}
-          onValueChange={(v) => setSttProvider(v as "deepgram" | "whisper")}
+          onValueChange={(v) => handleProviderChange(v as "deepgram" | "whisper")}
+          disabled={switchingStt}
           className="gap-3"
         >
           {/* Deepgram (cloud) */}
@@ -337,7 +366,8 @@ function SpeechSection() {
             </label>
             <Select
               value={whisperProfile}
-              onValueChange={(v) => setWhisperProfile(v as "fast" | "balanced")}
+              onValueChange={(v) => handleWhisperProfileChange(v as "fast" | "balanced")}
+              disabled={switchingStt}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />

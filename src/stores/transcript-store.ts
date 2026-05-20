@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import type { TranscriptSegment } from "@/types"
 
-const MAX_TRANSCRIPT_SEGMENTS = 300
+const MAX_TRANSCRIPT_SEGMENTS = 100
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error"
 

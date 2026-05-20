@@ -883,6 +883,16 @@ mod tests {
     }
 
     #[test]
+    fn test_book_chapter_verse_with_long_tail() {
+        let bm = make_book_match("Exodus", 2, 6);
+        let text = "Exodus 20 verse 4 keeping the sabbath holy";
+        let result = parse_reference(text, &bm).unwrap();
+        assert_eq!(result.chapter, 20);
+        assert_eq!(result.verse_start, 4);
+        assert_eq!(result.verse_end, None);
+    }
+
+    #[test]
     fn test_book_only_is_chapter_only() {
         // Pattern: Just book name → chapter-only (held for refinement)
         let bm = make_book_match("Genesis", 1, 7);
