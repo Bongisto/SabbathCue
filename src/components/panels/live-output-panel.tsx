@@ -71,33 +71,35 @@ export function LiveOutputPanel() {
         isFullscreen && "!rounded-none !border-0 !h-screen !w-screen",
       )}
     >
-      <PanelHeader title="Live output" icon={<RadioIcon className="size-3" />}>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="xs"
-            className="h-6 gap-1 px-2"
-            onClick={toggleFullscreen}
-          >
-            {isFullscreen ? (
-              <Minimize2Icon className="size-3.5" />
-            ) : (
-              <Maximize2Icon className="size-3.5" />
-            )}
-          </Button>
-          <Badge
-            variant={isLive ? "default" : "outline"}
-            className={cn(
-              "h-5 text-[0.5625rem] uppercase",
-              isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
-            )}
-          >
-            {isLive ? "On air" : "Hidden"}
-          </Badge>
-        </div>
-      </PanelHeader>
+      {!isFullscreen && (
+        <PanelHeader title="Live output" icon={<RadioIcon className="size-3" />}>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-6 gap-1 px-2"
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? (
+                <Minimize2Icon className="size-3.5" />
+              ) : (
+                <Maximize2Icon className="size-3.5" />
+              )}
+            </Button>
+            <Badge
+              variant={isLive ? "default" : "outline"}
+              className={cn(
+                "h-5 text-[0.5625rem] uppercase",
+                isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
+              )}
+            >
+              {isLive ? "On air" : "Hidden"}
+            </Badge>
+          </div>
+        </PanelHeader>
+      )}
 
-      <div className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+      <div className={cn("flex min-h-10 items-center justify-between gap-2 border-b border-border px-3 py-1.5", isFullscreen && "hidden")}>
         <Button
           size="sm"
           disabled={!canCommitPreview}
@@ -132,7 +134,7 @@ export function LiveOutputPanel() {
         </label>
       </div>
 
-      <div className="flex min-h-9 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+      <div className={cn("flex min-h-9 items-center justify-between gap-2 border-b border-border px-3 py-1.5", isFullscreen && "hidden")}>
         <span className="truncate text-xs text-muted-foreground">
           Auto-live reading mode
         </span>
@@ -148,13 +150,18 @@ export function LiveOutputPanel() {
       <div
         className={cn(
           "flex min-h-0 flex-1 items-center justify-center p-3 transition-opacity",
+          isFullscreen && "bg-black p-0",
           !isLive && "opacity-45",
         )}
       >
-        <CanvasVerse theme={activeTheme} verse={visibleVerse} />
+        <CanvasVerse
+          theme={activeTheme}
+          verse={visibleVerse}
+          className={isFullscreen ? "[&_canvas]:rounded-none" : undefined}
+        />
       </div>
 
-      <div className="truncate border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
+      <div className={cn("truncate border-t border-border px-3 py-1.5 text-xs text-muted-foreground", isFullscreen && "hidden")}>
         {liveVerse
           ? liveVerse.reference
           : "Nothing has been sent to the live output yet."}
