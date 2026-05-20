@@ -7,3 +7,4 @@ pub mod remote;
 pub mod secrets;
 pub mod stt;
 pub mod theme_files;
+pub mod transcript_router;

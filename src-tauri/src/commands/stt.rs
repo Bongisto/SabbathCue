@@ -43,6 +43,9 @@ use rhema_audio::{AudioConfig, AudioFrame};
 use rhema_stt::{DeepgramClient, SttConfig, SttProvider, TranscriptEvent, Word};
 
 use crate::commands::secrets;
+use crate::commands::transcript_router::{
+    TranscriptEventKind, TranscriptRouteInput, TranscriptRouter,
+};
 
 fn to_word_payloads(words: Vec<Word>) -> Vec<WordPayload> {
     words
@@ -415,6 +418,8 @@ pub async fn start_transcription(
     let semantic_dropped_evt = semantic_dropped.clone();
 
     tauri::async_runtime::spawn(async move {
+        let mut transcript_router = TranscriptRouter::default();
+
         while let Some(event) = event_rx.recv().await {
             if !evt_active.load(Ordering::SeqCst) {
                 break;
@@ -425,15 +430,28 @@ pub async fn start_transcription(
                     if !transcript.is_empty() {
                         let seq = transcript_seq.fetch_add(1, Ordering::Relaxed) + 1;
                         let t0 = std::time::Instant::now();
-                        let _ = event_app.emit(
-                            EVENT_TRANSCRIPT_PARTIAL,
-                            TranscriptPayload {
-                                text: transcript.clone(),
-                                is_final: false,
-                                confidence: 0.0,
-                                words: to_word_payloads(words),
-                            },
-                        );
+                        let route = transcript_router.route(TranscriptRouteInput {
+                            provider: &provider_log_name,
+                            kind: TranscriptEventKind::Partial,
+                            transcript: &transcript,
+                            confidence: None,
+                        });
+
+                        if let Some(reason) = &route.suppress_reason {
+                            log::debug!("[ROUTER] Suppressed partial ({reason})");
+                        }
+
+                        if route.emit_transcript {
+                            let _ = event_app.emit(
+                                EVENT_TRANSCRIPT_PARTIAL,
+                                TranscriptPayload {
+                                    text: transcript.clone(),
+                                    is_final: false,
+                                    confidence: 0.0,
+                                    words: to_word_payloads(words),
+                                },
+                            );
+                        }
 
                         // Check for voice control commands before normal detection work.
                         if check_stt_voice_command(&event_app, &transcript) {
@@ -443,13 +461,15 @@ pub async fn start_transcription(
                         // Check for translation commands on partials too (cheap string matching)
                         // This makes translation switching feel instant without waiting for speech_final
                         check_translation_command(&event_app, &transcript);
-                        match partial_preview_tx.try_send((seq, transcript.clone())) {
-                            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                                if transcript_logging_enabled() {
-                                    log::debug!("[QUEUE] partial_preview_tx dropped stale partial");
+                        if let Some(preview_text) = route.preview_candidate {
+                            match partial_preview_tx.try_send((seq, preview_text)) {
+                                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                    if transcript_logging_enabled() {
+                                        log::debug!("[QUEUE] partial_preview_tx dropped stale partial");
+                                    }
                                 }
+                                Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
                             }
-                            Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
                         }
                         log::debug!("[EVT] Partial processed in {:?}", t0.elapsed());
                     }
@@ -463,17 +483,30 @@ pub async fn start_transcription(
                     if !transcript.is_empty() {
                         let seq = transcript_seq.fetch_add(1, Ordering::Relaxed) + 1;
                         let t0 = std::time::Instant::now();
+                        let route = transcript_router.route(TranscriptRouteInput {
+                            provider: &provider_log_name,
+                            kind: TranscriptEventKind::Final,
+                            transcript: &transcript,
+                            confidence: Some(confidence),
+                        });
+
+                        if let Some(reason) = &route.suppress_reason {
+                            log::debug!("[ROUTER] Suppressed final ({reason})");
+                        }
+
                         // Emit as permanent transcript segment IMMEDIATELY
                         // (never blocked by detection work)
-                        let _ = event_app.emit(
-                            EVENT_TRANSCRIPT_FINAL,
-                            TranscriptPayload {
-                                text: transcript.clone(),
-                                is_final: true,
-                                confidence,
-                                words: to_word_payloads(words),
-                            },
-                        );
+                        if route.emit_transcript {
+                            let _ = event_app.emit(
+                                EVENT_TRANSCRIPT_FINAL,
+                                TranscriptPayload {
+                                    text: transcript.clone(),
+                                    is_final: true,
+                                    confidence,
+                                    words: to_word_payloads(words),
+                                },
+                            );
+                        }
 
                         // Check for voice control commands before normal detection work.
                         if check_stt_voice_command(&event_app, &transcript) {
@@ -482,13 +515,15 @@ pub async fn start_transcription(
 
                         // Check for translation commands (cheap, <1ms, stays inline)
                         check_translation_command(&event_app, &transcript);
-                        match partial_preview_tx.try_send((seq, transcript.clone())) {
-                            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                                if transcript_logging_enabled() {
-                                    log::debug!("[QUEUE] fast_preview_tx dropped stale transcript");
+                        if let Some(preview_text) = route.preview_candidate {
+                            match partial_preview_tx.try_send((seq, preview_text)) {
+                                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                    if transcript_logging_enabled() {
+                                        log::debug!("[QUEUE] fast_preview_tx dropped stale transcript");
+                                    }
                                 }
+                                Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
                             }
-                            Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
                         }
 
                         log::info!(
@@ -501,43 +536,45 @@ pub async fn start_transcription(
 
                         // Fire-and-forget: detection runs in background thread pool.
                         // Event consumer proceeds immediately to next transcript.
-                        if let Ok(()) = detect_tx.try_send(transcript.clone()) {
-                            let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                            if n % 25 == 0 {
-                                let depth = detect_tx.max_capacity() - detect_tx.capacity();
-                                let dropped = detect_dropped_evt.load(Ordering::Relaxed);
-                                log::info!(
-                                    "[QUEUE] detect_tx sent={n} dropped={dropped} depth={depth}/{}",
-                                    detect_tx.max_capacity()
+                        if let Some(detection_text) = route.authoritative_detection {
+                            if let Ok(()) = detect_tx.try_send(detection_text.clone()) {
+                                let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                if n % 25 == 0 {
+                                    let depth = detect_tx.max_capacity() - detect_tx.capacity();
+                                    let dropped = detect_dropped_evt.load(Ordering::Relaxed);
+                                    log::info!(
+                                        "[QUEUE] detect_tx sent={n} dropped={dropped} depth={depth}/{}",
+                                        detect_tx.max_capacity()
+                                    );
+                                }
+                            } else {
+                                let d = detect_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                let sent = detect_sent_evt.load(Ordering::Relaxed);
+                                log::warn!(
+                                    "[QUEUE] detect_tx DROPPED (consumer behind) sent={sent} dropped={d}"
                                 );
                             }
-                        } else {
-                            let d = detect_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                            let sent = detect_sent_evt.load(Ordering::Relaxed);
-                            log::warn!(
-                                "[QUEUE] detect_tx DROPPED (consumer behind) sent={sent} dropped={d}"
-                            );
-                        }
 
-                        // Send every is_final fragment to FTS5 immediately.
-                        // No sentence buffer — FTS5 is fast enough (~20-50ms)
-                        // to run on every fragment without waiting for pauses.
-                        if let Ok(()) = semantic_tx.try_send(transcript.clone()) {
-                            let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                            if n % 25 == 0 {
-                                let depth = semantic_tx.max_capacity() - semantic_tx.capacity();
-                                let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
-                                log::info!(
-                                    "[QUEUE] semantic_tx sent={n} dropped={dropped} depth={depth}/{}",
-                                    semantic_tx.max_capacity()
+                            // Send accepted is_final fragments to FTS5 immediately.
+                            // No sentence buffer — FTS5 is fast enough (~20-50ms)
+                            // to run on every fragment without waiting for pauses.
+                            if let Ok(()) = semantic_tx.try_send(detection_text) {
+                                let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                if n % 25 == 0 {
+                                    let depth = semantic_tx.max_capacity() - semantic_tx.capacity();
+                                    let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
+                                    log::info!(
+                                        "[QUEUE] semantic_tx sent={n} dropped={dropped} depth={depth}/{}",
+                                        semantic_tx.max_capacity()
+                                    );
+                                }
+                            } else {
+                                let d = semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                let sent = semantic_sent_evt.load(Ordering::Relaxed);
+                                log::warn!(
+                                    "[QUEUE] semantic_tx DROPPED (consumer behind) sent={sent} dropped={d}"
                                 );
                             }
-                        } else {
-                            let d = semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                            let sent = semantic_sent_evt.load(Ordering::Relaxed);
-                            log::warn!(
-                                "[QUEUE] semantic_tx DROPPED (consumer behind) sent={sent} dropped={d}"
-                            );
                         }
 
                         if transcript_logging_enabled() {
