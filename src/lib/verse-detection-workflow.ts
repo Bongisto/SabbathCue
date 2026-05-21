@@ -1,6 +1,7 @@
 import {
   previewVerseAndMaybeAutoLive,
   selectPreviewVerse,
+  createScriptureQueueItem,
 } from "@/lib/presentation-workflow"
 import { useBibleStore } from "@/stores/bible-store"
 import { useDetectionStore } from "@/stores/detection-store"
@@ -83,24 +84,26 @@ export function handleVerseDetections(detections: DetectionResult[]) {
 
     if (d.auto_queued) {
       const queue = useQueueStore.getState()
-      queue.addOrFlashDetectionItem({
-        id: crypto.randomUUID(),
-        verse: {
-          id: 0,
-          translation_id: useBibleStore.getState().activeTranslationId,
-          book_number: d.book_number,
-          book_name: d.book_name,
-          book_abbreviation: "",
-          chapter: d.chapter,
-          verse: d.verse,
-          text: d.verse_text,
-        },
-        reference: d.verse_ref,
-        confidence: d.confidence,
-        source: d.source === "direct" ? "ai-direct" : "ai-semantic",
-        added_at: Date.now(),
-        is_chapter_only: d.is_chapter_only,
-      })
+      queue.addOrFlashDetectionItem(
+        createScriptureQueueItem(
+          {
+            id: 0,
+            translation_id: useBibleStore.getState().activeTranslationId,
+            book_number: d.book_number,
+            book_name: d.book_name,
+            book_abbreviation: "",
+            chapter: d.chapter,
+            verse: d.verse,
+            text: d.verse_text,
+          },
+          {
+            reference: d.verse_ref,
+            confidence: d.confidence,
+            source: d.source === "direct" ? "ai-direct" : "ai-semantic",
+            is_chapter_only: d.is_chapter_only,
+          },
+        ),
+      )
     }
   }
 }

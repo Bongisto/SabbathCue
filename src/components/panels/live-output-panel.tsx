@@ -1,25 +1,24 @@
 import { useMemo, useRef, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CanvasVerse } from "@/components/ui/canvas-verse"
+import { CanvasPresentation } from "@/components/ui/canvas-verse"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { Switch } from "@/components/ui/switch"
 import { isPanelFullscreen, togglePanelFullscreen } from "@/components/panels/live-output-panel-fullscreen"
 import { commitPreviewToLive } from "@/lib/presentation-workflow"
 import { cn } from "@/lib/utils"
-import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { EyeIcon, EyeOffIcon, RadioIcon, SendIcon, Maximize2Icon, Minimize2Icon } from "lucide-react"
 import { toast } from "sonner"
 
 export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
-  const liveVerse = useBroadcastStore((s) => s.liveVerse)
+  const liveItem = useBroadcastStore((s) => s.liveItem)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
-  const selectedVerse = useBibleStore((s) => s.selectedVerse)
+  const previewItem = useBroadcastStore((s) => s.previewItem)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -28,11 +27,11 @@ export function LiveOutputPanel() {
     [themes, activeThemeId],
   )
 
-  const visibleVerse = useMemo(
-    () => (isLive ? liveVerse : null),
-    [isLive, liveVerse],
+  const visibleItem = useMemo(
+    () => (isLive ? liveItem : null),
+    [isLive, liveItem],
   )
-  const canCommitPreview = Boolean(selectedVerse)
+  const canCommitPreview = Boolean(previewItem)
 
   const toggleFullscreen = async () => {
     const panel = panelRef.current
@@ -155,10 +154,10 @@ export function LiveOutputPanel() {
           !isLive && "opacity-45",
         )}
       >
-        {visibleVerse ? (
-          <CanvasVerse
+        {visibleItem ? (
+          <CanvasPresentation
             theme={activeTheme}
-            verse={visibleVerse}
+            item={visibleItem}
             className={isFullscreen ? "[&_canvas]:rounded-none" : undefined}
           />
         ) : (
@@ -171,8 +170,8 @@ export function LiveOutputPanel() {
       </div>
 
       <div className={cn("truncate border-t border-border px-3 py-1.5 text-xs text-muted-foreground", isFullscreen && "hidden")}>
-        {liveVerse
-          ? liveVerse.reference
+        {liveItem
+          ? liveItem.reference
           : "Nothing has been sent to the live output yet."}
       </div>
     </div>

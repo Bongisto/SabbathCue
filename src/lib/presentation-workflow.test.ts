@@ -65,12 +65,12 @@ describe("presentation workflow", () => {
 
     expect(committed).toBe(true)
     expect(useBroadcastStore.getState().isLive).toBe(true)
-    expect(useBroadcastStore.getState().liveVerse).toEqual(previewPayload)
+    expect(useBroadcastStore.getState().liveItem).toEqual(previewPayload)
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:verse-update",
       expect.objectContaining({
-        verse: previewPayload,
+        item: previewPayload,
       }),
     )
   })
@@ -107,13 +107,13 @@ describe("presentation workflow", () => {
     useBroadcastStore.setState({
       isLive: true,
       readingModeAutoLive: true,
-      liveVerse: null,
+      liveItem: null,
     })
 
     const previewSelections: Array<Verse | null> = []
     const unsubscribe = useBibleStore.subscribe((state) => {
       previewSelections.push(state.selectedVerse)
-      expect(useBroadcastStore.getState().liveVerse).toEqual(
+      expect(useBroadcastStore.getState().liveItem).toEqual(
         toVerseRenderData(sampleVerse, "KJV")
       )
     })

@@ -28,7 +28,8 @@ export function OperatorStatusStrip() {
   const audioLevel = useAudioStore((s) => s.level)
   const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
   const isLive = useBroadcastStore((s) => s.isLive)
-  const liveVerse = useBroadcastStore((s) => s.liveVerse)
+  const liveItem = useBroadcastStore((s) => s.liveItem)
+  const previewItem = useBroadcastStore((s) => s.previewItem)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
   const queueLength = useQueueStore((s) => s.items.length)
   const themes = useBroadcastStore((s) => s.themes)
@@ -45,11 +46,12 @@ export function OperatorStatusStrip() {
   }, [])
 
   const clearLiveOutput = () => {
-    useBroadcastStore.getState().setLiveVerse(null)
+    useBroadcastStore.getState().setLiveItem(null)
     useBroadcastStore.getState().setLive(false)
   }
 
   const clearPreview = () => {
+    useBroadcastStore.getState().setPreviewItem?.(null)
     useBibleStore.getState().selectVerse(null)
   }
 
@@ -87,7 +89,7 @@ export function OperatorStatusStrip() {
           {isLive ? "On air" : "Hidden"}
         </Badge>
         <span className="max-w-[280px] truncate">
-          {liveVerse?.reference ?? "No live verse"}
+          {liveItem?.reference ?? "No live verse"}
         </span>
       </div>
 
@@ -99,11 +101,11 @@ export function OperatorStatusStrip() {
       <div className="flex items-center gap-1">
         <button
           onClick={clearLiveOutput}
-          disabled={!liveVerse}
+          disabled={!liveItem}
           title="Clear Live Output"
           className={cn(
             "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            liveVerse
+            liveItem
               ? "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
               : "cursor-not-allowed text-muted-foreground/30"
           )}
@@ -113,11 +115,11 @@ export function OperatorStatusStrip() {
         </button>
         <button
           onClick={clearPreview}
-          disabled={!selectedVerse}
+          disabled={!previewItem && !selectedVerse}
           title="Clear Preview"
           className={cn(
             "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            selectedVerse
+            previewItem || selectedVerse
               ? "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
               : "cursor-not-allowed text-muted-foreground/30"
           )}

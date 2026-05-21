@@ -5,8 +5,13 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { useSettingsStore } from "@/stores/settings-store"
-import { presentVerse } from "@/lib/presentation-workflow"
-import type { Verse } from "@/types"
+import { presentItem, presentVerse } from "@/lib/presentation-workflow"
+import {
+  getReferenceFromItem,
+  getScriptureVerse,
+  type QueueItem,
+  type Verse,
+} from "@/types"
 
 /**
  * Listens for remote control events from the Rust backend (OSC / HTTP API)
@@ -137,12 +142,12 @@ export function useRemoteControl() {
  * Returns null if the live verse doesn't match any queue item.
  */
 function findCurrentVerseIndex(): number | null {
-  const { liveVerse } = useBroadcastStore.getState()
-  if (!liveVerse) return null
+  const { liveItem } = useBroadcastStore.getState()
+  if (!liveItem) return null
 
   const { items } = useQueueStore.getState()
   const index = items.findIndex(
-    (item) => item.reference === liveVerse.reference
+    (item) => getReferenceFromItem(item) === liveItem.reference
   )
   return index >= 0 ? index : null
 }
@@ -157,7 +162,11 @@ async function presentQueueItem(index: number) {
     const item = items[index]
     if (!item) return
 
-    const { verse } = item
+    const verse = getScriptureVerse(item.presentation)
+    if (!verse) {
+      presentItem(item.presentation)
+      return
+    }
 
     // Fetch the full verse from the backend to ensure we have complete data
     // (AI-detected queue items may have partial verse objects)
@@ -191,7 +200,7 @@ function syncStatusSnapshot() {
   invoke("update_remote_status", {
     onAir: broadcast.isLive,
     activeTheme: activeTheme?.name ?? null,
-    liveVerse: broadcast.liveVerse?.reference ?? null,
+    liveVerse: broadcast.liveItem?.reference ?? null,
     queueLength: queue.items.length,
     confidenceThreshold: settings.confidenceThreshold,
   }).catch(() => {

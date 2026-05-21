@@ -5,16 +5,19 @@ import type { QueueItem } from "@/types"
 function makeItem(id: string, verse: number): QueueItem {
   return {
     id,
-    reference: `John 3:${verse}`,
-    verse: {
-      id: verse,
-      translation_id: 1,
-      book_number: 43,
-      book_name: "John",
-      book_abbreviation: "John",
-      chapter: 3,
-      verse,
-      text: `Verse ${verse}`,
+    presentation: {
+      kind: "scripture" as const,
+      verse: {
+        id: verse,
+        translation_id: 1,
+        book_number: 43,
+        book_name: "John",
+        book_abbreviation: "John",
+        chapter: 3,
+        verse,
+        text: `Verse ${verse}`,
+      },
+      reference: `John 3:${verse}`,
     },
     confidence: 0.95,
     source: "manual",

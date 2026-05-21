@@ -14,10 +14,10 @@ import {
 } from "lucide-react"
 import { useQueueStore } from "@/stores/queue-store"
 import {
-  presentVerse,
-  selectPreviewVerse,
+  presentItem,
+  selectPreviewItem,
 } from "@/lib/presentation-workflow"
-import type { QueueItem } from "@/types"
+import { getReferenceFromItem, type QueueItem } from "@/types"
 
 function QueueItemRow({
   item,
@@ -44,12 +44,12 @@ function QueueItemRow({
 }) {
   const handlePreview = () => {
     useQueueStore.getState().setActive(index)
-    selectPreviewVerse(item.verse)
+    selectPreviewItem(item.presentation)
   }
 
   const handlePresent = () => {
     useQueueStore.getState().setActive(index)
-    presentVerse(item.verse)
+    presentItem(item.presentation)
   }
 
   const handleRemove = () => {
@@ -110,7 +110,7 @@ function QueueItemRow({
       />
 
       <span className="flex-1 truncate text-sm font-medium text-foreground">
-        {item.reference}
+        {getReferenceFromItem(item)}
       </span>
 
       {sourceBadge}

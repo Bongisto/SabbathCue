@@ -1,27 +1,33 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo } from "react"
 import { getBroadcastRenderKey } from "@/lib/broadcast-render-key"
-import { renderVerse } from "@/lib/verse-renderer"
-import type { BroadcastTheme, VerseRenderData } from "@/types"
+import { renderPresentation } from "@/lib/verse-renderer"
+import type { BroadcastTheme, PresentationRenderData } from "@/types"
 import { cn } from "@/lib/utils"
 
-interface CanvasVerseProps {
+interface CanvasPresentationProps {
   theme: BroadcastTheme
-  verse: VerseRenderData | null
+  item: PresentationRenderData | null
   className?: string
 }
 
-export const CanvasVerse = memo(function CanvasVerse({
+interface CanvasVerseProps {
+  theme: BroadcastTheme
+  verse: PresentationRenderData | null
+  className?: string
+}
+
+export const CanvasPresentation = memo(function CanvasPresentation({
   theme,
-  verse,
+  item,
   className,
-}: CanvasVerseProps) {
+}: CanvasPresentationProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const renderKey = useMemo(
-    () => getBroadcastRenderKey(theme, verse),
-    [theme, verse],
+    () => getBroadcastRenderKey(theme, item),
+    [theme, item],
   )
   const lastDrawKeyRef = useRef<string | null>(null)
 
@@ -71,11 +77,11 @@ export const CanvasVerse = memo(function CanvasVerse({
 
     ctx.scale(dpr, dpr)
     const scale = displayW / theme.resolution.width
-    renderVerse(ctx, theme, verse, {
+    renderPresentation(ctx, theme, item, {
       scale,
       imageCache: imageCacheRef.current,
     })
-  }, [theme, verse, containerSize, renderKey])
+  }, [theme, item, containerSize, renderKey])
 
   // Preload background image so the renderer can find it in the cache.
   useEffect(() => {
@@ -108,4 +114,12 @@ export const CanvasVerse = memo(function CanvasVerse({
       <canvas ref={canvasRef} className="max-h-full max-w-full rounded-md" />
     </div>
   )
+})
+
+export const CanvasVerse = memo(function CanvasVerse({
+  theme,
+  verse,
+  className,
+}: CanvasVerseProps) {
+  return <CanvasPresentation theme={theme} item={verse} className={className} />
 })

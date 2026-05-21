@@ -1,20 +1,22 @@
 import { useEffect, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CanvasVerse } from "@/components/ui/canvas-verse"
+import { CanvasPresentation } from "@/components/ui/canvas-verse"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { bibleActions } from "@/hooks/use-bible"
-import { toVerseRenderData } from "@/hooks/use-broadcast"
-import { commitPreviewToLive } from "@/lib/presentation-workflow"
+import {
+  commitPreviewToLive,
+  selectPreviewVerse,
+} from "@/lib/presentation-workflow"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
 
 export function PreviewPanel() {
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
-  const translations = useBibleStore((s) => s.translations)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
+  const previewItem = useBroadcastStore((s) => s.previewItem)
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const isLive = useBroadcastStore((s) => s.isLive)
@@ -26,7 +28,7 @@ export function PreviewPanel() {
       bibleActions
         .fetchVerse(verse.book_number, verse.chapter, verse.verse)
         .then((v) => {
-          if (v) bibleActions.selectVerse(v)
+          if (v) selectPreviewVerse(v)
         })
         .catch(() => {})
     }
@@ -37,19 +39,11 @@ export function PreviewPanel() {
     [themes, activeThemeId],
   )
 
-  const translation = useMemo(
-    () => translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV",
-    [translations, activeTranslationId],
-  )
-
-  const verseData = useMemo(
-    () => (selectedVerse ? toVerseRenderData(selectedVerse, translation) : null),
-    [selectedVerse, translation],
-  )
   const clearPreviewBlocked = isLive && readingModeAutoLive
 
   const clearPreview = () => {
     if (clearPreviewBlocked) return
+    useBroadcastStore.getState().setPreviewItem(null)
     useBibleStore.getState().selectVerse(null)
   }
 
@@ -67,7 +61,7 @@ export function PreviewPanel() {
       <div className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground">
-            {verseData?.reference ?? "No verse selected"}
+            {previewItem?.reference ?? "No item selected"}
           </p>
           <p className="text-xs text-muted-foreground">
             Preview only. Audience output changes when sent live.
@@ -78,7 +72,7 @@ export function PreviewPanel() {
           <Button
             size="sm"
             variant="outline"
-            disabled={!verseData || clearPreviewBlocked}
+            disabled={!previewItem || clearPreviewBlocked}
             className="gap-1.5"
             onClick={clearPreview}
             title={
@@ -92,7 +86,7 @@ export function PreviewPanel() {
           </Button>
           <Button
             size="sm"
-            disabled={!verseData}
+            disabled={!previewItem}
             className="gap-1.5"
             onClick={() => commitPreviewToLive()}
           >
@@ -103,8 +97,8 @@ export function PreviewPanel() {
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center p-3">
-        {verseData ? (
-          <CanvasVerse theme={activeTheme} verse={verseData} />
+        {previewItem ? (
+          <CanvasPresentation theme={activeTheme} item={previewItem} />
         ) : (
           <PanelEmptyState
             icon={<MonitorIcon className="size-8" />}

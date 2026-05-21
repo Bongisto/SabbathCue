@@ -2,7 +2,18 @@ import { bibleActions } from "@/hooks/use-bible"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
-import type { DetectionResult, Verse } from "@/types"
+import type {
+  DetectionResult,
+  Verse,
+  QueueItem,
+  PresentationItem,
+  PresentationRenderData,
+  ScripturePresentationItemData,
+} from "@/types"
+import {
+  getPresentationRenderData,
+  getScriptureVerse,
+} from "@/types"
 
 function activeTranslationLabel(): string {
   const bible = useBibleStore.getState()
@@ -25,7 +36,37 @@ export function detectionToVerse(detection: DetectionResult): Verse {
   }
 }
 
+export function createPresentationItem(verse: Verse, reference?: string): ScripturePresentationItemData {
+  return {
+    kind: "scripture",
+    verse,
+    reference: reference ?? `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+  }
+}
+
+export function createScriptureQueueItem(
+  verse: Verse,
+  options?: {
+    reference?: string
+    confidence?: number
+    source?: QueueItem["source"]
+    is_chapter_only?: boolean
+  },
+): QueueItem {
+  return {
+    id: crypto.randomUUID(),
+    presentation: createPresentationItem(verse, options?.reference),
+    confidence: options?.confidence ?? 1,
+    source: options?.source ?? "manual",
+    added_at: Date.now(),
+    is_chapter_only: options?.is_chapter_only,
+  }
+}
+
 export function selectPreviewVerse(verse: Verse, options?: { navigate?: boolean }) {
+  const item = createPresentationItem(verse)
+  const renderData = toScriptureRenderData(item)
+  useBroadcastStore.getState().setPreviewItem(renderData)
   bibleActions.selectVerse(verse)
 
   if (options?.navigate && verse.book_number > 0) {
@@ -37,12 +78,37 @@ export function selectPreviewVerse(verse: Verse, options?: { navigate?: boolean 
   }
 }
 
+export function selectPreviewItem(item: PresentationItem, options?: { navigate?: boolean }) {
+  const verse = getScriptureVerse(item)
+  useBroadcastStore.getState().setPreviewItem(toPresentationRenderData(item))
+
+  if (verse) {
+    bibleActions.selectVerse(verse)
+    if (options?.navigate && verse.book_number > 0) {
+      bibleActions.navigateToVerse(
+        verse.book_number,
+        verse.chapter,
+        verse.verse,
+      )
+    }
+  }
+}
+
+function toScriptureRenderData(item: ScripturePresentationItemData): PresentationRenderData {
+  return toVerseRenderData(item.verse, activeTranslationLabel())
+}
+
+function toPresentationRenderData(item: PresentationItem): PresentationRenderData {
+  if (item.kind === "scripture") return toScriptureRenderData(item)
+  return getPresentationRenderData(item)
+}
+
 export function commitVerseToLive(verse: Verse, options?: { makeLive?: boolean }) {
-  const renderData = toVerseRenderData(verse, activeTranslationLabel())
+  const renderData = toPresentationRenderData(createPresentationItem(verse))
   const broadcast = useBroadcastStore.getState()
 
   console.info("[pipeline] commit_live", { reference: renderData.reference })
-  useBroadcastStore.setState({ liveVerse: renderData })
+  useBroadcastStore.setState({ liveItem: renderData })
 
   if (options?.makeLive ?? true) {
     broadcast.setLive(true)
@@ -52,11 +118,25 @@ export function commitVerseToLive(verse: Verse, options?: { makeLive?: boolean }
 }
 
 export function commitPreviewToLive(): boolean {
-  const verse = useBibleStore.getState().selectedVerse
-  if (!verse) return false
+  const previewItem =
+    useBroadcastStore.getState().previewItem ??
+    (() => {
+      const verse = useBibleStore.getState().selectedVerse
+      return verse ? toPresentationRenderData(createPresentationItem(verse)) : null
+    })()
+  if (!previewItem) return false
 
-  commitVerseToLive(verse, { makeLive: true })
+  useBroadcastStore.getState().setLiveItem(previewItem)
+  useBroadcastStore.getState().setLive(true)
   return true
+}
+
+export function presentItem(item: PresentationItem, options?: { navigate?: boolean }) {
+  selectPreviewItem(item, { navigate: options?.navigate })
+  const renderData = toPresentationRenderData(item)
+  console.info("[pipeline] commit_live", { reference: renderData.reference })
+  useBroadcastStore.getState().setLiveItem(renderData)
+  useBroadcastStore.getState().setLive(true)
 }
 
 export function presentVerse(verse: Verse, options?: { navigate?: boolean }) {

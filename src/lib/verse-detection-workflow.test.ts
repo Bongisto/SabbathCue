@@ -44,16 +44,19 @@ function makeDetection(
 function makeQueueItem(overrides: Partial<QueueItem> = {}): QueueItem {
   return {
     id: "chapter-hit",
-    reference: "John 3",
-    verse: {
-      id: 0,
-      translation_id: 7,
-      book_number: 43,
-      book_name: "John",
-      book_abbreviation: "",
-      chapter: 3,
-      verse: 1,
-      text: "Chapter start",
+    presentation: {
+      kind: "scripture",
+      verse: {
+        id: 0,
+        translation_id: 7,
+        book_number: 43,
+        book_name: "John",
+        book_abbreviation: "",
+        chapter: 3,
+        verse: 1,
+        text: "Chapter start",
+      },
+      reference: "John 3",
     },
     confidence: 0.9,
     source: "ai-direct",
@@ -111,7 +114,7 @@ describe("verse detection workflow", () => {
     })
     useBroadcastStore.setState({
       isLive: false,
-      liveVerse: null,
+      liveItem: null,
       readingModeAutoLive: true,
     })
   })
@@ -147,17 +150,19 @@ describe("verse detection workflow", () => {
     expect(useQueueStore.getState().items).toEqual([
       expect.objectContaining({
         id: "detection-id",
-        reference: "John 3:16",
         confidence: 0.96,
         source: "ai-direct",
         added_at: Date.now(),
         is_chapter_only: false,
-        verse: expect.objectContaining({
-          translation_id: 7,
-          book_number: 43,
-          chapter: 3,
-          verse: 16,
-          text: "For God so loved the world",
+        presentation: expect.objectContaining({
+          reference: "John 3:16",
+          verse: expect.objectContaining({
+            translation_id: 7,
+            book_number: 43,
+            chapter: 3,
+            verse: 16,
+            text: "For God so loved the world",
+          }),
         }),
       }),
     ])
@@ -175,11 +180,13 @@ describe("verse detection workflow", () => {
     expect(useQueueStore.getState().items).toHaveLength(1)
     expect(useQueueStore.getState().items[0]).toMatchObject({
       id: "chapter-hit",
-      reference: "John 3:16",
       is_chapter_only: false,
-      verse: expect.objectContaining({
-        verse: 16,
-        text: "For God so loved the world",
+      presentation: expect.objectContaining({
+        reference: "John 3:16",
+        verse: expect.objectContaining({
+          verse: 16,
+          text: "For God so loved the world",
+        }),
       }),
     })
   })
@@ -226,7 +233,7 @@ describe("verse detection workflow", () => {
 
     useBroadcastStore.setState({
       isLive: true,
-      liveVerse: {
+      liveItem: {
         reference: "Romans 8:1 (KJV)",
         segments: [{ verseNumber: 1, text: "There is therefore now no condemnation." }],
       },
@@ -239,14 +246,14 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 16,
     })
-    expect(useBroadcastStore.getState().liveVerse?.reference).toBe("Romans 8:1 (KJV)")
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe("Romans 8:1 (KJV)")
   })
 
   it("auto-updates live output for reading mode when already live", () => {
     useBroadcastStore.setState({
       isLive: true,
       readingModeAutoLive: true,
-      liveVerse: {
+      liveItem: {
         reference: "John 3:16 (KJV)",
         segments: [{ verseNumber: 16, text: "For God so loved the world." }],
       },
@@ -267,11 +274,11 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 17,
     })
-    expect(useBroadcastStore.getState().liveVerse?.reference).toBe("John 3:17 (KJV)")
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe("John 3:17 (KJV)")
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:verse-update",
-      expect.objectContaining({ verse: expect.objectContaining({ reference: "John 3:17 (KJV)" }) }),
+      expect.objectContaining({ item: expect.objectContaining({ reference: "John 3:17 (KJV)" }) }),
     )
   })
 
@@ -279,7 +286,7 @@ describe("verse detection workflow", () => {
     useBroadcastStore.setState({
       isLive: true,
       readingModeAutoLive: false,
-      liveVerse: {
+      liveItem: {
         reference: "John 3:16 (KJV)",
         segments: [{ verseNumber: 16, text: "For God so loved the world." }],
       },
@@ -300,13 +307,13 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 17,
     })
-    expect(useBroadcastStore.getState().liveVerse?.reference).toBe("John 3:16 (KJV)")
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe("John 3:16 (KJV)")
   })
 
   it("does not turn live output on for reading mode when hidden", () => {
     useBroadcastStore.setState({
       isLive: false,
-      liveVerse: null,
+      liveItem: null,
     })
 
     handleReadingAdvance({
@@ -325,7 +332,7 @@ describe("verse detection workflow", () => {
       verse: 17,
     })
     expect(useBroadcastStore.getState().isLive).toBe(false)
-    expect(useBroadcastStore.getState().liveVerse).toBeNull()
+    expect(useBroadcastStore.getState().liveItem).toBeNull()
   })
 
   it("previews from incoming direct detection event", () => {

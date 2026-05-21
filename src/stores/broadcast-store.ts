@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
-import type { BroadcastTheme, VerseRenderData } from "@/types"
+import type { BroadcastTheme, PresentationRenderData } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
 
 type SelectedElement = "verse" | "reference" | null
@@ -11,7 +11,8 @@ interface BroadcastState {
   activeThemeId: string
   altActiveThemeId: string
   isLive: boolean
-  liveVerse: VerseRenderData | null
+  previewItem: PresentationRenderData | null
+  liveItem: PresentationRenderData | null
   readingModeAutoLive: boolean
 
   // Projector display settings
@@ -38,7 +39,8 @@ interface BroadcastState {
   setActiveTheme: (id: string) => void
   setAltActiveTheme: (id: string) => void
   setLive: (live: boolean) => void
-  setLiveVerse: (verse: VerseRenderData | null) => void
+  setPreviewItem: (item: PresentationRenderData | null) => void
+  setLiveItem: (item: PresentationRenderData | null) => void
   setReadingModeAutoLive: (enabled: boolean) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
@@ -97,13 +99,13 @@ function emitDraftToBroadcast(state: BroadcastState): void {
   if (id === state.activeThemeId) {
     void emitTo("broadcast", "broadcast:verse-update", {
       theme: state.draftTheme,
-      verse: state.isLive ? state.liveVerse : null,
+      item: state.isLive ? state.liveItem : null,
     }).catch(() => {})
   }
   if (id === state.altActiveThemeId) {
     void emitTo("broadcast-alt", "broadcast:verse-update", {
       theme: state.draftTheme,
-      verse: state.isLive ? state.liveVerse : null,
+      item: state.isLive ? state.liveItem : null,
     }).catch(() => {})
   }
 }
@@ -113,7 +115,8 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   activeThemeId: BUILTIN_THEMES[0].id,
   altActiveThemeId: BUILTIN_THEMES[0].id,
   isLive: false,
-  liveVerse: null,
+  previewItem: null,
+  liveItem: null,
   readingModeAutoLive: true,
   mainDisplayMonitorIndex: 0,
   altDisplayMonitorIndex: 0,
@@ -194,7 +197,7 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
 
     void emitTo(label, "broadcast:verse-update", {
       theme,
-      verse: s.isLive ? s.liveVerse : null,
+      item: s.isLive ? s.liveItem : null,
     }).catch(() => {})
   },
   syncBroadcastOutput: () => {
@@ -213,8 +216,11 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     set({ isLive })
     get().syncBroadcastOutput()
   },
-  setLiveVerse: (liveVerse) => {
-    set({ liveVerse })
+  setPreviewItem: (previewItem) => {
+    set({ previewItem })
+  },
+  setLiveItem: (liveItem) => {
+    set({ liveItem })
     get().syncBroadcastOutput()
   },
   setReadingModeAutoLive: (readingModeAutoLive) => {

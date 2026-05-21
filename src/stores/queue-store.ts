@@ -1,5 +1,8 @@
 import { create } from "zustand"
-import type { QueueItem } from "@/types"
+import {
+  getVerseFromItem,
+  type QueueItem,
+} from "@/types"
 
 interface QueueState {
   items: QueueItem[]
@@ -31,21 +34,29 @@ export const useQueueStore = create<QueueState>((set, get) => ({
 
   addItem: (item) =>
     set((state) => {
-      const duplicate = state.items.some(
-        (i) =>
-          i.verse.book_number === item.verse.book_number &&
-          i.verse.chapter === item.verse.chapter &&
-          i.verse.verse === item.verse.verse,
-      )
+      const itemVerse = getVerseFromItem(item)
+      const duplicate = itemVerse
+        ? state.items.some((i) => {
+            const iv = getVerseFromItem(i)
+            return (
+              iv?.book_number === itemVerse.book_number &&
+              iv.chapter === itemVerse.chapter &&
+              iv.verse === itemVerse.verse
+            )
+          })
+        : state.items.some((i) => i.id === item.id)
       if (duplicate) return state
       return { items: [item, ...state.items] }
     }),
   addOrFlashItem: (item) => {
-    const duplicateIndex = get().findDuplicate(
-      item.verse.book_number,
-      item.verse.chapter,
-      item.verse.verse,
-    )
+    const itemVerse = getVerseFromItem(item)
+    const duplicateIndex = itemVerse
+      ? get().findDuplicate(
+          itemVerse.book_number,
+          itemVerse.chapter,
+          itemVerse.verse,
+        )
+      : get().items.findIndex((i) => i.id === item.id)
 
     if (duplicateIndex !== -1) {
       const existing = get().items[duplicateIndex]
@@ -57,16 +68,22 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     return "added"
   },
   addOrFlashDetectionItem: (item) => {
+    const itemVerse = getVerseFromItem(item)
+    if (!itemVerse) return get().addOrFlashItem(item)
     const duplicateIndex = item.is_chapter_only
       ? get().items.findIndex(
-          (i) =>
-            i.verse.book_number === item.verse.book_number &&
-            i.verse.chapter === item.verse.chapter,
+          (i) => {
+            const iv = getVerseFromItem(i)
+            return (
+              iv?.book_number === itemVerse.book_number &&
+              iv.chapter === itemVerse.chapter
+            )
+          },
         )
       : get().findDuplicate(
-          item.verse.book_number,
-          item.verse.chapter,
-          item.verse.verse,
+          itemVerse.book_number,
+          itemVerse.chapter,
+          itemVerse.verse,
         )
 
     if (duplicateIndex !== -1) {
@@ -136,35 +153,53 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   },
   findDuplicate: (bookNumber, chapter, verse) =>
     get().items.findIndex(
-      (i) =>
-        i.verse.book_number === bookNumber &&
-        i.verse.chapter === chapter &&
-        i.verse.verse === verse,
+      (i) => {
+        const iv = getVerseFromItem(i)
+        return (
+          iv?.book_number === bookNumber &&
+          iv.chapter === chapter &&
+          iv.verse === verse
+        )
+      },
     ),
   updateEarlyRef: (bookNumber, chapter, verse, reference, verseText) => {
     let found = false
     set((state) => {
       // First try exact match: same book + same chapter
       let idx = state.items.findIndex(
-        (i) =>
-          i.is_chapter_only &&
-          i.verse.book_number === bookNumber &&
-          i.verse.chapter === chapter,
+        (i) => {
+          const iv = getVerseFromItem(i)
+          return (
+            i.is_chapter_only &&
+            iv?.book_number === bookNumber &&
+            iv.chapter === chapter
+          )
+        },
       )
       // Fallback: same book, any chapter (book-only detection guessed chapter 1)
       if (idx === -1) {
         idx = state.items.findIndex(
-          (i) =>
-            i.is_chapter_only &&
-            i.verse.book_number === bookNumber,
+          (i) => {
+            const iv = getVerseFromItem(i)
+            return (
+              i.is_chapter_only &&
+              iv?.book_number === bookNumber
+            )
+          },
         )
       }
       if (idx === -1) return state
       found = true
       const items = [...state.items]
       const item = { ...items[idx] }
-      item.verse = { ...item.verse, verse, text: verseText }
-      item.reference = reference
+      const itemVerse = getVerseFromItem(item)
+      if (!itemVerse) return state
+      const updatedVerse = { ...itemVerse, verse, text: verseText }
+      item.presentation = {
+        ...item.presentation,
+        verse: updatedVerse,
+        reference,
+      }
       item.is_chapter_only = false
       items[idx] = item
       return { items }

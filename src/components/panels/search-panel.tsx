@@ -31,12 +31,16 @@ import {
 import { useBible, bibleActions } from "@/hooks/use-bible"
 import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
-import type { Book, Verse, SemanticSearchResult } from "@/types"
+import { getVerseFromItem, type Book, type Verse, type SemanticSearchResult } from "@/types"
 import { Input } from "@/components/ui/input"
 import {
   mergeContextSearchResults,
   searchContextWithFuse,
 } from "@/lib/context-search"
+import {
+  createScriptureQueueItem,
+  selectPreviewVerse,
+} from "@/lib/presentation-workflow"
 
 type SearchTab = "book" | "context" 
 
@@ -95,7 +99,11 @@ export function SearchPanel() {
   const queueItems = useQueueStore((s) => s.items)
   const queuedVerseKeys = useMemo(() => {
     return new Set(
-      queueItems.map((item) => `${item.verse.book_number}:${item.verse.chapter}:${item.verse.verse}`)
+      queueItems.map((item) => {
+        const verse = getVerseFromItem(item)
+        if (!verse) return null
+        return `${verse.book_number}:${verse.chapter}:${verse.verse}`
+      }).filter((key): key is string => Boolean(key))
     )
   }, [queueItems])
 
@@ -134,7 +142,7 @@ export function SearchPanel() {
     if (!stillExists) {
       const match = currentChapter.find((v) => v.verse === selectedVerse.verse)
       if (match && match.id !== selectedVerse.id) {
-        bibleActions.selectVerse(match)
+        selectPreviewVerse(match)
       }
     }
   }, [currentChapter, selectedVerseId, selectedVerse])
@@ -174,7 +182,7 @@ export function SearchPanel() {
         const target = verses.find((v) => v.verse === navVerse)
         if (target) {
           setSelectedVerseId(target.id)
-          bibleActions.selectVerse(target)
+          selectPreviewVerse(target)
           document
             .getElementById(`verse-${target.id}`)
             ?.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -190,7 +198,7 @@ export function SearchPanel() {
 
   const handleVerseClick = useCallback((verse: Verse) => {
     setSelectedVerseId(verse.id)
-    bibleActions.selectVerse(verse)
+    selectPreviewVerse(verse)
   }, [])
 
   // Arrow key navigation
@@ -216,7 +224,7 @@ export function SearchPanel() {
         const next = currentChapter[nextIdx]
         if (next) {
           setSelectedVerseId(next.id)
-          bibleActions.selectVerse(next)
+          selectPreviewVerse(next)
           document
             .getElementById(`verse-${next.id}`)
             ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
@@ -231,7 +239,7 @@ export function SearchPanel() {
         const prev = currentChapter[prevIdx]
         if (prev) {
           setSelectedVerseId(prev.id)
-          bibleActions.selectVerse(prev)
+          selectPreviewVerse(prev)
           document
             .getElementById(`verse-${prev.id}`)
             ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
@@ -627,14 +635,13 @@ export function SearchPanel() {
                             )}
                             onClick={(e) => {
                               e.stopPropagation()
-                              useQueueStore.getState().addOrFlashItem({
-                                id: crypto.randomUUID(),
-                                verse,
-                                reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
-                                confidence: 1,
-                                source: "manual",
-                                added_at: Date.now(),
-                              })
+                              useQueueStore.getState().addOrFlashItem(
+                                createScriptureQueueItem(verse, {
+                                  reference: `${verse.book_name} ${verse.chapter}:${verse.verse}`,
+                                  confidence: 1,
+                                  source: "manual",
+                                })
+                              )
                             }}
                           >
                             <PlusIcon className="size-3" />
@@ -677,7 +684,7 @@ export function SearchPanel() {
               <div
                 key={`${result.book_number}-${result.chapter}-${result.verse}-${idx}`}
                 onClick={() => {
-                  bibleActions.selectVerse({
+                  selectPreviewVerse({
                     id: 0,
                     translation_id: activeTranslationId,
                     book_number: result.book_number,
@@ -736,23 +743,23 @@ export function SearchPanel() {
                           className="absolute right-2 top-1/2 -translate-y-1/2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-primary-foreground hover:bg-primary/80"
                           onClick={(e) => {
                             e.stopPropagation()
-                            useQueueStore.getState().addOrFlashItem({
-                              id: crypto.randomUUID(),
-                              verse: {
-                                id: 0,
-                                translation_id: activeTranslationId,
-                                book_number: result.book_number,
-                                book_name: result.book_name,
-                                book_abbreviation: "",
-                                chapter: result.chapter,
-                                verse: result.verse,
-                                text: result.verse_text,
-                              },
-                              reference: `${result.book_name} ${result.chapter}:${result.verse}`,
-                              confidence: result.similarity,
-                              source: "manual",
-                              added_at: Date.now(),
-                            })
+                            const queueVerse: Verse = {
+                              id: 0,
+                              translation_id: activeTranslationId,
+                              book_number: result.book_number,
+                              book_name: result.book_name,
+                              book_abbreviation: "",
+                              chapter: result.chapter,
+                              verse: result.verse,
+                              text: result.verse_text,
+                            }
+                            useQueueStore.getState().addOrFlashItem(
+                              createScriptureQueueItem(queueVerse, {
+                                reference: `${result.book_name} ${result.chapter}:${result.verse}`,
+                                confidence: result.similarity,
+                                source: "manual",
+                              })
+                            )
                           }}
                         >
                           <PlusIcon className="size-3" />

@@ -13,13 +13,13 @@ describe("broadcast store sync", () => {
     vi.resetModules()
   })
 
-  it("syncBroadcastOutput emits current theme and verse to broadcast window", async () => {
+  it("syncBroadcastOutput emits current theme and item to broadcast window", async () => {
     const { useBroadcastStore } = await import("./broadcast-store")
     const theme = useBroadcastStore.getState().themes[0]
     useBroadcastStore.setState({
       activeThemeId: theme.id,
       isLive: true,
-      liveVerse: {
+      liveItem: {
         reference: "John 3:16",
         segments: [{ text: "For God so loved the world", verseNumber: 16 }],
       },
@@ -34,7 +34,7 @@ describe("broadcast store sync", () => {
       "broadcast:verse-update",
       expect.objectContaining({
         theme: expect.objectContaining({ id: theme.id }),
-        verse: expect.objectContaining({ reference: "John 3:16" }),
+        item: expect.objectContaining({ reference: "John 3:16" }),
       }),
     )
     expect(emitToMock).toHaveBeenCalledWith(
@@ -42,18 +42,18 @@ describe("broadcast store sync", () => {
       "broadcast:verse-update",
       expect.objectContaining({
         theme: expect.objectContaining({ id: theme.id }),
-        verse: expect.objectContaining({ reference: "John 3:16" }),
+        item: expect.objectContaining({ reference: "John 3:16" }),
       }),
     )
   })
 
-  it("emits a blank verse when live output is off", async () => {
+  it("emits a blank item when live output is off", async () => {
     const { useBroadcastStore } = await import("./broadcast-store")
     const theme = useBroadcastStore.getState().themes[0]
     useBroadcastStore.setState({
       activeThemeId: theme.id,
       isLive: false,
-      liveVerse: {
+      liveItem: {
         reference: "John 3:16",
         segments: [{ text: "For God so loved the world", verseNumber: 16 }],
       },
@@ -66,7 +66,7 @@ describe("broadcast store sync", () => {
       "broadcast",
       "broadcast:verse-update",
       expect.objectContaining({
-        verse: null,
+        item: null,
       }),
     )
   })
@@ -77,7 +77,7 @@ describe("broadcast store sync", () => {
     useBroadcastStore.setState({
       activeThemeId: theme.id,
       isLive: false,
-      liveVerse: {
+      liveItem: {
         reference: "John 3:16",
         segments: [{ text: "For God so loved the world", verseNumber: 16 }],
       },
@@ -90,7 +90,7 @@ describe("broadcast store sync", () => {
       "broadcast",
       "broadcast:verse-update",
       expect.objectContaining({
-        verse: expect.objectContaining({ reference: "John 3:16" }),
+        item: expect.objectContaining({ reference: "John 3:16" }),
       }),
     )
 
@@ -101,7 +101,7 @@ describe("broadcast store sync", () => {
       "broadcast",
       "broadcast:verse-update",
       expect.objectContaining({
-        verse: null,
+        item: null,
       }),
     )
   })

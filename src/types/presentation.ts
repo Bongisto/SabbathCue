@@ -1,0 +1,56 @@
+import type { Verse } from "./bible"
+
+export type PresentationItemKind = "scripture" | "hymn"
+
+export interface PresentationSegment {
+  verseNumber?: number
+  text: string
+}
+
+export interface PresentationRenderData {
+  reference: string
+  segments: PresentationSegment[]
+  kind?: PresentationItemKind
+}
+
+export interface ScripturePresentationItemData {
+  kind: "scripture"
+  verse: Verse
+  reference: string
+}
+
+export interface HymnPresentationItemData {
+  kind: "hymn"
+  hymnId: string
+  hymnNumber: number
+  hymnTitle: string
+  screenId: string
+  reference: string
+  segments: PresentationSegment[]
+}
+
+export type PresentationItem = ScripturePresentationItemData | HymnPresentationItemData
+
+export function getPresentationReference(item: PresentationItem): string {
+  return item.reference
+}
+
+export function getPresentationRenderData(item: PresentationItem): PresentationRenderData {
+  if (item.kind === "scripture") {
+    return {
+      kind: "scripture",
+      reference: item.reference,
+      segments: [{ verseNumber: item.verse.verse, text: item.verse.text }],
+    }
+  }
+
+  return {
+    kind: "hymn",
+    reference: item.reference,
+    segments: item.segments,
+  }
+}
+
+export function getScriptureVerse(item: PresentationItem): Verse | null {
+  return item.kind === "scripture" ? item.verse : null
+}

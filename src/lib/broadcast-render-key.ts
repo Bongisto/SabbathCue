@@ -1,8 +1,8 @@
-import type { BroadcastTheme, VerseRenderData } from "@/types"
+import type { BroadcastTheme, VerseRenderData, PresentationRenderData } from "@/types"
 
 export function getBroadcastRenderKey(
   theme: BroadcastTheme,
-  verse: VerseRenderData | null,
+  data: VerseRenderData | PresentationRenderData | null,
 ): string {
   return JSON.stringify({
     theme: {
@@ -16,6 +16,6 @@ export function getBroadcastRenderKey(
       reference: theme.reference,
       layout: theme.layout,
     },
-    verse,
+    data,
   })
 }

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, type RefObject } from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getBroadcastRenderKey } from "@/lib/broadcast-render-key"
-import { renderVerse } from "@/lib/verse-renderer"
-import type { BroadcastTheme, VerseRenderData } from "@/types/broadcast"
+import { renderPresentation } from "@/lib/verse-renderer"
+import type { BroadcastTheme, PresentationRenderData } from "@/types"
 import type { NdiConfigEventPayload, NdiFrameRequest } from "@/types"
 
 export interface BroadcastPayload {
   theme: BroadcastTheme
-  verse: VerseRenderData | null
+  item: PresentationRenderData | null
 }
 
 declare global {
@@ -85,17 +85,17 @@ export function useBroadcastOutputRuntime({
       return
     }
 
-    const { theme, verse } = data
+    const { theme, item } = data
     canvas.width = theme.resolution.width
     canvas.height = theme.resolution.height
-    const result = renderVerse(ctx, theme, verse, {
+    const result = renderPresentation(ctx, theme, item, {
       scale: 1,
       imageCache: imageCacheRef.current,
     })
 
     if (!result) {
       fillBlack(canvas)
-      logDebug("renderVerse returned null; drew fallback frame")
+      logDebug("renderPresentation returned null; drew fallback frame")
     }
   }, [canvasRef, logDebug])
 
@@ -183,11 +183,11 @@ export function useBroadcastOutputRuntime({
     }
 
     const applyPayload = (payload: BroadcastPayload) => {
-      const renderKey = getBroadcastRenderKey(payload.theme, payload.verse)
+      const renderKey = getBroadcastRenderKey(payload.theme, payload.item)
 
       if (lastRenderKeyRef.current === renderKey) {
         logDebug("Skipped duplicate broadcast payload", {
-          hasVerse: Boolean(payload.verse),
+          hasItem: Boolean(payload.item),
           themeId: payload.theme.id,
         })
         return
@@ -197,7 +197,7 @@ export function useBroadcastOutputRuntime({
       latestData.current = payload
       preloadBackgroundImage(payload.theme)
       logDebug("Received broadcast payload", {
-        hasVerse: Boolean(payload.verse),
+        hasItem: Boolean(payload.item),
         themeId: payload.theme.id,
       })
       draw()

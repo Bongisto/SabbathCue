@@ -30,14 +30,14 @@ vi.mock("@/stores/broadcast-store", () => {
   const useBroadcastStore = (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       isLive: broadcastIsLive,
-      liveVerse: broadcastLiveVerse,
+      liveItem: broadcastLiveVerse,
       readingModeAutoLive: broadcastReadingModeAutoLive,
       themes: [],
       activeThemeId: "",
     })
   useBroadcastStore.getState = () => ({
     setLive: mockSetLive,
-    setLiveVerse: mockSetLiveVerse,
+    setLiveItem: mockSetLiveVerse,
     setReadingModeAutoLive: mockSetReadingModeAutoLive,
   })
   return { useBroadcastStore }
@@ -173,7 +173,7 @@ describe("OperatorStatusStrip emergency controls", () => {
       expect(btn.disabled).toBe(true)
     })
 
-    it("clears liveVerse and hides output when clicked", async () => {
+    it("clears liveItem and hides output when clicked", async () => {
       broadcastLiveVerse = { reference: "John 3:16" }
       broadcastIsLive = true
       await renderStrip()

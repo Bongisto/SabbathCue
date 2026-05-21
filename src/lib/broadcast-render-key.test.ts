@@ -72,14 +72,14 @@ function makeTheme(overrides: Partial<BroadcastTheme> = {}): BroadcastTheme {
   }
 }
 
-const verse: VerseRenderData = {
+const verseData: VerseRenderData = {
   reference: "John 3:16",
   segments: [{ verseNumber: 16, text: "For God so loved the world" }],
 }
 
 describe("getBroadcastRenderKey", () => {
   it("changes when visible theme render settings change", () => {
-    const baseKey = getBroadcastRenderKey(makeTheme(), verse)
+    const baseKey = getBroadcastRenderKey(makeTheme(), verseData)
     const changedKey = getBroadcastRenderKey(
       makeTheme({
         verseText: {
@@ -87,14 +87,14 @@ describe("getBroadcastRenderKey", () => {
           color: "#ffcc00",
         },
       }),
-      verse
+      verseData
     )
 
     expect(changedKey).not.toBe(baseKey)
   })
 
   it("changes when verse content changes", () => {
-    const baseKey = getBroadcastRenderKey(makeTheme(), verse)
+    const baseKey = getBroadcastRenderKey(makeTheme(), verseData)
     const changedKey = getBroadcastRenderKey(makeTheme(), {
       reference: "Romans 8:28",
       segments: [{ verseNumber: 28, text: "All things work together" }],
@@ -104,7 +104,7 @@ describe("getBroadcastRenderKey", () => {
   })
 
   it("ignores library-only metadata that does not affect rendered pixels", () => {
-    const baseKey = getBroadcastRenderKey(makeTheme(), verse)
+    const baseKey = getBroadcastRenderKey(makeTheme(), verseData)
     const metadataOnlyKey = getBroadcastRenderKey(
       makeTheme({
         name: "Renamed In Library",
@@ -117,7 +117,7 @@ describe("getBroadcastRenderKey", () => {
           direction: "left",
         },
       }),
-      verse
+      verseData
     )
 
     expect(metadataOnlyKey).toBe(baseKey)
@@ -125,7 +125,7 @@ describe("getBroadcastRenderKey", () => {
 
   it("distinguishes a cleared verse from a rendered verse", () => {
     expect(getBroadcastRenderKey(makeTheme(), null)).not.toBe(
-      getBroadcastRenderKey(makeTheme(), verse)
+      getBroadcastRenderKey(makeTheme(), verseData)
     )
   })
 })

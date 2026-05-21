@@ -1,8 +1,9 @@
 import type {
   BroadcastTheme,
   VerseRenderData,
+  PresentationRenderData,
   RenderOptions,
-} from "@/types/broadcast"
+} from "@/types"
 
 export interface VerseLayoutRect {
   x: number
@@ -951,24 +952,38 @@ export function computeVerseLayoutMetrics(
 export function renderVerse(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
-  verse: VerseRenderData | null,
+  data: VerseRenderData | null,
   options?: RenderOptions
 ): VerseLayoutMetrics | null {
   try {
-    return renderVerseImpl(ctx, theme, verse, options)
+    return renderPresentationImpl(ctx, theme, data, options)
   } catch (e) {
     console.error("[verse-renderer] render error:", e)
     return null
   }
 }
 
-function renderVerseImpl(
+export function renderPresentation(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
-  verse: VerseRenderData | null,
+  data: PresentationRenderData | null,
+  options?: RenderOptions
+): VerseLayoutMetrics | null {
+  try {
+    return renderPresentationImpl(ctx, theme, data, options)
+  } catch (e) {
+    console.error("[verse-renderer] render error:", e)
+    return null
+  }
+}
+
+function renderPresentationImpl(
+  ctx: CanvasRenderingContext2D,
+  theme: BroadcastTheme,
+  data: VerseRenderData | PresentationRenderData | null,
   options?: RenderOptions
 ): VerseLayoutMetrics {
-  const metrics = computeVerseLayoutMetrics(ctx, theme, verse, options)
+  const metrics = computeVerseLayoutMetrics(ctx, theme, data as VerseRenderData | null, options)
   const scaledTheme = metrics.scaledTheme
 
   ctx.save()
@@ -998,8 +1013,8 @@ function renderVerseImpl(
     ctx.restore()
   }
 
-  // If no verse data, just draw the background and text box
-  if (!verse) {
+  // If no presentation data, just draw the background and text box
+  if (!data) {
     ctx.restore()
     return metrics
   }
@@ -1016,7 +1031,7 @@ function renderVerseImpl(
     const scaledFontSize = calculateScaledFontSize(
       ctx,
       scaledTheme,
-      verse,
+      data,
       metrics.textAreaRect.width,
       maxAvailableVerseHeight
     )
@@ -1024,7 +1039,7 @@ function renderVerseImpl(
     drawVerseText(
       ctx,
       scaledTheme,
-      verse,
+      data,
       metrics.textRect.x,
       metrics.textRect.width,
       verseRect.y,
@@ -1035,7 +1050,7 @@ function renderVerseImpl(
     drawReference(
       ctx,
       scaledTheme,
-      verse.reference,
+      data.reference,
       metrics.textRect.x,
       metrics.textRect.width,
       referenceRect.y

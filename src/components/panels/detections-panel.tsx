@@ -9,6 +9,7 @@ import {
   detectionToVerse,
   presentVerse,
   selectPreviewVerse,
+  createScriptureQueueItem,
 } from "@/lib/presentation-workflow"
 import type { DetectionResult } from "@/types"
 
@@ -70,14 +71,13 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           size="sm"
           className="gap-1"
           onClick={() => {
-            useQueueStore.getState().addOrFlashItem({
-              id: crypto.randomUUID(),
-              verse,
-              reference: detection.verse_ref,
-              confidence: detection.confidence,
-              source: detection.source === "direct" ? "ai-direct" : "ai-semantic",
-              added_at: Date.now(),
-            })
+            useQueueStore.getState().addOrFlashItem(
+              createScriptureQueueItem(verse, {
+                reference: detection.verse_ref,
+                confidence: detection.confidence,
+                source: detection.source === "direct" ? "ai-direct" : "ai-semantic",
+              })
+            )
           }}
         >
           <PlusIcon className="size-3" />
