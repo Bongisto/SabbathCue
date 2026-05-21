@@ -193,7 +193,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       const items = [...state.items]
       const item = { ...items[idx] }
       const itemVerse = getVerseFromItem(item)
-      if (!itemVerse) return state
+      if (!itemVerse || item.presentation.kind !== "scripture") return state
       const updatedVerse = { ...itemVerse, verse, text: verseText }
       item.presentation = {
         ...item.presentation,

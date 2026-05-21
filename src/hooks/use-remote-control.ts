@@ -9,7 +9,6 @@ import { presentItem, presentVerse } from "@/lib/presentation-workflow"
 import {
   getReferenceFromItem,
   getScriptureVerse,
-  type QueueItem,
   type Verse,
 } from "@/types"
 

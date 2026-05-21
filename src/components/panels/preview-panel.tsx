@@ -14,7 +14,6 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
 
 export function PreviewPanel() {
-  const selectedVerse = useBibleStore((s) => s.selectedVerse)
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
   const previewItem = useBroadcastStore((s) => s.previewItem)
   const themes = useBroadcastStore((s) => s.themes)
