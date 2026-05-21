@@ -13,8 +13,14 @@ vi.mock("sonner", () => ({
   },
 }))
 
+const handleHymnVoiceControlMock = vi.fn()
+
 vi.mock("@/hooks/use-tauri-event", () => ({
   useTauriEvent: () => {},
+}))
+
+vi.mock("@/services/hymnal/hymn-voice-control", () => ({
+  handleHymnVoiceControl: (...args: unknown[]) => handleHymnVoiceControlMock(...args),
 }))
 
 async function loadModules() {
@@ -26,6 +32,7 @@ async function loadModules() {
     useTranscriptStore: transcriptMod.useTranscriptStore,
     useSettingsStore: settingsMod.useSettingsStore,
     transcriptionActions: hookMod.transcriptionActions,
+    handleTranscriptFinalPayload: hookMod.handleTranscriptFinalPayload,
   }
 }
 
@@ -33,6 +40,8 @@ describe("use-transcription", () => {
   beforeEach(() => {
     mockInvoke.mockReset()
     mockToastError.mockReset()
+    handleHymnVoiceControlMock.mockReset()
+    handleHymnVoiceControlMock.mockResolvedValue(false)
   })
 
   describe("transcriptionActions.start", () => {
@@ -255,6 +264,28 @@ describe("use-transcription", () => {
         "start_transcription",
         expect.any(Object)
       )
+    })
+  })
+
+  describe("handleTranscriptFinalPayload", () => {
+    it("stores final transcript segments and invokes hymn voice control", async () => {
+      const { useTranscriptStore, handleTranscriptFinalPayload } = await loadModules()
+
+      handleTranscriptFinalPayload({
+        text: "hymn 12",
+        is_final: true,
+        confidence: 0.95,
+        words: [],
+      })
+
+      const state = useTranscriptStore.getState()
+      expect(state.segments).toHaveLength(1)
+      expect(state.segments[0]).toMatchObject({
+        text: "hymn 12",
+        is_final: true,
+        confidence: 0.95,
+      })
+      expect(handleHymnVoiceControlMock).toHaveBeenCalledWith("hymn 12")
     })
   })
 

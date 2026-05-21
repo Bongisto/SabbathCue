@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { useAudioStore } from "@/stores/audio-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
+import { handleHymnVoiceControl } from "@/services/hymnal/hymn-voice-control"
 import { useTauriEvent } from "./use-tauri-event"
 
 interface TranscriptPartialPayload {
@@ -82,6 +83,18 @@ export const transcriptionActions = {
   },
 }
 
+export function handleTranscriptFinalPayload(payload: TranscriptPartialPayload): void {
+  useTranscriptStore.getState().addSegment({
+    id: crypto.randomUUID(),
+    text: payload.text,
+    is_final: true,
+    confidence: payload.confidence,
+    words: payload.words,
+    timestamp: Date.now(),
+  })
+  void handleHymnVoiceControl(payload.text)
+}
+
 export function useTranscription(options?: UseTranscriptionOptions) {
   const segments = useTranscriptStore((s) => s.segments)
   const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
@@ -132,16 +145,7 @@ export function useTranscription(options?: UseTranscriptionOptions) {
     useTranscriptStore.getState().setPartial(payload.text)
   })
 
-  useTauriEvent<TranscriptPartialPayload>("transcript_final", (payload) => {
-    useTranscriptStore.getState().addSegment({
-      id: crypto.randomUUID(),
-      text: payload.text,
-      is_final: true,
-      confidence: payload.confidence,
-      words: payload.words,
-      timestamp: Date.now(),
-    })
-  })
+  useTauriEvent<TranscriptPartialPayload>("transcript_final", handleTranscriptFinalPayload)
 
   const onMissingApiKey = options?.onMissingApiKey
 
