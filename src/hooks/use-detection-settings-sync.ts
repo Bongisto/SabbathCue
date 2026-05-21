@@ -1,9 +1,11 @@
 import { useEffect } from "react"
-import { invoke } from "@tauri-apps/api/core"
+import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 import { useSettingsStore } from "@/stores/settings-store"
 
 export function useDetectionSettingsSync() {
   useEffect(() => {
+    if (!isTauriRuntime()) return
+
     let prev = {
       autoMode: useSettingsStore.getState().autoMode,
       confidenceThreshold: useSettingsStore.getState().confidenceThreshold,
@@ -11,7 +13,7 @@ export function useDetectionSettingsSync() {
     }
 
     const sync = (next = useSettingsStore.getState()) => {
-      void invoke("update_detection_settings", {
+      void invokeTauri("update_detection_settings", {
         autoMode: next.autoMode,
         confidenceThreshold: next.confidenceThreshold,
         cooldownMs: next.cooldownMs,

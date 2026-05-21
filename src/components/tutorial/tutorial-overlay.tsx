@@ -10,8 +10,15 @@ import {
 import { TUTORIAL_STEPS } from "./tutorial-steps"
 import { TutorialTooltip } from "./tutorial-tooltip"
 import { useTheme } from "@/components/theme-provider"
+import { isTauriRuntime } from "@/lib/tauri-runtime"
 
 export function TutorialOverlay() {
+  if (!isTauriRuntime()) return null
+
+  return <DesktopTutorialOverlay />
+}
+
+function DesktopTutorialOverlay() {
   const [isHydrated, setIsHydrated] = useState(false)
   const isRunning = useTutorialStore((s) => s.isRunning)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)

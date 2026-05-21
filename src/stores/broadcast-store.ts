@@ -3,6 +3,7 @@ import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
 import type { BroadcastTheme, PresentationRenderData } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import { isTauriRuntime } from "@/lib/tauri-runtime"
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -323,6 +324,8 @@ async function getThemeStore(): Promise<Store> {
 }
 
 export function hydrateBroadcastThemes(): Promise<void> {
+  if (!isTauriRuntime()) return Promise.resolve()
+
   if (hydrationPromise) return hydrationPromise
   hydrationPromise = (async () => {
     try {

@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { load } from "@tauri-apps/plugin-store"
-import { invoke } from "@tauri-apps/api/core"
+import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
 
@@ -56,13 +56,15 @@ export const useBibleStore = create<BibleState>((set) => ({
 
 /** Load persisted activeTranslationId from disk into Zustand, then sync to Rust backend. */
 export async function hydrateBibleStore(): Promise<void> {
+  if (!isTauriRuntime()) return
+
   try {
     const store = await load("bible.json", { autoSave: false, defaults: {} })
     const value = await store.get<number>("activeTranslationId")
     if (typeof value === "number") {
       useBibleStore.getState().setActiveTranslation(value)
     }
-    await invoke("set_active_translation", {
+    await invokeTauri("set_active_translation", {
       translationId: useBibleStore.getState().activeTranslationId,
     })
   } catch {
@@ -72,6 +74,8 @@ export async function hydrateBibleStore(): Promise<void> {
 
 /** Subscribe to activeTranslationId changes and persist to disk with debounce. */
 export async function initBiblePersistence(): Promise<void> {
+  if (!isTauriRuntime()) return
+
   try {
     const store = await load("bible.json", { autoSave: false, defaults: {} })
     let timer: ReturnType<typeof setTimeout> | null = null

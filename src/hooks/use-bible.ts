@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core"
 import { useBibleStore } from "@/stores/bible-store"
+import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 import type { Translation, Book, Verse, CrossReference } from "@/types"
 import type { SemanticSearchResult } from "@/types/detection"
 
@@ -7,14 +7,18 @@ import type { SemanticSearchResult } from "@/types/detection"
 // This prevents the infinite re-render loop caused by useCallback deps changing every render.
 
 async function loadTranslations() {
-  const translations = await invoke<Translation[]>("list_translations")
+  if (!isTauriRuntime()) return []
+
+  const translations = await invokeTauri<Translation[]>("list_translations")
   useBibleStore.getState().setTranslations(translations)
   return translations
 }
 
 async function loadBooks(translationId?: number) {
+  if (!isTauriRuntime()) return []
+
   const id = translationId ?? useBibleStore.getState().activeTranslationId
-  const books = await invoke<Book[]>("list_books", { translationId: id })
+  const books = await invokeTauri<Book[]>("list_books", { translationId: id })
   useBibleStore.getState().setBooks(books)
   return books
 }
@@ -24,8 +28,10 @@ async function loadChapter(
   chapter: number,
   translationId?: number
 ) {
+  if (!isTauriRuntime()) return []
+
   const id = translationId ?? useBibleStore.getState().activeTranslationId
-  const verses = await invoke<Verse[]>("get_chapter", {
+  const verses = await invokeTauri<Verse[]>("get_chapter", {
     translationId: id,
     bookNumber,
     chapter,
@@ -40,8 +46,10 @@ async function fetchVerse(
   verse: number,
   translationId?: number
 ) {
+  if (!isTauriRuntime()) return null
+
   const id = translationId ?? useBibleStore.getState().activeTranslationId
-  return invoke<Verse | null>("get_verse", {
+  return invokeTauri<Verse | null>("get_verse", {
     translationId: id,
     bookNumber,
     chapter,
@@ -54,8 +62,10 @@ async function searchVerses(
   limit = 20,
   translationId?: number
 ) {
+  if (!isTauriRuntime()) return []
+
   const id = translationId ?? useBibleStore.getState().activeTranslationId
-  const results = await invoke<Verse[]>("search_verses", {
+  const results = await invokeTauri<Verse[]>("search_verses", {
     query,
     translationId: id,
     limit,
@@ -65,7 +75,9 @@ async function searchVerses(
 }
 
 async function semanticSearch(query: string, limit = 10) {
-  const results = await invoke<SemanticSearchResult[]>("semantic_search", {
+  if (!isTauriRuntime()) return []
+
+  const results = await invokeTauri<SemanticSearchResult[]>("semantic_search", {
     query,
     limit,
   })
@@ -78,7 +90,9 @@ async function loadCrossReferences(
   chapter: number,
   verse: number
 ) {
-  const refs = await invoke<CrossReference[]>("get_cross_references", {
+  if (!isTauriRuntime()) return []
+
+  const refs = await invokeTauri<CrossReference[]>("get_cross_references", {
     bookNumber,
     chapter,
     verse,

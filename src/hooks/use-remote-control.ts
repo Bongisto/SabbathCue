@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { listen, type UnlistenFn } from "@tauri-apps/api/event"
-import { invoke } from "@tauri-apps/api/core"
+import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useBibleStore } from "@/stores/bible-store"
 import { useQueueStore } from "@/stores/queue-store"
@@ -20,6 +20,8 @@ import {
  */
 export function useRemoteControl() {
   useEffect(() => {
+    if (!isTauriRuntime()) return
+
     let cancelled = false
     const unlisteners: UnlistenFn[] = []
 
@@ -169,7 +171,7 @@ async function presentQueueItem(index: number) {
 
     // Fetch the full verse from the backend to ensure we have complete data
     // (AI-detected queue items may have partial verse objects)
-    const fullVerse = await invoke<Verse | null>("get_verse", {
+    const fullVerse = await invokeTauri<Verse | null>("get_verse", {
       translationId: useBibleStore.getState().activeTranslationId,
       bookNumber: verse.book_number,
       chapter: verse.chapter,
@@ -196,7 +198,9 @@ function syncStatusSnapshot() {
     (t) => t.id === broadcast.activeThemeId
   )
 
-  invoke("update_remote_status", {
+  if (!isTauriRuntime()) return
+
+  invokeTauri("update_remote_status", {
     onAir: broadcast.isLive,
     activeTheme: activeTheme?.name ?? null,
     liveVerse: broadcast.liveItem?.reference ?? null,

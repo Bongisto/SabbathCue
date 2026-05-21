@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { load, type Store } from "@tauri-apps/plugin-store"
+import { isTauriRuntime, invokeTauri } from "@/lib/tauri-runtime"
 
 type SttProvider = "deepgram" | "whisper" | "faster-whisper"
 type WhisperProfile = "fast" | "balanced"
@@ -73,6 +74,8 @@ async function getStore(): Promise<Store> {
  *  safe against concurrent callers — the first call owns the work and
  *  subsequent callers await the same promise. */
 export function hydrateSettings(): Promise<void> {
+  if (!isTauriRuntime()) return Promise.resolve()
+
   if (hydrationPromise) return hydrationPromise
   hydrationPromise = (async () => {
     try {
@@ -92,8 +95,7 @@ export function hydrateSettings(): Promise<void> {
       // Resolve keyring-backed secret presence (Deepgram key) and write only a boolean flag.
       // This is best-effort: if the command isn't available (web/dev), we just keep defaults.
       try {
-        const { invoke } = await import("@tauri-apps/api/core")
-        const has = await invoke<boolean>("has_deepgram_api_key")
+        const has = await invokeTauri<boolean>("has_deepgram_api_key")
         patch.hasDeepgramApiKey = has
       } catch {
         // ignore

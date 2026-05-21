@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { load } from "@tauri-apps/plugin-store"
+import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { useSettingsStore } from "./settings-store"
 
 interface TutorialState {
@@ -16,6 +17,8 @@ export const useTutorialStore = create<TutorialState>((set) => ({
 
 /** Load onboardingComplete from disk into settings store. */
 export async function hydrateOnboardingState(): Promise<void> {
+  if (!isTauriRuntime()) return
+
   try {
     const store = await load("settings.json", { autoSave: false, defaults: {} })
     const completed = await store.get<boolean>("onboardingComplete")
@@ -30,6 +33,8 @@ export async function hydrateOnboardingState(): Promise<void> {
 /** Write onboardingComplete=true to both Zustand and disk. */
 export async function persistOnboardingComplete(): Promise<void> {
   useSettingsStore.getState().setOnboardingComplete(true)
+  if (!isTauriRuntime()) return
+
   try {
     const store = await load("settings.json", { autoSave: false, defaults: {} })
     await store.set("onboardingComplete", true)
