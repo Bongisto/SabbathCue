@@ -46,6 +46,17 @@ describe("service plan shell integration", () => {
     expect(transport).toContain("openPlanner")
     expect(transport).toContain("Service Plan")
   })
+
+  it("validates service plan attachment paths and file sizes before storing them", () => {
+    const editor = readSource("src/components/service-plan/MediaAttachmentsEditor.tsx")
+    expect(editor).toContain("@tauri-apps/plugin-fs")
+    expect(editor).toContain("isAllowedLocalAttachmentPath")
+    expect(editor).toContain("isNetworkPath")
+    expect(editor).toContain("isBlockedSystemPath")
+    expect(editor).toContain("MAX_SLIDE_SIZE_BYTES")
+    expect(editor).toContain("MAX_MEDIA_SIZE_BYTES")
+    expect(editor).toContain("sizeBytes")
+  })
 })
 
 describe("prepare queue resources", () => {

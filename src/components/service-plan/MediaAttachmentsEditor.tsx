@@ -1,6 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog"
+import { stat } from "@tauri-apps/plugin-fs"
 import { Button } from "@/components/ui/button"
 import type { ServiceAttachment } from "@/types/service-plan"
+
+const MAX_SLIDE_SIZE_BYTES = 100 * 1024 * 1024
+const MAX_MEDIA_SIZE_BYTES = 750 * 1024 * 1024
 
 const SUPPORTED_ATTACHMENT_EXTENSIONS = [
   "png",
@@ -38,6 +42,64 @@ function isSupportedAttachmentPath(path: string): boolean {
   return SUPPORTED_ATTACHMENT_EXTENSIONS.includes(extensionFromPath(path))
 }
 
+function hasUrlScheme(path: string): boolean {
+  return /^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:[\\/]/i.test(path)
+}
+
+function isNetworkPath(path: string): boolean {
+  return path.startsWith("\\\\") || path.startsWith("//")
+}
+
+function isBlockedSystemPath(path: string): boolean {
+  const normalized = path.replaceAll("\\", "/").toLowerCase()
+  return (
+    /^[a-z]:\/windows(\/|$)/i.test(normalized) ||
+    /^[a-z]:\/program files( \(x86\))?(\/|$)/i.test(normalized) ||
+    /^[a-z]:\/programdata(\/|$)/i.test(normalized) ||
+    normalized.startsWith("/etc/") ||
+    normalized.startsWith("/bin/") ||
+    normalized.startsWith("/sbin/") ||
+    normalized.startsWith("/usr/") ||
+    normalized.startsWith("/var/") ||
+    normalized.startsWith("/system/") ||
+    normalized.startsWith("/library/")
+  )
+}
+
+function isAllowedLocalAttachmentPath(path: string): boolean {
+  if (!path.trim()) return false
+  if (hasUrlScheme(path)) return false
+  if (isNetworkPath(path)) return false
+  if (path.includes("..")) return false
+  if (isBlockedSystemPath(path)) return false
+  return isSupportedAttachmentPath(path)
+}
+
+function maxSizeForKind(kind: ServiceAttachment["kind"]): number {
+  return kind === "media" ? MAX_MEDIA_SIZE_BYTES : MAX_SLIDE_SIZE_BYTES
+}
+
+async function createAttachmentFromPath(path: string): Promise<ServiceAttachment | null> {
+  if (!isAllowedLocalAttachmentPath(path)) return null
+
+  const kind = attachmentKindFromPath(path)
+  try {
+    const info = await stat(path)
+    if (!info.isFile) return null
+    if (info.size > maxSizeForKind(kind)) return null
+    return {
+      id: crypto.randomUUID(),
+      kind,
+      label: fileNameFromPath(path),
+      path,
+      status: "pending",
+      sizeBytes: info.size,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function MediaAttachmentsEditor({ attachments, onChange }: MediaAttachmentsEditorProps) {
   const attachFiles = async () => {
     let selected: string | string[] | null
@@ -56,20 +118,16 @@ export function MediaAttachmentsEditor({ attachments, onChange }: MediaAttachmen
     }
 
     const paths = (Array.isArray(selected) ? selected : selected ? [selected] : []).filter(
-      isSupportedAttachmentPath,
+      isAllowedLocalAttachmentPath,
     )
     if (paths.length === 0) return
 
-    onChange([
-      ...attachments,
-      ...paths.map((path) => ({
-        id: crypto.randomUUID(),
-        kind: attachmentKindFromPath(path),
-        label: fileNameFromPath(path),
-        path,
-        status: "pending" as const,
-      })),
-    ])
+    const selectedAttachments = (
+      await Promise.all(paths.map((path) => createAttachmentFromPath(path)))
+    ).filter((attachment): attachment is ServiceAttachment => attachment !== null)
+
+    if (selectedAttachments.length === 0) return
+    onChange([...attachments, ...selectedAttachments])
   }
 
   return (
@@ -90,6 +148,12 @@ export function MediaAttachmentsEditor({ attachments, onChange }: MediaAttachmen
             <div key={attachment.id} className="flex items-center justify-between rounded-md border border-border px-2 py-1">
               <span className="truncate">
                 {attachment.label} <span className="text-muted-foreground">({attachment.kind})</span>
+                {typeof attachment.sizeBytes === "number" && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    - {(attachment.sizeBytes / (1024 * 1024)).toFixed(1)} MB
+                  </span>
+                )}
               </span>
               <Button
                 size="icon-xs"
