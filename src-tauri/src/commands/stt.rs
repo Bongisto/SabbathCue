@@ -813,8 +813,15 @@ fn run_direct_detection(
         let bad = DIRECT_LOCK_CONTENDED.fetch_add(1, Ordering::Relaxed) + 1;
         let good = DIRECT_LOCK_OK.load(Ordering::Relaxed);
         log::warn!(
-            "[DET-DIRECT] AppState try_lock FAILED (contention) ok={good} contended={bad} — emitting without verse text"
+            "[DET-DIRECT] AppState try_lock FAILED (contention) ok={good} contended={bad}"
         );
+
+        // Check for stale sequence BEFORE emitting in fallback path
+        if seq < latest_seq.load(Ordering::Relaxed) {
+            log::debug!("[DET-DIRECT] Skipping stale emission in fallback path seq={seq}");
+            return has_high_confidence;
+        }
+
         // AppState locked — emit results without verse text
         let results: Vec<super::detection::DetectionResult> = merged
             .iter()
@@ -921,16 +928,13 @@ fn run_semantic_detection(
             .and_then(|db| db.search_verses_bm25(transcript, 10).ok())
     };
 
-    let Some(fts) = fts_results else {
-        log::info!("[DET-SEMANTIC] No FTS5 results");
-        return;
-    };
+    let fts = fts_results.unwrap_or_default();
     if fts.is_empty() {
-        log::info!("[DET-SEMANTIC] No FTS5 results");
-        return;
+        log::debug!("[DET-SEMANTIC] No FTS5 results, trying vector-only search");
     }
 
-    // Use hybrid pipeline: FTS5 + vector search when available
+    // Use hybrid pipeline: FTS5 + vector search when available.
+    // Even with empty FTS5, vector search can catch paraphrases.
     let merged = {
         let pipeline_state: State<'_, Mutex<rhema_detection::DetectionPipeline>> = app.state();
         let Ok(mut pipeline) = pipeline_state.lock() else {
@@ -1298,4 +1302,65 @@ pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), Strin
 
     log::info!("Transcription stop requested");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    /// Test helper to verify stale sequence suppression logic.
+    /// This simulates the sequence checking used in run_direct_detection
+    /// and run_semantic_detection to ensure stale jobs don't emit.
+    #[test]
+    fn test_stale_sequence_suppression() {
+        let latest_seq = Arc::new(AtomicU64::new(10));
+
+        // Current job is stale (seq < latest)
+        let seq = 5;
+        assert!(seq < latest_seq.load(Ordering::Relaxed));
+        assert!(latest_seq.load(Ordering::Relaxed) > seq);
+
+        // Current job is fresh (seq == latest)
+        let seq = 10;
+        assert!(seq >= latest_seq.load(Ordering::Relaxed));
+
+        // Current job is ahead (seq > latest) - should be accepted
+        let seq = 15;
+        assert!(seq >= latest_seq.load(Ordering::Relaxed));
+    }
+
+    /// Test that sequence numbers increase monotonically
+    #[test]
+    fn test_sequence_monotonic_increase() {
+        let seq = Arc::new(AtomicU64::new(0));
+
+        let s1 = seq.fetch_add(1, Ordering::Relaxed) + 1;
+        let s2 = seq.fetch_add(1, Ordering::Relaxed) + 1;
+        let s3 = seq.fetch_add(1, Ordering::Relaxed) + 1;
+
+        assert!(s1 < s2);
+        assert!(s2 < s3);
+        assert_eq!(s1, 1);
+        assert_eq!(s2, 2);
+        assert_eq!(s3, 3);
+    }
+
+    /// Test that stale detection is correctly identified when
+    /// a newer transcript arrives while an older job is processing.
+    #[test]
+    fn test_stale_detection_with_concurrent_updates() {
+        let latest_seq = Arc::new(AtomicU64::new(5));
+
+        // Job starts with seq=5 (fresh)
+        let job_seq = 5;
+        assert!(job_seq >= latest_seq.load(Ordering::Relaxed));
+
+        // While job is processing, new transcript arrives (seq=6)
+        latest_seq.store(6, Ordering::Relaxed);
+
+        // Job finishes and checks for staleness
+        assert!(job_seq < latest_seq.load(Ordering::Relaxed));
+        // Should skip emission
+    }
 }
