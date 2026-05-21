@@ -90,6 +90,18 @@ describe("settings store", () => {
     expect(useSettingsStore.getState().whisperProfile).toBe("balanced")
   })
 
+  it("hydrate maps removed faster-whisper provider to local whisper", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "sttProvider") return "faster-whisper"
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    await hydrateSettings()
+
+    expect(useSettingsStore.getState().sttProvider).toBe("whisper")
+  })
+
   it("a setter call after hydration writes the full snapshot to disk", async () => {
     mockGet.mockResolvedValue(null)
 

@@ -102,18 +102,26 @@ impl WhisperProfile {
 
     pub(crate) const fn live_chunk_samples(self) -> usize {
         match self {
-            Self::Fast => 16_000 + 4_000,
-            Self::Balanced => (16_000 * 2) + 4_000,
+            Self::Fast => 16_000 + 2_000,
+            Self::Balanced => 16_000 * 2,
         }
     }
 
     pub(crate) const fn sampling_strategy(self) -> SamplingStrategy {
+        SamplingStrategy::Greedy { best_of: 1 }
+    }
+
+    pub(crate) const fn use_context(self) -> bool {
         match self {
-            Self::Fast => SamplingStrategy::Greedy { best_of: 1 },
-            Self::Balanced => SamplingStrategy::BeamSearch {
-                beam_size: 3,
-                patience: -1.0,
-            },
+            Self::Fast => false,
+            Self::Balanced => true,
+        }
+    }
+
+    pub(crate) const fn no_speech_threshold(self) -> f32 {
+        match self {
+            Self::Fast => 0.5,
+            Self::Balanced => 0.6,
         }
     }
 }
@@ -401,13 +409,13 @@ impl SttProvider for WhisperProvider {
                 params.set_print_realtime(false);
                 let initial_prompt = rolling_prompt.prompt();
                 params.set_initial_prompt(&initial_prompt);
-                params.set_no_context(false);
+                params.set_no_context(!profile.use_context());
                 params.set_no_timestamps(false);
-                params.set_single_segment(false);
+                params.set_single_segment(true);
                 params.set_token_timestamps(false);
                 params.set_temperature(0.0);
                 params.set_temperature_inc(0.0);
-                params.set_no_speech_thold(0.6);
+                params.set_no_speech_thold(profile.no_speech_threshold());
                 params.set_suppress_blank(true);
                 params.set_suppress_nst(true);
 
@@ -489,11 +497,10 @@ mod tests {
         ));
         assert!(matches!(
             balanced.sampling_strategy(),
-            SamplingStrategy::BeamSearch {
-                beam_size: 3,
-                patience: -1.0
-            }
+            SamplingStrategy::Greedy { best_of: 1 }
         ));
+        assert!(!fast.use_context());
+        assert!(balanced.use_context());
     }
 
     #[test]

@@ -153,7 +153,7 @@ This runs 7 idempotent phases in sequence, skipping any whose output artifacts a
 4. Download & export ONNX model (`all-MiniLM-L6-v2`) + INT8 quantization for ARM64
 5. Export KJV verses to JSON for embedding precomputation
 6. Precompute verse embeddings (GPU sentence-transformers when available, ONNX CPU fallback otherwise)
-7. Download Whisper model (`ggml-base.en.bin`) into `models/whisper/`
+7. Download Whisper model (`ggml-tiny.en.bin`) into `models/whisper/`
 
 ### Environment
 
@@ -164,7 +164,7 @@ SabbathCue supports two speech-to-text engines:
 **Option 1: Whisper (Local, Free)**
 Whisper runs locally on your machine with no API costs or per-minute billing.
 - Requires CMake + libclang — see [Platform-specific setup](#platform-specific-setup) above
-- The model (`ggml-base.en.bin`) is fetched as phase 7 of `setup:all`. Run `bun run download:whisper` to grab it on its own.
+- The model (`ggml-tiny.en.bin`) is fetched as phase 7 of `setup:all`. Run `bun run download:whisper` to grab it on its own.
 
 **Option 2: Deepgram (Cloud, Paid)**
 Create a `.env` file in the project root:
@@ -275,7 +275,7 @@ sabbathcue/
 | `precompute:embeddings-onnx` | Precompute embeddings via Python ONNX Runtime |
 | `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers (GPU path) |
 | `quantize:model` | Quantize ONNX model to INT8 for ARM64 |
-| `download:whisper` | Download `ggml-base.en.bin` for local Whisper STT |
+| `download:whisper` | Download `ggml-tiny.en.bin` for local Whisper STT |
 | `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
 | `web:dev`, `web:build`, `web:start`, `web:lint` | Marketing + Fumadocs documentation site under `web/` |
 

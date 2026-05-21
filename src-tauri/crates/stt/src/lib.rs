@@ -3,7 +3,6 @@
 //! Provides real-time transcription via multiple providers:
 //! - **Deepgram** (cloud) — WebSocket streaming with keyword boosting
 //! - **Whisper** (local) — offline inference via whisper.cpp
-//! - **faster-whisper** (local) — offline inference via Python/CTranslate2
 //!
 //! # Key types
 //!
@@ -17,7 +16,6 @@
 //!
 //! - `rest-fallback` — enables REST API fallback client
 //! - `whisper` — enables local Whisper STT provider
-//! - `faster-whisper` — enables local faster-whisper/CTranslate2 provider
 
 pub mod bench;
 pub mod deepgram;

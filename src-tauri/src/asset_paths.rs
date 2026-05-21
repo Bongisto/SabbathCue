@@ -3,8 +3,6 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 pub const WHISPER_MODEL_FILENAME: &str = "ggml-tiny.en.bin";
-const WHISPER_MODEL_FALLBACK_FILENAMES: [&str; 2] =
-    ["ggml-base.en.bin", "ggml-large-v3-turbo-q8_0.bin"];
 
 fn dev_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
@@ -33,23 +31,23 @@ pub fn bible_db_path(app: &AppHandle) -> PathBuf {
 }
 
 pub fn whisper_model_path(app: &AppHandle) -> PathBuf {
-    let candidates = std::iter::once(WHISPER_MODEL_FILENAME)
-        .chain(WHISPER_MODEL_FALLBACK_FILENAMES)
-        .into_iter()
-        .flat_map(|filename| {
-            [
-                app_data_dir(app)
-                    .ok()
-                    .map(|p| p.join("models").join("whisper").join(filename)),
-                app.path()
-                    .resource_dir()
-                    .ok()
-                    .map(|p| p.join("models").join("whisper").join(filename)),
-                Some(dev_root().join("models").join("whisper").join(filename)),
-            ]
-            .into_iter()
-            .flatten()
-        });
+    let candidates = [
+        app_data_dir(app)
+            .ok()
+            .map(|p| p.join("models").join("whisper").join(WHISPER_MODEL_FILENAME)),
+        app.path()
+            .resource_dir()
+            .ok()
+            .map(|p| p.join("models").join("whisper").join(WHISPER_MODEL_FILENAME)),
+        Some(
+            dev_root()
+                .join("models")
+                .join("whisper")
+                .join(WHISPER_MODEL_FILENAME),
+        ),
+    ]
+    .into_iter()
+    .flatten();
 
     first_existing(candidates).unwrap_or_else(|| {
         app_data_dir(app)
@@ -58,21 +56,6 @@ pub fn whisper_model_path(app: &AppHandle) -> PathBuf {
             .join("whisper")
             .join(WHISPER_MODEL_FILENAME)
     })
-}
-
-pub fn faster_whisper_worker_path(app: &AppHandle) -> PathBuf {
-    first_existing(
-        [
-            app.path()
-                .resource_dir()
-                .ok()
-                .map(|p| p.join("scripts").join("faster_whisper_worker.py")),
-            Some(dev_root().join("scripts").join("faster_whisper_worker.py")),
-        ]
-        .into_iter()
-        .flatten(),
-    )
-    .unwrap_or_else(|| dev_root().join("scripts").join("faster_whisper_worker.py"))
 }
 
 pub fn onnx_model_path(app: &AppHandle) -> PathBuf {

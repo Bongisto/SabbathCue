@@ -118,8 +118,8 @@ pub async fn start_transcription(
         #[cfg(feature = "whisper")]
         "whisper" => {
             // Resolve bundled Whisper model path.
-            // Dev: {CARGO_MANIFEST_DIR}/../models/whisper/ggml-base.en.bin
-            // Prod: resource_dir()/models/whisper/ggml-base.en.bin
+            // Dev: {CARGO_MANIFEST_DIR}/../models/whisper/ggml-tiny.en.bin
+            // Prod: resource_dir()/models/whisper/ggml-tiny.en.bin
             let model_path = asset_paths::whisper_model_path(&app);
             if !model_path.exists() {
                 return Err(format!(
@@ -148,41 +148,8 @@ pub async fn start_transcription(
         "whisper" => {
             return Err("Whisper support not compiled. Rebuild with --features whisper".into());
         }
-        #[cfg(feature = "faster-whisper")]
         "faster-whisper" => {
-            let script_path = asset_paths::faster_whisper_worker_path(&app);
-            if !script_path.exists() {
-                return Err(format!(
-                    "faster-whisper worker not found at {}.",
-                    script_path.display()
-                ));
-            }
-
-            let python_path =
-                std::env::var("SABBATHCUE_PYTHON").unwrap_or_else(|_| "python".to_string());
-            let model = std::env::var("SABBATHCUE_FASTER_WHISPER_MODEL")
-                .unwrap_or_else(|_| "large-v3-turbo".to_string());
-            let profile_log = whisper_profile.as_deref().unwrap_or("balanced");
-
-            log::info!(
-                "Starting faster-whisper transcription: python={python_path}, worker={}, model={model}, profile={profile_log}, device_id={device_id:?}",
-                script_path.display()
-            );
-
-            Box::new(rhema_stt::FasterWhisperProvider::new(
-                python_path,
-                script_path,
-                model,
-                Some("en".to_string()),
-                whisper_profile.as_deref(),
-            ))
-        }
-        #[cfg(not(feature = "faster-whisper"))]
-        "faster-whisper" => {
-            return Err(
-                "faster-whisper support not compiled. Rebuild with --features faster-whisper"
-                    .into(),
-            );
+            return Err("faster-whisper has been removed. Choose Local Whisper or Deepgram.".into());
         }
         _ => {
             // Deepgram (default)
