@@ -5,6 +5,7 @@ export type {
   TranscriptEventPayload,
 } from "./transcript"
 export type { Translation, Book, Verse, CrossReference } from "./bible"
+export type { Hymn, HymnScreen, HymnSearchResult, HymnSection, HymnSectionKind } from "./hymnal"
 export type { QueueItem } from "./queue"
 export { getVerseFromItem, getReferenceFromItem } from "./queue"
 export type { DetectionResult, DetectionStatus, ReadingAdvance, SemanticSearchResult } from "./detection"

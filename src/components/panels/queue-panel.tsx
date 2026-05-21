@@ -61,6 +61,10 @@ function QueueItemRow({
       <Badge variant="outline" className="shrink-0 text-[0.5rem]">
         Manual
       </Badge>
+    ) : item.source === "hymn" ? (
+      <Badge className="shrink-0 bg-amber-500/15 text-[0.5rem] text-amber-300 hover:bg-amber-500/15">
+        Hymn
+      </Badge>
     ) : item.source === "ai-semantic" ? (
       <Badge className="shrink-0 bg-indigo-500/15 text-[0.5rem] text-indigo-300 hover:bg-indigo-500/15">
         Semantic

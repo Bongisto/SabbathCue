@@ -1,8 +1,10 @@
 import {
   useCallback,
   useEffect,
+  lazy,
   useRef,
   useState,
+  Suspense,
   type PointerEvent as ReactPointerEvent,
 } from "react"
 import { Button } from "@/components/ui/button"
@@ -21,6 +23,12 @@ import {
   saveDashboardLayoutState,
   type DashboardViewMode,
 } from "@/lib/dashboard-layout"
+
+const LazyHymnalPanel = lazy(() =>
+  import("@/components/panels/hymnal-panel").then((mod) => ({
+    default: mod.HymnalPanel,
+  })),
+)
 
 function ResizeHandle({
   axis,
@@ -52,6 +60,7 @@ export function Dashboard() {
   const [windowWidth, setWindowWidth] = useState(() =>
     typeof window === "undefined" ? 1920 : window.innerWidth
   )
+  const [libraryMode, setLibraryMode] = useState<"scripture" | "hymnal">("scripture")
   const [layout, setLayout] = useState(loadDashboardLayoutState)
   const isCompact = windowWidth < 1400
   const viewMode = layout.viewMode
@@ -181,6 +190,20 @@ export function Dashboard() {
         >
           Reset layout
         </Button>
+        <Button
+          size="xs"
+          variant={libraryMode === "scripture" ? "default" : "outline"}
+          onClick={() => setLibraryMode("scripture")}
+        >
+          Bible
+        </Button>
+        <Button
+          size="xs"
+          variant={libraryMode === "hymnal" ? "default" : "outline"}
+          onClick={() => setLibraryMode("hymnal")}
+        >
+          Hymnal
+        </Button>
       </div>
 
       <div ref={contentRef} className="flex min-h-0 flex-1 flex-col gap-1.5 p-3">
@@ -233,7 +256,13 @@ export function Dashboard() {
             gridTemplateRows: isCompact ? "minmax(0, 1fr) minmax(220px, 0.55fr)" : undefined,
           }}
         >
-          <SearchPanel />
+          {libraryMode === "scripture" ? (
+            <SearchPanel />
+          ) : (
+            <Suspense fallback={<div className="rounded-lg border border-border bg-card" />}>
+              <LazyHymnalPanel />
+            </Suspense>
+          )}
           {!isCompact && (
             <ResizeHandle
               axis="x"
