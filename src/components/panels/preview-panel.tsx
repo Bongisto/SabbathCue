@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { PanelHeader } from "@/components/ui/panel-header"
+import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { bibleActions } from "@/hooks/use-bible"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
 import { commitPreviewToLive } from "@/lib/presentation-workflow"
@@ -57,7 +58,7 @@ export function PreviewPanel() {
       data-slot="preview-panel"
       className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
-      <PanelHeader title="Program preview" icon={<MonitorIcon className="size-3" />}>
+      <PanelHeader title="Program preview" icon={<MonitorIcon className="size-3" />} step={2}>
         <Badge variant="outline" className="h-5 text-[0.5625rem] uppercase">
           Staged
         </Badge>
@@ -102,7 +103,15 @@ export function PreviewPanel() {
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center p-3">
-        <CanvasVerse theme={activeTheme} verse={verseData} />
+        {verseData ? (
+          <CanvasVerse theme={activeTheme} verse={verseData} />
+        ) : (
+          <PanelEmptyState
+            icon={<MonitorIcon className="size-8" />}
+            title="No verse selected"
+            description="Detected, searched, or queued verses appear here before going live."
+          />
+        )}
       </div>
     </div>
   )

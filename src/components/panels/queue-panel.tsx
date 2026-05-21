@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
+import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -8,6 +9,8 @@ import {
   PlayIcon,
   XIcon,
   GripVerticalIcon,
+  ListOrderedIcon,
+  Rows3Icon,
 } from "lucide-react"
 import { useQueueStore } from "@/stores/queue-store"
 import {
@@ -166,7 +169,7 @@ export function QueuePanel() {
       data-slot="queue-panel"
       className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
-      <PanelHeader title="Queue">
+      <PanelHeader title="Queue" icon={<ListOrderedIcon className="size-3" />} step={4}>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{items.length}</Badge>
           <button
@@ -181,9 +184,13 @@ export function QueuePanel() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-0.5 p-1.5">
           {items.length === 0 && (
-            <p className="p-4 text-center text-xs text-muted-foreground">
-              Verses will appear here when detected or queued
-            </p>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <PanelEmptyState
+                icon={<Rows3Icon className="size-8" />}
+                title="Queue is empty"
+                description="Verses will appear here when detected or manually queued."
+              />
+            </div>
           )}
           {items.map((item, idx) => (
             <QueueItemRow

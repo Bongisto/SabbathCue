@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { PanelHeader } from "@/components/ui/panel-header"
+import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { Button } from "@/components/ui/button"
 import { ApiKeyPrompt } from "@/components/ui/api-key-prompt"
@@ -107,6 +108,7 @@ export function TranscriptPanel() {
       <PanelHeader
         title="Live transcript"
         icon={<MicIcon className="size-3" />}
+        step={1}
       >
         <div className="flex items-end gap-2 pb-px">
           {(segments.length > 0 || hasPartial) && (
@@ -143,9 +145,13 @@ export function TranscriptPanel() {
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b from-card to-transparent" />
 
           {segments.length === 0 && !hasPartial && !isTranscribing && (
-            <p className="text-sm text-muted-foreground">
-              Click "Start transcribing" to begin
-            </p>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <PanelEmptyState
+                icon={<MicOffIcon className="size-8" />}
+                title="No transcript yet"
+                description="Click Start transcribing to begin capturing live speech."
+              />
+            </div>
           )}
 
           {/* Final segments — recent ones brighter, older ones fade */}

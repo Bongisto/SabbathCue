@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { PanelHeader } from "@/components/ui/panel-header"
+import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { Switch } from "@/components/ui/switch"
 import { isPanelFullscreen, togglePanelFullscreen } from "@/components/panels/live-output-panel-fullscreen"
 import { commitPreviewToLive } from "@/lib/presentation-workflow"
@@ -72,7 +73,7 @@ export function LiveOutputPanel() {
       )}
     >
       {!isFullscreen && (
-        <PanelHeader title="Live output" icon={<RadioIcon className="size-3" />}>
+        <PanelHeader title="Live output" icon={<RadioIcon className="size-3" />} step={3}>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -154,11 +155,19 @@ export function LiveOutputPanel() {
           !isLive && "opacity-45",
         )}
       >
-        <CanvasVerse
-          theme={activeTheme}
-          verse={visibleVerse}
-          className={isFullscreen ? "[&_canvas]:rounded-none" : undefined}
-        />
+        {visibleVerse ? (
+          <CanvasVerse
+            theme={activeTheme}
+            verse={visibleVerse}
+            className={isFullscreen ? "[&_canvas]:rounded-none" : undefined}
+          />
+        ) : (
+          <PanelEmptyState
+            icon={<EyeOffIcon className="size-8" />}
+            title="Nothing live"
+            description="Send a verse or toggle visibility to show audience output."
+          />
+        )}
       </div>
 
       <div className={cn("truncate border-t border-border px-3 py-1.5 text-xs text-muted-foreground", isFullscreen && "hidden")}>

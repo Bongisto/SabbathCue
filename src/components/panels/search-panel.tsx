@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { invoke } from "@tauri-apps/api/core"
 // Using native overflow-y-auto instead of Radix ScrollArea for reliable scrolling in flex layouts
+import { PanelHeader } from "@/components/ui/panel-header"
+import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { Button } from "@/components/ui/button"
 import { getAutocompleteSuggestion, getTabNavigationResult } from "@/lib/quick-search"
 import {
@@ -18,6 +20,7 @@ import {
   ArrowRightIcon,
   CheckIcon,
   PlusIcon,
+  SearchIcon,
 } from "lucide-react"
 import {
   Tooltip,
@@ -378,6 +381,8 @@ export function SearchPanel() {
       onKeyDown={activeTab === "book" ? handleKeyDown : undefined}
       tabIndex={-1}
     >
+      <PanelHeader title="Search" icon={<SearchIcon className="size-3" />} step={5} />
+
       {/* STICKY: Tab row + search input */}
       <div className="flex shrink-0 items-center gap-0 border-b border-border min-h-11">
         <div className="flex items-center gap-1 px-3 py-1.5">
@@ -651,14 +656,22 @@ export function SearchPanel() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-0 p-2">
             {contextQuery.length < 5 && (
-              <p className="p-4 text-center text-xs text-muted-foreground">
-                Search by meaning — type a phrase, paraphrase, or topic...
-              </p>
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <PanelEmptyState
+                  icon={<SparklesIcon className="size-8" />}
+                  title="Type to search"
+                  description="Search by meaning — type a phrase, paraphrase, or topic..."
+                />
+              </div>
             )}
             {contextQuery.length >= 5 && semanticResults.length === 0 && (
-              <p className="p-4 text-center text-xs text-muted-foreground">
-                No results found
-              </p>
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <PanelEmptyState
+                  icon={<SparklesIcon className="size-8" />}
+                  title="No results found"
+                  description="Try a different phrase, paraphrase, or topic."
+                />
+              </div>
             )}
             {semanticResults.map((result, idx) => (
               <div

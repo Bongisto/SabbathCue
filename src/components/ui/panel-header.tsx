@@ -6,11 +6,13 @@ function PanelHeader({
   className,
   title,
   icon,
+  step,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   title: string
   icon?: React.ReactNode
+  step?: number
 }) {
   return (
     <div
@@ -22,6 +24,11 @@ function PanelHeader({
       {...props}
     >
       <span className="flex items-center gap-2 text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+        {step !== undefined && (
+          <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-muted-foreground/15 text-[0.5625rem] font-bold text-muted-foreground">
+            {step}
+          </span>
+        )}
         {icon}
         {title}
       </span>

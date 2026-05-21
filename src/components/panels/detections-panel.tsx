@@ -1,7 +1,8 @@
 import { PanelHeader } from "@/components/ui/panel-header"
+import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
-import { EyeIcon, PlayIcon, PlusIcon } from "lucide-react"
+import { EyeIcon, PlayIcon, PlusIcon, RadarIcon } from "lucide-react"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { useQueueStore } from "@/stores/queue-store"
 import {
@@ -95,7 +96,7 @@ export function DetectionsPanel() {
       data-slot="detections-panel"
       className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
-      <PanelHeader title="Recent detections">
+      <PanelHeader title="Recent detections" icon={<RadarIcon className="size-3" />} step={6}>
         <button
           onClick={() => detectionActions.clearDetections()}
           className="text-[0.625rem] text-muted-foreground transition-colors hover:text-foreground"
@@ -107,9 +108,13 @@ export function DetectionsPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-0">
           {detections.length === 0 && (
-            <p className="p-4 text-center text-xs text-muted-foreground">
-              Verse detections will appear here during transcription
-            </p>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <PanelEmptyState
+                icon={<RadarIcon className="size-8" />}
+                title="No detections yet"
+                description="Verse detections will appear here during live transcription."
+              />
+            </div>
           )}
           {detections.map((detection, i) => (
             <DetectionCard key={`${detection.verse_ref}-${i}`} detection={detection} />

@@ -5,7 +5,15 @@ import { useAudioStore } from "@/stores/audio-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
-import { MicIcon, RadioIcon, Rows3Icon, SwatchBookIcon } from "lucide-react"
+import { transcriptionActions } from "@/hooks/use-transcription"
+import {
+  MicIcon,
+  RadioIcon,
+  Rows3Icon,
+  SwatchBookIcon,
+  EyeOffIcon,
+  StopCircleIcon,
+} from "lucide-react"
 
 export function OperatorStatusStrip() {
   const audioLevel = useAudioStore((s) => s.level)
@@ -46,6 +54,37 @@ export function OperatorStatusStrip() {
       <div className="flex items-center gap-1.5">
         <Rows3Icon className="size-3.5" />
         <span>{queueLength} queued</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => useBroadcastStore.getState().setLive(false)}
+          disabled={!isLive}
+          title="Hide Live Output"
+          className={cn(
+            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
+            isLive
+              ? "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
+              : "cursor-not-allowed text-muted-foreground/30"
+          )}
+        >
+          <EyeOffIcon className="size-3" />
+          Hide Live Output
+        </button>
+        <button
+          onClick={() => { void transcriptionActions.stop() }}
+          disabled={!isTranscribing}
+          title="Stop Transcription"
+          className={cn(
+            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
+            isTranscribing
+              ? "text-red-500 hover:bg-red-500/15 hover:text-red-400"
+              : "cursor-not-allowed text-muted-foreground/30"
+          )}
+        >
+          <StopCircleIcon className="size-3" />
+          Stop Transcription
+        </button>
       </div>
 
       <div className="ml-auto flex min-w-0 items-center gap-1.5">
