@@ -1,17 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 export type Platform = "mac" | "windows" | "linux" | "other";
 
 export function usePlatform(): Platform | null {
-  const [platform, setPlatform] = useState<Platform | null>(null);
-
-  useEffect(() => {
-    setPlatform(detectPlatform());
-  }, []);
-
-  return platform;
+  return detectPlatform();
 }
 
 function detectPlatform(): Platform {

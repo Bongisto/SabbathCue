@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockInvoke = vi.fn()
 const mockToastError = vi.fn()
-let mockIsAppVerified = true
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
@@ -24,10 +23,6 @@ vi.mock("@/services/hymnal/hymn-voice-control", () => ({
   handleHymnVoiceControl: (...args: unknown[]) => handleHymnVoiceControlMock(...args),
 }))
 
-vi.mock("@/stores/verification-store", () => ({
-  isAppVerified: () => mockIsAppVerified,
-}))
-
 async function loadModules() {
   vi.resetModules()
   const transcriptMod = await import("@/stores/transcript-store")
@@ -47,7 +42,6 @@ describe("use-transcription", () => {
     mockToastError.mockReset()
     handleHymnVoiceControlMock.mockReset()
     handleHymnVoiceControlMock.mockResolvedValue(false)
-    mockIsAppVerified = true
   })
 
   describe("transcriptionActions.start", () => {
@@ -158,19 +152,6 @@ describe("use-transcription", () => {
         { description: "Whisper model not found" }
       )
       expect(useTranscriptStore.getState().connectionStatus).toBe("error")
-    })
-
-    it("blocks transcription while the app is unverified", async () => {
-      mockIsAppVerified = false
-      const { useTranscriptStore, transcriptionActions } = await loadModules()
-
-      await transcriptionActions.start()
-
-      expect(mockInvoke).not.toHaveBeenCalled()
-      expect(useTranscriptStore.getState().connectionStatus).toBe("error")
-      expect(mockToastError).toHaveBeenCalledWith("Verification required", {
-        description: "Verify this device before starting transcription.",
-      })
     })
   })
 

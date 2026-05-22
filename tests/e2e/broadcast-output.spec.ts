@@ -80,17 +80,17 @@ const verse = {
 }
 
 test("broadcast output paints the same payload committed from preview", async ({ page }) => {
-  await page.goto("/broadcast-output.html?output=main")
+  await page.goto("/broadcast-output.html?output=main", { waitUntil: "domcontentloaded" })
 
   const canvas = page.locator("canvas")
   await expect(canvas).toBeVisible()
 
   await page.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__))
   await page.evaluate(
-    ({ theme, verse }) => {
-      window.__SABBATHCUE_BROADCAST_TEST__?.render({ theme, verse })
+    ({ theme, item }) => {
+      window.__SABBATHCUE_BROADCAST_TEST__?.render({ theme, item })
     },
-    { theme, verse },
+    { theme, item: verse },
   )
 
   await expect

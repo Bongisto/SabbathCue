@@ -279,6 +279,18 @@ sabbathcue/
 | `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
 | `web:dev`, `web:build`, `web:start`, `web:lint` | Marketing + Fumadocs documentation site under `web/` |
 
+### Web documentation site (`web/`)
+
+The marketing/docs app under `web/` is a separate Next.js package. Install its dependencies
+before running any `web:*` script from the repo root:
+
+```bash
+cd web && bun install && cd ..
+bun run web:build
+```
+
+`web:build` runs `cd web && bun run build` and will fail if `web/node_modules` is missing.
+
 ## Security
 
 SabbathCue enforces a restrictive Content Security Policy on the Tauri webview to prevent script injection and unauthorized data exfiltration. The policy is defined in `src-tauri/tauri.conf.json`; see **[SECURITY.md](.github/SECURITY.md)** for the directive-by-directive rationale, threat model, and vulnerability reporting process.

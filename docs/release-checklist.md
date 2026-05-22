@@ -25,6 +25,8 @@ Run these from the repo root unless noted:
 - [ ] `bun run typecheck`
 - [ ] `bun run test -- --run`
 - [ ] `bun run build`
+- [ ] `cd web && bun install && cd ..` (required before `web:build`)
+- [ ] `bun run web:build`
 
 Run these from `src-tauri/`:
 

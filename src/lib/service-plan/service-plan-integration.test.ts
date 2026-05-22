@@ -47,15 +47,20 @@ describe("service plan shell integration", () => {
     expect(transport).toContain("Service Plan")
   })
 
-  it("validates service plan attachment paths and file sizes before storing them", () => {
+  it("validates service plan attachments through the backend command", () => {
     const editor = readSource("src/components/service-plan/MediaAttachmentsEditor.tsx")
-    expect(editor).toContain("@tauri-apps/plugin-fs")
-    expect(editor).toContain("isAllowedLocalAttachmentPath")
-    expect(editor).toContain("isNetworkPath")
-    expect(editor).toContain("isBlockedSystemPath")
-    expect(editor).toContain("MAX_SLIDE_SIZE_BYTES")
-    expect(editor).toContain("MAX_MEDIA_SIZE_BYTES")
+    expect(editor).not.toContain("@tauri-apps/plugin-fs")
+    expect(editor).toContain("validate_service_attachment_path")
+    expect(editor).toContain("invokeTauri")
     expect(editor).toContain("sizeBytes")
+  })
+
+  it("implements attachment validation in the Tauri assets command", () => {
+    const assets = readSource("src-tauri/src/commands/assets.rs")
+    expect(assets).toContain("validate_service_attachment_path")
+    expect(assets).toContain("ServiceAttachmentValidation")
+    expect(assets).toContain("MAX_SLIDE_SIZE_BYTES")
+    expect(assets).toContain("MAX_MEDIA_SIZE_BYTES")
   })
 })
 

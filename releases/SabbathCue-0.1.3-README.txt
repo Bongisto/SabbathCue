@@ -1,0 +1,24 @@
+SabbathCue 0.1.3 — Production Readiness
+========================================
+
+Build date: 2026-05-22
+Previous public build: 0.1.2
+
+This release removes the mock device verification gate from production builds,
+validates service-plan attachments through a narrow Tauri backend command,
+and fixes the broadcast-output end-to-end test to match the runtime payload contract.
+
+What's improved in 0.1.3
+------------------------
+- Public desktop builds no longer require mock verification to start transcription
+- Service-plan attachment paths are validated in Rust instead of plugin-fs
+- Broadcast e2e verifies the real `{ theme, item }` canvas payload shape
+- npm package metadata matches Tauri/Cargo version 0.1.3
+
+Installers (after build)
+------------------------
+- NSIS setup (recommended): src-tauri\target\release\bundle\nsis\SabbathCue_0.1.3_x64-setup.exe
+- MSI: src-tauri\target\release\bundle\msi\SabbathCue_0.1.3_x64_en-US.msi
+- Portable exe: src-tauri\target\release\SabbathCue.exe
+
+Verify version: Windows Settings > Apps, or right-click the .exe > Properties > Details.

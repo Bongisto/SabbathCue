@@ -1,10 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog"
-import { stat } from "@tauri-apps/plugin-fs"
 import { Button } from "@/components/ui/button"
+import { invokeTauri } from "@/lib/tauri-runtime"
 import type { ServiceAttachment } from "@/types/service-plan"
-
-const MAX_SLIDE_SIZE_BYTES = 100 * 1024 * 1024
-const MAX_MEDIA_SIZE_BYTES = 750 * 1024 * 1024
 
 const SUPPORTED_ATTACHMENT_EXTENSIONS = [
   "png",
@@ -18,82 +15,30 @@ const SUPPORTED_ATTACHMENT_EXTENSIONS = [
   "pdf",
 ]
 
+interface ServiceAttachmentValidation {
+  label: string
+  kind: ServiceAttachment["kind"]
+  sizeBytes: number
+}
+
 interface MediaAttachmentsEditorProps {
   attachments: ServiceAttachment[]
   onChange: (attachments: ServiceAttachment[]) => void
 }
 
-function fileNameFromPath(path: string): string {
-  return path.split(/[\\/]/).pop()?.trim() || "Attachment"
-}
-
-function extensionFromPath(path: string): string {
-  return fileNameFromPath(path).split(".").pop()?.toLowerCase() ?? ""
-}
-
-function attachmentKindFromPath(path: string): ServiceAttachment["kind"] {
-  const extension = extensionFromPath(path)
-  if (["png", "jpg", "jpeg", "webp", "gif", "pdf"].includes(extension)) return "slide"
-  if (["mp4", "mov", "webm"].includes(extension)) return "media"
-  return "document"
-}
-
-function isSupportedAttachmentPath(path: string): boolean {
-  return SUPPORTED_ATTACHMENT_EXTENSIONS.includes(extensionFromPath(path))
-}
-
-function hasUrlScheme(path: string): boolean {
-  return /^[a-z][a-z\d+.-]*:/i.test(path) && !/^[a-z]:[\\/]/i.test(path)
-}
-
-function isNetworkPath(path: string): boolean {
-  return path.startsWith("\\\\") || path.startsWith("//")
-}
-
-function isBlockedSystemPath(path: string): boolean {
-  const normalized = path.replaceAll("\\", "/").toLowerCase()
-  return (
-    /^[a-z]:\/windows(\/|$)/i.test(normalized) ||
-    /^[a-z]:\/program files( \(x86\))?(\/|$)/i.test(normalized) ||
-    /^[a-z]:\/programdata(\/|$)/i.test(normalized) ||
-    normalized.startsWith("/etc/") ||
-    normalized.startsWith("/bin/") ||
-    normalized.startsWith("/sbin/") ||
-    normalized.startsWith("/usr/") ||
-    normalized.startsWith("/var/") ||
-    normalized.startsWith("/system/") ||
-    normalized.startsWith("/library/")
-  )
-}
-
-function isAllowedLocalAttachmentPath(path: string): boolean {
-  if (!path.trim()) return false
-  if (hasUrlScheme(path)) return false
-  if (isNetworkPath(path)) return false
-  if (path.includes("..")) return false
-  if (isBlockedSystemPath(path)) return false
-  return isSupportedAttachmentPath(path)
-}
-
-function maxSizeForKind(kind: ServiceAttachment["kind"]): number {
-  return kind === "media" ? MAX_MEDIA_SIZE_BYTES : MAX_SLIDE_SIZE_BYTES
-}
-
 async function createAttachmentFromPath(path: string): Promise<ServiceAttachment | null> {
-  if (!isAllowedLocalAttachmentPath(path)) return null
-
-  const kind = attachmentKindFromPath(path)
   try {
-    const info = await stat(path)
-    if (!info.isFile) return null
-    if (info.size > maxSizeForKind(kind)) return null
+    const validated = await invokeTauri<ServiceAttachmentValidation>(
+      "validate_service_attachment_path",
+      { path },
+    )
     return {
       id: crypto.randomUUID(),
-      kind,
-      label: fileNameFromPath(path),
+      kind: validated.kind,
+      label: validated.label,
       path,
       status: "pending",
-      sizeBytes: info.size,
+      sizeBytes: validated.sizeBytes,
     }
   } catch {
     return null
@@ -117,9 +62,7 @@ export function MediaAttachmentsEditor({ attachments, onChange }: MediaAttachmen
       return
     }
 
-    const paths = (Array.isArray(selected) ? selected : selected ? [selected] : []).filter(
-      isAllowedLocalAttachmentPath,
-    )
+    const paths = Array.isArray(selected) ? selected : selected ? [selected] : []
     if (paths.length === 0) return
 
     const selectedAttachments = (

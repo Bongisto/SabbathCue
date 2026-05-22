@@ -32,6 +32,29 @@ jobs:
       - name: Build frontend
         run: bun run build
 
+  web-docs:
+    name: Web docs build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install root dependencies
+        run: bun install
+
+      - name: Install web dependencies
+        working-directory: web
+        run: bun install
+
+      - name: Build web docs
+        run: bun run web:build
+
   rust:
     name: Rust checks
     runs-on: windows-latest

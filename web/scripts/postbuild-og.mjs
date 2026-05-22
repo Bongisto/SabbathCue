@@ -13,8 +13,9 @@
 import { readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const OUT_DIR = new URL("../out/", import.meta.url).pathname;
+const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
 const TARGETS = [
   { route: "opengraph-image" },
