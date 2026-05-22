@@ -39,7 +39,12 @@ pub fn vosk_model_path(app: &AppHandle) -> PathBuf {
             .resource_dir()
             .ok()
             .map(|p| p.join("models").join("vosk").join(VOSK_MODEL_DIRNAME)),
-        Some(dev_root().join("models").join("vosk").join(VOSK_MODEL_DIRNAME)),
+        Some(
+            dev_root()
+                .join("models")
+                .join("vosk")
+                .join(VOSK_MODEL_DIRNAME),
+        ),
     ]
     .into_iter()
     .flatten();

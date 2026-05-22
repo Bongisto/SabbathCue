@@ -247,15 +247,22 @@ mod tests {
                 rank: 1.0,
             },
         ];
-        
+
         let results = pipeline.process_hybrid_with_fts("test text", &fts_results);
-        
+
         // Should return FTS5-backed results even without vector search
         assert!(!results.is_empty());
         // Results should include the FTS5 hits
         let verse_refs: Vec<String> = results
             .iter()
-            .map(|r| format!("{} {}:{}", r.detection.verse_ref.book_name, r.detection.verse_ref.chapter, r.detection.verse_ref.verse_start))
+            .map(|r| {
+                format!(
+                    "{} {}:{}",
+                    r.detection.verse_ref.book_name,
+                    r.detection.verse_ref.chapter,
+                    r.detection.verse_ref.verse_start
+                )
+            })
             .collect();
         assert!(verse_refs.iter().any(|r| r.contains("John")));
     }
@@ -264,9 +271,9 @@ mod tests {
     fn test_pipeline_hybrid_with_fts_empty_fts() {
         let mut pipeline = DetectionPipeline::new();
         let fts_results = vec![];
-        
+
         let results = pipeline.process_hybrid_with_fts("test text", &fts_results);
-        
+
         // Should return empty when no FTS5 results
         assert!(results.is_empty());
     }
@@ -290,13 +297,17 @@ mod tests {
                 rank: 5.0,
             },
         ];
-        
+
         let results = pipeline.process_hybrid_with_fts("test text", &fts_results);
-        
+
         // Rank 0 should have higher confidence than rank 5
-        let rank0 = results.iter().find(|r| r.detection.verse_ref.book_name == "John");
-        let rank5 = results.iter().find(|r| r.detection.verse_ref.book_name == "Romans");
-        
+        let rank0 = results
+            .iter()
+            .find(|r| r.detection.verse_ref.book_name == "John");
+        let rank5 = results
+            .iter()
+            .find(|r| r.detection.verse_ref.book_name == "Romans");
+
         assert!(rank0.is_some());
         assert!(rank5.is_some());
         assert!(rank0.unwrap().detection.confidence > rank5.unwrap().detection.confidence);

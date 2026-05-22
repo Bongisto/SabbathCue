@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crossbeam_channel::Receiver;
@@ -57,7 +57,6 @@ impl DeepgramClient {
             q.append_pair("endpointing", DEEPGRAM_ENDPOINTING_MS);
             q.append_pair("utterance_end_ms", DEEPGRAM_UTTERANCE_END_MS);
             q.append_pair("vad_events", "true");
-            q.append_pair("no_delay", "true");
             append_deepgram_keyterms(&mut q);
             log::info!(
                 "Deepgram keyterm boosting: {} keyterms added",
@@ -103,15 +102,8 @@ impl DeepgramClient {
                         "DeepgramClient: connection error (attempt {attempts}/{MAX_RECONNECT_ATTEMPTS}): {e}",
                     );
 
-                    let _ = event_tx.send(TranscriptEvent::Disconnected).await;
-
                     if attempts >= MAX_RECONNECT_ATTEMPTS {
                         log::error!("DeepgramClient: max reconnection attempts reached");
-                        let _ = event_tx
-                            .send(TranscriptEvent::Error(format!(
-                                "Max reconnection attempts reached: {e}"
-                            )))
-                            .await;
                         return Err(e);
                     }
 
@@ -160,8 +152,11 @@ impl DeepgramClient {
         // Track unexpected disconnects so try_connect returns Err and triggers reconnection.
         let send_error_flag = Arc::new(AtomicBool::new(false));
         let recv_error_flag = Arc::new(AtomicBool::new(false));
+        let error_detail = Arc::new(Mutex::new(None::<String>));
         let send_err = send_error_flag.clone();
         let recv_err = recv_error_flag.clone();
+        let send_error_detail = error_detail.clone();
+        let recv_error_detail = error_detail.clone();
 
         // Split the sender into two parts to avoid blocking the tokio runtime:
         // 1. A blocking thread reads audio from crossbeam → sends to a tokio channel
@@ -247,6 +242,9 @@ impl DeepgramClient {
                         if let Err(e) = write.send(Message::Binary(data.into())).await {
                             log::error!("DeepgramClient ws_writer: send error: {e}");
                             send_err.store(true, Ordering::SeqCst);
+                            if let Ok(mut detail) = send_error_detail.lock() {
+                                *detail = Some(format!("send error: {e}"));
+                            }
                             break;
                         }
                     }
@@ -255,6 +253,9 @@ impl DeepgramClient {
                         if let Err(e) = write.send(Message::Text(ka.into())).await {
                             log::error!("DeepgramClient ws_writer: keepalive error: {e}");
                             send_err.store(true, Ordering::SeqCst);
+                            if let Ok(mut detail) = send_error_detail.lock() {
+                                *detail = Some(format!("keepalive error: {e}"));
+                            }
                             break;
                         }
                     }
@@ -281,15 +282,22 @@ impl DeepgramClient {
                             log::warn!("DeepgramClient receiver: parse error: {e}");
                         }
                     }
-                    Ok(Message::Close(_)) => {
-                        log::info!("DeepgramClient receiver: server closed connection");
+                    Ok(Message::Close(close)) => {
+                        let reason = close
+                            .as_ref()
+                            .map(|frame| {
+                                format!(
+                                    "server closed connection: code={} reason={}",
+                                    frame.code, frame.reason
+                                )
+                            })
+                            .unwrap_or_else(|| "server closed connection without a reason".into());
+                        log::info!("DeepgramClient receiver: {reason}");
                         if !recv_cancelled.load(Ordering::SeqCst) {
                             recv_err.store(true, Ordering::SeqCst);
-                            let _ = event_tx
-                                .send(TranscriptEvent::Error(
-                                    "Deepgram WebSocket closed unexpectedly".into(),
-                                ))
-                                .await;
+                            if let Ok(mut detail) = recv_error_detail.lock() {
+                                *detail = Some(reason);
+                            }
                         }
                         break;
                     }
@@ -299,9 +307,9 @@ impl DeepgramClient {
                     Err(e) => {
                         log::error!("DeepgramClient receiver: WebSocket error: {e}");
                         recv_err.store(true, Ordering::SeqCst);
-                        let _ = event_tx
-                            .send(TranscriptEvent::Error(format!("WebSocket error: {e}")))
-                            .await;
+                        if let Ok(mut detail) = recv_error_detail.lock() {
+                            *detail = Some(format!("WebSocket error: {e}"));
+                        }
                         break;
                     }
                 }
@@ -324,9 +332,12 @@ impl DeepgramClient {
 
         // If either side had an unexpected error, return Err so the connection loop retries.
         if send_error_flag.load(Ordering::SeqCst) || recv_error_flag.load(Ordering::SeqCst) {
-            return Err(SttError::ConnectionFailed(
-                "Connection lost unexpectedly".into(),
-            ));
+            let detail = error_detail
+                .lock()
+                .ok()
+                .and_then(|detail| detail.clone())
+                .unwrap_or_else(|| "Connection lost unexpectedly".into());
+            return Err(SttError::ConnectionFailed(detail));
         }
 
         Ok(())
@@ -501,11 +512,7 @@ impl SttProvider for DeepgramClient {
             log::warn!(
                 "[STT-Deepgram] WebSocket failed after retries: {e}, switching to REST fallback"
             );
-            let _ = event_tx
-                .send(TranscriptEvent::Error(
-                    "Connection unstable, switching to Hybrid mode".into(),
-                ))
-                .await;
+            let _ = event_tx.send(TranscriptEvent::Connected).await;
 
             let rest_client = crate::rest::DeepgramRestClient::new(self.config.clone());
             let flush_interval = std::time::Duration::from_millis(1500);
@@ -621,6 +628,7 @@ mod tests {
         assert!(pairs.contains(&("utterance_end_ms".into(), DEEPGRAM_UTTERANCE_END_MS.into())));
         assert!(pairs.contains(&("language".into(), "en".into())));
         assert!(pairs.contains(&("keyterm".into(), "Jesus".into())));
+        assert!(!pairs.iter().any(|(key, _)| key == "no_delay"));
     }
 
     #[tokio::test]

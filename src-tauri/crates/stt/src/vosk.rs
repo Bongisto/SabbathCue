@@ -44,7 +44,9 @@ enum WorkerEvent {
         #[serde(default)]
         words: Vec<VoskWord>,
     },
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -157,10 +159,33 @@ fn vosk_grammar_json() -> Result<String, SttError> {
     phrases.extend(bible_keyterms().into_iter().map(|term| term.to_lowercase()));
     phrases.extend(
         [
-            "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-            "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
-            "eighteen", "nineteen", "twenty", "thirty", "forty", "fifty", "sixty",
-            "seventy", "eighty", "ninety",
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
+            "ten",
+            "eleven",
+            "twelve",
+            "thirteen",
+            "fourteen",
+            "fifteen",
+            "sixteen",
+            "seventeen",
+            "eighteen",
+            "nineteen",
+            "twenty",
+            "thirty",
+            "forty",
+            "fifty",
+            "sixty",
+            "seventy",
+            "eighty",
+            "ninety",
         ]
         .iter()
         .map(|term| (*term).to_string()),

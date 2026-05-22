@@ -156,7 +156,9 @@ fn is_supported_extension(extension: &str) -> bool {
 }
 
 fn path_contains_parent_traversal(path: &str) -> bool {
-    Path::new(path).components().any(|component| matches!(component, Component::ParentDir))
+    Path::new(path)
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
 }
 
 fn max_size_for_kind(kind: &str) -> u64 {
@@ -167,7 +169,9 @@ fn max_size_for_kind(kind: &str) -> u64 {
     }
 }
 
-fn validate_service_attachment_path_inner(path: &str) -> Result<ServiceAttachmentValidation, String> {
+fn validate_service_attachment_path_inner(
+    path: &str,
+) -> Result<ServiceAttachmentValidation, String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
         return Err("Attachment path is empty".to_string());
@@ -215,7 +219,9 @@ fn validate_service_attachment_path_inner(path: &str) -> Result<ServiceAttachmen
 
 /// Validates a local service-plan attachment path and returns display metadata.
 #[tauri::command]
-pub fn validate_service_attachment_path(path: String) -> Result<ServiceAttachmentValidation, String> {
+pub fn validate_service_attachment_path(
+    path: String,
+) -> Result<ServiceAttachmentValidation, String> {
     validate_service_attachment_path_inner(&path)
 }
 

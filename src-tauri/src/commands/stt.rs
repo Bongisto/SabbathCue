@@ -35,6 +35,8 @@ fn is_detection_paused(app: &AppHandle) -> bool {
 static DIRECT_LOCK_OK: AtomicU64 = AtomicU64::new(0);
 static DIRECT_LOCK_CONTENDED: AtomicU64 = AtomicU64::new(0);
 const SEMANTIC_WINDOW_SEGMENTS: usize = 4;
+const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(750);
+const PARTIAL_SEMANTIC_MIN_WORDS: usize = 6;
 
 fn transcript_logging_enabled() -> bool {
     matches!(
@@ -83,6 +85,26 @@ fn to_word_payloads(words: Vec<Word>) -> Vec<WordPayload> {
         .collect()
 }
 
+fn average_word_confidence(words: &[Word], fallback: f64) -> f64 {
+    let mut total = 0.0;
+    let mut count = 0usize;
+    for word in words {
+        if word.confidence > 0.0 {
+            total += word.confidence;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        fallback
+    } else {
+        total / count as f64
+    }
+}
+
+fn word_count(text: &str) -> usize {
+    text.split_whitespace().count()
+}
+
 /// Start the full audio-capture-to-transcription pipeline.
 ///
 /// 1. Opens the microphone via cpal (on a dedicated thread so the non-Send
@@ -127,7 +149,10 @@ pub async fn start_transcription(
             }
             let worker_path = asset_paths::vosk_worker_path(&app);
             if !worker_path.exists() {
-                return Err(format!("Vosk worker not found at {}", worker_path.display()));
+                return Err(format!(
+                    "Vosk worker not found at {}",
+                    worker_path.display()
+                ));
             }
 
             log::info!(
@@ -445,6 +470,10 @@ pub async fn start_transcription(
         let mut transcript_router = TranscriptRouter::default();
         let mut semantic_window: VecDeque<String> =
             VecDeque::with_capacity(SEMANTIC_WINDOW_SEGMENTS);
+        let partial_semantic_enabled = provider_log_name == "vosk";
+        let mut last_partial_semantic_at = Instant::now()
+            .checked_sub(PARTIAL_SEMANTIC_DEBOUNCE)
+            .unwrap_or_else(Instant::now);
 
         while let Some(event) = event_rx.recv().await {
             if !evt_active.load(Ordering::SeqCst) {
@@ -456,11 +485,12 @@ pub async fn start_transcription(
                     if !transcript.is_empty() {
                         let seq = transcript_seq.fetch_add(1, Ordering::Relaxed) + 1;
                         let t0 = std::time::Instant::now();
+                        let confidence = average_word_confidence(&words, 0.0);
                         let route = transcript_router.route(TranscriptRouteInput {
                             provider: &provider_log_name,
                             kind: TranscriptEventKind::Partial,
                             transcript: &transcript,
-                            confidence: None,
+                            confidence: (confidence > 0.0).then_some(confidence),
                         });
 
                         if let Some(reason) = &route.suppress_reason {
@@ -473,7 +503,7 @@ pub async fn start_transcription(
                                 TranscriptPayload {
                                     text: transcript.clone(),
                                     is_final: false,
-                                    confidence: 0.0,
+                                    confidence,
                                     words: to_word_payloads(words),
                                 },
                             );
@@ -490,17 +520,46 @@ pub async fn start_transcription(
                         if !is_detection_paused(&event_app) {
                             if let Some(preview_text) = route.preview_candidate {
                                 match partial_preview_tx.try_send((seq, preview_text)) {
-                                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                                    if transcript_logging_enabled() {
-                                        log::debug!(
-                                            "[QUEUE] partial_preview_tx dropped stale partial"
-                                        );
+                                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                        if transcript_logging_enabled() {
+                                            log::debug!(
+                                                "[QUEUE] partial_preview_tx dropped stale partial"
+                                            );
+                                        }
                                     }
-                                }
-                                Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                                    Ok(())
+                                    | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
                                 }
                             }
-                          }
+
+                            if partial_semantic_enabled
+                                && word_count(&transcript) >= PARTIAL_SEMANTIC_MIN_WORDS
+                                && last_partial_semantic_at.elapsed() >= PARTIAL_SEMANTIC_DEBOUNCE
+                            {
+                                last_partial_semantic_at = Instant::now();
+                                let mut parts = semantic_window.iter().cloned().collect::<Vec<_>>();
+                                parts.push(transcript.clone());
+                                let semantic_text = parts.join(" ");
+                                if let Ok(()) = semantic_tx.try_send((seq, semantic_text)) {
+                                    let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                    if n % 25 == 0 {
+                                        let depth =
+                                            semantic_tx.max_capacity() - semantic_tx.capacity();
+                                        let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
+                                        log::info!(
+                                            "[QUEUE] partial_semantic_tx sent={n} dropped={dropped} depth={depth}/{}",
+                                            semantic_tx.max_capacity()
+                                        );
+                                    }
+                                } else {
+                                    let d =
+                                        semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                    let sent = semantic_sent_evt.load(Ordering::Relaxed);
+                                    log::debug!(
+                                        "[QUEUE] partial_semantic_tx DROPPED (consumer behind) sent={sent} dropped={d}"
+                                    );
+                                }
+                            }
                         }
                         log::debug!("[EVT] Partial processed in {:?}", t0.elapsed());
                     }
@@ -548,20 +607,20 @@ pub async fn start_transcription(
                         check_translation_command(&event_app, &transcript);
                         if !is_detection_paused(&event_app) {
                             if let Some(preview_text) = route.preview_candidate {
-                            match partial_preview_tx.try_send((seq, preview_text)) {
-                                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-                                    if transcript_logging_enabled() {
-                                        log::debug!(
-                                            "[QUEUE] fast_preview_tx dropped stale transcript"
-                                        );
+                                match partial_preview_tx.try_send((seq, preview_text)) {
+                                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                        if transcript_logging_enabled() {
+                                            log::debug!(
+                                                "[QUEUE] fast_preview_tx dropped stale transcript"
+                                            );
+                                        }
                                     }
-                                }
-                                Ok(()) | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                                    Ok(())
+                                    | Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
                                 }
                             }
-                        }
 
-                        log::info!(
+                            log::info!(
                             "[PIPELINE] final_transcript provider={} conf={:.2} chars={} event_ms={:?}",
                             provider_log_name,
                             confidence,
@@ -569,59 +628,61 @@ pub async fn start_transcription(
                             t0.elapsed()
                         );
 
-                        // Fire-and-forget: detection runs in background thread pool.
-                        // Event consumer proceeds immediately to next transcript.
-                        if let Some(detection_text) = route.authoritative_detection {
-                            latest_accepted_seq.store(seq, Ordering::Relaxed);
-                            if let Ok(()) = detect_tx.try_send((seq, detection_text.clone())) {
-                                let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                if n % 25 == 0 {
-                                    let depth = detect_tx.max_capacity() - detect_tx.capacity();
-                                    let dropped = detect_dropped_evt.load(Ordering::Relaxed);
-                                    log::info!(
+                            // Fire-and-forget: detection runs in background thread pool.
+                            // Event consumer proceeds immediately to next transcript.
+                            if let Some(detection_text) = route.authoritative_detection {
+                                latest_accepted_seq.store(seq, Ordering::Relaxed);
+                                if let Ok(()) = detect_tx.try_send((seq, detection_text.clone())) {
+                                    let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                    if n % 25 == 0 {
+                                        let depth = detect_tx.max_capacity() - detect_tx.capacity();
+                                        let dropped = detect_dropped_evt.load(Ordering::Relaxed);
+                                        log::info!(
                                         "[QUEUE] detect_tx sent={n} dropped={dropped} depth={depth}/{}",
                                         detect_tx.max_capacity()
                                     );
-                                }
-                            } else {
-                                let d = detect_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                let sent = detect_sent_evt.load(Ordering::Relaxed);
-                                log::warn!(
+                                    }
+                                } else {
+                                    let d = detect_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                    let sent = detect_sent_evt.load(Ordering::Relaxed);
+                                    log::warn!(
                                     "[QUEUE] detect_tx DROPPED (consumer behind) sent={sent} dropped={d}"
                                 );
-                            }
+                                }
 
-                            // Send accepted is_final fragments to FTS5 immediately.
-                            // No sentence buffer — FTS5 is fast enough (~20-50ms)
-                            // to run on every fragment without waiting for pauses.
-                            semantic_window.push_back(detection_text.clone());
-                            while semantic_window.len() > SEMANTIC_WINDOW_SEGMENTS {
-                                semantic_window.pop_front();
-                            }
-                            let semantic_text = semantic_window
-                                .iter()
-                                .cloned()
-                                .collect::<Vec<_>>()
-                                .join(" ");
+                                // Send accepted is_final fragments to FTS5 immediately.
+                                // No sentence buffer — FTS5 is fast enough (~20-50ms)
+                                // to run on every fragment without waiting for pauses.
+                                semantic_window.push_back(detection_text.clone());
+                                while semantic_window.len() > SEMANTIC_WINDOW_SEGMENTS {
+                                    semantic_window.pop_front();
+                                }
+                                let semantic_text = semantic_window
+                                    .iter()
+                                    .cloned()
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
 
-                            if let Ok(()) = semantic_tx.try_send((seq, semantic_text)) {
-                                let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                if n % 25 == 0 {
-                                    let depth = semantic_tx.max_capacity() - semantic_tx.capacity();
-                                    let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
-                                    log::info!(
+                                if let Ok(()) = semantic_tx.try_send((seq, semantic_text)) {
+                                    let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                    if n % 25 == 0 {
+                                        let depth =
+                                            semantic_tx.max_capacity() - semantic_tx.capacity();
+                                        let dropped = semantic_dropped_evt.load(Ordering::Relaxed);
+                                        log::info!(
                                         "[QUEUE] semantic_tx sent={n} dropped={dropped} depth={depth}/{}",
                                         semantic_tx.max_capacity()
                                     );
-                                }
-                            } else {
-                                let d = semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                let sent = semantic_sent_evt.load(Ordering::Relaxed);
-                                log::warn!(
+                                    }
+                                } else {
+                                    let d =
+                                        semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
+                                    let sent = semantic_sent_evt.load(Ordering::Relaxed);
+                                    log::warn!(
                                     "[QUEUE] semantic_tx DROPPED (consumer behind) sent={sent} dropped={d}"
                                 );
+                                }
                             }
-                        }
                         }
 
                         if transcript_logging_enabled() {
@@ -805,9 +866,7 @@ fn run_direct_detection(
     let Ok(app_state) = app_managed.try_lock() else {
         let bad = DIRECT_LOCK_CONTENDED.fetch_add(1, Ordering::Relaxed) + 1;
         let good = DIRECT_LOCK_OK.load(Ordering::Relaxed);
-        log::warn!(
-            "[DET-DIRECT] AppState try_lock FAILED (contention) ok={good} contended={bad}"
-        );
+        log::warn!("[DET-DIRECT] AppState try_lock FAILED (contention) ok={good} contended={bad}");
 
         // Check for stale sequence BEFORE emitting in fallback path
         if seq < latest_seq.load(Ordering::Relaxed) {
@@ -885,12 +944,7 @@ fn run_direct_detection(
 
 /// Run hybrid semantic detection combining FTS5 BM25 with vector search.
 /// Uses spawn_blocking so mutex locks and DB I/O don't starve the tokio runtime.
-fn run_semantic_detection(
-    app: &AppHandle,
-    seq: u64,
-    latest_seq: Arc<AtomicU64>,
-    transcript: &str,
-) {
+fn run_semantic_detection(app: &AppHandle, seq: u64, latest_seq: Arc<AtomicU64>, transcript: &str) {
     // Stale detection suppression: if this job's sequence is older than the
     // latest accepted transcript sequence, skip emission.
     if seq < latest_seq.load(Ordering::Relaxed) {
@@ -1363,18 +1417,24 @@ mod tests {
     fn test_detection_paused_state() {
         let app_state = crate::state::AppState::new();
         assert!(
-            !app_state.detection_paused.load(std::sync::atomic::Ordering::Relaxed),
+            !app_state
+                .detection_paused
+                .load(std::sync::atomic::Ordering::Relaxed),
             "detection_paused should default to false"
         );
 
         app_state
             .detection_paused
             .store(true, std::sync::atomic::Ordering::SeqCst);
-        assert!(app_state.detection_paused.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(app_state
+            .detection_paused
+            .load(std::sync::atomic::Ordering::Relaxed));
 
         app_state
             .detection_paused
             .store(false, std::sync::atomic::Ordering::SeqCst);
-        assert!(!app_state.detection_paused.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(!app_state
+            .detection_paused
+            .load(std::sync::atomic::Ordering::Relaxed));
     }
 }

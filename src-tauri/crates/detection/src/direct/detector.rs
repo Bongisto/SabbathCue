@@ -995,7 +995,7 @@ mod tests {
         let results = detector.detect("let's look at John 1");
         assert_eq!(results.len(), 1);
         assert!(results[0].is_chapter_only);
-                                     // Incomplete now tracks John 1, not Genesis 3
+        // Incomplete now tracks John 1, not Genesis 3
         let inc = detector.incomplete.as_ref().unwrap();
         assert_eq!(inc.verse_ref.book_name, "John");
     }
