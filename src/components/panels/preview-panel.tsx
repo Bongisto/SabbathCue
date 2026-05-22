@@ -22,6 +22,7 @@ export function PreviewPanel() {
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
 
   useEffect(() => {
+    if (useBroadcastStore.getState().previewItem?.kind !== "scripture") return
     const verse = useBibleStore.getState().selectedVerse
     if (verse && verse.book_number > 0 && verse.chapter > 0 && verse.verse > 0) {
       bibleActions
