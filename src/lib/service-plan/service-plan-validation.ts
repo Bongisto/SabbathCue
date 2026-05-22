@@ -12,7 +12,7 @@ const PLAN_STATUSES = new Set(["draft", "practice", "live", "completed", "archiv
 const SERVICE_MODES = new Set(["planning", "practice", "performance"])
 const ITEM_KINDS = new Set(["general", "scripture", "hymn", "media", "slide", "announcement"])
 const ITEM_STATUSES = new Set(["pending", "ready", "active", "completed", "skipped"])
-const ATTACHMENT_KINDS = new Set(["media", "slide", "document"])
+const ATTACHMENT_KINDS = new Set(["media", "slide", "document", "deck"])
 const ATTACHMENT_STATUSES = new Set(["pending", "ready", "failed", "preloading"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,7 +105,8 @@ export function isValidAttachment(attachment: ServiceAttachment): boolean {
     ATTACHMENT_STATUSES.has(String(attachment.status)) &&
     isOptionalString(attachment.thumbnailUrl) &&
     isOptionalString(attachment.mimeType) &&
-    isOptionalNumber(attachment.sizeBytes)
+    isOptionalNumber(attachment.sizeBytes) &&
+    isOptionalNumber(attachment.order)
   )
 }
 

@@ -5,6 +5,7 @@ import { useAudioStore } from "@/stores/audio-store"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { handleHymnVoiceControl } from "@/services/hymnal/hymn-voice-control"
+import { handleSermonSlideVoiceControl } from "@/services/slides/sermon-slide-voice-control"
 import { useTauriEvent } from "./use-tauri-event"
 
 interface TranscriptPartialPayload {
@@ -91,6 +92,7 @@ export function handleTranscriptFinalPayload(payload: TranscriptPartialPayload):
     words: payload.words,
     timestamp: Date.now(),
   })
+  if (handleSermonSlideVoiceControl(payload.text)) return
   void handleHymnVoiceControl(payload.text)
 }
 

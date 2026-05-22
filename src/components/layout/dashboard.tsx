@@ -51,6 +51,12 @@ const LazyLiveHymnPage = lazy(() =>
   }))
 )
 
+const LazySermonSlidesPage = lazy(() =>
+  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
+    default: mod.SermonSlidesPage,
+  }))
+)
+
 function ResizeHandle({
   axis,
   label,
@@ -280,6 +286,17 @@ export function Dashboard() {
         >
           Live Hymns
         </Button>
+        <Button
+          size="xs"
+          variant={workspace === "sermon-slides" ? "default" : "outline"}
+          aria-pressed={workspace === "sermon-slides"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("sermon-slides")
+          }}
+        >
+          Sermon Slides
+        </Button>
 
         {workspace === "live" && (
           <>
@@ -348,6 +365,16 @@ export function Dashboard() {
             }
           >
             <LazyLiveHymnPage />
+          </Suspense>
+        </div>
+      ) : workspace === "sermon-slides" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazySermonSlidesPage />
           </Suspense>
         </div>
       ) : (

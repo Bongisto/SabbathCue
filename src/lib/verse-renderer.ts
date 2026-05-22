@@ -421,7 +421,7 @@ function drawHymnSlideCounter(
   data: PresentationRenderData
 ): void {
   const slide = data.hymnSlide
-  if (data.kind !== "hymn" || !slide || slide.slideCount <= 0) return
+  if (!["hymn", "slideDeck"].includes(data.kind ?? "") || !slide || slide.slideCount <= 0) return
 
   const text = `${slide.slideIndex + 1}/${slide.slideCount}`
   const fontSize = Math.max(14, Math.round(theme.resolution.width * 0.018))
@@ -447,6 +447,42 @@ function drawHymnSlideCounter(
   ctx.fillStyle = "rgba(255, 255, 255, 0.86)"
   ctx.fillText(text, x + boxWidth / 2, y + boxHeight / 2)
   ctx.restore()
+}
+
+function drawSlideDeckImage(
+  ctx: CanvasRenderingContext2D,
+  theme: BroadcastTheme,
+  data: PresentationRenderData,
+  imageCache?: Map<string, HTMLImageElement>,
+): boolean {
+  if (data.kind !== "slideDeck" || !data.slideImageUrl) return false
+  const img = imageCache?.get(data.slideImageUrl)
+  if (!img) return false
+
+  const { width, height } = theme.resolution
+  const imgRatio = img.naturalWidth / img.naturalHeight
+  const canvasRatio = width / height
+  let drawX = 0
+  let drawY = 0
+  let drawW = width
+  let drawH = height
+
+  if (imgRatio > canvasRatio) {
+    drawW = width
+    drawH = width / imgRatio
+    drawY = (height - drawH) / 2
+  } else {
+    drawH = height
+    drawW = height * imgRatio
+    drawX = (width - drawW) / 2
+  }
+
+  ctx.save()
+  ctx.fillStyle = "#000"
+  ctx.fillRect(0, 0, width, height)
+  ctx.drawImage(img, drawX, drawY, drawW, drawH)
+  ctx.restore()
+  return true
 }
 
 function drawVerseText(
@@ -1049,6 +1085,12 @@ function renderPresentationImpl(
 
   // If no presentation data, just draw the background and text box
   if (!data) {
+    ctx.restore()
+    return metrics
+  }
+
+  if (drawSlideDeckImage(ctx, scaledTheme, data as PresentationRenderData, options?.imageCache)) {
+    drawHymnSlideCounter(ctx, scaledTheme, data as PresentationRenderData)
     ctx.restore()
     return metrics
   }

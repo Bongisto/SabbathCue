@@ -13,6 +13,7 @@ import {
   CalendarClockIcon,
   ClipboardListIcon,
   FileTextIcon,
+  ImagesIcon,
   PlayIcon,
   RadioIcon,
   SkipForwardIcon,
@@ -21,6 +22,13 @@ import {
 import { ServiceTimeline } from "./ServiceTimeline"
 import { ServiceItemDetailsPanel } from "./ServiceItemDetailsPanel"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
+import { CanvasPresentation } from "@/components/ui/canvas-verse"
+import { selectPreviewItem } from "@/lib/presentation-workflow"
+import { buildSermonSlideDeck } from "@/services/slides/sermon-slide-deck"
+import { loadActiveSermonSlideDeck, presentSermonSlideAt } from "@/services/slides/sermon-slide-voice-control"
+import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useSermonSlideStore } from "@/stores/sermon-slide-store"
+import { getPresentationRenderData } from "@/types"
 
 export { ServiceLiveContextPanel } from "./ServiceLiveContextPanel"
 
@@ -581,6 +589,154 @@ export function LiveHymnPage() {
                 .map((segment) => segment.text)
                 .join("\n") || "No lyrics are currently selected."}
             </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+export function SermonSlidesPage() {
+  const activePlan = useServicePlanStore((s) => s.activePlan)
+  const activeItem = useMemo(
+    () =>
+      activePlan?.items.find((item) => item.id === activePlan.activeItemId) ??
+      null,
+    [activePlan],
+  )
+  const storedDeck = useSermonSlideStore((s) => s.deck)
+  const storedIndex = useSermonSlideStore((s) => s.activeIndex)
+  const themes = useBroadcastStore((s) => s.themes)
+  const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const activeTheme = themes.find((theme) => theme.id === activeThemeId) ?? themes[0]
+  const deck = useMemo(() => buildSermonSlideDeck(activeItem), [activeItem])
+  const activeIndex =
+    storedDeck.length > 0 && useSermonSlideStore.getState().activeItemId === activeItem?.id
+      ? storedIndex
+      : 0
+  const activeSlide = deck[activeIndex] ?? deck[0] ?? null
+
+  useEffect(() => {
+    if (!activeItem) {
+      useSermonSlideStore.getState().clear()
+      return
+    }
+    void loadActiveSermonSlideDeck(activeIndex)
+  }, [activeItem?.id])
+
+  const previewSlide = (index: number) => {
+    const slide = deck[index]
+    if (!activeItem || !slide) return
+    useSermonSlideStore.getState().setDeck(deck, index, activeItem.id)
+    selectPreviewItem(slide)
+  }
+
+  const presentSlide = (index: number) => {
+    presentSermonSlideAt(index)
+  }
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
+      <LiveProductionGrid />
+
+      <div className="grid min-h-0 flex-1 gap-2 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+          <PanelHeader title="Sermon Slides" icon={<ImagesIcon className="size-4" />}>
+            <Badge variant="outline">
+              {deck.length > 0 ? `${activeIndex + 1}/${deck.length}` : "No slides"}
+            </Badge>
+          </PanelHeader>
+
+          <div className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {activeItem?.title ?? "No active service item"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                Voice: next slide, previous slide, slide 3
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={!activeSlide || activeIndex === 0}
+                onClick={() => presentSlide(activeIndex - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={!activeSlide}
+                onClick={() => previewSlide(activeIndex)}
+              >
+                Preview
+              </Button>
+              <Button
+                size="xs"
+                disabled={!activeSlide}
+                onClick={() => presentSlide(activeIndex)}
+              >
+                Live
+              </Button>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={!activeSlide || activeIndex >= deck.length - 1}
+                onClick={() => presentSlide(activeIndex + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-1 items-center justify-center bg-black/80 p-3">
+            {activeSlide ? (
+              <CanvasPresentation theme={activeTheme} item={getPresentationRenderData(activeSlide)} />
+            ) : (
+              <div className="text-center text-sm text-muted-foreground">
+                Upload sermon slides on the active Service Plan item.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+          <PanelHeader title="Slide List" icon={<FileTextIcon className="size-4" />} />
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {deck.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">
+                No sermon slides are attached to the active item.
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {deck.map((slide, index) => (
+                  <button
+                    key={slide.slideId}
+                    type="button"
+                    onClick={() => previewSlide(index)}
+                    onDoubleClick={() => presentSlide(index)}
+                    className={`grid w-full grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border p-2 text-left transition-colors ${
+                      index === activeIndex
+                        ? "border-emerald-500/50 bg-emerald-500/10"
+                        : "border-border hover:bg-muted/50"
+                    }`}
+                  >
+                    <img src={slide.slidePath} alt="" className="aspect-video rounded bg-muted object-cover" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium">{slide.sectionLabel}</span>
+                      <span className="block truncate text-[0.625rem] text-muted-foreground">
+                        {slide.reference}
+                      </span>
+                    </span>
+                    <Badge variant={index === activeIndex ? "default" : "outline"}>
+                      {index + 1}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

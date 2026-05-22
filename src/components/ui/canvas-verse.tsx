@@ -104,6 +104,25 @@ export const CanvasPresentation = memo(function CanvasPresentation({
     img.src = url
   }, [theme.background, draw])
 
+  useEffect(() => {
+    if (item?.kind !== "slideDeck" || !item.slideImageUrl) return
+    const url = item.slideImageUrl
+    const cache = imageCacheRef.current
+    if (cache.has(url)) return
+
+    const img = new Image()
+    img.onload = () => {
+      cache.set(url, img)
+      draw(true)
+    }
+    img.onerror = () => {
+      console.warn("[canvas-verse] failed to load slide image", {
+        url: url.slice(0, 100),
+      })
+    }
+    img.src = url
+  }, [item, draw])
+
   // Redraw whenever theme, verse, or container size changes.
   useEffect(() => {
     draw()

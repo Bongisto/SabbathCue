@@ -4,11 +4,6 @@ import { invokeTauri } from "@/lib/tauri-runtime"
 import type { ServiceAttachment } from "@/types/service-plan"
 
 const SUPPORTED_ATTACHMENT_EXTENSIONS = [
-  "png",
-  "jpg",
-  "jpeg",
-  "webp",
-  "gif",
   "mp4",
   "mov",
   "webm",
@@ -53,7 +48,7 @@ export function MediaAttachmentsEditor({ attachments, onChange }: MediaAttachmen
         multiple: true,
         filters: [
           {
-            name: "Slides and media",
+            name: "Media and decks",
             extensions: SUPPORTED_ATTACHMENT_EXTENSIONS,
           },
         ],
@@ -77,14 +72,14 @@ export function MediaAttachmentsEditor({ attachments, onChange }: MediaAttachmen
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
-          Slides and media
+          Media and decks
         </span>
         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void attachFiles()}>
-          Attach files
+          Attach media
         </Button>
       </div>
       {attachments.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No slide or media files attached.</p>
+        <p className="text-xs text-muted-foreground">No media or deck files attached.</p>
       ) : (
         <div className="space-y-1 text-xs">
           {attachments.map((attachment) => (

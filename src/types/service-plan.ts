@@ -23,6 +23,7 @@ export interface ServiceAttachment {
   thumbnailUrl?: string
   mimeType?: string
   sizeBytes?: number
+  order?: number
   deckId?: string
 }
 

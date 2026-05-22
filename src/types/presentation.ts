@@ -11,6 +11,7 @@ export interface PresentationRenderData {
   reference: string
   segments: PresentationSegment[]
   kind?: PresentationItemKind
+  slideImageUrl?: string
   hymnSlide?: {
     screenId: string
     slideIndex: number
@@ -127,6 +128,7 @@ export function getPresentationRenderData(item: PresentationItem): PresentationR
       kind: "slideDeck",
       reference: item.reference,
       segments: item.segments,
+      slideImageUrl: item.slidePath,
       hymnSlide: {
         screenId: item.slideId,
         slideIndex: item.slideIndex,
