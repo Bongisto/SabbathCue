@@ -19,6 +19,25 @@ fn first_existing(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
     paths.into_iter().find(|p| p.exists())
 }
 
+fn is_vosk_model_dir(path: &PathBuf) -> bool {
+    path.join("conf").exists() && path.join("am").exists()
+}
+
+fn resolve_vosk_model_dir(path: PathBuf) -> Option<PathBuf> {
+    if is_vosk_model_dir(&path) {
+        return Some(path);
+    }
+
+    for dirname in VOSK_MODEL_DIRNAMES {
+        let nested = path.join(dirname);
+        if is_vosk_model_dir(&nested) {
+            return Some(nested);
+        }
+    }
+
+    None
+}
+
 pub fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
@@ -67,13 +86,16 @@ pub fn vosk_model_path(app: &AppHandle) -> PathBuf {
         }
     }
 
-    first_existing(candidates).unwrap_or_else(|| {
-        app_data_dir(app)
-            .unwrap_or_else(|_| dev_root())
-            .join("models")
-            .join("vosk")
-            .join(VOSK_MODEL_DIRNAME)
-    })
+    candidates
+        .into_iter()
+        .find_map(resolve_vosk_model_dir)
+        .unwrap_or_else(|| {
+            app_data_dir(app)
+                .unwrap_or_else(|_| dev_root())
+                .join("models")
+                .join("vosk")
+                .join(VOSK_MODEL_DIRNAME)
+        })
 }
 
 pub fn vosk_worker_path(app: &AppHandle) -> PathBuf {
