@@ -11,6 +11,9 @@ interface DetectionResultWithMeta extends DetectionResult {
 }
 
 const MAX_RECENT_DETECTIONS = 12
+const DIRECT_SOURCE_BONUS = 0.12
+const MAX_RECENCY_BONUS = 0.03
+const RECENCY_BONUS_WINDOW_MS = 30_000
 
 interface DetectionState {
   detections: DetectionResult[]
@@ -26,6 +29,55 @@ interface DetectionState {
   setConfidenceThreshold: (threshold: number) => void
 }
 
+function detectionRank(detection: DetectionResultWithMeta, now: number): number {
+  const sourceBonus = detection.source === "direct" ? DIRECT_SOURCE_BONUS : 0
+  const receivedAt = detection.received_at ?? 0
+  const ageMs = Math.max(0, now - receivedAt)
+  const recencyBonus =
+    receivedAt > 0
+      ? Math.max(0, MAX_RECENCY_BONUS * (1 - ageMs / RECENCY_BONUS_WINDOW_MS))
+      : 0
+
+  return detection.confidence + sourceBonus + recencyBonus
+}
+
+function compareDetections(
+  a: DetectionResultWithMeta,
+  b: DetectionResultWithMeta,
+  now: number,
+): number {
+  const rankDiff = detectionRank(b, now) - detectionRank(a, now)
+  if (Math.abs(rankDiff) > Number.EPSILON) return rankDiff
+
+  const aTime = a.received_at || 0
+  const bTime = b.received_at || 0
+  if (bTime !== aTime) return bTime - aTime
+
+  return b.confidence - a.confidence
+}
+
+function mergeDetection(
+  existing: DetectionResult,
+  incoming: DetectionResult,
+): DetectionResult {
+  const preferred = incoming.source === "direct" || existing.source !== "direct" ? incoming : existing
+  const fallback = preferred === incoming ? existing : incoming
+
+  return {
+    ...preferred,
+    confidence: Math.max(existing.confidence, incoming.confidence),
+    source: existing.source === "direct" || incoming.source === "direct" ? "direct" : "semantic",
+    verse_text: incoming.verse_text || existing.verse_text,
+    transcript_snippet: incoming.transcript_snippet || existing.transcript_snippet,
+    auto_queued: existing.auto_queued || incoming.auto_queued,
+    is_chapter_only: existing.is_chapter_only && incoming.is_chapter_only,
+    book_name: preferred.book_name || fallback.book_name,
+    book_number: preferred.book_number || fallback.book_number,
+    chapter: preferred.chapter || fallback.chapter,
+    verse: preferred.verse || fallback.verse,
+  }
+}
+
 export const useDetectionStore = create<DetectionState>((set) => ({
   detections: [],
   autoMode: false,
@@ -38,34 +90,20 @@ export const useDetectionStore = create<DetectionState>((set) => ({
       
       if (existingIndex >= 0) {
         const existing = state.detections[existingIndex] as DetectionResultWithMeta
-        // On duplicate: keep newest received_at, max confidence, prefer non-empty newest verse_text
         const updated: DetectionResultWithMeta = {
-          ...detection,
-          confidence: Math.max(existing.confidence, detection.confidence),
-          verse_text: detection.verse_text || existing.verse_text,
+          ...mergeDetection(existing, detection),
           received_at: now,
         }
         const newDetections = [...state.detections] as DetectionResultWithMeta[]
         newDetections[existingIndex] = updated
-        // Sort by received_at desc, then confidence desc
-        newDetections.sort((a, b) => {
-          const aTime = a.received_at || now
-          const bTime = b.received_at || now
-          if (bTime !== aTime) return bTime - aTime
-          return b.confidence - a.confidence
-        })
+        newDetections.sort((a, b) => compareDetections(a, b, now))
         return { detections: newDetections.slice(0, MAX_RECENT_DETECTIONS) as DetectionResult[] }
       }
       
       // New detection
       const withMeta: DetectionResultWithMeta = { ...detection, received_at: now }
       const newDetections = [withMeta, ...state.detections] as DetectionResultWithMeta[]
-      newDetections.sort((a, b) => {
-        const aTime = a.received_at || now
-        const bTime = b.received_at || now
-        if (bTime !== aTime) return bTime - aTime
-        return b.confidence - a.confidence
-      })
+      newDetections.sort((a, b) => compareDetections(a, b, now))
       return { detections: newDetections.slice(0, MAX_RECENT_DETECTIONS) as DetectionResult[] }
     }),
   addDetections: (incoming) =>
@@ -79,13 +117,8 @@ export const useDetectionStore = create<DetectionState>((set) => ({
         if (!existing) {
           map.set(d.verse_ref, { detection: d, received_at: now })
         } else {
-          // Keep max confidence, prefer non-empty verse_text, newest received_at
           map.set(d.verse_ref, {
-            detection: {
-              ...d,
-              confidence: Math.max(existing.detection.confidence, d.confidence),
-              verse_text: d.verse_text || existing.detection.verse_text,
-            },
+            detection: mergeDetection(existing.detection, d),
             received_at: now,
           })
         }
@@ -98,34 +131,28 @@ export const useDetectionStore = create<DetectionState>((set) => ({
         if (!existing) {
           map.set(d.verse_ref, { detection: d, received_at: dReceivedAt })
         } else {
-          // Keep max confidence, prefer non-empty verse_text, newest received_at
-          if (d.confidence > existing.detection.confidence) {
+          if (d.confidence > existing.detection.confidence || d.source === "direct") {
             map.set(d.verse_ref, {
-              detection: {
-                ...existing.detection,
-                confidence: d.confidence,
-                verse_text: d.verse_text || existing.detection.verse_text,
-              },
+              detection: mergeDetection(existing.detection, d),
               received_at: Math.max(existing.received_at, dReceivedAt),
             })
           } else if (dReceivedAt > existing.received_at) {
             map.set(d.verse_ref, {
-              detection: {
-                ...existing.detection,
-                verse_text: d.verse_text || existing.detection.verse_text,
-              },
+              detection: mergeDetection(d, existing.detection),
               received_at: dReceivedAt,
             })
           }
         }
       }
       
-      // Sort by received_at desc, then confidence desc
       const sorted = [...map.values()]
-        .sort((a, b) => {
-          if (b.received_at !== a.received_at) return b.received_at - a.received_at
-          return b.detection.confidence - a.detection.confidence
-        })
+        .sort((a, b) =>
+          compareDetections(
+            { ...a.detection, received_at: a.received_at },
+            { ...b.detection, received_at: b.received_at },
+            now,
+          )
+        )
         .map((item) => ({ ...item.detection, received_at: item.received_at } as DetectionResultWithMeta))
         .slice(0, MAX_RECENT_DETECTIONS) as DetectionResult[]
       

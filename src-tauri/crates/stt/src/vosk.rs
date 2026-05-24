@@ -21,8 +21,8 @@ use crate::keyterms::bible_keyterms;
 use crate::provider::SttProvider;
 use crate::types::{TranscriptEvent, Word};
 
-/// 25ms at 16 kHz. Smaller chunks keep Vosk partials moving in a live preview flow.
-const DEFAULT_CHUNK_SAMPLES: usize = 400;
+/// 35ms at 16 kHz. Still responsive, with a little more context per Vosk pass.
+const DEFAULT_CHUNK_SAMPLES: usize = 560;
 
 #[derive(Debug)]
 pub struct VoskProvider {

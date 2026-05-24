@@ -38,7 +38,7 @@ describe("detection store", () => {
     vi.restoreAllMocks()
   })
 
-  it("newer detection appears above older higher-confidence detection", () => {
+  it("higher-confidence detection stays above a newer weaker detection", () => {
     const store = useDetectionStore.getState()
     
     // Add older high-confidence detection
@@ -51,8 +51,29 @@ describe("detection store", () => {
     store.addDetection(makeDetection({ verse_ref: "John 3:16", confidence: 0.85 }))
     
     const detections = useDetectionStore.getState().detections
-    expect(detections[0].verse_ref).toBe("John 3:16")
-    expect(detections[1].verse_ref).toBe("Romans 8:1")
+    expect(detections[0].verse_ref).toBe("Romans 8:1")
+    expect(detections[1].verse_ref).toBe("John 3:16")
+  })
+
+  it("ranks direct detections above similar-confidence semantic detections", () => {
+    const store = useDetectionStore.getState()
+
+    store.addDetection(makeDetection({
+      verse_ref: "Semantic Hit",
+      confidence: 0.91,
+      source: "semantic",
+    }))
+
+    now = new Date("2026-05-19T00:00:01Z").getTime()
+    store.addDetection(makeDetection({
+      verse_ref: "Direct Hit",
+      confidence: 0.84,
+      source: "direct",
+    }))
+
+    const detections = useDetectionStore.getState().detections
+    expect(detections[0].verse_ref).toBe("Direct Hit")
+    expect(detections[1].verse_ref).toBe("Semantic Hit")
   })
 
   it("duplicate verse refreshes recency and keeps best confidence", () => {
@@ -86,7 +107,7 @@ describe("detection store", () => {
     expect(detections[0].confidence).toBe(0.97)
   })
 
-  it("sorts by received_at descending, then confidence descending", () => {
+  it("sorts by relevance score before recency", () => {
     const store = useDetectionStore.getState()
     
     store.addDetection(makeDetection({ verse_ref: "A", confidence: 0.9 }))
@@ -98,10 +119,31 @@ describe("detection store", () => {
     store.addDetection(makeDetection({ verse_ref: "C", confidence: 0.85 }))
     
     const detections = useDetectionStore.getState().detections
-    // B and C have same received_at, so C (higher confidence) should come first
-    expect(detections[0].verse_ref).toBe("C")
-    expect(detections[1].verse_ref).toBe("B")
-    expect(detections[2].verse_ref).toBe("A")
+    expect(detections[0].verse_ref).toBe("A")
+    expect(detections[1].verse_ref).toBe("C")
+    expect(detections[2].verse_ref).toBe("B")
+  })
+
+  it("duplicate semantic hit cannot replace a direct source label", () => {
+    const store = useDetectionStore.getState()
+
+    store.addDetection(makeDetection({
+      verse_ref: "John 3:16",
+      confidence: 0.9,
+      source: "direct",
+    }))
+
+    now = new Date("2026-05-19T00:00:01Z").getTime()
+    store.addDetection(makeDetection({
+      verse_ref: "John 3:16",
+      confidence: 0.95,
+      source: "semantic",
+    }))
+
+    const detections = useDetectionStore.getState().detections
+    expect(detections).toHaveLength(1)
+    expect(detections[0].source).toBe("direct")
+    expect(detections[0].confidence).toBe(0.95)
   })
 
   it("keeps only the most recent detections", () => {
