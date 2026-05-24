@@ -1,15 +1,15 @@
 ---
 title: Platform Setup
-description: System packages and build tools required by whisper.cpp on macOS, Linux, and Windows.
+description: System packages and build tools required on macOS, Linux, and Windows.
 icon: Settings2
 ---
 
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 import { Callout } from "fumadocs-ui/components/callout";
 
-The local Whisper STT engine compiles `whisper.cpp` from source. That means
-`bindgen` runs on every clean build and needs CMake plus `libclang`. Pick
-the block for your operating system below.
+SabbathCue is a Tauri v2 app with native Rust dependencies. Some optional
+features, including the legacy Whisper provider, require CMake plus `libclang`.
+Pick the block for your operating system below.
 
 ## macOS
 

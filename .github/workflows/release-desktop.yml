@@ -61,11 +61,46 @@ jobs:
           bun run export:verses
           bun run precompute:embeddings
 
+      - name: npm audit
+        run: npm audit --audit-level=moderate
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets
+
+      - name: Test workspace
+        working-directory: src-tauri
+        run: cargo test --workspace
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Dependency audit
+        working-directory: src-tauri
+        run: cargo deny check
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked
+
+      - name: Generate SBOM
+        working-directory: src-tauri
+        run: cargo cyclonedx --all --format json --output-cdx
+
       - name: Build Tauri installer
         run: bun run tauri build
+
+      - name: Generate checksums
+        run: |
+          Get-ChildItem -Path src-tauri/target/release/bundle -Recurse -File |
+            ForEach-Object {
+              $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash
+              "$hash  $($_.Name)" | Out-File -FilePath src-tauri/target/release/bundle/SHA256SUMS.txt -Append
+            }
 
       - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
           name: sabbathcue-windows-bundle
-          path: src-tauri/target/release/bundle/**
+          path: |
+            src-tauri/target/release/bundle/**
+            src-tauri/target/cyclonedx/**

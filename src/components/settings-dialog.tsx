@@ -362,9 +362,10 @@ function SpeechSection() {
           </div>
 
           <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
-            Vosk now uses Bible and worship phrase hints for better local
-            recognition. For best accuracy, install a larger English Vosk model
-            in this folder or set SABBATHCUE_VOSK_MODEL_DIR to the model folder.
+            Vosk runs in open dictation mode instead of a constrained phrase
+            grammar. Larger English Vosk models improve accuracy, especially
+            for uncommon vocabulary. Place the model folder here or set{" "}
+            <code className="text-[0.5625rem]">SABBATHCUE_VOSK_MODEL_DIR</code>.
           </p>
           {!assetsLoading &&
             (!assetStatus?.vosk_model || !assetStatus?.vosk_worker) && (

@@ -105,12 +105,10 @@ curl -X POST http://localhost:8080/api/v1/control \
 Unknown commands and invalid JSON are rejected with `success: false`
 and a descriptive `error` string.
 
-<Callout title="CORS is permissive by default" type="warn">
-The Axum router attaches `CorsLayer::permissive()`, so any origin on
-the network can call the API from a browser. That's convenient for
-local dashboards but unsafe to leave on once the listener is reachable
-beyond a trusted LAN — pair binding to `127.0.0.1` with a reverse
-proxy when you expose it.
+<Callout title="HTTP requires a bearer token" type="info">
+The HTTP API requires `Authorization: Bearer <token>` for `/api/v1/status`
+and `/api/v1/control`. The health endpoint remains unauthenticated so local
+supervisors can confirm the listener is alive.
 </Callout>
 
 ## Persistence and shutdown semantics
@@ -123,12 +121,14 @@ orphaned ports.
 
 ## Authentication
 
-By default both protocols are unauthenticated and bind to `0.0.0.0`.
-For multi-machine deployments, route them through your network's
-existing auth (a reverse proxy with mTLS, a Tailscale ACL, etc.) —
-the API is intentionally simple and protocol-only so it composes
-with whatever you already trust. For local-only access, bind to
-`127.0.0.1` in Settings → Remote.
+By default both protocols bind to `127.0.0.1`. OSC is local-only and
+unauthenticated. HTTP uses a locally generated bearer token that is stored in
+the OS keychain and sent in the `Authorization` header. The current Settings UI
+exposes listener ports, not a LAN bind-host control.
+
+For multi-machine deployments, put the local listener behind infrastructure you
+already trust, such as a reverse proxy with mTLS or a Tailscale ACL. A future
+LAN mode should be an explicit opt-in rather than the default.
 
 ## Status field reference
 

@@ -6,7 +6,7 @@ icon: KeyRound
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-SabbathCue runs without any environment variables — Whisper-based STT, the
+SabbathCue runs without any environment variables; local Vosk STT, the
 bundled translations, and the entire detection pipeline all work
 out of the box. The `.env` file only matters when you want to plug in
 optional cloud services.
@@ -15,7 +15,7 @@ optional cloud services.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `DEEPGRAM_API_KEY` | Optional | API key for [Deepgram](https://deepgram.com) speech-to-text. Not needed when running Whisper locally. |
+| `DEEPGRAM_API_KEY` | Optional | API key for [Deepgram](https://deepgram.com) speech-to-text. Not needed when running local Vosk. |
 | `GITHUB_TOKEN` | Optional | Used by the marketing site to fetch up-to-date star counts at build time without hitting the unauthenticated rate limit. |
 
 ## Where to put them

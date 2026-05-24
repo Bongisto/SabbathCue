@@ -29,8 +29,14 @@ jobs:
       - name: Unit tests
         run: bun run test -- --run
 
+      - name: Lint
+        run: bun run lint
+
       - name: Build frontend
         run: bun run build
+
+      - name: npm audit
+        run: npm audit --audit-level=moderate
 
   web-docs:
     name: Web docs build
@@ -54,6 +60,9 @@ jobs:
 
       - name: Build web docs
         run: bun run web:build
+
+      - name: Lint web docs
+        run: bun run web:lint
 
   rust:
     name: Rust checks
@@ -124,3 +133,14 @@ jobs:
       - name: Test workspace
         working-directory: src-tauri
         run: cargo test --workspace
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --workspace --all-targets
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Dependency audit
+        working-directory: src-tauri
+        run: cargo deny check

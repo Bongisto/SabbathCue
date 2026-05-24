@@ -1,6 +1,6 @@
 ---
 title: Speech-to-Text Engines
-description: Choose between local Whisper and cloud Deepgram, and configure either with the right environment variables.
+description: Choose between local Vosk and cloud Deepgram, and configure either with the right environment variables.
 icon: Mic
 ---
 
@@ -14,8 +14,8 @@ streaming.
 
 <Cards>
   <Card
-    title="Whisper (local, free)"
-    description="Runs whisper.cpp on your machine — no API key, no internet, no per-minute billing. Higher first-build cost since whisper.cpp compiles from source."
+    title="Vosk (local, free)"
+    description="Runs the Vosk speech recognition toolkit on your machine — no API key, no internet, no per-minute billing. Uses open dictation for broad word coverage."
   />
   <Card
     title="Deepgram (cloud, paid)"
@@ -23,29 +23,21 @@ streaming.
   />
 </Cards>
 
-## Option 1: Whisper (recommended for most installs)
+## Option 1: Vosk (local, default)
 
-The Whisper integration uses [`whisper.cpp`](https://github.com/ggerganov/whisper.cpp)
-through the `whisper-rs = "0.16"` Rust crate (gated behind the
-`whisper` feature on `rhema-stt`). The first `cargo build` compiles
-the C++ source via `bindgen`.
+Vosk is an offline speech recognition toolkit that transcribes audio in
+real time using open dictation — no constrained phrase grammar. The default
+small English model covers everyday vocabulary well, and larger Vosk models
+improve accuracy for specialized or uncommon terms.
 
-The model file (`ggml-tiny.en.bin`) is downloaded once
-into `models/whisper/` as **phase 7** of `setup:all`. If you skipped
-or interrupted that phase, run it on its own:
+To install the Vosk model:
 
-```bash
-bun run download:whisper
-```
+1. Download a model from [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models)
+2. Place it in `models/vosk/` (the app expects `vosk-model-small-en-us` by default)
+3. Or set `SABBATHCUE_VOSK_MODEL_DIR` to point to your model folder
 
-<Callout title="Build dependencies" type="info">
-You need **CMake** and **libclang** on your `PATH` for the Rust
-build to succeed. macOS gets these from Homebrew
-(`brew install cmake`) plus the Xcode CLT. Linux gets them from your
-package manager. Windows installs them via `bun run setup:windows`.
-See [Platform setup](/docs/getting-started/platform-setup) for the
-exact commands.
-</Callout>
+The model is required before Vosk transcription starts. The app shows
+model installation status in Settings → Speech Recognition.
 
 ## Option 2: Deepgram
 
@@ -73,9 +65,9 @@ Open Settings → STT and choose **Deepgram**. The status indicator shows
 WebSocket health in real time; if it falls back to REST, you'll see that
 labeled too.
 
-![Settings dialog with the STT engine picker showing Whisper and Deepgram options](/docs/screenshots/settings-stt-picker.png)
+![Settings dialog with the STT engine picker showing Vosk and Deepgram options](/docs/screenshots/settings-stt-picker.png)
 
-*Settings → STT lets you flip between local Whisper and cloud Deepgram at runtime. The connection status indicator under the picker turns green when Deepgram's WebSocket is healthy and amber when it falls back to REST. **Click to expand.***
+*Settings → STT lets you flip between local Vosk and cloud Deepgram at runtime. The connection status indicator under the picker turns green when Deepgram's WebSocket is healthy and amber when it falls back to REST. **Click to expand.***
 
 ## Switching engines at runtime
 
@@ -85,18 +77,18 @@ and queue state are preserved across the swap.
 
 ## Comparing the two
 
-| | Whisper (local) | Deepgram (cloud) |
+| | Vosk (local) | Deepgram (cloud) |
 | --- | --- | --- |
 | API cost | Free | Per-minute billing |
-| Internet required | No, after the model is downloaded | Yes (WebSocket) |
-| First-build time | Several minutes — `whisper.cpp` compiles via `bindgen` | Instant |
-| Long-form accuracy | Good | Excellent |
-| Punctuation | Decent | Excellent |
+| Internet required | No, after the model is installed | Yes (WebSocket) |
+| Recognition mode | Open dictation | Keyword-boosted streaming |
+| Long-form accuracy | Good with larger models | Excellent |
+| Punctuation | None (plain text) | Excellent |
 | Works offline | Yes | No |
 
-Latency depends heavily on hardware and network conditions, so we
-don't publish a single number — Whisper benefits from any GPU/Metal
-acceleration `whisper-rs` can pick up, and Deepgram is bounded by the
-round-trip to its nearest region. Pick whichever fits your install:
-Whisper for the no-cost local path, Deepgram for the lowest latency
-and best transcription quality on a reliable network.
+Accuracy depends heavily on the Vosk model size and audio quality —
+larger models produce better transcriptions but use more memory and CPU.
+Deepgram accuracy is bounded by the round-trip to its nearest region.
+Pick whichever fits your install: Vosk for the no-cost offline path,
+Deepgram for the lowest latency and best transcription quality on a
+reliable network.

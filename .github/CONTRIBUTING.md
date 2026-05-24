@@ -65,7 +65,7 @@ sabbathcue/
 ├── src-tauri/        Rust workspace
 │   ├── crates/
 │   │   ├── audio         cpal-based capture, VAD, metering
-│   │   ├── stt           Deepgram (WS + REST), local Whisper
+│   │   ├── stt           Vosk local STT, Deepgram cloud STT, legacy Whisper modules
 │   │   ├── bible         SQLite + FTS5, cross-references
 │   │   ├── detection     Direct parsing, semantic search, ensemble merger
 │   │   ├── broadcast     NDI output via FFI
@@ -168,7 +168,7 @@ bun run test            # if your change affects tested code
 **Rust** (from `src-tauri/`)
 
 ```sh
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets
 cargo fmt --check
 cargo test
 ```

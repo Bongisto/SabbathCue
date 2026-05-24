@@ -71,34 +71,34 @@ If you're reviewing the codebase for security:
 2. Trace each granted command to its handler in `rhema-api`.
 3. Audit the handler's input validation and side effects.
 
-## Remote control defaults — read carefully
+## Remote control defaults
 
 ![Settings → Remote tab with bind-host fields highlighted, port-bind error states, and the live command log](/docs/screenshots/settings-remote-binding.png)
 
-*Settings → Remote is where you'd swap the listener bind hosts from `0.0.0.0` to `127.0.0.1` when you don't want LAN-wide reachability. Port-bind failures show inline so you can spot a misconfigured port without leaving the dialog. **Click to expand.***
+*Settings → Remote panels for starting OSC and HTTP listeners. Port-bind failures show inline so you can spot a misconfigured port without leaving the dialog. **Click to expand.***
 
+The OSC and HTTP listeners are bound to localhost only by default:
 
-The OSC and HTTP listeners are **not** locked down by default. The
-shipped defaults are:
+- **OSC**: bind host `127.0.0.1`, port `8000`.
+- **HTTP**: bind host `127.0.0.1`, port `8080`, with bearer-token
+  authentication required for all control endpoints.
 
-- **OSC**: bind host `0.0.0.0`, port `8000`.
-- **HTTP**: bind host `0.0.0.0`, port `8080`, with
-  `CorsLayer::permissive()` attached to the Axum router.
+The HTTP API requires a cryptographically random bearer token that
+is generated on first launch and stored in the system keychain. Every
+control request must include `Authorization: Bearer <token>`; requests
+without a valid token receive `401 Unauthorized`.
 
-That means any device on the local network can drive the app and
-read its status without authentication. This is intentional for the
-LAN-only use case (Stream Deck on your operator's laptop), but it is
-**unsafe** to leave on once the listener is reachable from a
-broader network.
+Because both listeners bind to `127.0.0.1`, no external device can
+reach them — the API is accessible only from the local machine. This
+protects the operator from unauthorized remote control without
+requiring firewall configuration.
 
-Before exposing SabbathCue beyond a trusted LAN:
+LAN-wide reachability is not exposed in the current Settings UI. If a
+future release adds it (e.g., for a Stream Deck on a separate device),
+it should be an explicit opt-in with authentication, clear operator
+warnings, and firewall guidance.
 
-1. Bind both listeners to `127.0.0.1` from Settings → Remote.
-2. Or front them with a reverse proxy that adds authentication and
-   TLS.
-3. Or restrict ingress at your firewall.
-
-There is no built-in rate limit or auth on either protocol — the
+There is no built-in rate limit on either protocol — the
 API is intentionally simple so it composes with whatever you
 already trust.
 
@@ -106,7 +106,7 @@ already trust.
 
 - **No telemetry** — SabbathCue does not phone home. There's no
   analytics, no crash reporter, no usage tracking.
-- **Local-first by default** — Whisper runs locally, the database
+- **Local-first by default** — Vosk runs locally, the database
   lives on disk, and Deepgram is opt-in. No keys, no internet, no
   problem.
 - **Bundled SQLite** — `rusqlite` with the `bundled` feature, so

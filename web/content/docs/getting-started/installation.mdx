@@ -71,9 +71,8 @@ runs seven phases in this exact order:
 6. **Embedding precomputation** — runs the embeddings (auto-selects
    GPU via PyTorch if available; falls back to ONNX Runtime on
    CPU).
-7. **Whisper model** — downloads `ggml-tiny.en.bin`
-   into `models/whisper/` so the local STT engine works without an
-   internet round-trip.
+7. **Local STT model** - prepares the local speech-to-text model files used by
+   the offline Vosk provider.
 
   </Step>
   <Step>
@@ -133,7 +132,7 @@ bun run export:verses              # Export verses to JSON
 bun run precompute:embeddings      # Rust ONNX binary (recommended)
 bun run precompute:embeddings-onnx # Python ONNX Runtime path
 bun run precompute:embeddings-py   # Python sentence-transformers (GPU)
-bun run download:whisper           # Whisper model (ggml-tiny.en)
+bun run download:whisper           # Optional legacy Whisper model
 ```
 
   </Tab>

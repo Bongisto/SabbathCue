@@ -14,14 +14,13 @@ plus a Python interpreter for the data-prep pipeline. The complete list:
 | [Bun](https://bun.sh) | JavaScript runtime + package manager for `web/`, build scripts, and the orchestrator |
 | [Rust](https://rustup.rs) (stable, 1.77.2+) | Compiles the Tauri backend and the seven workspace crates |
 | [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) | Platform-specific system libraries (WebView2 on Windows, WebKit on Linux) |
-| [Python 3](https://www.python.org/) | Downloads copyrighted translations and exports the embedding model to ONNX |
-| CMake + LLVM/libclang | Required for local Whisper STT — `whisper.cpp` is built from source via `bindgen` |
-| [Deepgram API key](https://deepgram.com/) (optional) | Cloud speech-to-text, only if you don't want to run Whisper locally |
+| [Python 3](https://www.python.org/) | Downloads copyrighted translations, exports the embedding model to ONNX, and runs the local Vosk worker |
+| CMake + LLVM/libclang | Required for the optional legacy Whisper feature and some native Rust dependencies |
+| [Deepgram API key](https://deepgram.com/) (optional) | Cloud speech-to-text, only if you don't want to run local Vosk |
 
-<Callout title="Whisper vs Deepgram" type="info">
-You only need **one** speech-to-text engine. Whisper runs locally with no API
-costs but compiles `whisper.cpp` from source on first build. Deepgram streams
-via WebSocket and bypasses the local build but needs a paid API key. See
+<Callout title="Local vs Deepgram" type="info">
+You only need **one** speech-to-text engine. Vosk runs locally with no API
+costs. Deepgram streams via WebSocket and needs a paid API key. See
 [Speech-to-text](/docs/getting-started/speech-to-text) for tradeoffs.
 </Callout>
 

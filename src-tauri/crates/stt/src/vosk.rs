@@ -88,8 +88,6 @@ impl VoskProvider {
             .arg(&self.model_path)
             .arg("--sample-rate")
             .arg("16000")
-            .arg("--grammar-json")
-            .arg(vosk_grammar_json()?)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -139,6 +137,7 @@ fn average_confidence(words: &[Word]) -> f64 {
     scored.iter().map(|word| word.confidence).sum::<f64>() / scored.len() as f64
 }
 
+#[allow(dead_code)]
 fn vosk_grammar_json() -> Result<String, SttError> {
     let mut phrases = vec![
         "[unk]".to_string(),
@@ -299,5 +298,83 @@ impl SttProvider for VoskProvider {
 
     fn name(&self) -> &'static str {
         "vosk"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn grammar_json_is_valid_json_array() {
+        let json = vosk_grammar_json().expect("grammar JSON should be valid");
+        let parsed: Vec<String> =
+            serde_json::from_str(&json).expect("grammar JSON must parse as string array");
+        assert!(!parsed.is_empty(), "grammar phrases must not be empty");
+    }
+
+    #[test]
+    fn grammar_json_includes_bible_reference_terms() {
+        let json = vosk_grammar_json().expect("grammar JSON should be valid");
+        let parsed: Vec<String> =
+            serde_json::from_str(&json).expect("grammar JSON must parse as string array");
+        assert!(
+            parsed.iter().any(|p| p == "chapter"),
+            "grammar must include 'chapter'"
+        );
+        assert!(
+            parsed.iter().any(|p| p == "verse"),
+            "grammar must include 'verse'"
+        );
+    }
+
+    #[test]
+    fn grammar_json_includes_worship_terms() {
+        let json = vosk_grammar_json().expect("grammar JSON should be valid");
+        let parsed: Vec<String> =
+            serde_json::from_str(&json).expect("grammar JSON must parse as string array");
+        assert!(
+            parsed.iter().any(|p| p == "sabbath"),
+            "grammar must include 'sabbath'"
+        );
+        assert!(
+            parsed.iter().any(|p| p == "holy spirit"),
+            "grammar must include 'holy spirit'"
+        );
+    }
+
+    #[test]
+    fn grammar_json_has_no_duplicates() {
+        let json = vosk_grammar_json().expect("grammar JSON should be valid");
+        let mut parsed: Vec<String> =
+            serde_json::from_str(&json).expect("grammar JSON must parse as string array");
+        let before = parsed.len();
+        parsed.sort();
+        parsed.dedup();
+        assert_eq!(before, parsed.len(), "grammar must not contain duplicate phrases");
+    }
+
+    #[test]
+    fn default_spawn_does_not_pass_grammar_json() {
+        // Structural check: spawn_worker must not reference --grammar-json.
+        let source = include_str!("vosk.rs");
+        let mut in_spawn = false;
+        let mut spawn_lines: Vec<&str> = Vec::new();
+        for line in source.lines() {
+            if line.contains("fn spawn_worker") {
+                in_spawn = true;
+                spawn_lines.push(line);
+            } else if in_spawn {
+                if line.trim_start().starts_with("fn ") {
+                    break;
+                }
+                spawn_lines.push(line);
+            }
+        }
+        let body = spawn_lines.join("\n");
+        assert!(
+            !body.contains("--grammar-json"),
+            "default spawn_worker must not pass --grammar-json to the Vosk worker"
+        );
     }
 }

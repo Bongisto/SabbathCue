@@ -26,9 +26,9 @@ in the repository.
 | OSC | `8000` | UDP | Stream Deck (via Companion), TouchOSC, QLab, hardware |
 | HTTP | `8080` | TCP | REST clients, dashboards, scripting, status polling |
 
-Both default to binding `0.0.0.0` so a phone, a staff laptop, or a
-hardware controller on the LAN can reach them. Bind to `127.0.0.1` in
-Settings → Remote for local-only access.
+Both default to binding `127.0.0.1`, so remote control is local to the app
+machine unless you intentionally front it with trusted network infrastructure.
+The current Settings UI exposes listener ports, not a LAN bind-host control.
 
 ## What you can do remotely
 
@@ -71,7 +71,7 @@ can debug controller setups without leaving the app.
 
 ![Settings → Remote tab with OSC and HTTP toggles, port inputs, and a live command log](/docs/screenshots/settings-remote.png)
 
-*Settings → Remote: OSC and HTTP listeners with their port and host fields, connection status indicators, and a live command log that shows incoming OSC/HTTP traffic with timestamps. **Click to expand.***
+*Settings Remote: OSC and HTTP listeners with port fields, connection status indicators, and a live command log that shows incoming OSC/HTTP traffic with timestamps. **Click to expand.***
 
 ## HTTP API
 
@@ -116,10 +116,10 @@ down cleanly on app exit (no zombie threads, no orphaned ports).
 
 ## Security
 
-By default, both protocols bind to `0.0.0.0` and the HTTP server
-attaches a **permissive CORS layer**, so any origin on the network can
-call the API. Before exposing SabbathCue beyond a trusted local network,
-bind to `127.0.0.1` in Settings, or front it with a reverse proxy that
-adds authentication and TLS. The repo's
+By default, both protocols bind to `127.0.0.1`. OSC is local-only and
+unauthenticated. HTTP requires a bearer token for status and control calls, with
+`/api/v1/health` left open for liveness checks. Before exposing SabbathCue
+beyond the app machine, front it with a reverse proxy or private overlay network
+that adds authentication, TLS, and access control. The repo's
 [remote control guide](https://github.com/BongaNdlovu/SabbathCue/blob/main/documentation/remote-control.md#security-considerations)
 covers the threat model in more depth.
