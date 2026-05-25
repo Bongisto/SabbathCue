@@ -803,7 +803,8 @@ function RemoteControlSection() {
         await invoke("stop_osc")
         setOscError(null)
       } else {
-        const port = parseInt(oscPort) || 8000
+        const parsed = parseInt(oscPort, 10)
+        const port = Number.isFinite(parsed) ? parsed : 8000
         const boundPort = await invoke<number>("start_osc", { port })
         setOscPort(String(boundPort))
         setOscError(null)
@@ -819,7 +820,8 @@ function RemoteControlSection() {
         await invoke("stop_http")
         setHttpError(null)
       } else {
-        const port = parseInt(httpPort) || 8080
+        const parsed = parseInt(httpPort, 10)
+        const port = Number.isFinite(parsed) ? parsed : 8080
         const boundPort = await invoke<number>("start_http", { port })
         setHttpPort(String(boundPort))
         setHttpError(null)

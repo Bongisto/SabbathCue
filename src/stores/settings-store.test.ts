@@ -151,6 +151,25 @@ describe("settings store", () => {
     warnSpy.mockRestore()
   })
 
+  it("persisted numeric zero values survive hydration", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "gain") return 0
+      if (key === "confidenceThreshold") return 0
+      if (key === "cooldownMs") return 0
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    await hydrateSettings()
+
+    const state = useSettingsStore.getState()
+    expect(state.gain).toBe(0)
+    expect(state.confidenceThreshold).toBe(0)
+    expect(state.cooldownMs).toBe(0)
+    // Non-zero-keyed fields stay at defaults
+    expect(state.sttProvider).toBe("vosk")
+  })
+
   it("persist handles save rejection gracefully", async () => {
     mockGet.mockResolvedValue(null)
     mockSave.mockRejectedValue(new Error("disk error"))

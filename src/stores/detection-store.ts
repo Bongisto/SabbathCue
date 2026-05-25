@@ -49,8 +49,8 @@ function compareDetections(
   const rankDiff = detectionRank(b, now) - detectionRank(a, now)
   if (Math.abs(rankDiff) > Number.EPSILON) return rankDiff
 
-  const aTime = a.received_at || 0
-  const bTime = b.received_at || 0
+  const aTime = a.received_at ?? 0
+  const bTime = b.received_at ?? 0
   if (bTime !== aTime) return bTime - aTime
 
   return b.confidence - a.confidence
@@ -72,9 +72,10 @@ function mergeDetection(
     auto_queued: existing.auto_queued || incoming.auto_queued,
     is_chapter_only: existing.is_chapter_only && incoming.is_chapter_only,
     book_name: preferred.book_name || fallback.book_name,
-    book_number: preferred.book_number || fallback.book_number,
-    chapter: preferred.chapter || fallback.chapter,
-    verse: preferred.verse || fallback.verse,
+    // 0 is the "unresolved" sentinel — only use the preferred value when it is non-zero.
+    book_number: preferred.book_number !== 0 ? preferred.book_number : fallback.book_number,
+    chapter: preferred.chapter !== 0 ? preferred.chapter : fallback.chapter,
+    verse: preferred.verse !== 0 ? preferred.verse : fallback.verse,
   }
 }
 
@@ -127,7 +128,7 @@ export const useDetectionStore = create<DetectionState>((set) => ({
       // Merge existing detections
       for (const d of state.detections) {
         const existing = map.get(d.verse_ref)
-        const dReceivedAt = (d as DetectionResultWithMeta).received_at || 0
+        const dReceivedAt = (d as DetectionResultWithMeta).received_at ?? 0
         if (!existing) {
           map.set(d.verse_ref, { detection: d, received_at: dReceivedAt })
         } else {
@@ -140,6 +141,15 @@ export const useDetectionStore = create<DetectionState>((set) => ({
             map.set(d.verse_ref, {
               detection: mergeDetection(d, existing.detection),
               received_at: dReceivedAt,
+            })
+          } else {
+            // Incoming won on confidence, so make it the second arg so
+            // mergeDetection's preferred rule picks it. The non-zero sentinel
+            // checks for book_number/chapter/verse still fall through to the
+            // state detection when the incoming batch is unresolved.
+            map.set(d.verse_ref, {
+              detection: mergeDetection(d, existing.detection),
+              received_at: Math.max(existing.received_at, dReceivedAt),
             })
           }
         }

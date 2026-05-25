@@ -168,6 +168,87 @@ describe("detection store", () => {
     expect(detections[0].confidence).toBe(0.95)
   })
 
+  it("unresolved zero sentinels do not overwrite resolved verse coordinates", () => {
+    const store = useDetectionStore.getState()
+
+    store.addDetection(makeDetection({
+      verse_ref: "John 3:16",
+      book_number: 43,
+      chapter: 3,
+      verse: 16,
+      source: "direct",
+      confidence: 0.9,
+    }))
+
+    now = new Date("2026-05-19T00:00:01Z").getTime()
+    store.addDetection(makeDetection({
+      verse_ref: "John 3:16",
+      book_number: 0,
+      chapter: 0,
+      verse: 0,
+      book_name: "",
+      verse_text: "",
+      source: "semantic",
+      confidence: 0.85,
+    }))
+
+    const detections = useDetectionStore.getState().detections
+    expect(detections).toHaveLength(1)
+    expect(detections[0].book_number).toBe(43)
+    expect(detections[0].chapter).toBe(3)
+    expect(detections[0].verse).toBe(16)
+    expect(detections[0].source).toBe("direct")
+    expect(detections[0].confidence).toBe(0.9)
+  })
+
+  it("unresolved zero sentinels do not overwrite resolved coords through batch addDetections path", () => {
+    // The live transcription ingestion path calls addDetections, not addDetection.
+    // addDetections has its own merge control-flow that must not let an
+    // unresolved semantic hit (book_number=0) clobber an already-resolved
+    // detection, even when the incoming confidence is higher.
+    const store = useDetectionStore.getState()
+
+    store.addDetection(makeDetection({
+      verse_ref: "John 3:16",
+      book_number: 43,
+      chapter: 3,
+      verse: 16,
+      book_name: "Jn",
+      verse_text: "old text",
+      source: "semantic",
+      confidence: 0.85,
+    }))
+
+    now = new Date("2026-05-19T00:00:01Z").getTime()
+
+    // Batch ingestion: incoming has higher confidence and fresher text
+    // but unresolved coordinates.
+    store.addDetections([
+      makeDetection({
+        verse_ref: "John 3:16",
+        book_number: 0,
+        chapter: 0,
+        verse: 0,
+        book_name: "John",
+        verse_text: "For God so loved the world",
+        source: "semantic",
+        confidence: 0.92,
+      }),
+    ])
+
+    const detections = useDetectionStore.getState().detections
+    expect(detections).toHaveLength(1)
+    // Resolved coordinates survive (zero sentinels fall through)
+    expect(detections[0].book_number).toBe(43)
+    expect(detections[0].chapter).toBe(3)
+    expect(detections[0].verse).toBe(16)
+    // Fresher incoming text wins when non-empty
+    expect(detections[0].book_name).toBe("John")
+    expect(detections[0].verse_text).toBe("For God so loved the world")
+    // Confidence is max of both
+    expect(detections[0].confidence).toBe(0.92)
+  })
+
   it("keeps at most 8 detections", () => {
     const store = useDetectionStore.getState()
 
