@@ -6,18 +6,19 @@ export interface OpenBroadcastWindowArgs {
   fullscreen: boolean
 }
 
+export function parseMonitorIndex(value: string): number {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
 export function buildOpenBroadcastWindowArgs(
   outputId: BroadcastOutputId,
   selectedMonitor: string,
   fullscreen: boolean
 ): OpenBroadcastWindowArgs {
-  const parsedMonitorIndex = Number.parseInt(selectedMonitor, 10)
   return {
     outputId,
-    monitorIndex:
-      Number.isFinite(parsedMonitorIndex) && parsedMonitorIndex >= 0
-        ? parsedMonitorIndex
-        : 0,
+    monitorIndex: parseMonitorIndex(selectedMonitor),
     fullscreen,
   }
 }

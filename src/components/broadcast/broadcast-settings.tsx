@@ -21,7 +21,11 @@ import { Button } from "@/components/ui/button"
 
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { buildOpenBroadcastWindowArgs, clampMonitorIndex } from "@/components/broadcast/broadcast-settings-wiring"
+import {
+  buildOpenBroadcastWindowArgs,
+  clampMonitorIndex,
+  parseMonitorIndex,
+} from "@/components/broadcast/broadcast-settings-wiring"
 import { cn } from "@/lib/utils"
 import { useAssets } from "@/hooks/use-assets"
 import { useBroadcastStore } from "@/stores/broadcast-store"
@@ -296,7 +300,7 @@ export function BroadcastSettings({
 
   const handleMainMonitorChange = (value: string) => {
     setSelectedMonitor(value)
-    useBroadcastStore.getState().setMainDisplayMonitorIndex(Number(value))
+    useBroadcastStore.getState().setMainDisplayMonitorIndex(parseMonitorIndex(value))
   }
 
   const handleTogglePreview = async () => {
@@ -396,7 +400,7 @@ export function BroadcastSettings({
 
   const handleAltMonitorChange = (value: string) => {
     setAltSelectedMonitor(value)
-    useBroadcastStore.getState().setAltDisplayMonitorIndex(Number(value))
+    useBroadcastStore.getState().setAltDisplayMonitorIndex(parseMonitorIndex(value))
   }
 
   const handleAltTogglePreview = async () => {
