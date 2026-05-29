@@ -143,6 +143,76 @@ fn replace_semantic_job(
     }
 }
 
+fn enqueue_final_semantic_job(
+    job_slot: &Arc<Mutex<Option<(u64, String)>>>,
+    notify: &Arc<Notify>,
+    sent_counter: &Arc<AtomicU64>,
+    replaced_counter: &Arc<AtomicU64>,
+    seq: u64,
+    text: String,
+) {
+    if text.trim().is_empty() {
+        return;
+    }
+
+    let replaced = replace_semantic_job(job_slot, (seq, text), "final");
+    let n = sent_counter.fetch_add(1, Ordering::Relaxed) + 1;
+
+    if replaced {
+        let replaced_count = replaced_counter.fetch_add(1, Ordering::Relaxed) + 1;
+        let sent = sent_counter.load(Ordering::Relaxed);
+        log::debug!(
+            "[QUEUE] final_semantic latest-wins replaced stale work sent={sent} replaced={replaced_count}"
+        );
+    } else if n % 25 == 0 {
+        let replaced_count = replaced_counter.load(Ordering::Relaxed);
+        log::info!("[QUEUE] final_semantic latest-wins sent={n} replaced={replaced_count}");
+    }
+
+    notify.notify_one();
+}
+
+#[derive(Debug, Default)]
+struct DeepgramSemanticBuffer {
+    parts: Vec<String>,
+    seq: u64,
+}
+
+impl DeepgramSemanticBuffer {
+    fn push_final(&mut self, seq: u64, text: String, speech_final: bool) -> Option<(u64, String)> {
+        self.parts.push(text);
+        self.seq = seq;
+        if speech_final {
+            self.flush_with_seq(seq)
+        } else {
+            None
+        }
+    }
+
+    fn flush(&mut self) -> Option<(u64, String)> {
+        self.flush_with_seq(self.seq)
+    }
+
+    fn flush_with_seq(&mut self, seq: u64) -> Option<(u64, String)> {
+        if self.parts.is_empty() || seq == 0 {
+            return None;
+        }
+
+        let text = self.parts.join(" ");
+        self.clear();
+        Some((seq, text))
+    }
+
+    fn clear(&mut self) {
+        self.parts.clear();
+        self.seq = 0;
+    }
+
+    fn is_empty(&self) -> bool {
+        self.parts.is_empty()
+    }
+}
+
 fn semantic_result_key(result: &super::detection::DetectionResult) -> String {
     if result.book_number > 0 && result.chapter > 0 && result.verse > 0 {
         format!("{}:{}:{}", result.book_number, result.chapter, result.verse)
@@ -626,6 +696,8 @@ pub async fn start_transcription(
         let mut semantic_window: VecDeque<String> =
             VecDeque::with_capacity(SEMANTIC_WINDOW_SEGMENTS);
         let partial_semantic_enabled = provider_log_name == "vosk";
+        let deepgram_semantic_on_speech_final = provider_log_name == "deepgram";
+        let mut deepgram_semantic_buffer = DeepgramSemanticBuffer::default();
         let mut last_partial_semantic_at = Instant::now()
             .checked_sub(PARTIAL_SEMANTIC_DEBOUNCE)
             .unwrap_or_else(Instant::now);
@@ -725,7 +797,7 @@ pub async fn start_transcription(
                     transcript,
                     words,
                     confidence,
-                    speech_final: _,
+                    speech_final,
                 } => {
                     if !transcript.is_empty() {
                         let seq = transcript_seq.fetch_add(1, Ordering::Relaxed) + 1;
@@ -762,7 +834,11 @@ pub async fn start_transcription(
 
                         // Check for translation commands (cheap, <1ms, stays inline)
                         check_translation_command(&event_app, &transcript);
-                        if !is_detection_paused(&event_app) {
+                        let detection_paused = is_detection_paused(&event_app);
+                        if detection_paused && deepgram_semantic_on_speech_final && speech_final {
+                            deepgram_semantic_buffer.clear();
+                        }
+                        if !detection_paused {
                             if let Some(preview_text) = route.preview_candidate {
                                 match partial_preview_tx.try_send((seq, preview_text)) {
                                     Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -807,43 +883,62 @@ pub async fn start_transcription(
                                 );
                                 }
 
-                                // Send accepted is_final fragments to FTS5 immediately.
-                                // No sentence buffer — FTS5 is fast enough (~20-50ms)
-                                // to run on every fragment without waiting for pauses.
-                                semantic_window.push_back(detection_text.clone());
-                                while semantic_window.len() > SEMANTIC_WINDOW_SEGMENTS {
-                                    semantic_window.pop_front();
-                                }
-                                let semantic_text = semantic_window
-                                    .iter()
-                                    .cloned()
-                                    .collect::<Vec<_>>()
-                                    .join(" ");
-
-                                let replaced = replace_semantic_job(
-                                    &final_semantic_job_evt,
-                                    (seq, semantic_text),
-                                    "final",
-                                );
-
-                                let n = semantic_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-
-                                if replaced {
-                                    let replaced_count =
-                                        semantic_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                    let sent = semantic_sent_evt.load(Ordering::Relaxed);
-                                    log::debug!(
-                                        "[QUEUE] final_semantic latest-wins replaced stale work sent={sent} replaced={replaced_count}"
+                                // Deepgram waits for speech_final before semantic search.
+                                // Non-Deepgram providers keep the rolling final window.
+                                if deepgram_semantic_on_speech_final {
+                                    if let Some((semantic_seq, semantic_text)) =
+                                        deepgram_semantic_buffer.push_final(
+                                            seq,
+                                            detection_text,
+                                            speech_final,
+                                        )
+                                    {
+                                        enqueue_final_semantic_job(
+                                            &final_semantic_job_evt,
+                                            &final_semantic_notify_evt,
+                                            &semantic_sent_evt,
+                                            &semantic_dropped_evt,
+                                            semantic_seq,
+                                            semantic_text,
+                                        );
+                                    }
+                                } else {
+                                    semantic_window.push_back(detection_text.clone());
+                                    while semantic_window.len() > SEMANTIC_WINDOW_SEGMENTS {
+                                        semantic_window.pop_front();
+                                    }
+                                    let semantic_text = semantic_window
+                                        .iter()
+                                        .cloned()
+                                        .collect::<Vec<_>>()
+                                        .join(" ");
+                                    enqueue_final_semantic_job(
+                                        &final_semantic_job_evt,
+                                        &final_semantic_notify_evt,
+                                        &semantic_sent_evt,
+                                        &semantic_dropped_evt,
+                                        seq,
+                                        semantic_text,
                                     );
-                                } else if n % 25 == 0 {
-                                    let replaced_count =
-                                        semantic_dropped_evt.load(Ordering::Relaxed);
-                                    log::info!(
-                                        "[QUEUE] final_semantic latest-wins sent={n} replaced={replaced_count}"
+                                }
+                            } else if deepgram_semantic_on_speech_final
+                                && speech_final
+                                && !deepgram_semantic_buffer.is_empty()
+                            {
+                                // A duplicate speech_final result can be suppressed by the
+                                // transcript router; it still marks the buffered utterance ready.
+                                if let Some((semantic_seq, semantic_text)) =
+                                    deepgram_semantic_buffer.flush_with_seq(seq)
+                                {
+                                    enqueue_final_semantic_job(
+                                        &final_semantic_job_evt,
+                                        &final_semantic_notify_evt,
+                                        &semantic_sent_evt,
+                                        &semantic_dropped_evt,
+                                        semantic_seq,
+                                        semantic_text,
                                     );
                                 }
-
-                                final_semantic_notify_evt.notify_one();
                             }
                         }
 
@@ -858,7 +953,23 @@ pub async fn start_transcription(
                         }
                     }
                 }
-                TranscriptEvent::UtteranceEnd => {}
+                TranscriptEvent::UtteranceEnd => {
+                    if deepgram_semantic_on_speech_final {
+                        let pending = deepgram_semantic_buffer.flush();
+                        if !is_detection_paused(&event_app) {
+                            if let Some((semantic_seq, semantic_text)) = pending {
+                                enqueue_final_semantic_job(
+                                    &final_semantic_job_evt,
+                                    &final_semantic_notify_evt,
+                                    &semantic_sent_evt,
+                                    &semantic_dropped_evt,
+                                    semantic_seq,
+                                    semantic_text,
+                                );
+                            }
+                        }
+                    }
+                }
                 TranscriptEvent::SpeechStarted => {
                     let _ = event_app.emit("stt_speech_started", ());
                 }
@@ -1517,7 +1628,8 @@ pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::{
-        finalize_live_semantic_results, replace_semantic_job, take_semantic_job, LIVE_SEMANTIC_CAP,
+        finalize_live_semantic_results, replace_semantic_job, take_semantic_job,
+        DeepgramSemanticBuffer, LIVE_SEMANTIC_CAP,
     };
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -1695,5 +1807,41 @@ mod tests {
             take_semantic_job(&slot, "test"),
             Some((2, "recovered".to_string()))
         );
+    }
+
+    #[test]
+    fn deepgram_semantic_buffer_waits_until_speech_final() {
+        let mut buffer = DeepgramSemanticBuffer::default();
+
+        assert_eq!(buffer.push_final(1, "John 3".to_string(), false), None);
+        assert_eq!(
+            buffer.push_final(2, "sixteen".to_string(), true),
+            Some((2, "John 3 sixteen".to_string()))
+        );
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn deepgram_semantic_buffer_flushes_duplicate_speech_final_boundary() {
+        let mut buffer = DeepgramSemanticBuffer::default();
+
+        assert_eq!(buffer.push_final(1, "Psalm 23".to_string(), false), None);
+        assert_eq!(buffer.flush_with_seq(2), Some((2, "Psalm 23".to_string())));
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn deepgram_semantic_buffer_utterance_end_uses_last_final_seq() {
+        let mut buffer = DeepgramSemanticBuffer::default();
+
+        assert_eq!(
+            buffer.push_final(7, "The Lord is my shepherd".to_string(), false),
+            None
+        );
+        assert_eq!(
+            buffer.flush(),
+            Some((7, "The Lord is my shepherd".to_string()))
+        );
+        assert!(buffer.is_empty());
     }
 }

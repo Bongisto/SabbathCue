@@ -390,6 +390,7 @@ pub(crate) fn deepgram_keyterms() -> Vec<String> {
         "three angels messages".to_string(),
         "spirit of prophecy".to_string(),
         "Adventist".to_string(),
+        "Psalm".to_string(),
         "hymn number".to_string(),
         "scripture reading".to_string(),
         "responsive reading".to_string(),
@@ -653,6 +654,7 @@ mod tests {
         assert_eq!(terms.len(), unique.len());
         assert!(terms.len() <= MAX_DEEPGRAM_KEYTERMS);
         assert_eq!(terms.first().map(String::as_str), Some("Jesus"));
+        assert!(terms.iter().any(|term| term == "Psalm"));
         assert!(terms.iter().any(|term| term == "John"));
     }
 
