@@ -744,6 +744,217 @@ const CINEMA_NOIR_LOWER: BroadcastTheme = {
   },
 }
 
+const CINEMA_SAPPHIRE_HAZE: BroadcastTheme = {
+  ...CLASSIC_DARK,
+  id: "builtin-cinema-sapphire-haze",
+  name: "Cinema Sapphire Haze",
+  background: {
+    type: "gradient",
+    color: "#06111f",
+    gradient: {
+      type: "radial",
+      angle: 0,
+      stops: [
+        { color: "#2563eb", position: 0 },
+        { color: "#0f274a", position: 48 },
+        { color: "#04070d", position: 100 },
+      ],
+    },
+    image: null,
+  },
+  textBox: {
+    enabled: true,
+    color: "#020617",
+    opacity: 0.46,
+    borderRadius: 8,
+    padding: 30,
+  },
+  verseText: {
+    ...CLASSIC_DARK.verseText,
+    fontSize: 72,
+    color: "#eff6ff",
+    shadow: { color: "rgba(0,0,0,0.7)", blur: 14, x: 0, y: 4 },
+  },
+  verseNumbers: {
+    visible: true,
+    fontSize: 18,
+    color: "#93c5fd",
+    superscript: true,
+  },
+  reference: { ...CLASSIC_DARK.reference, color: "#bfdbfe", fontSize: 40 },
+}
+
+const CINEMA_COPPER_DAWN: BroadcastTheme = {
+  ...MODERN_LIGHT,
+  id: "builtin-cinema-copper-dawn",
+  name: "Cinema Copper Dawn",
+  background: {
+    type: "gradient",
+    color: "#fff7ed",
+    gradient: {
+      type: "linear",
+      angle: 150,
+      stops: [
+        { color: "#fff7ed", position: 0 },
+        { color: "#fdba74", position: 44 },
+        { color: "#14532d", position: 100 },
+      ],
+    },
+    image: null,
+  },
+  textBox: {
+    enabled: true,
+    color: "#1c1917",
+    opacity: 0.24,
+    borderRadius: 8,
+    padding: 28,
+  },
+  verseText: {
+    ...MODERN_LIGHT.verseText,
+    fontFamily: "Source Serif 4 Variable",
+    fontSize: 68,
+    color: "#1c1917",
+    lineHeight: 1.55,
+  },
+  verseNumbers: {
+    visible: true,
+    fontSize: 17,
+    color: "#9a3412",
+    superscript: true,
+  },
+  reference: {
+    ...MODERN_LIGHT.reference,
+    color: "#166534",
+    fontSize: 38,
+    uppercase: true,
+    letterSpacing: 1,
+  },
+}
+
+const CINEMA_CRIMSON_VEIL: BroadcastTheme = {
+  ...CLASSIC_DARK,
+  id: "builtin-cinema-crimson-veil",
+  name: "Cinema Crimson Veil",
+  background: {
+    type: "gradient",
+    color: "#13040b",
+    gradient: {
+      type: "radial",
+      angle: 0,
+      stops: [
+        { color: "#be123c", position: 0 },
+        { color: "#4c0519", position: 54 },
+        { color: "#050505", position: 100 },
+      ],
+    },
+    image: null,
+  },
+  textBox: {
+    enabled: true,
+    color: "#09090b",
+    opacity: 0.5,
+    borderRadius: 8,
+    padding: 26,
+  },
+  verseText: {
+    ...CLASSIC_DARK.verseText,
+    fontSize: 70,
+    color: "#fff1f2",
+    shadow: { color: "rgba(0,0,0,0.82)", blur: 12, x: 0, y: 3 },
+  },
+  verseNumbers: {
+    visible: true,
+    fontSize: 18,
+    color: "#fda4af",
+    superscript: true,
+  },
+  reference: { ...CLASSIC_DARK.reference, color: "#fecdd3", fontSize: 39 },
+}
+
+const CINEMA_ALPINE_MIST: BroadcastTheme = {
+  ...MODERN_LIGHT,
+  id: "builtin-cinema-alpine-mist",
+  name: "Cinema Alpine Mist",
+  background: {
+    type: "gradient",
+    color: "#f8fafc",
+    gradient: {
+      type: "linear",
+      angle: 165,
+      stops: [
+        { color: "#f8fafc", position: 0 },
+        { color: "#bae6fd", position: 48 },
+        { color: "#334155", position: 100 },
+      ],
+    },
+    image: null,
+  },
+  textBox: {
+    enabled: true,
+    color: "#ffffff",
+    opacity: 0.5,
+    borderRadius: 8,
+    padding: 28,
+  },
+  verseText: {
+    ...MODERN_LIGHT.verseText,
+    fontSize: 66,
+    color: "#0f172a",
+    lineHeight: 1.58,
+  },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#0f172a",
+    superscript: true,
+  },
+  reference: {
+    ...MODERN_LIGHT.reference,
+    color: "#075985",
+    fontSize: 36,
+    uppercase: true,
+  },
+}
+
+const CINEMA_LANTERN_LOWER: BroadcastTheme = {
+  ...BROADCAST_OVERLAY,
+  id: "builtin-cinema-lantern-lower",
+  name: "Cinema Lantern Lower",
+  textBox: {
+    enabled: true,
+    color: "#1a1208",
+    opacity: 0.84,
+    borderRadius: 6,
+    padding: 26,
+  },
+  verseText: {
+    ...BROADCAST_OVERLAY.verseText,
+    fontFamily: "Source Serif 4 Variable",
+    fontSize: 58,
+    color: "#fff7ed",
+    lineHeight: 1.36,
+  },
+  verseNumbers: {
+    visible: true,
+    fontSize: 16,
+    color: "#fbbf24",
+    superscript: true,
+  },
+  reference: {
+    ...BROADCAST_OVERLAY.reference,
+    color: "#fde68a",
+    fontSize: 31,
+    position: "below",
+  },
+  layout: {
+    ...BROADCAST_OVERLAY.layout,
+    anchor: "bottom-center",
+    textAreaWidth: 88,
+    textAreaHeight: 36,
+    padding: { top: 40, right: 68, bottom: 56, left: 68 },
+  },
+}
+
 export const BUILTIN_THEMES: BroadcastTheme[] = [
   CLASSIC_DARK,
   MODERN_LIGHT,
@@ -762,4 +973,9 @@ export const BUILTIN_THEMES: BroadcastTheme[] = [
   CINEMA_MONO,
   CINEMA_SUNRISE,
   CINEMA_NOIR_LOWER,
+  CINEMA_SAPPHIRE_HAZE,
+  CINEMA_COPPER_DAWN,
+  CINEMA_CRIMSON_VEIL,
+  CINEMA_ALPINE_MIST,
+  CINEMA_LANTERN_LOWER,
 ]

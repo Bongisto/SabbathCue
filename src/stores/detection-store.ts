@@ -14,9 +14,6 @@ const MAX_RECENT_DETECTIONS = 8
 const DIRECT_SOURCE_BONUS = 0.04
 const MAX_RECENCY_BONUS = 0.01
 const RECENCY_BONUS_WINDOW_MS = 30_000
-const DETECTION_VISIBLE_MS = 8_000
-
-const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 interface DetectionState {
   detections: DetectionResult[]
@@ -138,39 +135,6 @@ function findMapEntryKey(
   return undefined
 }
 
-function clearDetectionExpiry(key: string) {
-  const timer = expiryTimers.get(key)
-  if (timer) {
-    clearTimeout(timer)
-    expiryTimers.delete(key)
-  }
-}
-
-function scheduleDetectionExpiry(
-  key: string,
-  removeDetection: (key: string) => void,
-) {
-  clearDetectionExpiry(key)
-
-  const timer = setTimeout(() => {
-    expiryTimers.delete(key)
-    removeDetection(key)
-  }, DETECTION_VISIBLE_MS)
-
-  if (typeof timer === "object" && "unref" in timer && typeof timer.unref === "function") {
-    timer.unref()
-  }
-
-  expiryTimers.set(key, timer)
-}
-
-function clearAllDetectionExpiries() {
-  for (const timer of expiryTimers.values()) {
-    clearTimeout(timer)
-  }
-  expiryTimers.clear()
-}
-
 export const useDetectionStore = create<DetectionState>((set) => ({
   detections: [],
   autoMode: false,
@@ -180,7 +144,6 @@ export const useDetectionStore = create<DetectionState>((set) => ({
     set((state) => {
       const now = Date.now()
       const key = detectionKey(detection)
-      scheduleDetectionExpiry(key, useDetectionStore.getState().removeDetection)
       const existingIndex = state.detections.findIndex((d) =>
         detectionsAreEquivalent(d, detection)
       )
@@ -207,10 +170,6 @@ export const useDetectionStore = create<DetectionState>((set) => ({
     set((state) => {
       const now = Date.now()
       const map = new Map<string, DetectionWithMeta>()
-
-      for (const detection of incoming) {
-        scheduleDetectionExpiry(detectionKey(detection), useDetectionStore.getState().removeDetection)
-      }
       
       // Add incoming with received_at
       for (const d of incoming) {
@@ -270,24 +229,14 @@ export const useDetectionStore = create<DetectionState>((set) => ({
       
       return { detections: sorted }
     }),
-  setDetections: (detections) => {
-    clearAllDetectionExpiries()
-    for (const detection of detections) {
-      scheduleDetectionExpiry(detectionKey(detection), useDetectionStore.getState().removeDetection)
-    }
-    set({ detections })
-  },
+  setDetections: (detections) => set({ detections }),
   removeDetection: (key) =>
     set((state) => {
-      clearDetectionExpiry(key)
       return {
         detections: state.detections.filter((d) => !detectionMatchesRemovalKey(d, key)),
       }
     }),
-  clearDetections: () => {
-    clearAllDetectionExpiries()
-    set({ detections: [] })
-  },
+  clearDetections: () => set({ detections: [] }),
   setAutoMode: (autoMode) => set({ autoMode }),
   setConfidenceThreshold: (confidenceThreshold) =>
     set({ confidenceThreshold }),

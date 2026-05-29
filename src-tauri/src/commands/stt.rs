@@ -37,7 +37,7 @@ fn is_detection_paused(app: &AppHandle) -> bool {
 static DIRECT_LOCK_OK: AtomicU64 = AtomicU64::new(0);
 static DIRECT_LOCK_CONTENDED: AtomicU64 = AtomicU64::new(0);
 const SEMANTIC_WINDOW_SEGMENTS: usize = 8;
-const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(250);
+const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(150);
 const PARTIAL_SEMANTIC_MIN_WORDS: usize = 4;
 const LIVE_SEMANTIC_CAP: usize = 3;
 const LIVE_SEMANTIC_OVERLAP_BOOST: f64 = 0.10;
@@ -695,8 +695,8 @@ pub async fn start_transcription(
         let mut transcript_router = TranscriptRouter::default();
         let mut semantic_window: VecDeque<String> =
             VecDeque::with_capacity(SEMANTIC_WINDOW_SEGMENTS);
-        let partial_semantic_enabled = provider_log_name == "vosk";
-        let deepgram_semantic_on_speech_final = provider_log_name == "deepgram";
+        let partial_semantic_enabled = true;
+        let deepgram_semantic_on_speech_final = false;
         let mut deepgram_semantic_buffer = DeepgramSemanticBuffer::default();
         let mut last_partial_semantic_at = Instant::now()
             .checked_sub(PARTIAL_SEMANTIC_DEBOUNCE)
