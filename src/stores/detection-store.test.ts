@@ -265,7 +265,7 @@ describe("detection store", () => {
     expect(detections.some((d) => d.verse_ref === "Ref 0")).toBe(false)
   })
 
-  it("auto-removes recent detections after 5 seconds and refreshes duplicate expiry", () => {
+  it("auto-removes recent detections after 8 seconds and refreshes duplicate expiry", () => {
     vi.restoreAllMocks()
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-05-19T00:00:00Z"))
@@ -274,14 +274,36 @@ describe("detection store", () => {
     const store = useDetectionStore.getState()
     store.addDetections([makeDetection({ verse_ref: "John 3:16", confidence: 0.85 })])
 
-    vi.advanceTimersByTime(4_000)
+    vi.advanceTimersByTime(7_000)
     expect(useDetectionStore.getState().detections).toHaveLength(1)
 
     store.addDetections([makeDetection({ verse_ref: "John 3:16", confidence: 0.96 })])
-    vi.advanceTimersByTime(4_999)
+    vi.advanceTimersByTime(7_999)
     expect(useDetectionStore.getState().detections).toHaveLength(1)
 
     vi.advanceTimersByTime(1)
     expect(useDetectionStore.getState().detections).toHaveLength(0)
+  })
+
+  it("deduplicates the same resolved verse even when the label changes", () => {
+    const store = useDetectionStore.getState()
+
+    store.addDetections([
+      makeDetection({
+        verse_ref: "John 3:16",
+        source: "direct",
+        confidence: 0.9,
+      }),
+      makeDetection({
+        verse_ref: "Jn 3:16",
+        source: "semantic",
+        confidence: 0.95,
+      }),
+    ])
+
+    const detections = useDetectionStore.getState().detections
+    expect(detections).toHaveLength(1)
+    expect(detections[0].source).toBe("direct")
+    expect(detections[0].confidence).toBe(0.95)
   })
 })

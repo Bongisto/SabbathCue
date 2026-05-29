@@ -14,7 +14,7 @@ const MAX_RECENT_DETECTIONS = 8
 const DIRECT_SOURCE_BONUS = 0.04
 const MAX_RECENCY_BONUS = 0.01
 const RECENCY_BONUS_WINDOW_MS = 30_000
-const DETECTION_VISIBLE_MS = 5_000
+const DETECTION_VISIBLE_MS = 8_000
 
 const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -82,30 +82,86 @@ function mergeDetection(
   }
 }
 
-function clearDetectionExpiry(verseRef: string) {
-  const timer = expiryTimers.get(verseRef)
+function normalizeVerseRef(verseRef: string): string {
+  return verseRef
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/\s*:\s*/g, ":")
+    .trim()
+}
+
+function detectionKey(detection: DetectionResult): string {
+  const normalizedRef = normalizeVerseRef(detection.verse_ref)
+  const versePattern = new RegExp(`\\b${detection.chapter}\\s*:\\s*${detection.verse}\\b`)
+  const chapterPattern = new RegExp(`\\b${detection.chapter}\\b`)
+
+  if (
+    detection.book_number > 0 &&
+    detection.chapter > 0 &&
+    (detection.is_chapter_only ? chapterPattern.test(normalizedRef) : versePattern.test(normalizedRef))
+  ) {
+    if (detection.is_chapter_only) {
+      return `chapter:${detection.book_number}:${detection.chapter}`
+    }
+    if (detection.verse > 0) {
+      return `verse:${detection.book_number}:${detection.chapter}:${detection.verse}`
+    }
+  }
+
+  return `ref:${normalizedRef}`
+}
+
+function detectionMatchesRemovalKey(detection: DetectionResult, key: string): boolean {
+  return (
+    detectionKey(detection) === key ||
+    detection.verse_ref === key ||
+    normalizeVerseRef(detection.verse_ref) === normalizeVerseRef(key)
+  )
+}
+
+function detectionsAreEquivalent(a: DetectionResult, b: DetectionResult): boolean {
+  return (
+    detectionKey(a) === detectionKey(b) ||
+    normalizeVerseRef(a.verse_ref) === normalizeVerseRef(b.verse_ref)
+  )
+}
+
+function findMapEntryKey(
+  map: Map<string, DetectionWithMeta>,
+  detection: DetectionResult,
+): string | undefined {
+  for (const [key, item] of map) {
+    if (detectionsAreEquivalent(item.detection, detection)) {
+      return key
+    }
+  }
+  return undefined
+}
+
+function clearDetectionExpiry(key: string) {
+  const timer = expiryTimers.get(key)
   if (timer) {
     clearTimeout(timer)
-    expiryTimers.delete(verseRef)
+    expiryTimers.delete(key)
   }
 }
 
 function scheduleDetectionExpiry(
-  verseRef: string,
-  removeDetection: (verseRef: string) => void,
+  key: string,
+  removeDetection: (key: string) => void,
 ) {
-  clearDetectionExpiry(verseRef)
+  clearDetectionExpiry(key)
 
   const timer = setTimeout(() => {
-    expiryTimers.delete(verseRef)
-    removeDetection(verseRef)
+    expiryTimers.delete(key)
+    removeDetection(key)
   }, DETECTION_VISIBLE_MS)
 
   if (typeof timer === "object" && "unref" in timer && typeof timer.unref === "function") {
     timer.unref()
   }
 
-  expiryTimers.set(verseRef, timer)
+  expiryTimers.set(key, timer)
 }
 
 function clearAllDetectionExpiries() {
@@ -123,8 +179,11 @@ export const useDetectionStore = create<DetectionState>((set) => ({
   addDetection: (detection) =>
     set((state) => {
       const now = Date.now()
-      scheduleDetectionExpiry(detection.verse_ref, useDetectionStore.getState().removeDetection)
-      const existingIndex = state.detections.findIndex((d) => d.verse_ref === detection.verse_ref)
+      const key = detectionKey(detection)
+      scheduleDetectionExpiry(key, useDetectionStore.getState().removeDetection)
+      const existingIndex = state.detections.findIndex((d) =>
+        detectionsAreEquivalent(d, detection)
+      )
       
       if (existingIndex >= 0) {
         const existing = state.detections[existingIndex] as DetectionResultWithMeta
@@ -150,16 +209,17 @@ export const useDetectionStore = create<DetectionState>((set) => ({
       const map = new Map<string, DetectionWithMeta>()
 
       for (const detection of incoming) {
-        scheduleDetectionExpiry(detection.verse_ref, useDetectionStore.getState().removeDetection)
+        scheduleDetectionExpiry(detectionKey(detection), useDetectionStore.getState().removeDetection)
       }
       
       // Add incoming with received_at
       for (const d of incoming) {
-        const existing = map.get(d.verse_ref)
+        const key = findMapEntryKey(map, d) ?? detectionKey(d)
+        const existing = map.get(key)
         if (!existing) {
-          map.set(d.verse_ref, { detection: d, received_at: now })
+          map.set(key, { detection: d, received_at: now })
         } else {
-          map.set(d.verse_ref, {
+          map.set(key, {
             detection: mergeDetection(existing.detection, d),
             received_at: now,
           })
@@ -168,18 +228,19 @@ export const useDetectionStore = create<DetectionState>((set) => ({
       
       // Merge existing detections
       for (const d of state.detections) {
-        const existing = map.get(d.verse_ref)
+        const key = findMapEntryKey(map, d) ?? detectionKey(d)
+        const existing = map.get(key)
         const dReceivedAt = (d as DetectionResultWithMeta).received_at ?? 0
         if (!existing) {
-          map.set(d.verse_ref, { detection: d, received_at: dReceivedAt })
+          map.set(key, { detection: d, received_at: dReceivedAt })
         } else {
           if (d.confidence > existing.detection.confidence || d.source === "direct") {
-            map.set(d.verse_ref, {
+            map.set(key, {
               detection: mergeDetection(existing.detection, d),
               received_at: Math.max(existing.received_at, dReceivedAt),
             })
           } else if (dReceivedAt > existing.received_at) {
-            map.set(d.verse_ref, {
+            map.set(key, {
               detection: mergeDetection(d, existing.detection),
               received_at: dReceivedAt,
             })
@@ -188,7 +249,7 @@ export const useDetectionStore = create<DetectionState>((set) => ({
             // mergeDetection's preferred rule picks it. The non-zero sentinel
             // checks for book_number/chapter/verse still fall through to the
             // state detection when the incoming batch is unresolved.
-            map.set(d.verse_ref, {
+            map.set(key, {
               detection: mergeDetection(d, existing.detection),
               received_at: Math.max(existing.received_at, dReceivedAt),
             })
@@ -212,15 +273,15 @@ export const useDetectionStore = create<DetectionState>((set) => ({
   setDetections: (detections) => {
     clearAllDetectionExpiries()
     for (const detection of detections) {
-      scheduleDetectionExpiry(detection.verse_ref, useDetectionStore.getState().removeDetection)
+      scheduleDetectionExpiry(detectionKey(detection), useDetectionStore.getState().removeDetection)
     }
     set({ detections })
   },
-  removeDetection: (verseRef) =>
+  removeDetection: (key) =>
     set((state) => {
-      clearDetectionExpiry(verseRef)
+      clearDetectionExpiry(key)
       return {
-        detections: state.detections.filter((d) => d.verse_ref !== verseRef),
+        detections: state.detections.filter((d) => !detectionMatchesRemovalKey(d, key)),
       }
     }),
   clearDetections: () => {

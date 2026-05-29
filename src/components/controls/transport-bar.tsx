@@ -32,6 +32,12 @@ export function TransportBar() {
       className="col-span-4 flex h-14 items-center justify-between border-b border-border  bg-card px-3"
     >
       <div className="flex items-center gap-2.5">
+        <img
+          src="/app-logo.png"
+          alt=""
+          aria-hidden="true"
+          className="h-9 w-auto object-contain"
+        />
         <span className="text-sm font-semibold tracking-tight text-foreground">
           {APP_DISPLAY_NAME}
         </span>
