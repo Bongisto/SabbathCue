@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useTheme } from "@/components/theme-provider"
-import { APP_DISPLAY_NAME } from "@/lib/app-brand"
+import { AppLogo } from "@/components/ui/app-logo"
 
 const LazyBroadcastSettings = lazy(() =>
   import("@/components/broadcast/broadcast-settings").then((mod) => ({
@@ -32,11 +32,7 @@ export function TransportBar() {
       className="col-span-4 flex h-14 items-center justify-between border-b border-border  bg-card px-3"
     >
       <div className="flex items-center gap-2.5">
-        <img
-          src="/app-logo.png"
-          alt={APP_DISPLAY_NAME}
-          className="h-10 w-auto object-contain"
-        />
+        <AppLogo size="md" />
         <Badge variant="outline" className="text-[0.5625rem] uppercase">
           Free
         </Badge>

@@ -72,8 +72,7 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  // icon and apple-icon are wired automatically from app/icon.svg and
-  // app/apple-icon.tsx — overriding here would suppress Next.js's defaults.
+  // Favicon and apple touch icon are wired from app/icon.png.
   manifest: "/manifest.webmanifest",
 };
 

@@ -18,7 +18,7 @@ export function StructuredData() {
         url: SITE.url,
         logo: {
           "@type": "ImageObject",
-          url: `${SITE.url}/icon.svg`,
+          url: `${SITE.url}/sabbathcue-logo.png`,
           width: 1024,
           height: 1024,
         },
