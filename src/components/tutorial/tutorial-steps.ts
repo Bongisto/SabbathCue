@@ -8,11 +8,19 @@ const STEP_DEFAULTS = {
 export const TUTORIAL_STEPS: Step[] = [
   {
     ...STEP_DEFAULTS,
-    target: '[data-tour="go-live"]',
-    title: "Go Live",
+    target: '[data-slot="dashboard-shell"]',
+    title: "Workspace",
     content:
-      "Your broadcast console lives here. Switch modes for sermon, service plan, hymns, or slides without leaving preview, live output, or queue.",
+      "Prepare, Rehearse, and Go Live are one tap away. Under Go Live, pick Sermon for verses and AI detections, or switch to service plan, hymns, or slides.",
     placement: "bottom",
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-zone="bible"]',
+    title: "Bible & detections",
+    content:
+      "The lower zone holds verse search and AI detections. Drag the horizontal divider to give more room to production or study.",
+    placement: "top",
   },
   {
     ...STEP_DEFAULTS,

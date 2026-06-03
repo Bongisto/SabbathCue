@@ -75,7 +75,7 @@ export function PreviewPanel({
   return (
     <div
       data-slot="preview-panel"
-      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="panel-surface flex min-h-0 flex-col overflow-hidden"
     >
       <PanelHeader title="Program preview" icon={<MonitorIcon className="size-3" />} step={2}>
         <Badge variant="outline" className="h-5 text-[0.5625rem] uppercase">

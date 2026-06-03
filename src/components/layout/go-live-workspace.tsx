@@ -1,6 +1,5 @@
 import { Suspense, lazy } from "react"
-import { LiveProductionGrid } from "@/components/layout/live-production-grid"
-import { SermonModeContext } from "@/components/layout/sermon-mode-context"
+import { LiveSermonLayout } from "@/components/layout/live-sermon-layout"
 import { ServiceReadinessPanel } from "@/components/layout/service-readiness-panel"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import type { LiveMode } from "@/lib/dashboard-navigation"
@@ -23,18 +22,7 @@ const LazySermonSlidesLiveContext = lazy(() =>
   })),
 )
 
-const LIVE_MODE_LABELS: Record<LiveMode, string> = {
-  sermon: "Sermon",
-  "service-plan": "Service Plan",
-  hymns: "Hymns",
-  slides: "Slides",
-}
-
 function GoLiveModeContext({ mode }: { mode: LiveMode }) {
-  if (mode === "sermon") {
-    return <SermonModeContext />
-  }
-
   const fallback = (
     <div className="h-full min-h-[200px] rounded-lg border border-border bg-card" />
   )
@@ -65,19 +53,23 @@ function GoLiveModeContext({ mode }: { mode: LiveMode }) {
 export function GoLiveWorkspace() {
   const liveMode = useDashboardWorkspaceStore((s) => s.liveMode)
 
+  if (liveMode === "sermon") {
+    return (
+      <div
+        data-slot="go-live-workspace"
+        className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-3"
+      >
+        <ServiceReadinessPanel />
+        <LiveSermonLayout />
+      </div>
+    )
+  }
+
   return (
     <div
       data-slot="go-live-workspace"
-      className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden p-3"
     >
-      <ServiceReadinessPanel />
-      <p className="text-xs text-muted-foreground">
-        Live mode:{" "}
-        <span className="font-medium text-foreground">
-          {LIVE_MODE_LABELS[liveMode]}
-        </span>
-      </p>
-      <LiveProductionGrid />
       <GoLiveModeContext mode={liveMode} />
     </div>
   )

@@ -205,7 +205,7 @@ export function HymnalPanel() {
     <div
       ref={panelRef}
       data-slot="hymnal-panel"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="panel-surface flex min-h-0 flex-1 flex-col overflow-hidden"
       tabIndex={-1}
     >
       <PanelHeader title="SDA Hymnal" icon={<ListMusicIcon className="size-3" />} step={5}>
@@ -285,7 +285,7 @@ export function HymnalPanel() {
                 className={cn(
                   "flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors",
                   selectedHymn?.id === result.id
-                    ? "bg-lime-500/15 text-foreground"
+                    ? "bg-primary/15 text-foreground"
                     : "hover:bg-muted/50",
                 )}
               >
@@ -477,7 +477,7 @@ export function HymnalPanel() {
                         className={cn(
                           "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                           index === activeScreenIndex
-                            ? "border-lime-500/50 bg-lime-500/15"
+                            ? "border-primary/50 bg-primary/15"
                             : "border-border hover:bg-muted/50",
                         )}
                       >

@@ -116,7 +116,7 @@ export function ServiceTimeline({
                     title="Complete"
                     onClick={() => onComplete(item.id)}
                   >
-                    <CheckIcon className="size-3 text-emerald-500" />
+                    <CheckIcon className="size-3 text-primary" />
                   </Button>
                 )}
 

@@ -26,7 +26,7 @@ const WORKSPACE_PANEL_DEFAULTS = {
 
 export const DASHBOARD_LAYOUT_PRESETS: Record<DashboardViewMode, DashboardLayoutPreset> = {
   balanced: {
-    topHeightPercent: 48,
+    topHeightPercent: 45,
     transcriptWidth: 320,
     queueWidth: 320,
     detectionsWidth: 624,

@@ -103,7 +103,7 @@ export function TranscriptPanel() {
   return (
     <div
       data-slot="transcript-panel"
-      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="panel-surface flex flex-col overflow-hidden"
     >
       <PanelHeader
         title="Live transcript"
@@ -125,9 +125,9 @@ export function TranscriptPanel() {
             <span
               className={`mb-1 size-1.5 rounded-full ${
                 connectionStatus === "connected"
-                  ? "bg-emerald-500"
+                  ? "bg-primary"
                   : connectionStatus === "connecting"
-                    ? "animate-pulse bg-amber-500"
+                    ? "animate-pulse bg-brand-yellow"
                     : connectionStatus === "error"
                       ? "bg-red-500"
                       : "bg-muted-foreground/40"

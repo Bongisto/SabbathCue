@@ -55,10 +55,10 @@ function StripButton({
           "text-red-500 hover:bg-red-500/15 hover:text-red-400",
         !disabled &&
           variant === "success" &&
-          "text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400",
+          "text-primary hover:bg-primary/15 hover:text-primary",
         !disabled &&
           variant === "default" &&
-          "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400",
+          "text-brand-yellow hover:bg-brand-yellow/15 hover:text-brand-yellow",
       )}
     >
       {children}
@@ -140,7 +140,7 @@ export function OperatorStatusStrip() {
   return (
     <div
       data-slot="operator-status-strip"
-      className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-card/80 px-3 py-1 text-xs text-muted-foreground"
+      className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-surface-elevated/80 px-3 py-1 text-xs text-muted-foreground"
     >
       <div
         data-zone="safe"
@@ -172,13 +172,13 @@ export function OperatorStatusStrip() {
 
         <div className="flex items-center gap-2">
           <RadioIcon
-            className={cn("size-3.5", isLive && "text-emerald-500")}
+            className={cn("size-3.5", isLive && "text-primary")}
           />
           <Badge
             variant={isLive ? "default" : "outline"}
             className={cn(
               "h-5 text-[0.5625rem] uppercase",
-              isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
+              isLive && "bg-primary text-primary-foreground hover:bg-primary/90",
             )}
           >
             {isLive ? "On air" : "Hidden"}

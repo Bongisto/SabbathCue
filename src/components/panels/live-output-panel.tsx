@@ -89,7 +89,7 @@ export function LiveOutputPanel({
       ref={panelRef}
       data-slot="live-output-panel"
       className={cn(
-        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card",
+        "panel-surface flex min-h-0 flex-col overflow-hidden",
         isLive && "shadow-[inset_0_2px_0_0_rgba(16,185,129,0.35)]",
         isFullscreen && "!rounded-none !border-0 !h-screen !w-screen",
       )}
@@ -113,7 +113,7 @@ export function LiveOutputPanel({
               variant={isLive ? "default" : "outline"}
               className={cn(
                 "h-5 text-[0.5625rem] uppercase",
-                isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
+                isLive && "bg-primary text-primary-foreground hover:bg-primary/90",
               )}
             >
               {isLive ? "On air" : "Hidden"}
@@ -150,7 +150,7 @@ export function LiveOutputPanel({
 
         <label className="flex items-center gap-2.5">
           {isLive ? (
-            <EyeIcon className="size-3.5 text-emerald-500" />
+            <EyeIcon className="size-3.5 text-primary" />
           ) : (
             <EyeOffIcon className="size-3.5 text-muted-foreground" />
           )}
@@ -162,7 +162,7 @@ export function LiveOutputPanel({
             onCheckedChange={(checked) =>
               useBroadcastStore.getState().setLive(checked)
             }
-            className="data-[state=checked]:bg-emerald-500"
+            className="data-[state=checked]:bg-primary"
           />
         </label>
       </div>
@@ -176,7 +176,7 @@ export function LiveOutputPanel({
           onCheckedChange={(checked) =>
             useBroadcastStore.getState().setReadingModeAutoLive(checked)
           }
-          className="data-[state=checked]:bg-emerald-500"
+          className="data-[state=checked]:bg-primary"
         />
       </div>
 

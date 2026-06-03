@@ -319,7 +319,7 @@ export function ServicePlanLibraryPanel() {
 
   return (
     <div
-      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="flex min-h-0 flex-col overflow-hidden panel-surface"
       data-slot="service-plan-page"
     >
       <div className="space-y-4 overflow-y-auto p-4">
@@ -395,7 +395,7 @@ export function ServicePlanWorkspace() {
         label="Resize service plan library"
         onPointerDown={startLibraryResize}
       />
-      <div className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
+      <div className="min-h-0 overflow-hidden panel-surface">
         {activePlan ? (
           <Suspense
             fallback={
@@ -518,7 +518,7 @@ export function RunServicePage() {
           gridTemplateColumns: `minmax(0, 1fr) 6px ${timelineWidth}px`,
         }}
       >
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
           <PanelHeader title="Run Service" icon={<RadioIcon className="size-4" />}>
             <Badge variant="outline" className="text-[0.5625rem] uppercase">
               {activeItemContentLabel(activeItem)}
@@ -642,7 +642,7 @@ export function RunServicePage() {
           onPointerDown={startTimelineResize}
         />
 
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
           <PanelHeader
             title="Service timeline"
             icon={<ClipboardListIcon className="size-4" />}
@@ -710,7 +710,7 @@ export function LiveServicePlanContext() {
         gridTemplateColumns: `minmax(0, 1fr) 6px ${contextWidth}px`,
       }}
     >
-        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
+        <section className="min-h-0 overflow-hidden panel-surface">
           <PanelHeader
             title="Live Service Plan"
             icon={<ClipboardListIcon className="size-4" />}
@@ -782,7 +782,7 @@ export function LiveServicePlanContext() {
           label="Resize live service context panel"
           onPointerDown={startContextResize}
         />
-        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
+        <section className="min-h-0 overflow-hidden panel-surface">
           <PanelHeader
             title="Live Context"
             icon={<FileTextIcon className="size-4" />}
@@ -866,7 +866,7 @@ export function LiveHymnContext() {
         gridTemplateColumns: `minmax(0, 1fr) 6px ${lyricsWidth}px`,
       }}
     >
-        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
+        <section className="min-h-0 overflow-hidden panel-surface">
           <PanelHeader
             title="Live Hymns"
             icon={<ListMusicIcon className="size-4" />}
@@ -946,7 +946,7 @@ export function LiveHymnContext() {
           label="Resize lyrics panel"
           onPointerDown={startLyricsResize}
         />
-        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
+        <section className="min-h-0 overflow-hidden panel-surface">
           <PanelHeader
             title="Current Lyrics"
             icon={<FileTextIcon className="size-4" />}
@@ -1012,7 +1012,7 @@ export function SermonSlidesLiveContext() {
   return (
     <div
       data-slot="sermon-slides-live-context"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden panel-surface"
     >
       <PanelHeader title="Sermon slides (live)" icon={<ImagesIcon className="size-4" />}>
         <Badge variant="outline" className="tabular-nums">
@@ -1186,7 +1186,7 @@ export function SermonSlidesPreparePage() {
           gridTemplateColumns: `minmax(0, 1fr) 6px ${editorWidth}px`,
         }}
       >
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
           <PanelHeader
             title="Sermon Slides"
             icon={<ImagesIcon className="size-4" />}
@@ -1262,7 +1262,7 @@ export function SermonSlidesPreparePage() {
           onPointerDown={startEditorResize}
         />
 
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
           <PanelHeader
             title="Slide List"
             icon={<FileTextIcon className="size-4" />}

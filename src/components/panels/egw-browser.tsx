@@ -101,7 +101,7 @@ export function EgwBrowser() {
       className={cn(
         "group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors",
         p.id === selectedParagraphId
-          ? "border border-lime-500/50 bg-lime-500/10"
+          ? "border border-primary/50 bg-primary/10"
           : "border border-transparent hover:bg-muted/50"
       )}
     >
@@ -114,7 +114,7 @@ export function EgwBrowser() {
             {p.book_title} — {p.chapter_title}
           </div>
         )}
-        <p className="text-sm leading-relaxed text-foreground/80">{p.text}</p>
+        <p className="text-scripture text-foreground/85">{p.text}</p>
       </div>
       <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <Button

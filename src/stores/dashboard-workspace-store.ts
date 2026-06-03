@@ -6,6 +6,7 @@ import {
   type LegacyDashboardWorkspace,
   type LiveMode,
   type PrepareView,
+  isContentJob,
   loadDashboardNavigation,
   resolveLegacyWorkspace,
   saveDashboardNavigation,
@@ -51,6 +52,12 @@ export const useDashboardWorkspaceStore = create<DashboardWorkspaceState>(
       }
       if (job === "go-live" && current.job !== "go-live") {
         patch.liveMode = current.liveMode
+      }
+      if (
+        isContentJob(current.job) &&
+        (job === "design" || job === "settings")
+      ) {
+        patch.lastContentJob = current.job
       }
       const next = applyNavigationPatch(current, patch)
       saveDashboardNavigation(next)
