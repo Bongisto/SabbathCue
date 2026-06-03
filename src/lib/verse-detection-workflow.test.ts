@@ -378,10 +378,9 @@ describe("verse detection workflow", () => {
       makeDetection({ verse_text: "Text from the earlier translation" }),
     ])
 
+    const presentation = useQueueStore.getState().items[0].presentation
     expect(
-      useQueueStore.getState().items[0].presentation.kind === "scripture"
-        ? useQueueStore.getState().items[0].presentation.verse.text
-        : null,
+      presentation.kind === "scripture" ? presentation.verse.text : null,
     ).toBe("Current translation text")
   })
 })

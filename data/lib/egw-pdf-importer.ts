@@ -18,7 +18,7 @@ export interface EgwBookConfig {
   debugSlug: string
   requiredTokens: string[]
   appendixMarker?: string
-  chapters: EgwChapterConfig[]
+  chapters: readonly EgwChapterConfig[]
 }
 
 type OutputChapter = {
