@@ -129,6 +129,11 @@
     --live-pulse: oklch(0.65 0.25 25);
     --surface-elevated: oklch(0.96 0 0);
     --surface-sunken: oklch(0.92 0 0);
+    --zone-production: oklch(0.97 0.008 130);
+    --zone-bible: oklch(0.965 0.012 95);
+    --brand-yellow: oklch(0.78 0.16 95);
+    --brand-green: oklch(0.532 0.157 131.589);
+    --brand-cream: oklch(0.985 0.01 95);
     --source-service-plan: oklch(0.52 0.12 305);
 }
 

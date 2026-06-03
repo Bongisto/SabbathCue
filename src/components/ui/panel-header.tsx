@@ -6,7 +6,7 @@ function PanelHeader({
   className,
   title,
   icon,
-  step: _step,
+  step: deprecatedStep,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
@@ -15,6 +15,8 @@ function PanelHeader({
   /** @deprecated Step numbers removed from UI; kept for API compatibility */
   step?: number
 }) {
+  void deprecatedStep
+
   return (
     <div
       data-slot="panel-header"
