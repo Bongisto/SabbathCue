@@ -16,6 +16,7 @@ import {
   saveDashboardLayoutState,
   type DashboardViewMode,
 } from "@/lib/dashboard-layout"
+import { useWindowPointerDragCleanup } from "@/hooks/use-window-pointer-drag-cleanup"
 
 export function SermonModeContext() {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -26,6 +27,7 @@ export function SermonModeContext() {
   const isCompact = windowWidth < 1400
   const viewMode = layout.viewMode
   const detectionsWidth = layout.detectionsWidth
+  const registerPointerDrag = useWindowPointerDragCleanup()
 
   useEffect(() => {
     const onResize = () => setWindowWidth(window.innerWidth)
@@ -60,14 +62,9 @@ export function SermonModeContext() {
           ),
         }))
       }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
+      registerPointerDrag(onMove)
     },
-    [detectionsWidth],
+    [detectionsWidth, registerPointerDrag],
   )
 
   return (

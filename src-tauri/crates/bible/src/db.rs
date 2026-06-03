@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{Connection, OpenFlags};
 
@@ -16,6 +16,12 @@ impl std::fmt::Debug for BibleDb {
 }
 
 impl BibleDb {
+    pub(crate) fn conn(&self) -> Result<MutexGuard<'_, Connection>, BibleError> {
+        self.conn
+            .lock()
+            .map_err(|_| BibleError::Internal("Bible database lock was poisoned".to_string()))
+    }
+
     pub fn open(path: &Path) -> Result<Self, BibleError> {
         let conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;

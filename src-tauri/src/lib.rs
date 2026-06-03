@@ -4,7 +4,26 @@ mod events;
 mod memstats;
 mod state;
 
-use std::sync::Mutex;
+use std::io;
+use std::panic;
+use std::sync::{Mutex, Once};
+
+static PANIC_HOOK: Once = Once::new();
+
+fn install_panic_hook() {
+    PANIC_HOOK.call_once(|| {
+        let default_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            eprintln!("Unhandled panic: {info}");
+            log::error!("Unhandled panic: {info}");
+            default_hook(info);
+        }));
+    });
+}
+
+fn poisoned_lock_error(name: &str) -> io::Error {
+    io::Error::other(format!("{name} lock was poisoned"))
+}
 
 #[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -12,6 +31,7 @@ pub fn run() {
     // Load .env file — try src-tauri/.env first, then project root ../.env
     dotenvy::dotenv().ok();
     dotenvy::from_filename("../.env").ok();
+    install_panic_hook();
     let detection_cooldown = rhema_detection::AutoQueueCooldown::default();
     tauri::Builder::default()
         .plugin(
@@ -111,7 +131,9 @@ pub fn run() {
                 };
 
                 let managed_state = app.state::<Mutex<state::AppState>>();
-                let mut state = managed_state.lock().unwrap();
+                let mut state = managed_state
+                    .lock()
+                    .map_err(|_| poisoned_lock_error("App state"))?;
                 if let Ok(translations) = bible_db.list_translations() {
                     if let Some(translation_id) = state::initial_translation_id(&translations) {
                         state.active_translation_id = translation_id;
@@ -141,7 +163,9 @@ pub fn run() {
                     Ok(embedder) => {
                         log::info!("ONNX embedding model loaded");
                         let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
-                        let mut pipeline = managed_pipeline.lock().unwrap();
+                        let mut pipeline = managed_pipeline
+                            .lock()
+                            .map_err(|_| poisoned_lock_error("Detection pipeline"))?;
 
                         // If pre-computed embeddings exist, load the vector index
                         if embeddings_path.exists() && ids_path.exists() {

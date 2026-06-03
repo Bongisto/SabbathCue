@@ -3,17 +3,13 @@ use crate::error::BibleError;
 use crate::models::CrossReference;
 
 impl BibleDb {
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (i.e., a thread panicked
-    /// while holding the database lock).
     pub fn get_cross_references(
         &self,
         book_number: i32,
         chapter: i32,
         verse: i32,
     ) -> Result<Vec<CrossReference>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT \
                  from_book || ':' || from_chapter || ':' || from_verse AS from_ref, \

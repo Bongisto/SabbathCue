@@ -340,16 +340,10 @@ pub async fn start_transcription(
         }
         _ => {
             // Deepgram (default)
-            let resolved_api_key = match std::env::var("DEEPGRAM_API_KEY") {
-                Ok(v) if !v.trim().is_empty() => secrets::normalize_deepgram_api_key(&v),
-                _ => secrets::get_deepgram_api_key_or_empty()?,
-            };
+            let resolved_api_key = secrets::get_deepgram_api_key_or_empty()?;
 
             if resolved_api_key.is_empty() {
-                return Err(
-                    "No Deepgram API key configured. Set it in Settings or via DEEPGRAM_API_KEY env var."
-                        .into(),
-                );
+                return Err("No Deepgram API key configured. Set it in Settings.".into());
             }
 
             log::info!(
@@ -1613,12 +1607,11 @@ fn check_translation_command(app: &AppHandle, transcript: &str) {
 pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
     let app_state = state.lock().map_err(|e| e.to_string())?;
 
-    if !app_state.stt_active.load(Ordering::Relaxed) {
+    if !app_state.stt_active.swap(false, Ordering::SeqCst) {
         return Err("Transcription is not running".into());
     }
 
     // Setting these flags causes the background threads/tasks to exit.
-    app_state.stt_active.store(false, Ordering::SeqCst);
     app_state.audio_active.store(false, Ordering::SeqCst);
 
     log::info!("Transcription stop requested");

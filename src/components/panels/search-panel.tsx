@@ -190,7 +190,13 @@ export function SearchPanel() {
         }
         panelRef.current?.focus()
       }).catch(console.error).finally(() => {
-        useBibleStore.getState().setPendingNavigation(null)
+        const current = useBibleStore.getState().pendingNavigation
+        const currentKey = current
+          ? `${current.bookNumber}:${current.chapter}:${current.verse}`
+          : null
+        if (currentKey === pendingKey) {
+          useBibleStore.getState().setPendingNavigation(null)
+        }
       })
     })
 

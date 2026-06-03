@@ -423,18 +423,42 @@ fn resolve_library_path() -> Result<PathBuf, NdiError> {
         ]
     };
 
-    let base = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-    for candidate in &candidates {
-        if candidate.is_empty() {
-            continue;
-        }
-        let absolute = base.join(candidate);
-        if absolute.exists() {
-            return Ok(absolute);
+    for base in ndi_library_search_bases() {
+        for candidate in &candidates {
+            let absolute = base.join(candidate);
+            if absolute.exists() {
+                return Ok(absolute);
+            }
         }
     }
 
     Err(NdiError::LibraryNotFound(candidates.join(", ")))
+}
+
+fn ndi_library_search_bases() -> Vec<PathBuf> {
+    let mut bases = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        add_path_and_ancestors(&mut bases, &exe);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        add_path_and_ancestors(&mut bases, &cwd);
+    }
+    bases
+}
+
+fn add_path_and_ancestors(bases: &mut Vec<PathBuf>, path: &Path) {
+    let start = if path.is_file() {
+        path.parent().unwrap_or(path)
+    } else {
+        path
+    };
+
+    for ancestor in start.ancestors().take(8) {
+        let candidate = ancestor.to_path_buf();
+        if !bases.iter().any(|base| base == &candidate) {
+            bases.push(candidate);
+        }
+    }
 }
 
 fn load_symbol<'a, T>(

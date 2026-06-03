@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client"
 
 import "./index.css"
 import App from "./App.tsx"
+import { ErrorBoundary } from "@/components/error-boundary.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { TooltipProvider } from "@/components/ui/tooltip.tsx"
 import { hydrateSettings } from "@/stores/settings-store"
@@ -37,7 +38,9 @@ resetTranscription
       <StrictMode>
         <ThemeProvider defaultTheme="dark">
           <TooltipProvider>
-            <App />
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
           </TooltipProvider>
         </ThemeProvider>
       </StrictMode>

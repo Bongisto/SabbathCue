@@ -27,10 +27,11 @@ impl KeychainStore for RealKeychainStore {
 /// Default keychain store used in production.
 static DEFAULT_STORE: RealKeychainStore = RealKeychainStore;
 
-fn entry(name: &str) -> keyring::Entry {
+fn entry(name: &str) -> Result<keyring::Entry, String> {
     // The keyring crate uses the OS credential manager (Credential Manager, Keychain, etc.)
     // `name` acts like the account/username within the service namespace.
-    keyring::Entry::new(SERVICE_NAME, name).expect("keyring entry construction should not fail")
+    keyring::Entry::new(SERVICE_NAME, name)
+        .map_err(|e| format!("Could not access OS keychain entry: {e}"))
 }
 
 fn generate_token() -> String {
@@ -115,7 +116,7 @@ pub fn set_deepgram_api_key_with_store(
 pub fn clear_deepgram_api_key() -> Result<(), String> {
     // keyring v3 does not expose a cross-platform delete API; overwriting with
     // an empty value is sufficient for our "configured vs not configured" model.
-    entry("deepgram_api_key")
+    entry("deepgram_api_key")?
         .set_password("")
         .map_err(|e| format!("Could not remove Deepgram API key from OS keychain: {e}"))
 }
@@ -155,7 +156,7 @@ pub fn rotate_verification_token_with_store(store: &dyn KeychainStore) -> Result
 
 #[command]
 pub fn clear_verification_token() -> Result<(), String> {
-    entry("verification_token")
+    entry("verification_token")?
         .set_password("")
         .map_err(|e| format!("Could not clear verification token from OS keychain: {e}"))
 }
@@ -175,7 +176,7 @@ pub fn has_remote_http_token_with_store(store: &dyn KeychainStore) -> Result<boo
 /// This does not persist the value anywhere on the frontend; callers should copy it immediately.
 #[command]
 pub fn reveal_remote_http_token() -> Result<String, String> {
-    entry("remote_http_token")
+    entry("remote_http_token")?
         .get_password()
         .map_err(|e| format!("Could not read remote HTTP token from OS keychain: {e}"))
 }
@@ -197,11 +198,12 @@ pub fn rotate_remote_http_token_with_store(store: &dyn KeychainStore) -> Result<
 
 /// Ensure a remote HTTP token exists. Returns `true` if it was created.
 pub fn ensure_remote_http_token_exists() -> Result<bool, String> {
-    match entry("remote_http_token").get_password() {
+    let entry = entry("remote_http_token")?;
+    match entry.get_password() {
         Ok(pw) if !pw.trim().is_empty() => Ok(false),
         Ok(_) | Err(keyring::Error::NoEntry) => {
             let token = generate_token();
-            entry("remote_http_token")
+            entry
                 .set_password(&token)
                 .map_err(|e| format!("Could not store remote HTTP token in OS keychain: {e}"))?;
             Ok(true)
@@ -213,7 +215,7 @@ pub fn ensure_remote_http_token_exists() -> Result<bool, String> {
 }
 
 pub fn get_remote_http_token() -> Result<String, String> {
-    entry("remote_http_token")
+    entry("remote_http_token")?
         .get_password()
         .map_err(|e| format!("Could not read remote HTTP token from OS keychain: {e}"))
 }

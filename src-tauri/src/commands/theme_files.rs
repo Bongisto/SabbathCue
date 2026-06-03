@@ -3,6 +3,7 @@
     reason = "Tauri command extractors require pass-by-value"
 )]
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
@@ -122,6 +123,32 @@ fn theme_from_bytes(bytes: &[u8]) -> Result<serde_json::Value, String> {
     Ok(value)
 }
 
+fn write_file_atomically(path: &Path, contents: &str) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "Export path must include a valid file name".to_string())?;
+    let mut temp_file = tempfile::Builder::new()
+        .prefix(&format!(".{file_name}."))
+        .suffix(".tmp")
+        .tempfile_in(parent)
+        .map_err(|e| format!("Could not create temporary theme file: {e}"))?;
+
+    temp_file
+        .write_all(contents.as_bytes())
+        .and_then(|()| temp_file.flush())
+        .map_err(|e| format!("Could not write temporary theme file: {e}"))?;
+    temp_file
+        .persist(path)
+        .map_err(|e| format!("Could not replace theme file: {}", e.error))?;
+
+    Ok(())
+}
+
 #[command]
 pub fn import_theme_from_path(path: String) -> Result<serde_json::Value, String> {
     let p = validate_readable_path(&path)?;
@@ -146,7 +173,7 @@ pub fn export_theme_to_path(path: String, theme: serde_json::Value) -> Result<()
     if json.len() as u64 > MAX_THEME_BYTES {
         return Err("Theme JSON is too large to export".into());
     }
-    std::fs::write(&p, json).map_err(|e| format!("Could not write theme file: {e}"))
+    write_file_atomically(&p, &json)
 }
 
 fn image_mime_for_extension(ext: &str) -> Option<&'static str> {

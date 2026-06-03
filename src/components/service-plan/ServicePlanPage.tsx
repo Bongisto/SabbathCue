@@ -47,6 +47,7 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { getPresentationRenderData } from "@/types"
+import { useWindowPointerDragCleanup } from "@/hooks/use-window-pointer-drag-cleanup"
 import type {
   ServiceAttachment,
   ServiceContextItem,
@@ -54,6 +55,10 @@ import type {
 } from "@/types/service-plan"
 
 export { ServiceLiveContextPanel } from "./ServiceLiveContextPanel"
+
+function useServicePlanPointerDragCleanup() {
+  return useWindowPointerDragCleanup()
+}
 
 function activeItemContentLabel(
   item: ServiceItem | ServiceContextItem | null | undefined,
@@ -351,6 +356,7 @@ export function ServicePlanWorkspace() {
   const [libraryWidth, setLibraryWidth] = useState(
     () => loadDashboardLayoutState().servicePlanLibraryWidth
   )
+  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -370,14 +376,9 @@ export function ServicePlanWorkspace() {
           clampNumber(startWidth + moveEvent.clientX - startX, 240, 480)
         )
       }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
+      registerPointerDrag(onMove)
     },
-    [libraryWidth]
+    [libraryWidth, registerPointerDrag]
   )
 
   return (
@@ -446,6 +447,7 @@ export function RunServicePage() {
   const [timelineWidth, setTimelineWidth] = useState(
     () => loadDashboardLayoutState().liveServiceContextWidth,
   )
+  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -465,14 +467,9 @@ export function RunServicePage() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520),
         )
       }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
+      registerPointerDrag(onMove)
     },
-    [timelineWidth],
+    [timelineWidth, registerPointerDrag],
   )
 
   const previewSlide = (index: number) => {
@@ -680,6 +677,7 @@ export function LiveServicePlanContext() {
   const [contextWidth, setContextWidth] = useState(
     () => loadDashboardLayoutState().liveServiceContextWidth
   )
+  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -699,14 +697,9 @@ export function LiveServicePlanContext() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 240, 480)
         )
       }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
+      registerPointerDrag(onMove)
     },
-    [contextWidth]
+    [contextWidth, registerPointerDrag]
   )
 
   return (
@@ -840,6 +833,7 @@ export function LiveHymnContext() {
   const [lyricsWidth, setLyricsWidth] = useState(
     () => loadDashboardLayoutState().liveHymnLyricsWidth
   )
+  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -859,14 +853,9 @@ export function LiveHymnContext() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520)
         )
       }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
+      registerPointerDrag(onMove)
     },
-    [lyricsWidth]
+    [lyricsWidth, registerPointerDrag]
   )
 
   return (
@@ -1161,6 +1150,7 @@ export function SermonSlidesPreparePage() {
   const [editorWidth, setEditorWidth] = useState(
     () => loadDashboardLayoutState().sermonSlidesEditorWidth
   )
+  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -1180,14 +1170,9 @@ export function SermonSlidesPreparePage() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520)
         )
       }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
+      registerPointerDrag(onMove)
     },
-    [editorWidth]
+    [editorWidth, registerPointerDrag]
   )
 
   return (

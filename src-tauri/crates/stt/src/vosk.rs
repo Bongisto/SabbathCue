@@ -280,9 +280,30 @@ impl SttProvider for VoskProvider {
             Ok::<(), SttError>(())
         });
 
-        let _ = writer.await;
-        let _ = child.kill();
-        let _ = reader.join();
+        match tokio::time::timeout(Duration::from_secs(2), writer).await {
+            Ok(Ok(Ok(()))) => {}
+            Ok(Ok(Err(e))) => log::warn!("Vosk writer exited with error: {e}"),
+            Ok(Err(e)) => log::warn!("Vosk writer task failed: {e}"),
+            Err(_) => {
+                log::warn!("Vosk writer did not stop promptly; terminating worker process");
+            }
+        }
+
+        match child.try_wait() {
+            Ok(Some(_status)) => {}
+            Ok(None) => {
+                if let Err(e) = child.kill() {
+                    log::warn!("Failed to terminate Vosk worker process: {e}");
+                }
+            }
+            Err(e) => log::warn!("Failed to inspect Vosk worker process: {e}"),
+        }
+        if let Err(e) = child.wait() {
+            log::warn!("Failed to reap Vosk worker process: {e}");
+        }
+        if reader.join().is_err() {
+            log::warn!("Vosk reader thread panicked");
+        }
         let _ = event_tx.send(TranscriptEvent::Disconnected).await;
         Ok(())
     }

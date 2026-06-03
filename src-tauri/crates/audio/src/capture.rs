@@ -216,6 +216,7 @@ struct AudioProcessor {
     target_rate: u32,
     gain: f32,
     resampler: LinearResampler,
+    pending_samples: Vec<i16>,
 }
 
 impl AudioProcessor {
@@ -226,6 +227,7 @@ impl AudioProcessor {
             target_rate,
             gain,
             resampler: LinearResampler::new(source_rate, target_rate),
+            pending_samples: Vec::new(),
         }
     }
 
@@ -244,8 +246,22 @@ impl AudioProcessor {
             return;
         }
 
-        let gained: Vec<i16> = samples
-            .chunks_exact(self.source_channels)
+        let combined_samples;
+        let input_samples = if self.pending_samples.is_empty() {
+            samples
+        } else {
+            combined_samples = self
+                .pending_samples
+                .iter()
+                .chain(samples.iter())
+                .copied()
+                .collect::<Vec<_>>();
+            combined_samples.as_slice()
+        };
+        let frames = input_samples.chunks_exact(self.source_channels);
+        let remainder = frames.remainder().to_vec();
+
+        let gained: Vec<i16> = frames
             .map(|frame| {
                 let sum: i32 = frame.iter().map(|&s| i32::from(s)).sum();
                 let mono = sum / self.source_channels as i32;
@@ -259,6 +275,7 @@ impl AudioProcessor {
                 }
             })
             .collect();
+        self.pending_samples = remainder;
 
         let processed = if self.source_rate == self.target_rate {
             gained
@@ -397,5 +414,19 @@ mod tests {
         }
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn downmix_carries_incomplete_frame_between_callbacks() {
+        let (sender, receiver) = crossbeam_channel::bounded(4);
+        let mut processor = AudioProcessor::new(2, 16_000, 16_000, 1.0);
+
+        processor.process_i16_and_send(&[10], &sender);
+        assert!(receiver.try_recv().is_err());
+
+        processor.process_i16_and_send(&[30, 20, 40], &sender);
+        let frame = receiver.recv().expect("frame should be sent");
+
+        assert_eq!(frame.samples, vec![20, 30]);
     }
 }

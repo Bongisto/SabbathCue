@@ -5,10 +5,8 @@ use crate::models::{EgwBook, EgwChapterInfo, EgwParagraph};
 impl BibleDb {
     /// List all EGW books, ordered by book number.
     ///
-    /// # Panics
-    /// Panics if the internal mutex is poisoned.
     pub fn list_egw_books(&self) -> Result<Vec<EgwBook>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, book_number, title, abbreviation, chapter_count \
              FROM egw_books ORDER BY book_number",
@@ -27,7 +25,7 @@ impl BibleDb {
 
     /// List chapters (with titles and paragraph counts) for one EGW book.
     pub fn list_egw_chapters(&self, book_number: i32) -> Result<Vec<EgwChapterInfo>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT chapter, chapter_title, COUNT(*) AS paragraph_count \
              FROM egw_paragraphs \
@@ -51,7 +49,7 @@ impl BibleDb {
         book_number: i32,
         chapter: i32,
     ) -> Result<Vec<EgwParagraph>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, text \
              FROM egw_paragraphs \
@@ -69,7 +67,7 @@ impl BibleDb {
         chapter: i32,
         paragraph: i32,
     ) -> Result<Option<EgwParagraph>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, text \
              FROM egw_paragraphs \
@@ -87,7 +85,7 @@ impl BibleDb {
 
     /// Full-text keyword search of EGW paragraphs via FTS5 (all terms, any order).
     pub fn search_egw(&self, query: &str, limit: usize) -> Result<Vec<EgwParagraph>, BibleError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn()?;
 
         // If no EGW content has been imported, the FTS table won't exist yet.
         let fts_exists: bool = conn
