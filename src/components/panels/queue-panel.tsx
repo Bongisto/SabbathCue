@@ -123,7 +123,14 @@ function QueueItemRow({
 
       {sourceBadge}
 
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-0.5 transition-opacity",
+          isActive || isHighlighted
+            ? "opacity-100"
+            : "opacity-80 group-hover:opacity-100 focus-within:opacity-100",
+        )}
+      >
         <Button
           variant="ghost"
           size="icon-xs"

@@ -42,22 +42,24 @@ export function TransportBar() {
         </Badge>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-2">
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="gap-1.5 px-2"
           title="Toggle theme"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? (
-            <SunIcon className="size-3.5" />
+            <SunIcon className="size-3.5 shrink-0" />
           ) : (
-            <MoonIcon className="size-3.5" />
+            <MoonIcon className="size-3.5 shrink-0" />
           )}
         </Button>
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="gap-1.5 px-2"
           title="Broadcast Settings"
           data-tour="broadcast"
           onClick={() => {
@@ -65,7 +67,8 @@ export function TransportBar() {
             setBroadcastOpen(true)
           }}
         >
-          <CastIcon className="size-3.5" />
+          <CastIcon className="size-3.5 shrink-0" />
+          <span className="hidden text-xs sm:inline">Broadcast</span>
         </Button>
         {broadcastSettingsMounted && (
           <Suspense fallback={null}>
@@ -77,7 +80,8 @@ export function TransportBar() {
         )}
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="gap-1.5 px-2"
           title="Theme Designer"
           data-tour="theme"
           onClick={() => {
@@ -85,7 +89,8 @@ export function TransportBar() {
             useBroadcastStore.getState().setDesignerOpen(true)
           }}
         >
-          <PaletteIcon className="size-3.5" />
+          <PaletteIcon className="size-3.5 shrink-0" />
+          <span className="hidden text-xs sm:inline">Theme</span>
         </Button>
         {themeDesignerMounted && (
           <Suspense fallback={null}>
@@ -94,11 +99,13 @@ export function TransportBar() {
         )}
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="sm"
+          className="gap-1.5 px-2"
           title="Service Plan"
           onClick={() => useServicePlanStore.getState().openPlanner()}
         >
-          <ClipboardListIcon className="size-3.5" />
+          <ClipboardListIcon className="size-3.5 shrink-0" />
+          <span className="hidden text-xs sm:inline">Plan</span>
         </Button>
         <SettingsDialog />
       </div>

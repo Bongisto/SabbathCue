@@ -234,6 +234,8 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
 
   startPractice: async () => {
     patchActivePlan(startPracticeMode, { immediate: true })
+    useDashboardWorkspaceStore.getState().setJob("rehearse")
+    get().closePlanner()
 
     const plan = get().activePlan
     if (plan && !plan.activeItemId) {
@@ -245,7 +247,7 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
   startLiveService: async () => {
     patchActivePlan(startLiveServiceMode, { immediate: true })
 
-    useDashboardWorkspaceStore.getState().setWorkspace("run-service")
+    useDashboardWorkspaceStore.getState().navigateGoLive("service-plan")
     get().closePlanner()
 
     const plan = get().activePlan

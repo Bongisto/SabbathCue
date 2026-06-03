@@ -16,7 +16,11 @@ import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
 import { EyeIcon, EyeOffIcon, RadioIcon, SendIcon, Maximize2Icon, Minimize2Icon } from "lucide-react"
 import { toast } from "sonner"
 
-export function LiveOutputPanel() {
+export function LiveOutputPanel({
+  showTakeLive = true,
+}: {
+  showTakeLive?: boolean
+}) {
   const isLive = useBroadcastStore((s) => s.isLive)
   const liveItem = useBroadcastStore((s) => s.liveItem)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
@@ -120,20 +124,22 @@ export function LiveOutputPanel() {
 
       <div className={cn("flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2", isFullscreen && "hidden")}>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            disabled={!canCommitPreview}
-            className="gap-2"
-            onClick={() => commitPreviewToLive()}
-            title={
-              canCommitPreview
-                ? "Send the Program Preview item to Live Output"
-                : "Select a verse, hymn, or song before sending live"
-            }
-          >
-            <SendIcon className="size-3.5" />
-            Send Preview Live
-          </Button>
+          {showTakeLive ? (
+            <Button
+              size="sm"
+              disabled={!canCommitPreview}
+              className="gap-2"
+              onClick={() => commitPreviewToLive()}
+              title={
+                canCommitPreview
+                  ? "Send the Program Preview item to Live Output"
+                  : "Select a verse, hymn, or song before sending live"
+              }
+            >
+              <SendIcon className="size-3.5" />
+              Take Live
+            </Button>
+          ) : null}
           {isLive && presentationDeckKind(liveItem) ? (
             <PresentationDeckControls
               item={liveItem}

@@ -8,6 +8,14 @@ const STEP_DEFAULTS = {
 export const TUTORIAL_STEPS: Step[] = [
   {
     ...STEP_DEFAULTS,
+    target: '[data-tour="go-live"]',
+    title: "Go Live",
+    content:
+      "Your broadcast console lives here. Switch modes for sermon, service plan, hymns, or slides without leaving preview, live output, or queue.",
+    placement: "bottom",
+  },
+  {
+    ...STEP_DEFAULTS,
     target: '[data-slot="transcript-panel"]',
     title: "Live Transcript",
     content:

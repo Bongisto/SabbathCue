@@ -18,7 +18,11 @@ import { PresentationDeckControls } from "@/components/panels/presentation-deck-
 import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
 
-export function PreviewPanel() {
+export function PreviewPanel({
+  showTakeLive = false,
+}: {
+  showTakeLive?: boolean
+}) {
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
   const previewItem = useBroadcastStore((s) => s.previewItem)
   const themes = useBroadcastStore((s) => s.themes)
@@ -111,15 +115,18 @@ export function PreviewPanel() {
             <XIcon className="size-3.5" />
             Clear
           </Button>
-          <Button
-            size="sm"
-            disabled={!previewItem}
-            className="gap-2"
-            onClick={() => commitPreviewToLive()}
-          >
-            <SendIcon className="size-3.5" />
-            Send Live
-          </Button>
+          {showTakeLive ? (
+            <Button
+              size="sm"
+              disabled={!previewItem}
+              className="gap-2"
+              onClick={() => commitPreviewToLive()}
+              title="Send preview to live output (Ctrl+Enter)"
+            >
+              <SendIcon className="size-3.5" />
+              Take Live
+            </Button>
+          ) : null}
         </div>
       </div>
 

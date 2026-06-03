@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client"
 
 const mockSetLive = vi.fn()
 const mockSetLiveVerse = vi.fn()
+const mockSetPreviewItem = vi.fn()
 const mockSelectVerse = vi.fn()
 const mockSetReadingModeAutoLive = vi.fn()
 const mockSetDetectionPaused = vi.fn().mockResolvedValue(true)
@@ -22,6 +23,7 @@ vi.mock("@/stores/audio-store", () => ({
 
 let broadcastIsLive = false
 let broadcastLiveVerse: unknown = null
+let broadcastPreviewItem: unknown = null
 let broadcastReadingModeAutoLive = false
 let transcriptIsTranscribing = false
 let bibleSelectedVerse: unknown = null
@@ -31,6 +33,7 @@ vi.mock("@/stores/broadcast-store", () => {
     selector({
       isLive: broadcastIsLive,
       liveItem: broadcastLiveVerse,
+      previewItem: broadcastPreviewItem,
       readingModeAutoLive: broadcastReadingModeAutoLive,
       themes: [],
       activeThemeId: "",
@@ -38,6 +41,7 @@ vi.mock("@/stores/broadcast-store", () => {
   useBroadcastStore.getState = () => ({
     setLive: mockSetLive,
     setLiveItem: mockSetLiveVerse,
+    setPreviewItem: mockSetPreviewItem,
     setReadingModeAutoLive: mockSetReadingModeAutoLive,
   })
   return { useBroadcastStore }
@@ -80,6 +84,7 @@ vi.mock("@/components/ui/level-meter", () => ({
 function resetState() {
   broadcastIsLive = false
   broadcastLiveVerse = null
+  broadcastPreviewItem = null
   broadcastReadingModeAutoLive = false
   transcriptIsTranscribing = false
   bibleSelectedVerse = null
@@ -92,6 +97,7 @@ describe("OperatorStatusStrip emergency controls", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetState()
+    vi.stubGlobal("confirm", vi.fn(() => true))
   })
 
   afterEach(async () => {
@@ -195,10 +201,12 @@ describe("OperatorStatusStrip emergency controls", () => {
 
     it("calls selectVerse(null) when clicked", async () => {
       bibleSelectedVerse = { book_number: 1, chapter: 1, verse: 1 }
+      broadcastPreviewItem = { reference: "John 3:16" }
       await renderStrip()
       const btn = getButtonByTitle("Clear Preview")
       expect(btn.disabled).toBe(false)
       await click(btn)
+      expect(mockSetPreviewItem).toHaveBeenCalledWith(null)
       expect(mockSelectVerse).toHaveBeenCalledWith(null)
     })
   })

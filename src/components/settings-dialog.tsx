@@ -51,6 +51,7 @@ import { useAssets } from "@/hooks/use-assets"
 import { transcriptionActions } from "@/hooks/use-transcription"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useSettingsDialogStore } from "@/lib/settings-dialog"
+import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import type { DeviceInfo } from "@/types/audio"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 
@@ -1072,7 +1073,8 @@ function HelpSection() {
             <div>
               <p className="text-sm font-medium">Keyboard Shortcuts</p>
               <p className="text-xs text-muted-foreground">
-                Arrow keys navigate the tutorial, Esc to dismiss
+                Alt+1 Go Live (sermon), Alt+2 Prepare plans, Alt+3 Rehearse,
+                Alt+4 Prepare hymns. Mod+Enter Take Live.
               </p>
             </div>
           </div>
@@ -1127,12 +1129,20 @@ export function SettingsDialog() {
           openSettingsFn()
         } else {
           closeSettings()
+          useDashboardWorkspaceStore.getState().restoreLastContentJob()
         }
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" data-tour="settings">
-          <SettingsIcon className="size-3.5" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 px-2"
+          data-tour="settings"
+          title="Settings"
+        >
+          <SettingsIcon className="size-3.5 shrink-0" />
+          <span className="hidden text-xs sm:inline">Settings</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[800px] lg:max-w-[900px]">

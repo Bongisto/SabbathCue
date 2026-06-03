@@ -164,28 +164,28 @@ export function handleDashboardKeyboardEvent(event: KeyboardEvent): void {
 
   if (event.altKey && key === "1") {
     event.preventDefault()
-    useDashboardWorkspaceStore.getState().setWorkspace("live")
+    useDashboardWorkspaceStore.getState().navigateGoLive("sermon")
     useServicePlanStore.getState().closePlanner()
     return
   }
 
   if (event.altKey && key === "2") {
     event.preventDefault()
-    useDashboardWorkspaceStore.getState().setWorkspace("service-plans")
+    useDashboardWorkspaceStore.getState().setJob("prepare", { prepareView: "plans" })
     useServicePlanStore.getState().openPlanner()
     return
   }
 
   if (event.altKey && key === "3") {
     event.preventDefault()
-    useDashboardWorkspaceStore.getState().setWorkspace("run-service")
+    useDashboardWorkspaceStore.getState().setJob("rehearse")
     useServicePlanStore.getState().closePlanner()
     return
   }
 
   if (event.altKey && key === "4") {
     event.preventDefault()
-    useDashboardWorkspaceStore.getState().setWorkspace("hymns")
+    useDashboardWorkspaceStore.getState().setJob("prepare", { prepareView: "hymns" })
     useServicePlanStore.getState().closePlanner()
     return
   }
