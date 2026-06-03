@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { ImageResponse } from "next/og";
 import { SITE } from "./_lib/site";
 
@@ -8,10 +5,6 @@ export const dynamic = "force-static";
 export const alt = `${SITE.name} — ${SITE.tagline}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const iconSvg = readFileSync(join(__dirname, "icon.svg"), "utf8");
-const iconDataUrl = `data:image/svg+xml;base64,${Buffer.from(iconSvg).toString("base64")}`;
 
 export default async function Image() {
   return new ImageResponse(
@@ -40,14 +33,23 @@ export default async function Image() {
             letterSpacing: "-0.02em",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={iconDataUrl}
-            width={56}
-            height={56}
-            alt=""
-            style={{ borderRadius: 12, display: "block" }}
-          />
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              background: "#0099FF",
+              color: "#000000",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 26,
+              fontWeight: 800,
+              letterSpacing: 0,
+            }}
+          >
+            SC
+          </div>
           <span style={{ color: "#FFFFFF", fontWeight: 600 }}>{SITE.name}</span>
           <span>·</span>
           <span>github.com/BongaNdlovu/SabbathCue</span>
