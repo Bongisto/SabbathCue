@@ -1,17 +1,67 @@
-import { useEffect, type PointerEvent as ReactPointerEvent } from "react"
+import {
+  useCallback,
+  useEffect,
+  lazy,
+  useRef,
+  useState,
+  Suspense,
+  type PointerEvent as ReactPointerEvent,
+} from "react"
+import { Button } from "@/components/ui/button"
 import { TransportBar } from "@/components/controls/transport-bar"
 import { OperatorStatusStrip } from "@/components/layout/operator-status-strip"
-import { DashboardShell } from "@/components/layout/dashboard-shell"
-import { WorkspaceFocusBanner } from "@/components/layout/workspace-focus-banner"
-import { cn } from "@/lib/utils"
-import { GoLiveWorkspace } from "@/components/layout/go-live-workspace"
-import { PrepareWorkspace } from "@/components/layout/prepare-workspace"
-import { RehearseWorkspace } from "@/components/layout/rehearse-workspace"
+import { TranscriptPanel } from "@/components/panels/transcript-panel"
+import { PreviewPanel } from "@/components/panels/preview-panel"
+import { LiveOutputPanel } from "@/components/panels/live-output-panel"
+import { QueuePanel } from "@/components/panels/queue-panel"
+import { DetectionsPanel } from "@/components/panels/detections-panel"
+import { SearchPanel } from "@/components/panels/search-panel"
 import { useDashboardKeyboardControls } from "@/hooks/use-dashboard-keyboard-controls"
+import {
+  clampNumber,
+  layoutStateFromPreset,
+  loadDashboardLayoutState,
+  saveDashboardLayoutState,
+  type DashboardViewMode,
+} from "@/lib/dashboard-layout"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
-import { useBroadcastStore } from "@/stores/broadcast-store"
-import { isContentJob, type DashboardJob } from "@/lib/dashboard-navigation"
+
+const LazyHymnWorkspace = lazy(() =>
+  import("@/components/hymnal/HymnWorkspace").then((mod) => ({
+    default: mod.HymnWorkspace,
+  }))
+)
+
+const LazyServicePlanWorkspace = lazy(() =>
+  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
+    default: mod.ServicePlanWorkspace,
+  }))
+)
+
+const LazyRunServicePage = lazy(() =>
+  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
+    default: mod.RunServicePage,
+  }))
+)
+
+const LazyLiveServicePlanPage = lazy(() =>
+  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
+    default: mod.LiveServicePlanPage,
+  }))
+)
+
+const LazyLiveHymnPage = lazy(() =>
+  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
+    default: mod.LiveHymnPage,
+  }))
+)
+
+const LazySermonSlidesPage = lazy(() =>
+  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
+    default: mod.SermonSlidesPage,
+  }))
+)
 
 export function ResizeHandle({
   axis,
@@ -31,76 +81,399 @@ export function ResizeHandle({
       onPointerDown={onPointerDown}
       className={
         axis === "x"
-          ? "relative min-h-full cursor-col-resize rounded-sm bg-border/30 transition-colors after:absolute after:inset-y-2 after:left-1/2 after:w-0.5 after:-translate-x-1/2 after:rounded-full after:bg-primary/30 hover:bg-primary/20 hover:after:bg-primary/60"
-          : "relative min-h-2 cursor-row-resize rounded-sm bg-border/30 transition-colors after:absolute after:top-1/2 after:right-2 after:left-2 after:h-0.5 after:-translate-y-1/2 after:rounded-full after:bg-primary/30 hover:bg-primary/20 hover:after:bg-primary/60"
+          ? "relative cursor-col-resize rounded-sm bg-border/40 transition-colors after:absolute after:inset-y-1 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-muted-foreground/40 hover:bg-primary/50"
+          : "relative cursor-row-resize rounded-sm bg-border/40 transition-colors after:absolute after:top-1/2 after:right-1 after:left-1 after:h-px after:-translate-y-1/2 after:bg-muted-foreground/40 hover:bg-primary/50"
       }
     />
   )
 }
 
-function WorkspaceBody({ job }: { job: DashboardJob }) {
-  if (job === "prepare") return <PrepareWorkspace />
-  if (job === "rehearse") return <RehearseWorkspace />
-  if (job === "go-live") return <GoLiveWorkspace />
-  return null
-}
-
 export function Dashboard() {
-  const job = useDashboardWorkspaceStore((s) => s.job)
-  const lastContentJob = useDashboardWorkspaceStore((s) => s.lastContentJob)
-  const plannerOpen = useServicePlanStore((s) => s.plannerOpen)
-  const setJob = useDashboardWorkspaceStore((s) => s.setJob)
-  const isDesignerOpen = useBroadcastStore((s) => s.isDesignerOpen)
-  const restoreLastContentJob = useDashboardWorkspaceStore(
-    (s) => s.restoreLastContentJob,
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [windowWidth, setWindowWidth] = useState(() =>
+    typeof window === "undefined" ? 1920 : window.innerWidth
   )
-
-  const displayJob: DashboardJob =
-    job === "design" || job === "settings"
-      ? (lastContentJob ?? "go-live")
-      : job
-
-  const focusMode =
-    job === "design" ? "design" : job === "settings" ? "settings" : null
+  const workspace = useDashboardWorkspaceStore((s) => s.workspace)
+  const setWorkspace = useDashboardWorkspaceStore((s) => s.setWorkspace)
+  const plannerOpen = useServicePlanStore((s) => s.plannerOpen)
+  const openPlanner = useServicePlanStore((s) => s.openPlanner)
+  const closePlanner = useServicePlanStore((s) => s.closePlanner)
+  const [layout, setLayout] = useState(loadDashboardLayoutState)
+  const isCompact = windowWidth < 1400
+  const viewMode = layout.viewMode
+  const topHeightPercent = layout.topHeightPercent
+  const transcriptWidth = layout.transcriptWidth
+  const queueWidth = layout.queueWidth
+  const detectionsWidth = layout.detectionsWidth
 
   useDashboardKeyboardControls()
 
   useEffect(() => {
-    if (plannerOpen && job !== "prepare") {
-      setJob("prepare")
-    }
-  }, [plannerOpen, setJob, job])
+    const onResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
 
   useEffect(() => {
-    if (job === "design" && !isDesignerOpen) {
-      restoreLastContentJob()
+    saveDashboardLayoutState(layout)
+  }, [layout])
+
+  useEffect(() => {
+    if (plannerOpen && workspace !== "service-plans") {
+      setWorkspace("service-plans")
     }
-  }, [isDesignerOpen, job, restoreLastContentJob])
+  }, [plannerOpen, setWorkspace, workspace])
+
+  const applyViewMode = (mode: DashboardViewMode) => {
+    setLayout(layoutStateFromPreset(mode))
+  }
+
+  const resetLayout = () => {
+    setLayout(layoutStateFromPreset("balanced"))
+  }
+
+  const startTopResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const content = contentRef.current
+      if (!content) return
+
+      const rect = content.getBoundingClientRect()
+      const onMove = (moveEvent: PointerEvent) => {
+        const next = ((moveEvent.clientY - rect.top) / rect.height) * 100
+        setLayout((current) => ({
+          ...current,
+          topHeightPercent: clampNumber(next, 34, 68),
+        }))
+      }
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
+    },
+    []
+  )
+
+  const startTranscriptResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = transcriptWidth
+      const onMove = (moveEvent: PointerEvent) => {
+        setLayout((current) => ({
+          ...current,
+          transcriptWidth: clampNumber(
+            startWidth + moveEvent.clientX - startX,
+            240,
+            520
+          ),
+        }))
+      }
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
+    },
+    [transcriptWidth]
+  )
+
+  const startQueueResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = queueWidth
+      const onMove = (moveEvent: PointerEvent) => {
+        setLayout((current) => ({
+          ...current,
+          queueWidth: clampNumber(
+            startWidth - (moveEvent.clientX - startX),
+            240,
+            520
+          ),
+        }))
+      }
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
+    },
+    [queueWidth]
+  )
+
+  const startDetectionsResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = detectionsWidth
+      const onMove = (moveEvent: PointerEvent) => {
+        setLayout((current) => ({
+          ...current,
+          detectionsWidth: clampNumber(
+            startWidth - (moveEvent.clientX - startX),
+            360,
+            760
+          ),
+        }))
+      }
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
+    },
+    [detectionsWidth]
+  )
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-background">
       <TransportBar />
       <OperatorStatusStrip />
-      <DashboardShell />
-      <div className="flex min-h-0 flex-1 flex-col">
-        {focusMode ? <WorkspaceFocusBanner mode={focusMode} /> : null}
-        <div
-          className={cn(
-            "relative flex min-h-0 flex-1 flex-col",
-            focusMode && "pointer-events-none",
-          )}
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card/70 px-4 py-2">
+        <Button
+          size="xs"
+          variant={workspace === "live" ? "default" : "outline"}
+          aria-pressed={workspace === "live"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("live")
+          }}
         >
-          {isContentJob(displayJob) ? (
-            <WorkspaceBody job={displayJob} />
-          ) : null}
-          {focusMode ? (
-            <div
-              className="absolute inset-0 bg-background/55 transition-opacity duration-150"
-              aria-hidden
-            />
-          ) : null}
-        </div>
+          Live
+        </Button>
+        <Button
+          size="xs"
+          variant={workspace === "run-service" ? "default" : "outline"}
+          aria-pressed={workspace === "run-service"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("run-service")
+          }}
+        >
+          Run Service
+        </Button>
+        <Button
+          size="xs"
+          variant={workspace === "service-plans" ? "default" : "outline"}
+          aria-pressed={workspace === "service-plans"}
+          onClick={() => {
+            setWorkspace("service-plans")
+            openPlanner()
+          }}
+        >
+          Service Plans
+        </Button>
+        <Button
+          size="xs"
+          variant={workspace === "live-service" ? "default" : "outline"}
+          aria-pressed={workspace === "live-service"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("live-service")
+          }}
+        >
+          Live Service
+        </Button>
+        <Button
+          size="xs"
+          variant={workspace === "hymns" ? "default" : "outline"}
+          aria-pressed={workspace === "hymns"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("hymns")
+          }}
+        >
+          Hymns
+        </Button>
+        <Button
+          size="xs"
+          variant={workspace === "live-hymns" ? "default" : "outline"}
+          aria-pressed={workspace === "live-hymns"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("live-hymns")
+          }}
+        >
+          Live Hymns
+        </Button>
+        <Button
+          size="xs"
+          variant={workspace === "sermon-slides" ? "default" : "outline"}
+          aria-pressed={workspace === "sermon-slides"}
+          onClick={() => {
+            closePlanner()
+            setWorkspace("sermon-slides")
+          }}
+        >
+          Sermon Slides
+        </Button>
+
+        {workspace === "live" && (
+          <>
+            <div className="mx-1 h-5 w-px bg-border" />
+            {(["balanced", "broadcast", "study"] as const).map((mode) => (
+              <Button
+                key={mode}
+                size="xs"
+                variant={viewMode === mode ? "default" : "outline"}
+                onClick={() => applyViewMode(mode)}
+                className="capitalize"
+              >
+                {mode}
+              </Button>
+            ))}
+            <span className="ml-1 text-xs text-muted-foreground">
+              Drag labeled dividers to resize panels
+            </span>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={resetLayout}
+              className="ml-auto"
+            >
+              Reset layout
+            </Button>
+          </>
+        )}
       </div>
+
+      {workspace === "service-plans" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazyServicePlanWorkspace />
+          </Suspense>
+        </div>
+      ) : workspace === "hymns" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazyHymnWorkspace />
+          </Suspense>
+        </div>
+      ) : workspace === "run-service" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazyRunServicePage />
+          </Suspense>
+        </div>
+      ) : workspace === "live-service" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazyLiveServicePlanPage />
+          </Suspense>
+        </div>
+      ) : workspace === "live-hymns" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazyLiveHymnPage />
+          </Suspense>
+        </div>
+      ) : workspace === "sermon-slides" ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Suspense
+            fallback={
+              <div className="h-full rounded-lg border border-border bg-card" />
+            }
+          >
+            <LazySermonSlidesPage />
+          </Suspense>
+        </div>
+      ) : (
+        <div
+          ref={contentRef}
+          className="flex min-h-0 flex-1 flex-col gap-3 p-4"
+        >
+          <div
+            className="grid min-h-0 gap-3 *:min-h-0"
+            style={{
+              height: `${topHeightPercent}%`,
+              gridTemplateColumns: isCompact
+                ? `minmax(0, 1fr) minmax(0, 1fr)`
+                : `${transcriptWidth}px 6px minmax(280px, 1fr) minmax(280px, 1fr) 6px ${queueWidth}px`,
+              gridTemplateRows: isCompact
+                ? `minmax(0, 1fr) minmax(0, 0.8fr)`
+                : undefined,
+            }}
+          >
+            <div className={isCompact ? "min-h-0" : "contents"}>
+              <TranscriptPanel />
+            </div>
+            {!isCompact && (
+              <ResizeHandle
+                axis="x"
+                label="Resize transcript panel"
+                onPointerDown={startTranscriptResize}
+              />
+            )}
+            <PreviewPanel />
+            <LiveOutputPanel />
+            {!isCompact && (
+              <ResizeHandle
+                axis="x"
+                label="Resize queue panel"
+                onPointerDown={startQueueResize}
+              />
+            )}
+            <div className={isCompact ? "min-h-0" : "contents"}>
+              <QueuePanel />
+            </div>
+          </div>
+
+          <ResizeHandle
+            axis="y"
+            label="Resize top and bottom dashboard sections"
+            onPointerDown={startTopResize}
+          />
+
+          <div
+            className="grid min-h-0 flex-1 gap-3"
+            style={{
+              gridTemplateColumns: isCompact
+                ? "minmax(0, 1fr)"
+                : `minmax(0, 1fr) 6px ${detectionsWidth}px`,
+              gridTemplateRows: isCompact
+                ? "minmax(0, 1fr) minmax(220px, 0.55fr)"
+                : undefined,
+            }}
+          >
+            <SearchPanel />
+            {!isCompact && (
+              <ResizeHandle
+                axis="x"
+                label="Resize recent detections panel"
+                onPointerDown={startDetectionsResize}
+              />
+            )}
+            <DetectionsPanel />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

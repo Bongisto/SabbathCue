@@ -16,8 +16,8 @@ import {
 import type { DetectionResult } from "@/types"
 
 const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  direct: { bg: "bg-ai-direct/15", text: "text-ai-direct", label: "Direct" },
-  semantic: { bg: "bg-ai-semantic/15", text: "text-ai-semantic", label: "Semantic" },
+  direct: { bg: "bg-green-500/15", text: "text-green-600", label: "Direct" },
+  semantic: { bg: "bg-indigo-500/15", text: "text-indigo-300", label: "Semantic" },
 }
 
 function SourceBadge({ source }: { source: string }) {
@@ -54,7 +54,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       </div>
 
       {detection.verse_text && (
-        <p className="text-scripture mt-1.5 line-clamp-2 text-muted-foreground">
+        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
           {detection.verse_text}
         </p>
       )}
@@ -119,7 +119,7 @@ export function DetectionsPanel() {
   return (
     <div
       data-slot="detections-panel"
-      className="panel-surface flex h-full flex-col overflow-hidden"
+      className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader title="Recent detections" icon={<RadarIcon className="size-3" />} step={6}>
         <div className="flex items-center gap-2">

@@ -18,11 +18,7 @@ import { PresentationDeckControls } from "@/components/panels/presentation-deck-
 import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
 
-export function PreviewPanel({
-  showTakeLive = false,
-}: {
-  showTakeLive?: boolean
-}) {
+export function PreviewPanel() {
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
   const previewItem = useBroadcastStore((s) => s.previewItem)
   const themes = useBroadcastStore((s) => s.themes)
@@ -75,7 +71,7 @@ export function PreviewPanel({
   return (
     <div
       data-slot="preview-panel"
-      className="panel-surface flex min-h-0 flex-col overflow-hidden"
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader title="Program preview" icon={<MonitorIcon className="size-3" />} step={2}>
         <Badge variant="outline" className="h-5 text-[0.5625rem] uppercase">
@@ -115,18 +111,15 @@ export function PreviewPanel({
             <XIcon className="size-3.5" />
             Clear
           </Button>
-          {showTakeLive ? (
-            <Button
-              size="sm"
-              disabled={!previewItem}
-              className="gap-2"
-              onClick={() => commitPreviewToLive()}
-              title="Send preview to live output (Ctrl+Enter)"
-            >
-              <SendIcon className="size-3.5" />
-              Take Live
-            </Button>
-          ) : null}
+          <Button
+            size="sm"
+            disabled={!previewItem}
+            className="gap-2"
+            onClick={() => commitPreviewToLive()}
+          >
+            <SendIcon className="size-3.5" />
+            Send Live
+          </Button>
         </div>
       </div>
 

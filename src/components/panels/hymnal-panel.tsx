@@ -40,14 +40,6 @@ import {
   StarIcon,
 } from "lucide-react"
 
-function hymnPreviewTextClass(lineCount: number): string {
-  if (lineCount <= 4) return "text-2xl leading-snug"
-  if (lineCount <= 6) return "text-xl leading-snug"
-  if (lineCount <= 8) return "text-lg leading-snug"
-  if (lineCount <= 10) return "text-base leading-snug"
-  return "text-sm leading-tight"
-}
-
 export function HymnalPanel() {
   const [query, setQuery] = useState("")
   const [selectedHymn, setSelectedHymn] = useState<Hymn | null>(null)
@@ -95,6 +87,7 @@ export function HymnalPanel() {
         ? generateHymnScreens({
             hymn: selectedHymn,
             selectedSectionIds,
+            maxLinesPerScreen: 4,
           })
         : [],
     [selectedHymn, selectedSectionIds],
@@ -205,7 +198,7 @@ export function HymnalPanel() {
     <div
       ref={panelRef}
       data-slot="hymnal-panel"
-      className="panel-surface flex min-h-0 flex-1 flex-col overflow-hidden"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
       tabIndex={-1}
     >
       <PanelHeader title="SDA Hymnal" icon={<ListMusicIcon className="size-3" />} step={5}>
@@ -285,7 +278,7 @@ export function HymnalPanel() {
                 className={cn(
                   "flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors",
                   selectedHymn?.id === result.id
-                    ? "bg-primary/15 text-foreground"
+                    ? "bg-lime-500/15 text-foreground"
                     : "hover:bg-muted/50",
                 )}
               >
@@ -458,14 +451,11 @@ export function HymnalPanel() {
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {activeScreen ? (
                 <div className="flex min-h-full flex-col gap-3">
-                  <div className="flex aspect-video items-center justify-center rounded-md border border-border bg-black p-6 text-center">
-                    <div
-                      className={cn(
-                        "max-h-full max-w-[90%] overflow-hidden text-balance font-semibold whitespace-pre-wrap text-white",
-                        hymnPreviewTextClass(activeScreen.lines.length),
-                      )}
-                    >
-                      {activeScreen.lines.join("\n")}
+                  <div className="flex aspect-video items-center justify-center rounded-md border border-border bg-black p-8 text-center">
+                    <div className="max-w-[80%] space-y-3 text-balance text-2xl font-semibold leading-snug text-white">
+                      {activeScreen.lines.map((line) => (
+                        <p key={line}>{line}</p>
+                      ))}
                     </div>
                   </div>
 
@@ -477,7 +467,7 @@ export function HymnalPanel() {
                         className={cn(
                           "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                           index === activeScreenIndex
-                            ? "border-primary/50 bg-primary/15"
+                            ? "border-lime-500/50 bg-lime-500/15"
                             : "border-border hover:bg-muted/50",
                         )}
                       >

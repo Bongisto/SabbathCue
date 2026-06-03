@@ -70,7 +70,7 @@ function ThemeCard({
 
         {/* Active badge */}
         {isActive && (
-          <Badge className="absolute top-1.5 left-1.5 bg-primary text-[0.5rem] text-primary-foreground hover:bg-primary/90">
+          <Badge className="absolute top-1.5 left-1.5 bg-emerald-600 text-[0.5rem] text-white hover:bg-emerald-600">
             Active
           </Badge>
         )}

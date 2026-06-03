@@ -72,6 +72,7 @@ export function TranscriptPanel() {
     "translation_command",
     (data) => {
       useBibleStore.getState().setActiveTranslation(data.translation_id)
+      console.log(`[VOICE] Translation switched to ${data.abbreviation}`)
     }
   )
 
@@ -102,7 +103,7 @@ export function TranscriptPanel() {
   return (
     <div
       data-slot="transcript-panel"
-      className="panel-surface flex flex-col overflow-hidden"
+      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader
         title="Live transcript"
@@ -124,9 +125,9 @@ export function TranscriptPanel() {
             <span
               className={`mb-1 size-1.5 rounded-full ${
                 connectionStatus === "connected"
-                  ? "bg-primary"
+                  ? "bg-emerald-500"
                   : connectionStatus === "connecting"
-                    ? "animate-pulse bg-brand-yellow"
+                    ? "animate-pulse bg-amber-500"
                     : connectionStatus === "error"
                       ? "bg-red-500"
                       : "bg-muted-foreground/40"
@@ -193,7 +194,7 @@ export function TranscriptPanel() {
           </Button>
         ) : (
           <Button variant="ghost" size="sm" onClick={startTranscription}>
-            <MicIcon className="size-3" />
+              <MicIcon className="size-3" />
             Start transcribing
           </Button>
         )}

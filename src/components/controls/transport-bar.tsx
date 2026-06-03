@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useTheme } from "@/components/theme-provider"
-import { AppLogo } from "@/components/ui/app-logo"
+import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 
 const LazyBroadcastSettings = lazy(() =>
   import("@/components/broadcast/broadcast-settings").then((mod) => ({
@@ -32,30 +32,32 @@ export function TransportBar() {
       className="col-span-4 flex h-14 items-center justify-between border-b border-border  bg-card px-3"
     >
       <div className="flex items-center gap-2.5">
-        <AppLogo size="md" />
+        <img
+          src="/app-logo.png"
+          alt={APP_DISPLAY_NAME}
+          className="h-10 w-auto object-contain"
+        />
         <Badge variant="outline" className="text-[0.5625rem] uppercase">
           Free
         </Badge>
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex items-center gap-3">
         <Button
           variant="ghost"
-          size="sm"
-          className="gap-1.5 px-2"
+          size="icon-sm"
           title="Toggle theme"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         >
           {theme === "dark" ? (
-            <SunIcon className="size-3.5 shrink-0" />
+            <SunIcon className="size-3.5" />
           ) : (
-            <MoonIcon className="size-3.5 shrink-0" />
+            <MoonIcon className="size-3.5" />
           )}
         </Button>
         <Button
           variant="ghost"
-          size="sm"
-          className="gap-1.5 px-2"
+          size="icon-sm"
           title="Broadcast Settings"
           data-tour="broadcast"
           onClick={() => {
@@ -63,8 +65,7 @@ export function TransportBar() {
             setBroadcastOpen(true)
           }}
         >
-          <CastIcon className="size-3.5 shrink-0" />
-          <span className="hidden text-xs sm:inline">Broadcast</span>
+          <CastIcon className="size-3.5" />
         </Button>
         {broadcastSettingsMounted && (
           <Suspense fallback={null}>
@@ -76,8 +77,7 @@ export function TransportBar() {
         )}
         <Button
           variant="ghost"
-          size="sm"
-          className="gap-1.5 px-2"
+          size="icon-sm"
           title="Theme Designer"
           data-tour="theme"
           onClick={() => {
@@ -85,8 +85,7 @@ export function TransportBar() {
             useBroadcastStore.getState().setDesignerOpen(true)
           }}
         >
-          <PaletteIcon className="size-3.5 shrink-0" />
-          <span className="hidden text-xs sm:inline">Theme</span>
+          <PaletteIcon className="size-3.5" />
         </Button>
         {themeDesignerMounted && (
           <Suspense fallback={null}>
@@ -95,13 +94,11 @@ export function TransportBar() {
         )}
         <Button
           variant="ghost"
-          size="sm"
-          className="gap-1.5 px-2"
+          size="icon-sm"
           title="Service Plan"
           onClick={() => useServicePlanStore.getState().openPlanner()}
         >
-          <ClipboardListIcon className="size-3.5 shrink-0" />
-          <span className="hidden text-xs sm:inline">Plan</span>
+          <ClipboardListIcon className="size-3.5" />
         </Button>
         <SettingsDialog />
       </div>

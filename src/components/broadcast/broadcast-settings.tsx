@@ -498,7 +498,7 @@ export function BroadcastSettings({
 
         <div className="grid grid-cols-2 gap-4">
           {/* ── Main Output Card ── */}
-          <div className="panel-surface p-4 space-y-4">
+          <div className="rounded-lg border border-border bg-card p-4 space-y-4">
             {/* Card header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -552,7 +552,7 @@ export function BroadcastSettings({
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     outputType === "display"
-                      ? "border-primary/50 bg-primary/15 text-primary"
+                      ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
                       : "border-border bg-background text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -564,7 +564,7 @@ export function BroadcastSettings({
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     outputType === "ndi"
-                      ? "border-primary/50 bg-primary/15 text-primary"
+                      ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
                       : "border-border bg-background text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -739,7 +739,7 @@ export function BroadcastSettings({
                   className={cn(
                     "w-full gap-1.5",
                     ndiActive &&
-                    "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                    "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-400"
                   )}
                   onClick={handleToggleNdi}
                   disabled={!ndiActive && !assetsLoading && !ndiSdkInstalled}
@@ -761,7 +761,7 @@ export function BroadcastSettings({
           </div>
 
           {/* ── Alternate Output Card ── */}
-          <div className="panel-surface p-4 space-y-4">
+          <div className="rounded-lg border border-border bg-card p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CastIcon className="size-4 text-muted-foreground" />
@@ -795,7 +795,7 @@ export function BroadcastSettings({
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     altOutputType === "display"
-                      ? "border-primary/50 bg-primary/15 text-primary"
+                      ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
                       : "border-border bg-background text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -807,7 +807,7 @@ export function BroadcastSettings({
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     altOutputType === "ndi"
-                      ? "border-primary/50 bg-primary/15 text-primary"
+                      ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
                       : "border-border bg-background text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -900,7 +900,7 @@ export function BroadcastSettings({
                 <Button
                   variant="outline"
                   size="sm"
-                  className={cn("w-full gap-1.5", altNdiActive && "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary")}
+                  className={cn("w-full gap-1.5", altNdiActive && "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-400")}
                   onClick={handleAltToggleNdi}
                   disabled={!altNdiActive && !assetsLoading && !ndiSdkInstalled}
                 >

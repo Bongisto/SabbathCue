@@ -58,7 +58,7 @@ function QueueItemRow({
 
   const sourceBadge =
     item.source === "service-plan" ? (
-      <Badge className="shrink-0 bg-source-service-plan/15 text-[0.5rem] text-source-service-plan hover:bg-source-service-plan/15">
+      <Badge className="shrink-0 bg-violet-500/15 text-[0.5rem] text-violet-300 hover:bg-violet-500/15">
         Plan
       </Badge>
     ) : item.source === "manual" ? (
@@ -66,15 +66,15 @@ function QueueItemRow({
         Manual
       </Badge>
     ) : item.source === "hymn" ? (
-      <Badge className="shrink-0 bg-brand-yellow/15 text-[0.5rem] text-brand-yellow hover:bg-brand-yellow/15">
+      <Badge className="shrink-0 bg-amber-500/15 text-[0.5rem] text-amber-300 hover:bg-amber-500/15">
         Hymn
       </Badge>
     ) : item.source === "ai-semantic" ? (
-      <Badge className="shrink-0 bg-ai-semantic/15 text-[0.5rem] text-ai-semantic hover:bg-ai-semantic/15">
+      <Badge className="shrink-0 bg-indigo-500/15 text-[0.5rem] text-indigo-300 hover:bg-indigo-500/15">
         Semantic
       </Badge>
     ) : (
-      <Badge className="shrink-0 bg-ai-direct/15 text-[0.5rem] text-ai-direct hover:bg-ai-direct/15">
+      <Badge className="shrink-0 bg-green-500/15 text-[0.5rem] text-green-600 hover:bg-green-500/15">
         Direct
       </Badge>
     )
@@ -106,7 +106,7 @@ function QueueItemRow({
         isDragging && "opacity-50",
         isDropTarget && "ring-1 ring-primary/60",
         isHighlighted
-          ? "animate-pulse border border-brand-yellow/40 bg-brand-yellow/15"
+          ? "animate-pulse border border-amber-500/40 bg-amber-500/15"
           : isActive
             ? "border border-primary/30 bg-primary/10"
             : "hover:bg-muted/50"
@@ -123,14 +123,7 @@ function QueueItemRow({
 
       {sourceBadge}
 
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-0.5 transition-opacity",
-          isActive || isHighlighted
-            ? "opacity-100"
-            : "opacity-80 group-hover:opacity-100 focus-within:opacity-100",
-        )}
-      >
+      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
         <Button
           variant="ghost"
           size="icon-xs"
@@ -182,7 +175,7 @@ export function QueuePanel() {
   return (
     <div
       data-slot="queue-panel"
-      className="panel-surface flex flex-col overflow-hidden"
+      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
     >
       <PanelHeader title="Queue" icon={<ListOrderedIcon className="size-3" />} step={4}>
         <div className="flex items-center gap-2">

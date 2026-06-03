@@ -9,8 +9,8 @@ function readSource(relativePath: string): string {
 describe("service plan shell integration", () => {
   it("mounts the service plan workspace from the dashboard shell", () => {
     const dashboard = readSource("src/components/layout/dashboard.tsx")
-    expect(dashboard).toContain("PrepareWorkspace")
-    expect(dashboard).toContain("Prepare")
+    expect(dashboard).toContain("LazyServicePlanWorkspace")
+    expect(dashboard).toContain("Service Plans")
     expect(dashboard).not.toContain("LazyServicePlanDialog")
   })
 
@@ -86,11 +86,10 @@ describe("service plan shell integration", () => {
     expect(assets).toContain("get_service_attachment_limits")
   })
 
-  it("mounts the rehearse workspace from the dashboard shell", () => {
+  it("mounts the run service workspace from the dashboard shell", () => {
     const dashboard = readSource("src/components/layout/dashboard.tsx")
-    expect(dashboard).toContain("RehearseWorkspace")
-    expect(dashboard).toContain("Rehearse")
-    expect(dashboard).toContain("GoLiveWorkspace")
+    expect(dashboard).toContain("LazyRunServicePage")
+    expect(dashboard).toContain("Run Service")
   })
 
   it("uses backend-derived attachment limit copy in sermon slide uploads", () => {

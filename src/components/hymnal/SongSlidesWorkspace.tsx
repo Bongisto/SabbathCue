@@ -130,7 +130,7 @@ export function SongSlidesWorkspace() {
 
   return (
     <div
-      className="panel-surface flex min-h-0 flex-1 flex-col overflow-hidden"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
       data-slot="song-slides-workspace"
     >
       <PanelHeader title="Song Slides" icon={<ListMusicIcon className="size-3" />}>
@@ -231,7 +231,7 @@ export function SongSlidesWorkspace() {
                       className={cn(
                         "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                         index === activeIndex
-                          ? "border-primary/50 bg-primary/15"
+                          ? "border-lime-500/50 bg-lime-500/15"
                           : "border-border hover:bg-muted/50",
                       )}
                     >

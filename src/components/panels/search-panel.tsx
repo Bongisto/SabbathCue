@@ -42,35 +42,8 @@ import {
   selectPreviewVerse,
 } from "@/lib/presentation-workflow"
 import { EgwBrowser } from "@/components/panels/egw-browser"
-import {
-  SegmentedControl,
-  type SegmentOption,
-} from "@/components/ui/segmented-control"
 
 type SearchTab = "book" | "context" | "egw"
-
-const SEARCH_TAB_OPTIONS: SegmentOption<SearchTab>[] = [
-  {
-    id: "book",
-    label: "Book",
-    tourId: "book-search",
-    icon: <BookOpenIcon />,
-    title: "Look up verses by book, chapter, and number",
-  },
-  {
-    id: "context",
-    label: "Context",
-    tourId: "context-search",
-    icon: <SparklesIcon />,
-    title: "AI phrase and topic search",
-  },
-  {
-    id: "egw",
-    label: "EGW",
-    icon: <BookOpenIcon />,
-    title: "Ellen G. White writings",
-  },
-]
 
 /** Highlights words from the query that appear in the text. */
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -89,7 +62,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
         const cleaned = part.toLowerCase().replace(/[^a-z']/g, "")
         if (cleaned.length >= 2 && queryWords.has(cleaned)) {
           return (
-            <mark key={i} className="rounded-[2px] bg-primary/35 px-0.5 text-foreground">
+            <mark key={i} className="rounded-[2px] bg-emerald-800/90 px-0.5 text-foreground">
               {part}
             </mark>
           )
@@ -186,24 +159,27 @@ export function SearchPanel() {
 
   // Auto-navigate when a detection or "Present" click sets pendingNavigation
   useEffect(() => {
-    let navigationEpoch = 0
+    let lastHandledKey: string | null = null
 
     const unsubscribe = useBibleStore.subscribe((state) => {
       const pendingNavigation = state.pendingNavigation
-      if (!pendingNavigation) return
+      if (!pendingNavigation) {
+        lastHandledKey = null
+        return
+      }
 
-      const epoch = ++navigationEpoch
       const { bookNumber, chapter: navChapter, verse: navVerse } = pendingNavigation
       const pendingKey = `${bookNumber}:${navChapter}:${navVerse}`
+      if (pendingKey === lastHandledKey) return
 
       const book = state.books.find((b) => b.book_number === bookNumber)
       if (!book) return
 
-      setActiveTab("book")
+      lastHandledKey = pendingKey
       applyNavigationSelection(book, navChapter)
 
+      // Load chapter explicitly, then select + scroll to the verse.
       bibleActions.loadChapter(bookNumber, navChapter).then((verses) => {
-        if (epoch !== navigationEpoch) return
         const target = verses.find((v) => v.verse === navVerse)
         if (target) {
           setSelectedVerseId(target.id)
@@ -214,14 +190,7 @@ export function SearchPanel() {
         }
         panelRef.current?.focus()
       }).catch(console.error).finally(() => {
-        if (epoch !== navigationEpoch) return
-        const current = useBibleStore.getState().pendingNavigation
-        const currentKey = current
-          ? `${current.bookNumber}:${current.chapter}:${current.verse}`
-          : null
-        if (currentKey === pendingKey) {
-          useBibleStore.getState().setPendingNavigation(null)
-        }
+        useBibleStore.getState().setPendingNavigation(null)
       })
     })
 
@@ -422,23 +391,58 @@ export function SearchPanel() {
     <div
       ref={panelRef}
       data-slot="search-panel"
-      className="panel-surface flex min-h-0 flex-1 flex-col overflow-hidden outline-none"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card outline-none"
       onKeyDown={activeTab === "book" ? handleKeyDown : undefined}
       tabIndex={-1}
     >
       <PanelHeader title="Search" icon={<SearchIcon className="size-3" />} step={5} />
 
       {/* STICKY: Tab row + search input */}
-      <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
-        <SegmentedControl
-          value={activeTab}
-          options={SEARCH_TAB_OPTIONS}
-          size="xs"
-          onChange={(tab) => {
-            if (tab === "context") setContextQuery("")
-            setActiveTab(tab)
-          }}
-        />
+      <div className="flex shrink-0 items-center gap-0 border-b border-border min-h-11">
+        <div className="flex items-center gap-1 px-3 py-1.5">
+          
+          <button
+            data-tour="book-search"
+            onClick={() => setActiveTab("book")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "book"
+                ? "border-lime-500/50 bg-lime-500/15 "
+                : "border-border text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <BookOpenIcon className={cn("size-3.5", activeTab === "book" ? "text-lime-400" : "text-muted-foreground")} />
+            Book search
+          </button>
+          <button
+            data-tour="context-search"
+            onClick={() => {
+              setActiveTab("context")
+              setContextQuery("")
+            }}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "context"
+                ? "border-lime-500/50 bg-lime-500/15"
+                : "border-border bg-background  text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <SparklesIcon className={cn("size-3.5", activeTab === "context" ? "text-lime-400" : "text-muted-foreground")} />
+            Context search
+          </button>
+          <button
+            onClick={() => setActiveTab("egw")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+              activeTab === "egw"
+                ? "border-lime-500/50 bg-lime-500/15"
+                : "border-border text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <BookOpenIcon className={cn("size-3.5", activeTab === "egw" ? "text-lime-400" : "text-muted-foreground")} />
+            EGW
+          </button>
+        </div>
 
         {activeTab === "book" ? (
           <div className="flex flex-1 items-center gap-2 pr-3">
@@ -601,14 +605,14 @@ export function SearchPanel() {
                   className={cn(
                     "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
                     verse.id === effectiveSelectedVerseId
-                      ? "border border-primary/50 bg-primary/10"
+                      ? "border border-lime-500/50 bg-lime-500/10"
                       : "border border-transparent hover:bg-muted/50"
                   )}
                 >
                   <span className="w-6 shrink-0 text-right text-sm font-semibold text-primary">
                     {verse.verse}
                   </span>
-                  <p className="text-scripture flex-1 text-foreground/85">
+                  <p className="flex-1 text-sm leading-relaxed text-foreground/80">
                     {verse.text}
                   </p>
                   {queuedVerseKeys.has(`${verse.book_number}:${verse.chapter}:${verse.verse}`) ? (
@@ -644,7 +648,7 @@ export function SearchPanel() {
                             className={cn(
                               "shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
                               verse.id === effectiveSelectedVerseId
-                                ? "hover:bg-primary/20 hover:text-primary"
+                                ? "hover:bg-lime-500/20 hover:text-lime-500"
                                 : "bg-primary/40! text-primary-foreground hover:bg-primary!"
                             )}
                             onClick={(e) => {
@@ -721,7 +725,7 @@ export function SearchPanel() {
                     {Math.round(result.similarity * 100)}%
                   </span>
                 </div>
-                <p className="text-scripture flex-1 text-[0.8125rem] text-muted-foreground">
+                <p className="flex-1 text-xs leading-relaxed text-muted-foreground">
                   <HighlightedText text={result.verse_text} query={contextQuery} />
                 </p>
                 {queuedVerseKeys.has(`${result.book_number}:${result.chapter}:${result.verse}`) ? (

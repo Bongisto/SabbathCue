@@ -17,6 +17,10 @@ import {
   loadDashboardLayoutState,
   saveDashboardLayoutState,
 } from "@/lib/dashboard-layout"
+import { LiveOutputPanel } from "@/components/panels/live-output-panel"
+import { PreviewPanel } from "@/components/panels/preview-panel"
+import { QueuePanel } from "@/components/panels/queue-panel"
+import { TranscriptPanel } from "@/components/panels/transcript-panel"
 import { SERVICE_PLAN_TEMPLATES } from "@/lib/service-plan/service-plan-templates"
 import { useServicePlanStore } from "@/stores/service-plan-store"
 import {
@@ -47,7 +51,6 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { getPresentationRenderData } from "@/types"
-import { useWindowPointerDragCleanup } from "@/hooks/use-window-pointer-drag-cleanup"
 import type {
   ServiceAttachment,
   ServiceContextItem,
@@ -55,10 +58,6 @@ import type {
 } from "@/types/service-plan"
 
 export { ServiceLiveContextPanel } from "./ServiceLiveContextPanel"
-
-function useServicePlanPointerDragCleanup() {
-  return useWindowPointerDragCleanup()
-}
 
 function activeItemContentLabel(
   item: ServiceItem | ServiceContextItem | null | undefined,
@@ -319,7 +318,7 @@ export function ServicePlanLibraryPanel() {
 
   return (
     <div
-      className="flex min-h-0 flex-col overflow-hidden panel-surface"
+      className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
       data-slot="service-plan-page"
     >
       <div className="space-y-4 overflow-y-auto p-4">
@@ -356,7 +355,6 @@ export function ServicePlanWorkspace() {
   const [libraryWidth, setLibraryWidth] = useState(
     () => loadDashboardLayoutState().servicePlanLibraryWidth
   )
-  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -376,9 +374,14 @@ export function ServicePlanWorkspace() {
           clampNumber(startWidth + moveEvent.clientX - startX, 240, 480)
         )
       }
-      registerPointerDrag(onMove)
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
     },
-    [libraryWidth, registerPointerDrag]
+    [libraryWidth]
   )
 
   return (
@@ -395,7 +398,7 @@ export function ServicePlanWorkspace() {
         label="Resize service plan library"
         onPointerDown={startLibraryResize}
       />
-      <div className="min-h-0 overflow-hidden panel-surface">
+      <div className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
         {activePlan ? (
           <Suspense
             fallback={
@@ -424,6 +427,17 @@ export function ServicePlanPage() {
   return <ServicePlanWorkspace />
 }
 
+function LiveProductionGrid() {
+  return (
+    <div className="grid min-h-[360px] grid-cols-1 gap-3 xl:grid-cols-[300px_minmax(320px,1fr)_minmax(320px,1fr)_320px]">
+      <TranscriptPanel />
+      <PreviewPanel />
+      <LiveOutputPanel />
+      <QueuePanel />
+    </div>
+  )
+}
+
 export function RunServicePage() {
   const activePlan = useServicePlanStore((s) => s.activePlan)
   const serviceContext = useServicePlanStore((s) => s.serviceContext)
@@ -447,7 +461,6 @@ export function RunServicePage() {
   const [timelineWidth, setTimelineWidth] = useState(
     () => loadDashboardLayoutState().liveServiceContextWidth,
   )
-  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -467,9 +480,14 @@ export function RunServicePage() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520),
         )
       }
-      registerPointerDrag(onMove)
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
     },
-    [timelineWidth, registerPointerDrag],
+    [timelineWidth],
   )
 
   const previewSlide = (index: number) => {
@@ -511,6 +529,7 @@ export function RunServicePage() {
       data-slot="run-service-page"
     >
       <ServiceLiveContextPanel />
+      <LiveProductionGrid />
 
       <div
         className="grid min-h-0 flex-1 gap-3"
@@ -518,7 +537,7 @@ export function RunServicePage() {
           gridTemplateColumns: `minmax(0, 1fr) 6px ${timelineWidth}px`,
         }}
       >
-        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader title="Run Service" icon={<RadioIcon className="size-4" />}>
             <Badge variant="outline" className="text-[0.5625rem] uppercase">
               {activeItemContentLabel(activeItem)}
@@ -642,7 +661,7 @@ export function RunServicePage() {
           onPointerDown={startTimelineResize}
         />
 
-        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Service timeline"
             icon={<ClipboardListIcon className="size-4" />}
@@ -667,7 +686,7 @@ export function RunServicePage() {
   )
 }
 
-export function LiveServicePlanContext() {
+export function LiveServicePlanPage() {
   const activePlan = useServicePlanStore((s) => s.activePlan)
   const serviceContext = useServicePlanStore((s) => s.serviceContext)
   const orderedItems = useMemo(
@@ -677,7 +696,6 @@ export function LiveServicePlanContext() {
   const [contextWidth, setContextWidth] = useState(
     () => loadDashboardLayoutState().liveServiceContextWidth
   )
-  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -697,20 +715,27 @@ export function LiveServicePlanContext() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 240, 480)
         )
       }
-      registerPointerDrag(onMove)
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
     },
-    [contextWidth, registerPointerDrag]
+    [contextWidth]
   )
 
   return (
-    <div
-      data-slot="live-service-plan-context"
-      className="grid min-h-0 flex-1 gap-3"
-      style={{
-        gridTemplateColumns: `minmax(0, 1fr) 6px ${contextWidth}px`,
-      }}
-    >
-        <section className="min-h-0 overflow-hidden panel-surface">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4">
+      <LiveProductionGrid />
+
+      <div
+        className="grid min-h-0 flex-1 gap-3"
+        style={{
+          gridTemplateColumns: `minmax(0, 1fr) 6px ${contextWidth}px`,
+        }}
+      >
+        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Live Service Plan"
             icon={<ClipboardListIcon className="size-4" />}
@@ -782,7 +807,7 @@ export function LiveServicePlanContext() {
           label="Resize live service context panel"
           onPointerDown={startContextResize}
         />
-        <section className="min-h-0 overflow-hidden panel-surface">
+        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Live Context"
             icon={<FileTextIcon className="size-4" />}
@@ -817,15 +842,12 @@ export function LiveServicePlanContext() {
             </div>
           </div>
         </section>
+      </div>
     </div>
   )
 }
 
-export function LiveServicePlanPage() {
-  return <LiveServicePlanContext />
-}
-
-export function LiveHymnContext() {
+export function LiveHymnPage() {
   const serviceContext = useServicePlanStore((s) => s.serviceContext)
   const deck = useHymnSlideStore((s) => s.deck)
   const activeIndex = useHymnSlideStore((s) => s.activeIndex)
@@ -833,7 +855,6 @@ export function LiveHymnContext() {
   const [lyricsWidth, setLyricsWidth] = useState(
     () => loadDashboardLayoutState().liveHymnLyricsWidth
   )
-  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -853,20 +874,27 @@ export function LiveHymnContext() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520)
         )
       }
-      registerPointerDrag(onMove)
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
     },
-    [lyricsWidth, registerPointerDrag]
+    [lyricsWidth]
   )
 
   return (
-    <div
-      data-slot="live-hymn-context"
-      className="grid min-h-0 flex-1 gap-3"
-      style={{
-        gridTemplateColumns: `minmax(0, 1fr) 6px ${lyricsWidth}px`,
-      }}
-    >
-        <section className="min-h-0 overflow-hidden panel-surface">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4">
+      <LiveProductionGrid />
+
+      <div
+        className="grid min-h-0 flex-1 gap-3"
+        style={{
+          gridTemplateColumns: `minmax(0, 1fr) 6px ${lyricsWidth}px`,
+        }}
+      >
+        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Live Hymns"
             icon={<ListMusicIcon className="size-4" />}
@@ -946,7 +974,7 @@ export function LiveHymnContext() {
           label="Resize lyrics panel"
           onPointerDown={startLyricsResize}
         />
-        <section className="min-h-0 overflow-hidden panel-surface">
+        <section className="min-h-0 overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Current Lyrics"
             icon={<FileTextIcon className="size-4" />}
@@ -959,141 +987,17 @@ export function LiveHymnContext() {
             </p>
           </div>
         </section>
-    </div>
-  )
-}
-
-export function LiveHymnPage() {
-  return <LiveHymnContext />
-}
-
-export function SermonSlidesLiveContext() {
-  const activePlan = useServicePlanStore((s) => s.activePlan)
-  const setActiveItem = useServicePlanStore((s) => s.setActiveItem)
-  const orderedItems = useMemo(
-    () => [...(activePlan?.items ?? [])].sort((a, b) => a.order - b.order),
-    [activePlan?.items],
-  )
-  const activeItem = useMemo(
-    () =>
-      activePlan?.items.find((item) => item.id === activePlan.activeItemId) ??
-      null,
-    [activePlan],
-  )
-  const deck = useMemo(() => buildSermonSlideDeck(activeItem), [activeItem])
-  const storedDeck = useSermonSlideStore((s) => s.deck)
-  const storedIndex = useSermonSlideStore((s) => s.activeIndex)
-  const activeIndex =
-    storedDeck.length > 0 &&
-    useSermonSlideStore.getState().activeItemId === activeItem?.id
-      ? storedIndex
-      : 0
-  const activeSlide = deck[activeIndex] ?? deck[0] ?? null
-
-  useEffect(() => {
-    if (!activeItem) {
-      useSermonSlideStore.getState().clear()
-      return
-    }
-    void loadActiveSermonSlideDeck(activeIndex)
-  }, [activeItem, activeIndex])
-
-  const previewSlide = (index: number) => {
-    const slide = deck[index]
-    if (!activeItem || !slide) return
-    useSermonSlideStore.getState().setDeck(deck, index, activeItem.id)
-    selectPreviewItem(slide)
-  }
-
-  const presentSlide = (index: number) => {
-    presentSermonSlideAt(index)
-  }
-
-  return (
-    <div
-      data-slot="sermon-slides-live-context"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden panel-surface"
-    >
-      <PanelHeader title="Sermon slides (live)" icon={<ImagesIcon className="size-4" />}>
-        <Badge variant="outline" className="tabular-nums">
-          {deck.length > 0 ? `${activeIndex + 1} of ${deck.length}` : "No slides"}
-        </Badge>
-      </PanelHeader>
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-        <Button
-          size="xs"
-          variant="outline"
-          disabled={!activeSlide || activeIndex === 0}
-          onClick={() => presentSlide(activeIndex - 1)}
-        >
-          Previous
-        </Button>
-        <Button
-          size="xs"
-          variant="outline"
-          disabled={!activeSlide}
-          onClick={() => previewSlide(activeIndex)}
-        >
-          Preview
-        </Button>
-        <Button size="xs" disabled={!activeSlide} onClick={() => presentSlide(activeIndex)}>
-          Live
-        </Button>
-        <Button
-          size="xs"
-          variant="outline"
-          disabled={!activeSlide || activeIndex >= deck.length - 1}
-          onClick={() => presentSlide(activeIndex + 1)}
-        >
-          Next
-        </Button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {orderedItems.length > 0 ? (
-          <select
-            value={activeItem?.id ?? ""}
-            onChange={(event) => void setActiveItem(event.target.value || null)}
-            className="mb-3 h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-          >
-            <option value="">Select service item</option>
-            {orderedItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        {deck.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Upload sermon slides on a Service Plan item in Prepare.
-          </p>
-        ) : (
-          deck.map((slide, index) => (
-            <button
-              key={slide.slideId}
-              type="button"
-              onClick={() => previewSlide(index)}
-              className="mb-1 flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-muted/50"
-            >
-              <span className="truncate">{slide.reference}</span>
-              <Badge variant={index === activeIndex ? "default" : "outline"}>
-                {index + 1}
-              </Badge>
-            </button>
-          ))
-        )}
       </div>
     </div>
   )
 }
 
-export function SermonSlidesPreparePage() {
+export function SermonSlidesPage() {
   const activePlan = useServicePlanStore((s) => s.activePlan)
   const updateItem = useServicePlanStore((s) => s.updateItem)
   const setActiveItem = useServicePlanStore((s) => s.setActiveItem)
   const openPlanner = useServicePlanStore((s) => s.openPlanner)
+  const setWorkspace = useDashboardWorkspaceStore((s) => s.setWorkspace)
   const orderedItems = useMemo(
     () => [...(activePlan?.items ?? [])].sort((a, b) => a.order - b.order),
     [activePlan?.items]
@@ -1150,7 +1054,6 @@ export function SermonSlidesPreparePage() {
   const [editorWidth, setEditorWidth] = useState(
     () => loadDashboardLayoutState().sermonSlidesEditorWidth
   )
-  const registerPointerDrag = useServicePlanPointerDragCleanup()
 
   useEffect(() => {
     const layout = loadDashboardLayoutState()
@@ -1170,23 +1073,27 @@ export function SermonSlidesPreparePage() {
           clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520)
         )
       }
-      registerPointerDrag(onMove)
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+      }
+      window.addEventListener("pointermove", onMove)
+      window.addEventListener("pointerup", onUp)
     },
-    [editorWidth, registerPointerDrag]
+    [editorWidth]
   )
 
   return (
-    <div
-      data-slot="sermon-slides-prepare-page"
-      className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3"
-    >
+    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
+      <LiveProductionGrid />
+
       <div
         className="grid min-h-0 flex-1 gap-2"
         style={{
           gridTemplateColumns: `minmax(0, 1fr) 6px ${editorWidth}px`,
         }}
       >
-        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Sermon Slides"
             icon={<ImagesIcon className="size-4" />}
@@ -1262,7 +1169,7 @@ export function SermonSlidesPreparePage() {
           onPointerDown={startEditorResize}
         />
 
-        <section className="flex min-h-0 flex-col overflow-hidden panel-surface">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
           <PanelHeader
             title="Slide List"
             icon={<FileTextIcon className="size-4" />}
@@ -1301,8 +1208,7 @@ export function SermonSlidesPreparePage() {
                 variant="outline"
                 onClick={() => {
                   openPlanner()
-                  useDashboardWorkspaceStore.getState().setPrepareView("plans")
-                  useDashboardWorkspaceStore.getState().setJob("prepare")
+                  setWorkspace("service-plans")
                 }}
               >
                 Open Service Plans
@@ -1324,11 +1230,6 @@ export function SermonSlidesPreparePage() {
       </div>
     </div>
   )
-}
-
-/** @deprecated Use SermonSlidesLiveContext inside Go Live, or SermonSlidesPreparePage in Prepare. */
-export function SermonSlidesPage() {
-  return <SermonSlidesLiveContext />
 }
 
 export const LazyServicePlanLibraryPanel = lazy(async () => ({

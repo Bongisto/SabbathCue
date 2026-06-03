@@ -16,11 +16,7 @@ import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
 import { EyeIcon, EyeOffIcon, RadioIcon, SendIcon, Maximize2Icon, Minimize2Icon } from "lucide-react"
 import { toast } from "sonner"
 
-export function LiveOutputPanel({
-  showTakeLive = true,
-}: {
-  showTakeLive?: boolean
-}) {
+export function LiveOutputPanel() {
   const isLive = useBroadcastStore((s) => s.isLive)
   const liveItem = useBroadcastStore((s) => s.liveItem)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
@@ -89,7 +85,7 @@ export function LiveOutputPanel({
       ref={panelRef}
       data-slot="live-output-panel"
       className={cn(
-        "panel-surface flex min-h-0 flex-col overflow-hidden",
+        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card",
         isLive && "shadow-[inset_0_2px_0_0_rgba(16,185,129,0.35)]",
         isFullscreen && "!rounded-none !border-0 !h-screen !w-screen",
       )}
@@ -113,7 +109,7 @@ export function LiveOutputPanel({
               variant={isLive ? "default" : "outline"}
               className={cn(
                 "h-5 text-[0.5625rem] uppercase",
-                isLive && "bg-primary text-primary-foreground hover:bg-primary/90",
+                isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
               )}
             >
               {isLive ? "On air" : "Hidden"}
@@ -124,22 +120,20 @@ export function LiveOutputPanel({
 
       <div className={cn("flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2", isFullscreen && "hidden")}>
         <div className="flex flex-wrap items-center gap-2">
-          {showTakeLive ? (
-            <Button
-              size="sm"
-              disabled={!canCommitPreview}
-              className="gap-2"
-              onClick={() => commitPreviewToLive()}
-              title={
-                canCommitPreview
-                  ? "Send the Program Preview item to Live Output"
-                  : "Select a verse, hymn, or song before sending live"
-              }
-            >
-              <SendIcon className="size-3.5" />
-              Take Live
-            </Button>
-          ) : null}
+          <Button
+            size="sm"
+            disabled={!canCommitPreview}
+            className="gap-2"
+            onClick={() => commitPreviewToLive()}
+            title={
+              canCommitPreview
+                ? "Send the Program Preview item to Live Output"
+                : "Select a verse, hymn, or song before sending live"
+            }
+          >
+            <SendIcon className="size-3.5" />
+            Send Preview Live
+          </Button>
           {isLive && presentationDeckKind(liveItem) ? (
             <PresentationDeckControls
               item={liveItem}
@@ -150,7 +144,7 @@ export function LiveOutputPanel({
 
         <label className="flex items-center gap-2.5">
           {isLive ? (
-            <EyeIcon className="size-3.5 text-primary" />
+            <EyeIcon className="size-3.5 text-emerald-500" />
           ) : (
             <EyeOffIcon className="size-3.5 text-muted-foreground" />
           )}
@@ -162,7 +156,7 @@ export function LiveOutputPanel({
             onCheckedChange={(checked) =>
               useBroadcastStore.getState().setLive(checked)
             }
-            className="data-[state=checked]:bg-primary"
+            className="data-[state=checked]:bg-emerald-500"
           />
         </label>
       </div>
@@ -176,7 +170,7 @@ export function LiveOutputPanel({
           onCheckedChange={(checked) =>
             useBroadcastStore.getState().setReadingModeAutoLive(checked)
           }
-          className="data-[state=checked]:bg-primary"
+          className="data-[state=checked]:bg-emerald-500"
         />
       </div>
 
