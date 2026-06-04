@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 const fetchVerseMock = vi.fn()
 const selectVerseMock = vi.fn()
@@ -45,18 +45,25 @@ vi.mock("@/stores/broadcast-store", () => {
       isLive: false,
       readingModeAutoLive: false,
     })
+  const selectActiveTheme = (state: { themes: Array<{ id: string }>; activeThemeId: string }) =>
+    state.themes.find((theme) => theme.id === state.activeThemeId) ?? state.themes[0] ?? null
   useBroadcastStore.getState = () => ({
     previewItem,
     setPreviewItem: setPreviewItemMock,
     setLiveItem: setLiveItemMock,
     setLive: setLiveMock,
   })
-  return { useBroadcastStore }
+  return { selectActiveTheme, useBroadcastStore }
 })
 
 describe("PreviewPanel", () => {
+  let PreviewPanel: typeof import("./preview-panel").PreviewPanel
   let root: Root | null = null
   let container: HTMLDivElement | null = null
+
+  beforeAll(async () => {
+    ;({ PreviewPanel } = await import("./preview-panel"))
+  })
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -76,7 +83,6 @@ describe("PreviewPanel", () => {
   })
 
   async function renderPanel() {
-    const { PreviewPanel } = await import("./preview-panel")
     container = document.createElement("div")
     document.body.appendChild(container)
     root = createRoot(container)

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
+import { describe, expect, it, vi, beforeEach, afterEach, beforeAll } from "vitest"
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 
@@ -31,17 +31,20 @@ vi.mock("@/stores/broadcast-store", () => {
     selector({
       isLive: broadcastIsLive,
       liveItem: broadcastLiveVerse,
+      previewItem: null,
       readingModeAutoLive: broadcastReadingModeAutoLive,
       themes: [],
       activeThemeId: "",
     })
+  const selectActiveTheme = (state: { themes: Array<{ id: string }>; activeThemeId: string }) =>
+    state.themes.find((theme) => theme.id === state.activeThemeId) ?? state.themes[0] ?? null
   useBroadcastStore.getState = () => ({
     setLive: mockSetLive,
     setLiveItem: mockSetLiveVerse,
     setReadingModeAutoLive: mockSetReadingModeAutoLive,
     setPreviewItem: vi.fn(),
   })
-  return { useBroadcastStore }
+  return { selectActiveTheme, useBroadcastStore }
 })
 
 vi.mock("@/stores/transcript-store", () => ({
@@ -92,8 +95,13 @@ function resetState() {
 }
 
 describe("OperatorStatusStrip emergency controls", () => {
+  let OperatorStatusStrip: typeof import("./operator-status-strip").OperatorStatusStrip
   let root: Root | null = null
   let container: HTMLDivElement | null = null
+
+  beforeAll(async () => {
+    ;({ OperatorStatusStrip } = await import("./operator-status-strip"))
+  })
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -112,7 +120,6 @@ describe("OperatorStatusStrip emergency controls", () => {
   })
 
   async function renderStrip() {
-    const { OperatorStatusStrip } = await import("./operator-status-strip")
     container = document.createElement("div")
     document.body.appendChild(container)
     root = createRoot(container)
@@ -124,7 +131,7 @@ describe("OperatorStatusStrip emergency controls", () => {
   }
 
   function getButtonByTitle(title: string): HTMLButtonElement {
-    const button = document.querySelector<HTMLButtonElement>(
+    const button = container?.querySelector<HTMLButtonElement>(
       `button[title="${title}"]`
     )
     expect(button).toBeTruthy()
