@@ -62,7 +62,7 @@ export function ServiceTimeline({
             <div
               key={item.id}
               className={cn(
-                "rounded-md border border-border/60 bg-card/60",
+                "rounded-md border border-white/[0.08] bg-black/30",
                 isActive && "border-primary/50 bg-primary/5"
               )}
             >
@@ -135,7 +135,7 @@ export function ServiceTimeline({
               </div>
 
               {expanded && (
-                <div className="border-t border-border/40 px-2 py-1.5">
+                <div className="border-t border-white/5 px-2 py-1.5">
                   {item.durationMinutes ? (
                     <div className="mb-1 text-[0.625rem] text-muted-foreground">
                       Duration: {item.durationMinutes} min

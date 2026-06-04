@@ -118,7 +118,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         </PanelHeader>
       )}
 
-      <div className={cn("flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2", isFullscreen && "hidden")}>
+      <div className={cn("flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2", isFullscreen && "hidden")}>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
@@ -161,7 +161,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         </label>
       </div>
 
-      <div className={cn("flex min-h-10 items-center justify-between gap-3 border-b border-border px-4 py-2", isFullscreen && "hidden")}>
+      <div className={cn("flex min-h-10 items-center justify-between gap-3 border-b border-white/5 px-4 py-2", isFullscreen && "hidden")}>
         <span className="truncate text-xs text-muted-foreground">
           Auto-live reading mode
         </span>
@@ -203,7 +203,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className={cn("truncate border-t border-border px-4 py-2 text-xs text-muted-foreground", isFullscreen && "hidden")}>
+      <div className={cn("truncate border-t border-white/5 px-4 py-2 text-xs text-muted-foreground", isFullscreen && "hidden")}>
         {liveItem
           ? liveItem.reference
           : "Nothing has been sent to the live output yet."}

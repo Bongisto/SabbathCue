@@ -322,7 +322,7 @@ function SpeechSection() {
       </div>
 
       {sttProvider === "vosk" && (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+        <div className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/5 p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <HardDriveIcon className="size-3.5 text-muted-foreground" />
@@ -348,7 +348,7 @@ function SpeechSection() {
             </p>
           {!assetsLoading &&
             (!assetStatus?.vosk_model || !assetStatus?.vosk_worker) && (
-              <p className="rounded-md bg-background px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
+              <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
                 C:\Users\fanel\Downloads\vosk-model-small-en-us
               </p>
             )}
@@ -940,7 +940,7 @@ function RemoteControlSection() {
       </div>
 
       {/* Firewall guidance */}
-      <div className="rounded-lg border border-border bg-muted/30 p-3">
+      <div className="rounded-lg border border-white/5 bg-white/5 p-3">
         <p className="mb-1 text-[0.625rem] font-medium text-muted-foreground">
           Firewall Note
         </p>
@@ -967,7 +967,7 @@ function RemoteControlSection() {
             </Button>
           )}
         </div>
-        <div className="h-32 overflow-y-auto rounded-lg border border-border bg-background p-2">
+        <div className="h-32 overflow-y-auto rounded-lg border border-white/5 bg-black/40 p-2">
           {commandLog.length === 0 ? (
             <p className="mt-8 text-center text-[0.625rem] text-muted-foreground">
               No commands received yet
@@ -1012,7 +1012,7 @@ function HelpSection() {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between glass-panel relative rounded-2xl border border-border bg-card p-4">
+        <div className="glass-panel flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <GraduationCapIcon className="size-4 text-primary" />
@@ -1036,9 +1036,9 @@ function HelpSection() {
           </Button>
         </div>
 
-        <div className="flex items-center justify-between glass-panel relative rounded-2xl border border-border bg-card p-4">
+        <div className="glass-panel flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
               <KeyIcon className="size-4 text-muted-foreground" />
             </div>
             <div>
@@ -1100,7 +1100,7 @@ export function SettingsPage() {
   }, [activeSection, pendingScroll, clearPendingScroll])
 
   return (
-    <div className="view-pane flex flex-col gap-5">
+    <div className="view-pane flex flex-col gap-5" data-tour="settings">
       <div className="glass-panel p-5">
         <h2 className="mb-2 text-2xl font-bold text-white">
           Configuration and Hardware Setup

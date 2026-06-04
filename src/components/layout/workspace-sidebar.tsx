@@ -36,6 +36,13 @@ export function WorkspaceSidebar() {
               <button
                 type="button"
                 aria-current={active ? "page" : undefined}
+                data-tour={
+                  item.id === "live-service"
+                    ? "broadcast"
+                    : item.id === "settings"
+                      ? "settings"
+                      : undefined
+                }
                 onClick={() => selectWorkspace(item.id, item.opensPlanner)}
                 className={cn(
                   "nav-item flex w-full cursor-pointer items-center gap-3 px-5 py-3.5 text-left text-xs font-medium decoration-none",

@@ -521,17 +521,6 @@
   }
 }
 
-.dark [data-slot="dialog-overlay"] {
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-}
-
-.dark [data-slot="dialog-content"] {
-  background: linear-gradient(145deg, rgba(13, 20, 38, 0.95), rgba(4, 7, 16, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
-}
-
 .dark .transcript-recording-dot.bg-emerald-500 {
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
 }
@@ -539,90 +528,6 @@
 .dark [data-slot="theme-designer-content"] .glass-panel-header,
 .dark [data-slot="theme-designer-content"] .controller-headboard {
   background: rgba(2, 4, 10, 0.92);
-}
-
-/* Tactile controls */
-.btn-tactile {
-  transition:
-    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 0.2s ease,
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.btn-tactile:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(1.08);
-}
-
-.btn-tactile:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn-tactile:hover:not(:disabled),
-  .btn-tactile:active:not(:disabled) {
-    transform: none;
-    filter: none;
-  }
-}
-
-/* Modal pop */
-@keyframes modal-pop {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.94);
-    filter: blur(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-    filter: blur(0);
-  }
-}
-
-.dark [data-slot="dialog-content"][data-open] {
-  animation: modal-pop 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dark [data-slot="dialog-content"][data-open] {
-    animation: none;
-  }
-}
-
-/* Interactive list rows */
-.dark .interactive-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  border-left: 3px solid transparent;
-  transition:
-    background-color 0.25s ease,
-    border-color 0.25s ease;
-}
-
-.dark .interactive-row:hover {
-  background: rgba(250, 204, 21, 0.04);
-  border-left-color: var(--brand-accent);
-}
-
-/* Thin scrollbars in controller surfaces */
-.scrollbar-controller {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-}
-
-.scrollbar-controller::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scrollbar-controller::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-.scrollbar-controller::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 .dark [data-slot="panel-empty-state"] {

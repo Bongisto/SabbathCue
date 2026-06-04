@@ -1,4 +1,11 @@
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { ServiceItem, ServiceItemKind } from "@/types/service-plan"
 
 const ITEM_KINDS: ServiceItemKind[] = [
@@ -17,7 +24,7 @@ interface ServiceItemBasicFieldsProps {
 
 export function ServiceItemBasicFields({ item, onPatchItem }: ServiceItemBasicFieldsProps) {
   return (
-    <div className="space-y-4 rounded-lg border border-border/80 bg-card/40 p-4">
+    <div className="space-y-4 rounded-lg border border-white/[0.08] bg-black/25 p-4">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <label className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
@@ -29,17 +36,21 @@ export function ServiceItemBasicFields({ item, onPatchItem }: ServiceItemBasicFi
           <label className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">
             Type
           </label>
-          <select
+          <Select
             value={item.kind}
-            onChange={(event) => onPatchItem({ kind: event.target.value as ServiceItemKind })}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            onValueChange={(kind) => onPatchItem({ kind: kind as ServiceItemKind })}
           >
-            {ITEM_KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {kind.replace("_", " ")}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ITEM_KINDS.map((kind) => (
+                <SelectItem key={kind} value={kind}>
+                  {kind.replace("_", " ")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

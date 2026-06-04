@@ -41,11 +41,11 @@ export function HymnWorkspace() {
 
       <div className="min-h-0 flex-1">
         {mode === "library" ? (
-          <Suspense fallback={<div className="h-full glass-panel relative rounded-2xl border border-border bg-card" />}>
+          <Suspense fallback={<div className="glass-panel h-full" />}>
             <LazyHymnalPanel />
           </Suspense>
         ) : (
-          <Suspense fallback={<div className="h-full glass-panel relative rounded-2xl border border-border bg-card" />}>
+          <Suspense fallback={<div className="glass-panel h-full" />}>
             <LazySongSlidesWorkspace />
           </Suspense>
         )}

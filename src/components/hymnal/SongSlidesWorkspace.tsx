@@ -130,7 +130,7 @@ export function SongSlidesWorkspace() {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card"
+      className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-hidden"
       data-slot="song-slides-workspace"
     >
       <PanelHeader title="Song Slides" icon={<ListMusicIcon className="size-3" />}>
@@ -140,8 +140,8 @@ export function SongSlidesWorkspace() {
       </PanelHeader>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,0.8fr)_minmax(320px,1fr)]">
-        <div className="flex min-h-0 flex-col border-r border-border">
-          <div className="space-y-2 border-b border-border p-3">
+        <div className="flex min-h-0 flex-col border-r border-[var(--border-subtle)]">
+          <div className="space-y-2 border-b border-white/5 p-3">
             <label className="text-[0.625rem] font-medium uppercase text-muted-foreground">
               Song title
             </label>
@@ -179,13 +179,13 @@ export function SongSlidesWorkspace() {
                 setActiveIndex(0)
               }}
               spellCheck
-              className="min-h-0 flex-1 resize-none rounded-md border border-input bg-background p-3 text-sm leading-relaxed outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="search-input min-h-0 flex-1 resize-none p-3 text-sm leading-relaxed"
             />
           </div>
         </div>
 
         <div className="flex min-h-0 flex-col">
-          <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-3 py-1.5">
+          <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-white/5 px-3 py-1.5">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{title || "Custom Song"}</p>
               <p className="truncate text-xs text-muted-foreground">
@@ -211,7 +211,7 @@ export function SongSlidesWorkspace() {
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             {activeSlide ? (
               <div className="flex min-h-full flex-col gap-3">
-                <div className="relative flex aspect-video items-center justify-center rounded-md border border-border bg-black p-8 text-center">
+                <div className="relative flex aspect-video items-center justify-center rounded-md border border-white/5 bg-black p-8 text-center">
                   <span className="absolute right-3 top-3 rounded bg-white/10 px-2 py-0.5 text-[0.625rem] font-semibold text-white/80">
                     {activeSlide.slideIndex + 1} of {activeSlide.slideCount}
                   </span>
@@ -232,7 +232,7 @@ export function SongSlidesWorkspace() {
                         "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                         index === activeIndex
                           ? "border-lime-500/50 bg-lime-500/15"
-                          : "border-border hover:bg-muted/50",
+                          : "border-white/5 hover:bg-white/5",
                       )}
                     >
                       <span className="block truncate font-medium">

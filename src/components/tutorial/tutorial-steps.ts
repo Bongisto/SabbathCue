@@ -78,15 +78,15 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="broadcast"]',
     title: "Broadcast",
     content:
-      "Configure NDI output, display windows, and resolution for your production setup.",
-    placement: "bottom",
+      "Open Broadcast Overlays to configure NDI output, display windows, and resolution for your production setup.",
+    placement: "right",
   },
   {
     ...STEP_DEFAULTS,
     target: '[data-tour="theme"]',
     title: "Themes",
     content:
-      "Choose from built-in themes or design your own with the visual editor.",
+      "Pick an accent from the header swatches, or open Theme designer from Broadcast Overlays for full slide styling.",
     placement: "bottom",
   },
   {
@@ -94,7 +94,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="settings"]',
     title: "Settings",
     content:
-      "Configure audio input, Bible translations, display mode, remote control, and API keys.",
-    placement: "bottom",
+      "Open System Settings in the sidebar to configure audio, Bible translations, display mode, remote control, and API keys.",
+    placement: "left",
   },
 ]

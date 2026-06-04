@@ -96,7 +96,7 @@ function NdiSdkStatus({
   onRefresh: () => void
 }) {
   return (
-    <div className="rounded-md border border-border bg-muted/30 p-2">
+    <div className="rounded-md border border-white/5 bg-white/5 p-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">NDI SDK</span>
         <div className="flex items-center gap-1.5">
@@ -115,7 +115,7 @@ function NdiSdkStatus({
         </div>
       </div>
       {!loading && !installed ? (
-        <p className="mt-1.5 rounded bg-background px-2 py-1 font-mono text-[0.625rem] text-muted-foreground">
+        <p className="mt-1.5 rounded bg-black/40 px-2 py-1 font-mono text-[0.625rem] text-muted-foreground">
           bun run download:ndi-sdk
         </p>
       ) : null}
@@ -498,7 +498,7 @@ export function BroadcastSettings({
 
         <div className="grid grid-cols-2 gap-4">
           {/* ── Main Output Card ── */}
-          <div className="glass-panel relative rounded-2xl border border-border bg-card p-4 space-y-4">
+          <div className="glass-panel relative space-y-4 p-4">
             {/* Card header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -553,7 +553,7 @@ export function BroadcastSettings({
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     outputType === "display"
                       ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <MonitorIcon className="size-3.5" />
@@ -565,7 +565,7 @@ export function BroadcastSettings({
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     outputType === "ndi"
                       ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <RadioIcon className="size-3.5" />
@@ -761,7 +761,7 @@ export function BroadcastSettings({
           </div>
 
           {/* ── Alternate Output Card ── */}
-          <div className="glass-panel relative rounded-2xl border border-border bg-card p-4 space-y-4">
+          <div className="glass-panel relative space-y-4 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CastIcon className="size-4 text-muted-foreground" />
@@ -796,7 +796,7 @@ export function BroadcastSettings({
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     altOutputType === "display"
                       ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <MonitorIcon className="size-3.5" />
@@ -808,7 +808,7 @@ export function BroadcastSettings({
                     "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
                     altOutputType === "ndi"
                       ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <RadioIcon className="size-3.5" />

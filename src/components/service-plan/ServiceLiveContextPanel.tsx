@@ -23,7 +23,7 @@ export function ServiceLiveContextPanel() {
 
   return (
     <div
-      className="grid gap-2 border-b border-border bg-muted/20 px-3 py-2 text-xs"
+      className="grid gap-2 border-b border-white/5 bg-black/20 px-3 py-2 text-xs"
       data-slot="service-live-context"
     >
       <div className="flex items-center justify-between gap-2">

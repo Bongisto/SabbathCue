@@ -48,11 +48,11 @@ export function TutorialTooltip({
   return (
     <div
       {...tooltipProps}
-      className="z-[70] w-[340px] overflow-hidden rounded-xl bg-card shadow-2xl shadow-black/25"
+      className="glass-panel z-[70] w-[340px] overflow-hidden shadow-2xl shadow-black/25"
     >
-      <div className="flex items-center gap-2.5 border-b border-border/40 px-4 pb-3 pt-4">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15">
-          <SparklesIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5 border-b border-white/5 px-4 pb-3 pt-4">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-glow)]">
+          <SparklesIcon className="size-3.5 text-[var(--accent)]" />
         </div>
         <h3 className="text-sm font-semibold leading-tight tracking-tight text-foreground">
           {step.title ?? `Step ${index + 1}`}
@@ -65,16 +65,16 @@ export function TutorialTooltip({
         </p>
       </div>
 
-      <div className="space-y-2.5 border-t border-border/40 px-4 py-3">
+      <div className="space-y-2.5 border-t border-white/5 px-4 py-3">
         <div className="flex items-center gap-1">
           {Array.from({ length: size }, (_, i) => (
             <div
               key={i}
               className={`h-1 rounded-full transition-all duration-200 ${
                 i === index
-                  ? "w-3.5 bg-primary"
+                  ? "w-3.5 bg-[var(--accent)]"
                   : i < index
-                    ? "w-1.5 bg-primary/40"
+                    ? "w-1.5 bg-[var(--accent)]/40"
                     : "w-1.5 bg-muted-foreground/20"
               }`}
             />
@@ -87,14 +87,14 @@ export function TutorialTooltip({
         <div className="flex items-center justify-end gap-1.5">
           <button
             {...skipProps}
-            className="mr-auto rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="btn-action mr-auto rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
           >
             Skip
           </button>
           {index > 0 ? (
             <button
               {...backProps}
-              className="inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="btn-action inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
             >
               <ChevronLeftIcon className="size-3" />
               Back
@@ -102,7 +102,7 @@ export function TutorialTooltip({
           ) : null}
           <button
             {...primaryProps}
-            className="rounded-md bg-primary px-3.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="btn-action rounded-md bg-[var(--accent)] px-3.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:brightness-110"
           >
             {isLastStep ? "Done" : "Next"}
           </button>

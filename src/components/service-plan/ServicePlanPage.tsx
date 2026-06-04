@@ -148,7 +148,7 @@ function ServicePlanEditor() {
         </Badge>
       </PanelHeader>
 
-      <div className="border-b border-border px-4 py-3">
+      <div className="border-b border-white/5 px-4 py-3">
         <Input
           value={activePlan.title}
           onChange={(event) => updatePlanTitle(event.target.value)}
@@ -157,8 +157,8 @@ function ServicePlanEditor() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <div className="flex min-h-0 flex-col border-r border-border">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex min-h-0 flex-col border-r border-white/5">
+          <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
             <span className="text-xs font-medium text-muted-foreground">
               Timeline
             </span>
@@ -210,7 +210,7 @@ function ServicePlanEditor() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-white/5 px-4 py-3">
         <Button
           size="sm"
           variant="outline"
@@ -260,7 +260,7 @@ function ServicePlanEditor() {
         )}
       </div>
       {lastReport && (
-        <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+        <div className="border-t border-white/5 px-4 py-3 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Post-service report</div>
           <div>
             {lastReport.completedItems}/{lastReport.totalItems} items completed
@@ -280,7 +280,7 @@ export function ServicePlanSummaryWidget() {
 
   if (summaries.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
+      <div className="rounded-md border border-dashed border-white/5 px-3 py-4 text-xs text-muted-foreground">
         No service plans yet.
       </div>
     )
@@ -292,7 +292,7 @@ export function ServicePlanSummaryWidget() {
         <button
           key={summary.id}
           type="button"
-          className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-xs hover:bg-muted/40"
+          className="flex w-full items-center justify-between rounded-md border border-white/5 px-3 py-2 text-left text-xs hover:bg-white/5"
           onClick={() => void loadPlan(summary.id)}
         >
           <span className="font-medium">{summary.title}</span>
@@ -323,7 +323,7 @@ export function ServicePlanLibraryPanel() {
 
   return (
     <div
-      className="flex min-h-0 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card"
+      className="glass-panel relative flex min-h-0 flex-col overflow-hidden"
       data-slot="service-plan-page"
     >
       <div className="space-y-4 overflow-y-auto p-4">
@@ -480,8 +480,8 @@ export function RunServicePage() {
             </Badge>
           </PanelHeader>
 
-          <div className="grid gap-4 border-b border-border p-4 md:grid-cols-2">
-            <div className="rounded-md border border-border p-3">
+          <div className="grid gap-4 border-b border-white/5 p-4 md:grid-cols-2">
+            <div className="rounded-md border border-white/5 p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Current item
               </div>
@@ -492,7 +492,7 @@ export function RunServicePage() {
                 {activeItemContentLabel(activeItem ?? serviceContext.activeItem)}
               </p>
             </div>
-            <div className="rounded-md border border-border p-3">
+            <div className="rounded-md border border-white/5 p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Up next
               </div>
@@ -506,7 +506,7 @@ export function RunServicePage() {
           </div>
 
           {slideDeck.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-4 py-3">
               <span className="text-xs font-medium text-muted-foreground">
                 Sermon slides
               </span>
@@ -540,7 +540,7 @@ export function RunServicePage() {
           )}
 
           {deck.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-4 py-3">
               <span className="text-xs font-medium text-muted-foreground">
                 Hymn deck
               </span>
@@ -570,7 +570,7 @@ export function RunServicePage() {
           )}
 
           {(presentationDeckKind(previewItem) || presentationDeckKind(liveItem)) && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-4 py-3">
               <span className="text-xs text-muted-foreground">Deck navigation</span>
               {previewItem && presentationDeckKind(previewItem) ? (
                 <PresentationDeckControls
@@ -683,7 +683,7 @@ export function LiveServicePlanPage() {
             </Badge>
           </PanelHeader>
           <div className="grid gap-3 p-3 md:grid-cols-2">
-            <div className="rounded-md border border-border p-3">
+            <div className="rounded-md border border-white/5 p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Active item
               </div>
@@ -695,7 +695,7 @@ export function LiveServicePlanPage() {
                   "Start a service plan to populate this view"}
               </div>
             </div>
-            <div className="rounded-md border border-border p-3">
+            <div className="rounded-md border border-white/5 p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Up next
               </div>
@@ -708,7 +708,7 @@ export function LiveServicePlanPage() {
             </div>
           </div>
           <div className="min-h-0 px-3 pb-3">
-            <div className="max-h-[calc(100vh-560px)] min-h-[180px] overflow-y-auto rounded-md border border-border">
+            <div className="max-h-[calc(100vh-560px)] min-h-[180px] overflow-y-auto rounded-md border border-white/5">
               {orderedItems.length === 0 ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">
                   No service plan is loaded.
@@ -717,7 +717,7 @@ export function LiveServicePlanPage() {
                 orderedItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                    className="flex items-center justify-between gap-3 border-b border-white/5 px-3 py-2 last:border-b-0"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">
@@ -801,7 +801,7 @@ export function LiveHymnPage() {
             </Badge>
           </PanelHeader>
           <div className="grid gap-3 p-3 md:grid-cols-2">
-            <div className="rounded-md border border-border p-3">
+            <div className="rounded-md border border-white/5 p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Current hymn slide
               </div>
@@ -814,7 +814,7 @@ export function LiveHymnPage() {
                   : "Queue hymn slides to populate this page"}
               </div>
             </div>
-            <div className="rounded-md border border-border p-3">
+            <div className="rounded-md border border-white/5 p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Service-plan hymns
               </div>
@@ -834,7 +834,7 @@ export function LiveHymnPage() {
             </div>
           </div>
           <div className="min-h-0 px-3 pb-3">
-            <div className="max-h-[calc(100vh-560px)] min-h-[180px] overflow-y-auto rounded-md border border-border">
+            <div className="max-h-[calc(100vh-560px)] min-h-[180px] overflow-y-auto rounded-md border border-white/5">
               {deck.length === 0 ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">
                   No hymn slide deck is loaded.
@@ -843,7 +843,7 @@ export function LiveHymnPage() {
                 deck.map((slide, index) => (
                   <div
                     key={slide.screenId}
-                    className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 last:border-b-0"
+                    className="flex items-center justify-between gap-3 border-b border-white/5 px-3 py-2 last:border-b-0"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">
@@ -958,7 +958,7 @@ export function SermonSlidesPage() {
             </Badge>
           </PanelHeader>
 
-          <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+          <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">
                 {activeItem?.title ?? "No active service item"}
@@ -1022,7 +1022,7 @@ export function SermonSlidesPage() {
             icon={<FileTextIcon className="size-4" />}
           />
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <div className="mb-4 space-y-2 rounded-md border border-border p-3">
+            <div className="mb-4 space-y-2 rounded-md border border-white/5 p-3">
               <label
                 htmlFor="sermon-slide-service-item"
                 className="text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase"
@@ -1062,7 +1062,7 @@ export function SermonSlidesPage() {
               </Button>
             </div>
             {!activeItem ? (
-              <div className="rounded-md border border-dashed border-border p-4 text-xs text-muted-foreground">
+              <div className="rounded-md border border-dashed border-white/5 p-4 text-xs text-muted-foreground">
                 No active service item. Select an item in the Service Plan to
                 edit slides.
               </div>

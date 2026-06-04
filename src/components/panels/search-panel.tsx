@@ -395,7 +395,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
         "relative flex min-h-0 flex-col overflow-hidden outline-none",
         embedded
           ? "flex-1"
-          : "glass-panel min-h-0 flex-1 rounded-2xl border border-border bg-card",
+          : "glass-panel min-h-0 flex-1",
       )}
       onKeyDown={activeTab === "book" ? handleKeyDown : undefined}
       tabIndex={-1}
@@ -403,7 +403,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
       <PanelHeader title="Search" icon={<SearchIcon className="size-3" />} step={5} />
 
       {/* STICKY: Tab row + search input */}
-      <div className="flex shrink-0 items-center gap-0 border-b border-border min-h-11">
+      <div className="flex min-h-11 shrink-0 items-center gap-0 border-b border-white/5">
         <div className="flex items-center gap-1 px-3 py-1.5">
           
           <button
@@ -413,7 +413,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
               activeTab === "book"
                 ? "border-lime-500/50 bg-lime-500/15 "
-                : "border-border text-muted-foreground hover:text-foreground"
+                : "border-white/5 text-muted-foreground hover:text-foreground"
             )}
           >
             <BookOpenIcon className={cn("size-3.5", activeTab === "book" ? "text-lime-400" : "text-muted-foreground")} />
@@ -429,7 +429,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
               activeTab === "context"
                 ? "border-lime-500/50 bg-lime-500/15"
-                : "border-border bg-background  text-muted-foreground hover:text-foreground"
+                : "border-white/5 bg-black/40  text-muted-foreground hover:text-foreground"
             )}
           >
             <SparklesIcon className={cn("size-3.5", activeTab === "context" ? "text-lime-400" : "text-muted-foreground")} />
@@ -441,7 +441,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
               activeTab === "egw"
                 ? "border-lime-500/50 bg-lime-500/15"
-                : "border-border text-muted-foreground hover:text-foreground"
+                : "border-white/5 text-muted-foreground hover:text-foreground"
             )}
           >
             <BookOpenIcon className={cn("size-3.5", activeTab === "egw" ? "text-lime-400" : "text-muted-foreground")} />
@@ -472,7 +472,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
                 onKeyDown={handleQuickKeyDown}
                 placeholder="Type: J → John 3:16"
                 className={cn(
-                  "h-7 text-xs relative bg-background",
+                  "h-7 text-xs relative bg-black/40",
                   quickSuggestion && quickSuggestion !== quickInput ? "text-transparent" : ""
                 )}
                 style={quickSuggestion && quickSuggestion !== quickInput ? {
@@ -482,7 +482,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
 
               {/* Verse dropdown */}
               {shouldShowVerseDropdown && quickVersesList.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 z-50 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/5 bg-[rgba(2,3,7,0.95)] shadow-lg backdrop-blur-md">
                   <div className="p-1">
                     {quickVersesList.map((verse) => (
                       <button
@@ -566,7 +566,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
         <>
           {/* STICKY: Chapter header */}
 
-          <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2 min-h-9">
+          <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-3 py-2 min-h-9">
             {selectedBook ?
               <h3 className="text-sm font-semibold text-foreground">
                 {selectedBook.name} {chapter}
@@ -611,7 +611,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
                     "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
                     verse.id === effectiveSelectedVerseId
                       ? "border border-lime-500/50 bg-lime-500/10"
-                      : "border border-transparent hover:bg-muted/50"
+                      : "border border-transparent hover:bg-white/5"
                   )}
                 >
                   <span className="w-6 shrink-0 text-right text-sm font-semibold text-primary">
@@ -718,7 +718,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
                     text: result.verse_text,
                   })
                 }}
-                className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-muted/50 relative"
+                className="group flex flex-col cursor-pointer gap-1 rounded-lg p-3 transition-colors hover:bg-white/5 relative"
               >
                 <div className="flex shrink-0 flex-row items-start gap-2">
                   <span className="text-xs font-semibold ">

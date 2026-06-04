@@ -9,7 +9,6 @@ import {
 } from "@/stores/tutorial-store"
 import { TUTORIAL_STEPS } from "./tutorial-steps"
 import { TutorialTooltip } from "./tutorial-tooltip"
-import { useTheme } from "@/components/theme-provider"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 
 export function TutorialOverlay() {
@@ -22,18 +21,16 @@ function DesktopTutorialOverlay() {
   const [isHydrated, setIsHydrated] = useState(false)
   const isRunning = useTutorialStore((s) => s.isRunning)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)
-  const { theme } = useTheme()
-
   const [arrowColor, setArrowColor] = useState<string | undefined>()
 
   useEffect(() => {
     requestAnimationFrame(() => {
-      const cardEl = document.querySelector(".bg-card")
+      const cardEl = document.querySelector(".glass-panel")
       if (cardEl) {
         setArrowColor(getComputedStyle(cardEl).backgroundColor)
       }
     })
-  }, [theme])
+  }, [])
 
   const steps = useMemo(
     () =>

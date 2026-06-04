@@ -198,7 +198,7 @@ export function HymnalPanel() {
     <div
       ref={panelRef}
       data-slot="hymnal-panel"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card"
+      className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-hidden"
       tabIndex={-1}
     >
       <PanelHeader title="SDA Hymnal" icon={<ListMusicIcon className="size-3" />} step={5}>
@@ -208,8 +208,8 @@ export function HymnalPanel() {
       </PanelHeader>
 
       <div className="flex min-h-0 flex-1">
-        <div className="flex w-[300px] shrink-0 flex-col border-r border-border">
-          <div className="border-b border-border p-2">
+        <div className="flex w-[300px] shrink-0 flex-col border-r border-white/5">
+          <div className="border-b border-white/5 p-2">
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -231,7 +231,7 @@ export function HymnalPanel() {
                   "flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[0.625rem] transition-colors",
                   viewMode === "search"
                     ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted/50 text-muted-foreground",
+                    : "hover:bg-white/5 text-muted-foreground",
                 )}
               >
                 <SearchIcon className="size-2.5" />
@@ -246,7 +246,7 @@ export function HymnalPanel() {
                   "flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[0.625rem] transition-colors",
                   viewMode === "recent"
                     ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted/50 text-muted-foreground",
+                    : "hover:bg-white/5 text-muted-foreground",
                 )}
               >
                 <StarIcon className="size-2.5" />
@@ -261,7 +261,7 @@ export function HymnalPanel() {
                   "flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-[0.625rem] transition-colors",
                   viewMode === "favorites"
                     ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted/50 text-muted-foreground",
+                    : "hover:bg-white/5 text-muted-foreground",
                 )}
               >
                 <HeartIcon className="size-2.5" />
@@ -279,7 +279,7 @@ export function HymnalPanel() {
                   "flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors",
                   selectedHymn?.id === result.id
                     ? "bg-lime-500/15 text-foreground"
-                    : "hover:bg-muted/50",
+                    : "hover:bg-white/5",
                 )}
               >
                 <span className="truncate text-xs font-semibold">
@@ -294,10 +294,10 @@ export function HymnalPanel() {
         </div>
 
         <div className="grid min-w-0 flex-1 grid-cols-[minmax(220px,0.8fr)_minmax(280px,1fr)]">
-          <div className="flex min-w-0 flex-col border-r border-border">
+          <div className="flex min-w-0 flex-col border-r border-white/5">
             {selectedHymn ? (
               <>
-                <div className="border-b border-border px-3 py-2">
+                <div className="border-b border-white/5 px-3 py-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">
@@ -329,7 +329,7 @@ export function HymnalPanel() {
                     {selectedHymn.sections.map((section) => (
                       <label
                         key={section.id}
-                        className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+                        className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 hover:bg-white/5"
                       >
                         <input
                           type="checkbox"
@@ -350,7 +350,7 @@ export function HymnalPanel() {
                       </label>
                     ))}
                   </div>
-                  <div className="mt-2 flex gap-1 border-t border-border pt-2">
+                  <div className="mt-2 flex gap-1 border-t border-white/5 pt-2">
                     <Button
                       size="xs"
                       variant="ghost"
@@ -403,7 +403,7 @@ export function HymnalPanel() {
           </div>
 
           <div className="flex min-w-0 flex-col">
-            <div className="grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-border px-3 py-1.5">
+            <div className="grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-white/5 px-3 py-1.5">
               <div className="flex items-center gap-1">
                 <Button
                   size="icon-xs"
@@ -451,7 +451,7 @@ export function HymnalPanel() {
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
               {activeScreen ? (
                 <div className="flex min-h-full flex-col gap-3">
-                  <div className="flex aspect-video items-center justify-center rounded-md border border-border bg-black p-8 text-center">
+                  <div className="flex aspect-video items-center justify-center rounded-md border border-white/5 bg-black p-8 text-center">
                     <div className="max-w-[80%] space-y-3 text-balance text-2xl font-semibold leading-snug text-white">
                       {activeScreen.lines.map((line) => (
                         <p key={line}>{line}</p>
@@ -468,7 +468,7 @@ export function HymnalPanel() {
                           "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                           index === activeScreenIndex
                             ? "border-lime-500/50 bg-lime-500/15"
-                            : "border-border hover:bg-muted/50",
+                            : "border-white/5 hover:bg-white/5",
                         )}
                       >
                         <span className="block truncate font-medium">

@@ -22,7 +22,7 @@ const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }>
 }
 
 function SourceBadge({ source }: { source: string }) {
-  const style = SOURCE_COLORS[source] ?? { bg: "bg-muted", text: "text-muted-foreground", label: source }
+  const style = SOURCE_COLORS[source] ?? { bg: "bg-white/10", text: "text-muted-foreground", label: source }
   return (
     <span className={`rounded px-1.5 py-0.5 text-[0.5625rem] font-medium uppercase tracking-wider ${style.bg} ${style.text}`}>
       {style.label}
@@ -42,7 +42,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   }
 
   return (
-    <div className="interactive-row border-b border-border p-3 last:border-0">
+    <div className="queue-item p-3 last:border-0">
       <div className="flex items-center gap-2">
         <ConfidenceDot confidence={detection.confidence} />
         <span className="text-xs font-medium text-muted-foreground">
@@ -128,7 +128,7 @@ export function DetectionsPanel({ className }: { className?: string }) {
       <PanelHeader title="Recent detections" icon={<RadarIcon className="size-3" />} step={6}>
         <div className="flex items-center gap-2">
           <span
-            className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[0.5625rem] uppercase text-muted-foreground"
+            className="inline-flex items-center gap-1 rounded border border-white/5 px-1.5 py-0.5 text-[0.5625rem] uppercase text-muted-foreground"
             title="Semantic detections remain visible from 42%; the threshold controls automatic output only."
           >
             <BrainCircuitIcon className="size-2.5" />

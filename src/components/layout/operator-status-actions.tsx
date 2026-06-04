@@ -74,7 +74,7 @@ export function OperatorStatusActions({
 
   const stripActionClass = (enabled: boolean, tone: "amber" | "emerald" | "red") =>
     cn(
-      "btn-tactile flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
+      "btn-action flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
       enabled
         ? tone === "emerald"
           ? "text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400"
@@ -141,7 +141,7 @@ export function OperatorStatusActions({
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="chrome" size="xs" className="btn-tactile gap-1 font-mono text-[10px] uppercase">
+          <Button variant="chrome" size="xs" className="btn-action gap-1 font-mono text-[10px] uppercase">
             <MoreHorizontalIcon className="size-3.5" />
             Actions
           </Button>

@@ -83,7 +83,7 @@ export function PreviewPanel({ className }: { className?: string }) {
         </Badge>
       </PanelHeader>
 
-      <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2">
+      <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground">
             {previewItem?.reference ?? "No item selected"}

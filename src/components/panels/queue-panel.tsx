@@ -109,7 +109,7 @@ function QueueItemRow({
           ? "animate-pulse border border-amber-500/40 bg-amber-500/15"
           : isActive
             ? "border border-primary/30 bg-primary/10"
-            : "hover:bg-muted/50"
+            : "hover:bg-white/5"
       )}
     >
       <GripVerticalIcon

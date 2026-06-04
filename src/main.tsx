@@ -4,7 +4,6 @@ import { createRoot } from "react-dom/client"
 import "./index.css"
 import App from "./App.tsx"
 import { ErrorBoundary } from "@/components/error-boundary.tsx"
-import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { TooltipProvider } from "@/components/ui/tooltip.tsx"
 import { hydrateSettings } from "@/stores/settings-store"
 import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
@@ -12,6 +11,14 @@ import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
 import { hydrateServicePlans } from "@/stores/service-plan-store"
 import { useAccentThemeStore } from "@/stores/accent-theme-store"
 import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
+
+function ensureControllerDarkShell() {
+  const root = document.documentElement
+  root.classList.remove("light")
+  root.classList.add("dark")
+}
+
+ensureControllerDarkShell()
 
 // Webview reloads do NOT restart the Rust backend, so any STT pipeline
 // left running from the previous webview session still has
@@ -39,13 +46,11 @@ resetTranscription
   .finally(() => {
     createRoot(document.getElementById("root")!).render(
       <StrictMode>
-        <ThemeProvider defaultTheme="dark">
-          <TooltipProvider>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-          </TooltipProvider>
-        </ThemeProvider>
+        <TooltipProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </TooltipProvider>
       </StrictMode>
     )
   })

@@ -78,7 +78,10 @@ export function AppControllerHeader() {
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 p-1">
+        <div
+          className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 p-1"
+          data-tour="theme"
+        >
           <span className="hidden px-2 font-mono text-[10px] font-bold uppercase text-slate-400 sm:inline">
             Theme:
           </span>
