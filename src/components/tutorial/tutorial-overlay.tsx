@@ -10,6 +10,7 @@ import {
 import { TUTORIAL_STEPS } from "./tutorial-steps"
 import { TutorialTooltip } from "./tutorial-tooltip"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
+import { getTutorialArrowColor } from "./tutorial-arrow-color"
 
 export function TutorialOverlay() {
   if (!isTauriRuntime()) return null
@@ -27,7 +28,7 @@ function DesktopTutorialOverlay() {
     requestAnimationFrame(() => {
       const cardEl = document.querySelector(".glass-panel")
       if (cardEl) {
-        setArrowColor(getComputedStyle(cardEl).backgroundColor)
+        setArrowColor(getTutorialArrowColor(getComputedStyle(cardEl)))
       }
     })
   }, [])
