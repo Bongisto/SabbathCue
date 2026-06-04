@@ -268,7 +268,7 @@ export function DesignCanvas() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/40 px-3" style={{ background: "#18181b" }}>
+      <div className="glass-panel-header flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.06] px-3">
         <Button variant="ghost" size="icon-xs" className="text-muted-foreground">
           <MousePointer2Icon className="size-3.5" />
         </Button>
@@ -298,14 +298,14 @@ export function DesignCanvas() {
       <div ref={containerRef} className="relative min-h-0 flex-1">
         <canvas ref={canvasElRef} />
         {!draftTheme && (
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "#18181b" }}>
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-base,#18181b)]">
             <p className="text-xs text-muted-foreground">Select a theme to begin editing</p>
           </div>
         )}
       </div>
 
       {/* Status bar */}
-      <div className="flex h-8 shrink-0 items-center border-t border-border/40 px-3 text-[0.5625rem] text-muted-foreground/70" style={{ background: "#18181b" }}>
+      <div className="glass-panel-header flex h-8 shrink-0 items-center border-t border-white/[0.06] px-3 text-[0.5625rem] text-muted-foreground/70">
         <span>Output: {WS_WIDTH} × {WS_HEIGHT}px</span>
         <span className="mx-2">·</span>
         <span>Zoom: {zoomLevel}%</span>

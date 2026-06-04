@@ -391,7 +391,7 @@ export function SearchPanel() {
     <div
       ref={panelRef}
       data-slot="search-panel"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card outline-none"
+      className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card outline-none"
       onKeyDown={activeTab === "book" ? handleKeyDown : undefined}
       tabIndex={-1}
     >

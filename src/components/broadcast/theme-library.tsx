@@ -230,7 +230,7 @@ export function ThemeLibrary() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden border-r border-border bg-card">
+    <div className="controller-sidebar flex h-full min-h-0 flex-col overflow-hidden border-r border-white/[0.06] bg-card/80">
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-3">
         <span className="text-lg font-semibold text-foreground">Themes</span>

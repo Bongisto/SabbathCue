@@ -127,14 +127,19 @@
 }
 
 .dark {
-    --background: oklch(0.141 0.005 285.823);
+    --brand-accent: #eab308;
+    --brand-accent-glow: rgba(234, 179, 8, 0.22);
+    --brand-border: rgba(234, 179, 8, 0.4);
+    --bg-deep: #03050a;
+    --bg-base: #060914;
+    --background: oklch(0.12 0.02 265);
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.21 0.006 285.885);
+    --card: oklch(0.18 0.025 265 / 0.72);
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.21 0.006 285.885);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.453 0.124 130.933);
-    --primary-foreground: oklch(0.986 0.031 120.757);
+    --primary: oklch(0.78 0.16 95);
+    --primary-foreground: oklch(0.18 0.04 95);
     --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.274 0.006 286.033);
@@ -152,7 +157,7 @@
     --chart-5: oklch(0.453 0.124 130.933);
     --sidebar: oklch(0.21 0.006 285.885);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.768 0.233 130.85);
+    --sidebar-primary: oklch(0.78 0.16 95);
     --sidebar-primary-foreground: oklch(0.274 0.072 132.109);
     --sidebar-accent: oklch(0.274 0.006 286.033);
     --sidebar-accent-foreground: oklch(0.985 0 0);
@@ -184,4 +189,143 @@
 /* Smooth spotlight morph between tutorial steps */
 #react-joyride-portal .react-joyride__spotlight {
   transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease;
+}
+
+/* ── SabbathCue gold-glass controller shell (dark) ── */
+.dark body {
+  background-color: var(--bg-deep);
+}
+
+.dark body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 85% 20%, rgba(253, 224, 71, 0.18) 0%, transparent 55%),
+    radial-gradient(circle at 45% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+}
+
+.dark .app-controller-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.dark .controller-headboard {
+  background: rgba(2, 4, 10, 0.9);
+}
+
+.dark .controller-sidebar {
+  background: rgba(3, 5, 11, 0.82);
+}
+
+.dark .controller-status-strip {
+  background: rgba(2, 6, 23, 0.82);
+}
+
+.dark .controller-nav-item.active,
+.dark .controller-nav-item[aria-current="page"] {
+  background: linear-gradient(90deg, var(--brand-accent-glow), transparent);
+  box-shadow: inset 6px 0 16px -4px var(--brand-accent-glow);
+}
+
+.dark .controller-nav-item:not([aria-current="page"]):hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(2px);
+}
+
+.dark .glass-panel {
+  background: linear-gradient(145deg, rgba(13, 20, 38, 0.65), rgba(4, 7, 16, 0.92));
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.85);
+}
+
+.dark .glass-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dark .glass-panel-header {
+  background: rgba(3, 5, 11, 0.72);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dark .live-glowing-active {
+  border-color: var(--brand-accent) !important;
+  box-shadow: 0 0 25px var(--brand-accent-glow);
+  animation: slide-pulse 4s ease-in-out infinite;
+}
+
+@keyframes slide-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.002);
+    opacity: 0.97;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.view-pane-enter {
+  animation: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-pane-enter,
+  .dark .live-glowing-active {
+    animation: none;
+  }
+  .dark .controller-nav-item:not([aria-current="page"]):hover {
+    transform: none;
+  }
+}
+
+.dark [data-slot="dialog-overlay"] {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.dark [data-slot="dialog-content"] {
+  background: linear-gradient(145deg, rgba(13, 20, 38, 0.95), rgba(4, 7, 16, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+}
+
+.dark .transcript-recording-dot.bg-emerald-500 {
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
+}
+
+.dark [data-slot="theme-designer-content"] .glass-panel-header,
+.dark [data-slot="theme-designer-content"] .controller-headboard {
+  background: rgba(2, 4, 10, 0.92);
 }

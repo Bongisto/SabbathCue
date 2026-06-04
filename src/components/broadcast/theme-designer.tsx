@@ -39,10 +39,14 @@ export function ThemeDesigner() {
       }
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Overlay
+          data-slot="dialog-overlay"
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        />
 
         <DialogPrimitive.Content
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background text-foreground outline-none"
+          data-slot="theme-designer-content"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background text-foreground outline-none dark:bg-[var(--bg-deep)]"
           aria-describedby={undefined}
         >
           <DialogPrimitive.Title className="sr-only">
@@ -50,8 +54,8 @@ export function ThemeDesigner() {
           </DialogPrimitive.Title>
 
           {/* Top bar */}
-          <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 bg-card">
-            <span className="text-xl font-semibold text-foreground">
+          <div className="controller-headboard flex h-14 shrink-0 items-center gap-3 border-b border-white/[0.06] px-5">
+            <span className="font-serif text-lg tracking-wide text-foreground">
               Theme Designer
             </span>
 

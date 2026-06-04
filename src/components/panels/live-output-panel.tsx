@@ -85,8 +85,8 @@ export function LiveOutputPanel() {
       ref={panelRef}
       data-slot="live-output-panel"
       className={cn(
-        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card",
-        isLive && "shadow-[inset_0_2px_0_0_rgba(16,185,129,0.35)]",
+        "glass-panel relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card",
+        isLive && "live-glowing-active shadow-[inset_0_2px_0_0_rgba(16,185,129,0.35)]",
         isFullscreen && "!rounded-none !border-0 !h-screen !w-screen",
       )}
     >

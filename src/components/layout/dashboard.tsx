@@ -7,9 +7,10 @@ import {
   Suspense,
   type PointerEvent as ReactPointerEvent,
 } from "react"
-import { Button } from "@/components/ui/button"
-import { TransportBar } from "@/components/controls/transport-bar"
+import { AppControllerHeader } from "@/components/layout/app-controller-header"
+import { LiveLayoutToolbar } from "@/components/layout/live-layout-toolbar"
 import { OperatorStatusStrip } from "@/components/layout/operator-status-strip"
+import { WorkspaceSidebar } from "@/components/layout/workspace-sidebar"
 import { TranscriptPanel } from "@/components/panels/transcript-panel"
 import { PreviewPanel } from "@/components/panels/preview-panel"
 import { LiveOutputPanel } from "@/components/panels/live-output-panel"
@@ -81,8 +82,8 @@ export function ResizeHandle({
       onPointerDown={onPointerDown}
       className={
         axis === "x"
-          ? "relative cursor-col-resize rounded-sm bg-border/40 transition-colors after:absolute after:inset-y-1 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-muted-foreground/40 hover:bg-primary/50"
-          : "relative cursor-row-resize rounded-sm bg-border/40 transition-colors after:absolute after:top-1/2 after:right-1 after:left-1 after:h-px after:-translate-y-1/2 after:bg-muted-foreground/40 hover:bg-primary/50"
+          ? "relative cursor-col-resize rounded-sm bg-border/40 transition-colors after:absolute after:inset-y-1 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-muted-foreground/40 hover:bg-[var(--brand-accent)]/30 dark:hover:bg-[var(--brand-accent-glow)]"
+          : "relative cursor-row-resize rounded-sm bg-border/40 transition-colors after:absolute after:top-1/2 after:right-1 after:left-1 after:h-px after:-translate-y-1/2 after:bg-muted-foreground/40 hover:bg-[var(--brand-accent)]/30 dark:hover:bg-[var(--brand-accent-glow)]"
       }
     />
   )
@@ -96,8 +97,6 @@ export function Dashboard() {
   const workspace = useDashboardWorkspaceStore((s) => s.workspace)
   const setWorkspace = useDashboardWorkspaceStore((s) => s.setWorkspace)
   const plannerOpen = useServicePlanStore((s) => s.plannerOpen)
-  const openPlanner = useServicePlanStore((s) => s.openPlanner)
-  const closePlanner = useServicePlanStore((s) => s.closePlanner)
   const [layout, setLayout] = useState(loadDashboardLayoutState)
   const isCompact = windowWidth < 1400
   const viewMode = layout.viewMode
@@ -231,184 +230,60 @@ export function Dashboard() {
     [detectionsWidth]
   )
 
-  return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-background">
-      <TransportBar />
-      <OperatorStatusStrip />
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card/70 px-4 py-2">
-        <Button
-          size="xs"
-          variant={workspace === "live" ? "default" : "outline"}
-          aria-pressed={workspace === "live"}
-          onClick={() => {
-            closePlanner()
-            setWorkspace("live")
-          }}
-        >
-          Live
-        </Button>
-        <Button
-          size="xs"
-          variant={workspace === "run-service" ? "default" : "outline"}
-          aria-pressed={workspace === "run-service"}
-          onClick={() => {
-            closePlanner()
-            setWorkspace("run-service")
-          }}
-        >
-          Run Service
-        </Button>
-        <Button
-          size="xs"
-          variant={workspace === "service-plans" ? "default" : "outline"}
-          aria-pressed={workspace === "service-plans"}
-          onClick={() => {
-            setWorkspace("service-plans")
-            openPlanner()
-          }}
-        >
-          Service Plans
-        </Button>
-        <Button
-          size="xs"
-          variant={workspace === "live-service" ? "default" : "outline"}
-          aria-pressed={workspace === "live-service"}
-          onClick={() => {
-            closePlanner()
-            setWorkspace("live-service")
-          }}
-        >
-          Live Service
-        </Button>
-        <Button
-          size="xs"
-          variant={workspace === "hymns" ? "default" : "outline"}
-          aria-pressed={workspace === "hymns"}
-          onClick={() => {
-            closePlanner()
-            setWorkspace("hymns")
-          }}
-        >
-          Hymns
-        </Button>
-        <Button
-          size="xs"
-          variant={workspace === "live-hymns" ? "default" : "outline"}
-          aria-pressed={workspace === "live-hymns"}
-          onClick={() => {
-            closePlanner()
-            setWorkspace("live-hymns")
-          }}
-        >
-          Live Hymns
-        </Button>
-        <Button
-          size="xs"
-          variant={workspace === "sermon-slides" ? "default" : "outline"}
-          aria-pressed={workspace === "sermon-slides"}
-          onClick={() => {
-            closePlanner()
-            setWorkspace("sermon-slides")
-          }}
-        >
-          Sermon Slides
-        </Button>
-
-        {workspace === "live" && (
-          <>
-            <div className="mx-1 h-5 w-px bg-border" />
-            {(["balanced", "broadcast", "study"] as const).map((mode) => (
-              <Button
-                key={mode}
-                size="xs"
-                variant={viewMode === mode ? "default" : "outline"}
-                onClick={() => applyViewMode(mode)}
-                className="capitalize"
-              >
-                {mode}
-              </Button>
-            ))}
-            <span className="ml-1 text-xs text-muted-foreground">
-              Drag labeled dividers to resize panels
-            </span>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={resetLayout}
-              className="ml-auto"
-            >
-              Reset layout
-            </Button>
-          </>
-        )}
-      </div>
-
-      {workspace === "service-plans" ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full rounded-lg border border-border bg-card" />
-            }
-          >
-            <LazyServicePlanWorkspace />
-          </Suspense>
-        </div>
-      ) : workspace === "hymns" ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full rounded-lg border border-border bg-card" />
-            }
-          >
-            <LazyHymnWorkspace />
-          </Suspense>
-        </div>
-      ) : workspace === "run-service" ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full rounded-lg border border-border bg-card" />
-            }
-          >
-            <LazyRunServicePage />
-          </Suspense>
-        </div>
-      ) : workspace === "live-service" ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full rounded-lg border border-border bg-card" />
-            }
-          >
-            <LazyLiveServicePlanPage />
-          </Suspense>
-        </div>
-      ) : workspace === "live-hymns" ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full rounded-lg border border-border bg-card" />
-            }
-          >
-            <LazyLiveHymnPage />
-          </Suspense>
-        </div>
-      ) : workspace === "sermon-slides" ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense
-            fallback={
-              <div className="h-full rounded-lg border border-border bg-card" />
-            }
-          >
-            <LazySermonSlidesPage />
-          </Suspense>
-        </div>
-      ) : (
-        <div
-          ref={contentRef}
-          className="flex min-h-0 flex-1 flex-col gap-3 p-4"
-        >
+  const workspaceContent =
+    workspace === "service-plans" ? (
+      <Suspense
+        fallback={
+          <div className="glass-panel h-full rounded-2xl border border-border bg-card" />
+        }
+      >
+        <LazyServicePlanWorkspace />
+      </Suspense>
+    ) : workspace === "hymns" ? (
+      <Suspense
+        fallback={
+          <div className="glass-panel h-full rounded-2xl border border-border bg-card" />
+        }
+      >
+        <LazyHymnWorkspace />
+      </Suspense>
+    ) : workspace === "run-service" ? (
+      <Suspense
+        fallback={
+          <div className="glass-panel h-full rounded-2xl border border-border bg-card" />
+        }
+      >
+        <LazyRunServicePage />
+      </Suspense>
+    ) : workspace === "live-service" ? (
+      <Suspense
+        fallback={
+          <div className="glass-panel h-full rounded-2xl border border-border bg-card" />
+        }
+      >
+        <LazyLiveServicePlanPage />
+      </Suspense>
+    ) : workspace === "live-hymns" ? (
+      <Suspense
+        fallback={
+          <div className="glass-panel h-full rounded-2xl border border-border bg-card" />
+        }
+      >
+        <LazyLiveHymnPage />
+      </Suspense>
+    ) : workspace === "sermon-slides" ? (
+      <Suspense
+        fallback={
+          <div className="glass-panel h-full rounded-2xl border border-border bg-card" />
+        }
+      >
+        <LazySermonSlidesPage />
+      </Suspense>
+    ) : (
+      <div
+        ref={contentRef}
+        className="flex min-h-0 flex-1 flex-col gap-3"
+      >
           <div
             className="grid min-h-0 gap-3 *:min-h-0"
             style={{
@@ -473,7 +348,34 @@ export function Dashboard() {
             <DetectionsPanel />
           </div>
         </div>
-      )}
+    )
+
+  return (
+    <div className="app-controller-shell fixed inset-0 flex flex-col overflow-hidden bg-background">
+      <AppControllerHeader />
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <WorkspaceSidebar />
+
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <OperatorStatusStrip />
+
+          {workspace === "live" && (
+            <LiveLayoutToolbar
+              viewMode={viewMode}
+              onViewModeChange={applyViewMode}
+              onResetLayout={resetLayout}
+            />
+          )}
+
+          <div
+            key={workspace}
+            className="view-pane-enter flex min-h-0 flex-1 flex-col overflow-hidden p-4"
+          >
+            {workspaceContent}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

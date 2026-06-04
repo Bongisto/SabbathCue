@@ -130,7 +130,7 @@ export function SongSlidesWorkspace() {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card"
       data-slot="song-slides-workspace"
     >
       <PanelHeader title="Song Slides" icon={<ListMusicIcon className="size-3" />}>

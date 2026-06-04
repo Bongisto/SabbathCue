@@ -198,7 +198,7 @@ export function HymnalPanel() {
     <div
       ref={panelRef}
       data-slot="hymnal-panel"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card"
       tabIndex={-1}
     >
       <PanelHeader title="SDA Hymnal" icon={<ListMusicIcon className="size-3" />} step={5}>

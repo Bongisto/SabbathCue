@@ -486,7 +486,7 @@ export function BroadcastSettings({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[700px] gap-4"
+        className="gap-4 sm:max-w-[700px] dark:max-h-[85vh] dark:overflow-y-auto"
         showCloseButton={true}
       >
         <DialogHeader>
@@ -498,7 +498,7 @@ export function BroadcastSettings({
 
         <div className="grid grid-cols-2 gap-4">
           {/* ── Main Output Card ── */}
-          <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+          <div className="glass-panel relative rounded-2xl border border-border bg-card p-4 space-y-4">
             {/* Card header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -761,7 +761,7 @@ export function BroadcastSettings({
           </div>
 
           {/* ── Alternate Output Card ── */}
-          <div className="rounded-lg border border-border bg-card p-4 space-y-4">
+          <div className="glass-panel relative rounded-2xl border border-border bg-card p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CastIcon className="size-4 text-muted-foreground" />

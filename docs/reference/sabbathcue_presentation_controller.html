@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SabbathCue — Premium Live Presentation Suite</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500;600&family=DM+Serif+Display&family=Source+Sans+3:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['DM Serif Display', 'serif'],
+                        body: ['Source Sans 3', 'sans-serif'],
+                        mono: ['DM Mono', 'monospace'],
+                    },
+                    boxShadow: {
+                        'neon-gold': '0 0 35px rgba(250, 204, 21, 0.25)',
+                        'neon-emerald': '0 0 35px rgba(16, 185, 129, 0.2)',
+                        'neon-blue': '0 0 35px rgba(56, 189, 248, 0.2)',
+                        'neon-purple': '0 0 35px rgba(167, 139, 250, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        :root {
+            /* Theme Accent Colors (Bright Yellow/Gold Base) */
+            --accent: #facc15;
+            --accent-glow: rgba(250, 204, 21, 0.18);
+            --accent-border: rgba(250, 204, 21, 0.35);
+            --accent-dark: #ca8a04;
+            
+            /* Glassmorphic Base Colors */
+            --bg-deep: #03050a;
+            --bg-base: #060914;
+            --bg-surface: rgba(13, 19, 36, 0.65);
+            --bg-elevated: rgba(24, 34, 59, 0.75);
+            --border-subtle: rgba(255, 255, 255, 0.05);
+            --border-dim: rgba(255, 255, 255, 0.12);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
+        /* Gold/Bright Yellow Theme Classes */
+        .theme-gold {
+            --accent: #eab308;
+            --accent-glow: rgba(234, 179, 8, 0.25);
+            --accent-border: rgba(234, 179, 8, 0.45);
+            --accent-dark: #a16207;
+        }
+
+        /* Emerald Theme Classes */
+        .theme-emerald {
+            --accent: #10b981;
+            --accent-glow: rgba(16, 185, 129, 0.2);
+            --accent-border: rgba(16, 185, 129, 0.4);
+            --accent-dark: #047857;
+        }
+
+        /* Royal Purple Theme Classes */
+        .theme-purple {
+            --accent: #a78bfa;
+            --accent-glow: rgba(167, 139, 250, 0.2);
+            --accent-border: rgba(167, 139, 250, 0.4);
+            --accent-dark: #6d28d9;
+        }
+
+        /* Midnight Aurora Theme Classes */
+        .theme-aurora {
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.2);
+            --accent-border: rgba(56, 189, 248, 0.4);
+            --accent-dark: #0369a1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'Source Sans 3', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            transition: background 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Ambient neon blending lights including high density bright yellow background node */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 45%),
+                radial-gradient(circle at 85% 20%, rgba(253, 224, 71, 0.25) 0%, transparent 55%), /* Vibrant Bright Yellow Node */
+                radial-gradient(circle at 45% 85%, rgba(16, 185, 129, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 95% 75%, rgba(168, 85, 247, 0.15) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+            transition: all 0.8s ease-in-out;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.85;
+        }
+
+        .app-shell { position: relative; z-index: 10; height: 100vh; display: flex; flex-direction: column; }
+
+        /* Modern Glass panels with micro interactive spring properties */
+        .glass-panel {
+            background: linear-gradient(145deg, rgba(13, 20, 38, 0.65), rgba(4, 7, 16, 0.9));
+            backdrop-filter: blur(28px) saturate(1.6);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.85);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 35px -6px rgba(0, 0, 0, 0.95);
+        }
+
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+            z-index: 2;
+        }
+
+        .panel-header {
+            background: rgba(3, 5, 11, 0.7);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Nav mechanics with active elastic slide effects */
+        .nav-item {
+            border-left: 4px solid transparent;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+        }
+        .nav-item.active {
+            background: linear-gradient(90deg, var(--accent-glow), transparent);
+            border-left-color: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            box-shadow: inset 6px 0 16px -4px var(--accent-glow);
+        }
+        .nav-item:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            transform: translateX(4px);
+        }
+
+        /* Buttons with tactile haptic physics */
+        .btn-action {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Source Sans 3', sans-serif;
+            font-weight: 500;
+        }
+        .btn-action:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.15);
+        }
+        .btn-action:active { transform: translateY(1px); }
+
+        .btn-tab {
+            font-family: 'Source Sans 3', sans-serif;
+            font-weight: 600;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-tab.active {
+            background: var(--accent-glow);
+            color: var(--accent);
+            border-color: var(--accent-border);
+        }
+
+        /* Beautiful Queue item transitions */
+        .queue-item {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .queue-item:hover { 
+            background: rgba(250, 204, 21, 0.04);
+            border-left: 4px solid var(--accent);
+            padding-left: 20px !important;
+        }
+
+        /* Responsive text inputs */
+        .search-input {
+            background: rgba(2, 3, 7, 0.85);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            font-family: 'Source Sans 3', sans-serif;
+            color: var(--text-primary);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-border);
+            box-shadow: 0 0 20px var(--accent-glow);
+            background: rgba(2, 3, 7, 0.95);
+        }
+
+        /* Scrollbars custom styling */
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* High-fidelity transition Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(16px); filter: blur(6px); }
+            to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        .view-pane {
+            animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Smooth interactive monitor refresh animations */
+        @keyframes slidePulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.005); opacity: 0.97; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .slide-frame {
+            background: linear-gradient(135deg, rgba(11,18,36,0.95), rgba(19,30,58,0.85));
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .live-glowing-active {
+            border: 1.5px solid var(--accent) !important;
+            box-shadow: 0 0 25px var(--accent-glow);
+            animation: slidePulse 4s infinite ease-in-out;
+        }
+
+        /* Modal pop physics */
+        @keyframes modalPop {
+            from { transform: scale(0.92); opacity: 0; filter: blur(4px); }
+            to { transform: scale(1); opacity: 1; filter: blur(0); }
+        }
+        .modal-body-anim {
+            animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        /* Live signal indicator ping animations */
+        @keyframes pingGlow {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .live-ping-button {
+            animation: pingGlow 2s infinite;
+        }
+    </style>
+</head>
+<body class="theme-gold" id="bodyThemeContainer">
+<div class="app-shell">
+
+    <!-- ══════════ STREAMING_CHUNK:Structuring layout with glowing ambient backdrops... ══════════ -->
+    <!-- ── SYSTEM HEADBOARD BAR ── -->
+    <header class="h-[56px] border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between px-6 shrink-0 z-50 backdrop-blur-xl bg-[#02040a]/90">
+        <div class="flex items-center gap-5">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:rotate-12 transition-transform duration-300">
+                    <svg width="18" height="18" fill="none" stroke="#000" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-display text-xl text-white tracking-wide leading-none">SabbathCue</span>
+                    <span class="text-[9px] text-slate-500 font-mono tracking-wider uppercase mt-0.5">Automated Presentation Space</span>
+                </div>
+                <span class="font-mono text-[9px] text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 rounded-md px-2 py-0.5 uppercase font-semibold ml-2 tracking-wider">PREMIUM V1.4</span>
+            </div>
+        </div>
+
+        <!-- Dynamic parameters & running clocks -->
+        <div class="hidden md:flex items-center gap-6 text-sm text-slate-400 font-mono">
+            <div class="flex items-center gap-2 bg-slate-900/50 border border-white/5 rounded-lg px-3 py-1 text-xs">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>DESKTOP CORE: ACTIVE</span>
+            </div>
+            <div id="topBarClock" class="text-slate-100 font-semibold tracking-wider bg-slate-950/60 border border-white/5 rounded-lg px-3 py-1 text-xs">
+                00:00:00 AM
+            </div>
+        </div>
+
+        <!-- Visual Core Theme Switcher -->
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5 bg-slate-900/60 border border-white/5 p-1 rounded-lg">
+                <span class="text-[10px] text-slate-400 uppercase font-mono font-bold px-2 hidden sm:inline">Theme:</span>
+                <button onclick="switchTheme('gold')" class="w-4.5 h-4.5 rounded-md bg-yellow-400 border border-white/10 hover:scale-125 transition-all" title="Sunrise Gold"></button>
+                <button onclick="switchTheme('emerald')" class="w-4.5 h-4.5 rounded-md bg-emerald-500 border border-white/10 hover:scale-125 transition-all" title="Emerald Sanctuary"></button>
+                <button onclick="switchTheme('purple')" class="w-4.5 h-4.5 rounded-md bg-purple-400 border border-white/10 hover:scale-125 transition-all" title="Royal Amethyst"></button>
+                <button onclick="switchTheme('aurora')" class="w-4.5 h-4.5 rounded-md bg-sky-400 border border-white/10 hover:scale-125 transition-all" title="Midnight Aurora"></button>
+            </div>
+            <button onclick="clearActiveLive()" class="btn-action bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-red-300 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span>Blackout Output</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ══════════ APP WORKSPACE SHELL ══════════ -->
+    <div class="flex flex-1 overflow-hidden">
+
+        <!-- ══════════ SIDEBAR NAVIGATION ══════════ -->
+        <aside class="w-[210px] bg-[#03050b]/80 border-r border-[rgba(255,255,255,0.06)] flex flex-shrink-0 flex-col justify-between backdrop-blur-md">
+            <nav class="flex-1 py-4 flex flex-col gap-1">
+                <a href="#" id="nav-live" onclick="changeView('live', this)" class="nav-item active flex items-center gap-3 px-5 py-3.5 text-xs text-slate-300 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"/></svg>
+                    <span>Live Desk</span>
+                </a>
+                <a href="#" id="nav-runService" onclick="changeView('runService', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Run Service Flow</span>
+                </a>
+                <a href="#" id="nav-servicePlans" onclick="changeView('servicePlans', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+                    <span>Service Schedules</span>
+                </a>
+                <a href="#" id="nav-liveService" onclick="changeView('liveService', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span>Broadcast Overlays</span>
+                </a>
+                <div class="h-px bg-white/5 my-2 mx-5"></div>
+                <a href="#" id="nav-hymns" onclick="changeView('hymns', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    <span>SDA Hymns Search</span>
+                </a>
+                <a href="#" id="nav-liveHymns" onclick="changeView('liveHymns', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                    <span>Lyric Presenter</span>
+                </a>
+                <a href="#" id="nav-sermonSlides" onclick="changeView('sermonSlides', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    <span>Sermon Slide Studio</span>
+                </a>
+                <div class="h-px bg-white/5 my-2 mx-5"></div>
+                <a href="#" id="nav-settings" onclick="changeView('settings', this)" class="nav-item flex items-center gap-3 px-5 py-3.5 text-xs text-slate-400 font-medium cursor-pointer decoration-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>System Settings</span>
+                </a>
+            </nav>
+
+            <!-- Mic and Connectivity Node -->
+            <div class="p-4 border-t border-[rgba(255,255,255,0.06)] bg-slate-950/40">
+                <div class="flex items-center gap-2.5 text-xs text-slate-400">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span class="font-mono tracking-wide text-[11px]">System: Online</span>
+                </div>
+                <div class="font-mono text-[9px] text-slate-600 mt-2 flex justify-between">
+                    <span>SABBATHCUE PRO</span>
+                    <span>ACTIVE</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ══════════ CONTENT VIEWS CONTAINER ══════════ -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
+
+            <!-- ── HORIZONTAL SUB-INFO STATUS PANEL ── -->
+            <section class="h-11 bg-slate-950/80 border-b border-[rgba(255,255,255,0.06)] flex items-center justify-between px-5 gap-4 shrink-0 overflow-x-auto select-none scrollbar-thin">
+                <div class="flex items-center gap-5 min-w-max">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                        <div id="audioVisualizer" class="flex items-end gap-[2.5px] h-[16px] w-[60px]"></div>
+                    </div>
+                    <div class="h-4 w-px bg-white/10"></div>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-300">
+                        <span class="font-mono text-slate-500 text-[11px]">ACTIVE PROGRAM:</span>
+                        <span class="font-bold text-white text-[11px]">Sabbath Divine Worship</span>
+                    </div>
+                    <div class="h-4 w-px bg-white/10"></div>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-300">
+                        <span class="font-mono text-slate-500 text-[11px]">CURRENT LIVE:</span>
+                        <span id="statusBarActiveSlideRef" class="text-yellow-400 font-mono font-bold text-[11px]">Genesis 1:1</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0">
+                    <div class="flex items-center gap-1.5 bg-slate-900/60 border border-white/5 px-2.5 py-0.5 rounded-md text-[10px]">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                        <span class="text-slate-400 font-mono">BROADCAST SYNC:</span>
+                        <span class="text-slate-200 font-semibold uppercase">OBS LIVE</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── VIEW RENDER WORKSPACE ── -->
+            <div id="viewsContentWrapper" class="flex-1 overflow-y-auto p-5 scrollbar-thin">
+                <!-- VIEWPORT Content injected dynamically here -->
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Global Toast HUD -->
+<div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-12 opacity-0 transition-all duration-300 pointer-events-none bg-slate-950/95 border border-white/10 shadow-2xl p-4 rounded-xl flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <div class="flex flex-col">
+        <span class="text-xs font-bold text-white uppercase tracking-wider">System Event Info</span>
+        <span id="toastMessage" class="text-xs text-slate-400">Action feedback report</span>
+    </div>
+</div>
+
+<!-- Modal Dialog Host -->
+<div id="actionModal" class="fixed inset-0 z-50 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300 bg-black/75 backdrop-blur-md"></div>
+
+<script>
+    const state = {
+        activeTab: 'live',
+        theme: 'gold',
+        currentLiveText: "In the beginning, God created the heavens and the earth.",
+        currentLiveTitle: "Genesis 1:1",
+        currentLiveVersion: "ESV",
+        currentLiveBg: "linear-gradient(135deg, #1e293b, #0f172a)",
+        previewText: "Praise to the Lord, the Almighty, the King of creation! O my soul, praise Him, for He is thy health and salvation!",
+        previewTitle: "Hymn 1",
+        previewVersion: "SDA Hymnal",
+        previewBg: "linear-gradient(135deg, #311b92, #12005e)",
+        
+        // Hymns state storage
+        hymns: [
+            { id: 1, number: 1, title: "Praise to the Lord", category: "Adoration", verses: [
+                "Praise to the Lord, the Almighty, the King of creation! O my soul, praise Him, for He is thy health and salvation!",
+                "All ye who hear, now to His temple draw near; Join ye in glad adoration!"
+            ]},
+            { id: 2, number: 100, title: "Great Is Thy Faithfulness", category: "Faithfulness", verses: [
+                "Great is Thy faithfulness, O God my Father; There is no shadow of turning with Thee;",
+                "Thou changest not, Thy compassions, they fail not; As Thou hast been, Thou forever wilt be."
+            ]},
+            { id: 3, number: 109, title: "Marvelous Grace", category: "Grace", verses: [
+                "Marvelous grace of our loving Lord, Grace that exceeds our sin and our guilt!",
+                "Yonder on Calvary’s mount outpoured, There where the blood of the Lamb was spilt."
+            ]},
+            { id: 4, number: 334, title: "Come, Thou Fount of Every Blessing", category: "Blessing", verses: [
+                "Come, Thou Fount of every blessing, Tune my heart to sing Thy grace;",
+                "Streams of mercy, never ceasing, Call for songs of loudest praise."
+            ]}
+        ],
+        activeHymnIndex: 0,
+        activeHymnVerseIndex: 0,
+
+        // Sermon Deck Collection
+        sermonSlides: [
+            { id: 1, title: "Scriptural Foundation", scripture: "Romans 8:28", content: "And we know that for those who love God all things work together for good, for those who are called according to his purpose.", bg: "midnight" },
+            { id: 2, title: "Point I: Divine Assurance", scripture: "Exodus 14:14", content: "The Lord will fight for you, and you have only to be silent.", bg: "midnight" },
+            { id: 3, title: "Point II: Abiding in Light", scripture: "1 John 1:7", content: "But if we walk in the light, as he is in the light, we have fellowship with one another, and the blood of Jesus his Son cleanses us from all sin.", bg: "midnight" }
+        ],
+        sermonActiveIndex: 0,
+
+        // Service schedules
+        servicePlans: [
+            { id: 1, date: "Sabbath morning service is live", title: "Morning Divine Worship Service", speaker: "Pastor David Vance", status: "Active", items: [
+                { time: "10:50 AM", name: "Organ Prelude", type: "Music" },
+                { time: "11:00 AM", name: "Doxology & Invocation", type: "Service" },
+                { time: "11:05 AM", name: "Opening Hymn: SDA 1", type: "Hymn" },
+                { time: "11:15 AM", name: "Scripture Reading: Romans 8", type: "Scripture" },
+                { time: "11:20 AM", name: "Pastoral Prayer", type: "Prayer" },
+                { time: "11:30 AM", name: "Sermon: 'All Things for Good'", type: "Sermon" },
+                { time: "12:00 PM", name: "Closing Hymn: SDA 334", type: "Hymn" }
+            ]},
+            { id: 2, date: "Friday night vespers program", title: "Vespers & Sabbath Welcome", speaker: "Elder Joshua Kim", status: "Upcoming", items: [
+                { time: "07:00 PM", name: "Sabbath Welcome Songs", type: "Music" },
+                { time: "07:15 PM", name: "Vespers Meditation", type: "Sermon" },
+                { time: "07:45 PM", name: "Sunset Prayer Circle", type: "Prayer" }
+            ]}
+        ],
+        
+        overlay: {
+            title: "WELCOME TO CHURCH",
+            subtitle: "Worship Service is broadcast live online",
+            onAir: false,
+            template: "lower-third",
+            color: "#facc15"
+        },
+
+        recentDetections: [
+            { verse: "Genesis 1:1", snippet: "In the beginning, God created the heavens...", confidence: 98 },
+            { verse: "John 3:16", snippet: "For God so loved the world...", confidence: 95 },
+            { verse: "Romans 8:28", snippet: "And we know that all things...", confidence: 91 },
+            { verse: "Psalm 23:1", snippet: "The Lord is my shepherd...", confidence: 85 }
+        ],
+
+        queue: [
+            { id: 1, title: "Genesis 1:1 (ESV)", subtitle: "Scripture Slide", length: "2:00", type: "Scripture", text: "In the beginning, God created the heavens and the earth.", ref: "Genesis 1:1" },
+            { id: 2, title: "SDA Hymn 1: Praise to the Lord", subtitle: "Hymn Verse 1", length: "3:30", type: "Hymn", text: "Praise to the Lord, the Almighty, the King of creation! O my soul, praise Him, for He is thy health and salvation!", ref: "Hymn 1 v1" },
+            { id: 3, title: "Sermon Slide: Divine Assurance", subtitle: "Sermon Deck Slide 2", length: "10:00", type: "Sermon", text: "The Lord will fight for you, and you have only to be silent.", ref: "Exodus 14:14" }
+        ],
+
+        // Transcript mock records
+        transcriptList: [
+            { id: 1, time: "11:01:05", text: "Welcome church and guests. It is a wonderful day to worship together." },
+            { id: 2, time: "11:01:45", text: "Today, we read a word of dynamic promise from the very beginning of Holy Writ." }
+        ],
+
+        // Count up clock for service
+        timerValue: 2535, // starting elapsed timer value (42m 15s)
+        timerInterval: null,
+        timerIsActive: true
+    };
+</script>
+
+<script>
+    function getLiveViewTemplate() {
+        return `
+        <div class="view-pane grid grid-cols-12 gap-5">
+            
+            <!-- COLUMN 1: Dynamic Microphone & Speech Input Interface -->
+            <div class="glass-panel col-span-12 xl:col-span-3 flex flex-col h-[520px]">
+                <div class="panel-header">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                        <span class="text-xs font-semibold tracking-wide uppercase">Speech Stream Synthesizer</span>
+                    </div>
+                    <span class="font-mono text-[9px] bg-red-500/10 border border-red-500/20 text-red-400 px-2 py-0.5 rounded uppercase">On Air</span>
+                </div>
+                
+                <div id="transcriptTerminalFeed" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3 font-body text-[13px] scrollbar-thin">
+                    <div class="opacity-40 text-[10px] font-mono text-slate-500 border-b border-white/5 pb-2">SESSION START — LIVE INTERCEPT ENGAGED</div>
+                    ${state.transcriptList.map(t => `
+                        <div class="p-2.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                            <span class="text-slate-500 font-mono text-[9px] block mb-0.5">${t.time}</span>
+                            <p class="text-slate-300 leading-normal">${t.text}</p>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="p-3 border-t border-[rgba(255,255,255,0.06)] bg-slate-950/60">
+                    <div class="relative mb-2">
+                        <input id="speechSimulatorInput" type="text" onkeydown="handleMockTranscriptionKeydown(event)" placeholder="Simulate speaking... Press Enter" class="w-full search-input py-2 pl-3 pr-8 text-xs">
+                        <button onclick="triggerSimulatedSpeech()" class="absolute right-2 top-1/2 -translate-y-1/2 text-yellow-400 hover:text-white">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                    <div class="text-[9px] text-slate-500 font-mono flex justify-between">
+                        <span>Try typing "Psalm 23" or "John 3:16"</span>
+                        <span class="text-yellow-500 font-semibold text-[10px]">*HOTWORD MATCH</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMN 2: Slide Output monitors and active controller deck -->
+            <div class="col-span-12 xl:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-5 h-fit">
+                
+                <!-- Monitor 1: Preview Canvas -->
+                <div class="glass-panel flex flex-col h-[330px]">
+                    <div class="panel-header">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Preview Layout Monitor</span>
+                        <span class="font-mono text-[9px] bg-sky-500/10 border border-sky-500/20 text-sky-400 px-2 py-0.5 rounded">CUE ENGINE</span>
+                    </div>
+                    <div class="flex-1 p-4 bg-slate-950/50 flex flex-col justify-between">
+                        <div id="deckPreviewBox" class="w-full h-full rounded-xl border border-white/5 relative flex flex-col items-center justify-center text-center p-6 shadow-md" style="background: ${state.previewBg}">
+                            <span class="absolute top-3 left-3 text-[9px] font-mono text-white/50 tracking-wider uppercase bg-black/40 px-2 py-0.5 rounded">Projector Draft</span>
+                            <div class="max-w-[85%]">
+                                <h3 id="previewSlideTitle" class="font-display text-lg text-white drop-shadow-lg leading-relaxed mb-4">"${state.previewText}"</h3>
+                                <p id="previewSlideSubtitle" class="font-mono text-xs text-yellow-300 tracking-wider">${state.previewTitle} (${state.previewVersion})</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3 border-t border-[rgba(255,255,255,0.06)] flex gap-3">
+                        <button onclick="addCurrentPreviewToQueue()" class="btn-action bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs px-3.5 py-1.5 rounded-lg font-bold">
+                            + Queue Card
+                        </button>
+                        <button onclick="applyPreviewToLive()" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs px-4 py-1.5 rounded-lg font-bold flex items-center gap-1.5 flex-1 justify-center">
+                            <span>Direct Output</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Monitor 2: Live Canvas (Glowing state-driven) -->
+                <div class="glass-panel flex flex-col h-[330px]">
+                    <div class="panel-header">
+                        <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wider">Live On-Air Canvas</span>
+                        <span class="font-mono text-[9px] bg-red-500/10 border border-red-500/30 text-red-400 px-2 py-0.5 rounded flex items-center gap-1 font-bold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                            MAIN PROJECTION
+                        </span>
+                    </div>
+                    <div class="flex-1 p-4 bg-slate-950/50 flex flex-col justify-between">
+                        <div id="deckLiveBox" class="w-full h-full rounded-xl border border-yellow-500/20 relative flex flex-col items-center justify-center text-center p-6 live-glowing-active" style="background: ${state.currentLiveBg}">
+                            <span class="absolute top-3 left-3 text-[9px] font-mono text-yellow-400 tracking-wider uppercase bg-black/40 px-2 py-0.5 rounded">Broadcast output</span>
+                            <div class="max-w-[85%] animate-fade-in">
+                                <h3 id="liveSlideTitle" class="font-display text-xl text-white drop-shadow-xl leading-relaxed mb-4">"${state.currentLiveText}"</h3>
+                                <p id="liveSlideSubtitle" class="font-mono text-xs text-yellow-300 tracking-wider">${state.currentLiveTitle} (${state.currentLiveVersion})</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3 border-t border-[rgba(255,255,255,0.06)] flex items-center justify-between gap-3">
+                        <button onclick="clearActiveLive()" class="btn-action bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 text-xs px-4 py-1.5 rounded-lg font-bold flex-1">
+                            Clear Live Frame (Blackout)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Queue Column (Fully interactive list) -->
+                <div class="glass-panel col-span-1 flex flex-col h-[290px]">
+                    <div class="panel-header">
+                        <span class="text-xs font-semibold uppercase tracking-wider">Active Queue Cards</span>
+                        <span class="font-mono text-xs text-slate-500">${state.queue.length} slides</span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto scrollbar-thin">
+                        <div id="liveQueueWrapper">
+                            ${state.queue.map((item, idx) => `
+                                <div class="queue-item flex items-center justify-between p-3 cursor-pointer">
+                                    <div class="flex items-center gap-3 min-w-0" onclick="activateQueueItem(${idx})">
+                                        <span class="font-mono text-[10px] text-slate-500">${idx + 1}</span>
+                                        <div class="truncate">
+                                            <h4 class="text-slate-200 text-xs font-semibold truncate">${item.title}</h4>
+                                            <p class="text-[9px] text-slate-500 truncate">${item.subtitle}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/25">${item.type}</span>
+                                        <button onclick="moveQueueItem(${idx}, -1); event.stopPropagation();" class="text-slate-400 hover:text-white p-1">▲</button>
+                                        <button onclick="moveQueueItem(${idx}, 1); event.stopPropagation();" class="text-slate-400 hover:text-white p-1">▼</button>
+                                        <button onclick="removeQueueItem(${idx}); event.stopPropagation();" class="text-red-400 hover:text-red-300 p-1">×</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="p-2 border-t border-white/5 bg-slate-950/30 flex justify-between">
+                        <button onclick="clearAllQueue()" class="text-[10px] text-slate-500 hover:text-slate-300 font-mono">Clear List</button>
+                        <button onclick="triggerToast('Automatic sequential timer is running.')" class="text-[10px] text-yellow-400 hover:text-yellow-300 font-mono">Run Slides Autoplay</button>
+                    </div>
+                </div>
+
+                <!-- Scripture Verse Voice Matches -->
+                <div class="glass-panel col-span-1 flex flex-col h-[290px]">
+                    <div class="panel-header">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Voice Identified Scriptures</span>
+                        <span class="font-mono text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded">AUTO SCAN</span>
+                    </div>
+                    <div id="micScriptureMatches" class="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2">
+                        ${state.recentDetections.map((det) => `
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex flex-col justify-between hover:border-yellow-500/25 transition-all">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-200">${det.verse}</span>
+                                    <span class="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">${det.confidence}% precision</span>
+                                </div>
+                                <p class="text-[11px] text-slate-400 italic mt-1 mb-2">"${det.snippet}"</p>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="pushTextToPreview('${det.snippet}', '${det.verse}')" class="text-[10px] bg-white/5 hover:bg-white/10 px-2 py-1 rounded text-slate-300 font-mono">Draft</button>
+                                    <button onclick="pushTextToLive('${det.snippet}', '${det.verse}')" class="text-[10px] bg-yellow-400/20 hover:bg-yellow-400 text-yellow-300 hover:text-black px-2 py-1 rounded font-bold font-mono">Present</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        `;
+    }
+
+    function getRunServiceViewTemplate() {
+        const activePlan = state.servicePlans[0];
+        return `
+        <div class="view-pane flex flex-col gap-5">
+            <div class="glass-panel p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <span class="font-mono text-xs text-yellow-400 font-bold uppercase tracking-widest">Active Timeline Workspace</span>
+                    <h2 class="text-2xl font-bold mt-1 text-white">${activePlan.title}</h2>
+                    <p class="text-sm text-slate-400 mt-1">${activePlan.date} • Speaker: ${activePlan.speaker}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-900 border border-white/5 p-3 rounded-xl text-center min-w-[120px]">
+                        <span class="text-[9px] font-mono text-slate-500 block uppercase">Elapsed Time</span>
+                        <span id="serviceTimer" class="font-mono text-lg font-bold text-white tracking-widest">${formatTimer(state.timerValue)}</span>
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        <button onclick="toggleServiceTimer()" id="timerControlBtn" class="btn-action bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/20 text-emerald-300 px-3 py-1 rounded text-xs font-semibold">
+                            ${state.timerIsActive ? 'Pause Count' : 'Resume Count'}
+                        </button>
+                        <button onclick="resetServiceTimer()" class="btn-action bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 px-3 py-1 rounded text-xs font-semibold">
+                            Reset Clock
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Program Flow Timeline List -->
+            <div class="grid grid-cols-12 gap-5">
+                <div class="col-span-12 xl:col-span-8 space-y-3">
+                    <h3 class="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-4 h-4 text-yellow-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Service Elements Timeline
+                    </h3>
+                    
+                    ${activePlan.items.map((item, idx) => {
+                        const isSermon = item.type === 'Sermon';
+                        const isHymn = item.type === 'Hymn';
+                        return `
+                        <div class="glass-panel p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 ${isSermon ? 'border-l-yellow-400 bg-yellow-400/5' : isHymn ? 'border-l-indigo-500 bg-indigo-500/5' : 'border-l-slate-600'} hover:scale-[1.005] transition-all duration-200">
+                            <div class="flex items-center gap-4">
+                                <div class="font-mono text-xs text-slate-500 w-16">${item.time}</div>
+                                <div>
+                                    <h4 class="font-bold text-white text-sm">${item.name}</h4>
+                                    <span class="text-[9px] font-mono uppercase font-bold tracking-wider rounded px-2 py-0.5 bg-white/5 text-slate-400 border border-white/5">${item.type}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="triggerToast('Cue ${item.name} prepped in Preview deck.')" class="btn-action bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 text-xs px-3 py-1.5 rounded-lg">Prep Slide</button>
+                                <button onclick="pushServiceItemToLive('${item.name}', '${item.type}')" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs px-3.5 py-1.5 rounded-lg font-bold">Go Live Now</button>
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <div class="col-span-12 xl:col-span-4 space-y-4">
+                    <!-- Prompter System -->
+                    <div class="glass-panel p-5 flex flex-col h-[280px]">
+                        <h4 class="text-xs font-semibold mb-3 text-slate-300 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">AV Prompter & Speaker Assistant</h4>
+                        <div class="flex-1 overflow-y-auto text-xs text-slate-300 italic font-body space-y-2 scrollbar-thin">
+                            <p>"Pastor Vance is currently completing opening remarks on Romans chapter 8."</p>
+                            <p class="text-xs text-yellow-400 font-mono font-bold mt-4 uppercase">UPCOMING SCRIPTURE SLIDE:</p>
+                            <p class="p-2.5 rounded bg-yellow-500/10 text-yellow-300 font-mono text-xs border border-yellow-500/20">"And we know that for those who love God all things work together..." (Romans 8:28)</p>
+                        </div>
+                        <button onclick="pushTextToLive('And we know that for those who love God all things work together for good...', 'Romans 8:28')" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs font-bold py-2 rounded-xl mt-3">Push Scripture to Live Frame</button>
+                    </div>
+
+                    <!-- AV Operator Quick Actions -->
+                    <div class="glass-panel p-5">
+                        <h4 class="text-xs font-semibold mb-3 text-slate-300 uppercase tracking-wider font-mono">Operational Hotkeys</h4>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <button onclick="triggerToast('Muffled chime sound cue triggered.')" class="p-2.5 rounded-lg border border-white/5 bg-slate-900 text-center text-xs text-slate-200 hover:border-yellow-500/30 transition-all font-semibold">🔔 Play Chime Sign</button>
+                            <button onclick="triggerToast('Active overlays hidden instantly.')" class="p-2.5 rounded-lg border border-white/5 bg-slate-900 text-center text-xs text-slate-200 hover:border-yellow-500/30 transition-all font-semibold">🚫 Force Hide Overlay</button>
+                            <button onclick="pushServiceItemToLive('Opening Praise and Prayer', 'Service')" class="p-2.5 rounded-lg border border-white/5 bg-slate-900 text-center text-xs text-slate-200 hover:border-indigo-500/30 transition-all font-semibold">📖 Welcome Slide</button>
+                            <button onclick="triggerToast('OBS Broadcast Frame Signal Confirmed')" class="p-2.5 rounded-lg border border-red-500/25 bg-red-500/10 text-center text-xs text-red-400 hover:bg-red-500/20 transition-all font-semibold">🔴 Sync OBS Live</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    function getServicePlansViewTemplate() {
+        return `
+        <div class="view-pane flex flex-col gap-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Sabbath Worship Program Schedules</h2>
+                    <p class="text-sm text-slate-400 mt-1">Pre-configure and coordinate future services for instant presentation recall</p>
+                </div>
+                <button onclick="openPlanCreatorModal()" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    <span>Add Service Plan</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                ${state.servicePlans.map((plan) => `
+                    <div class="glass-panel p-5 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                <span class="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest">${plan.date}</span>
+                                <span class="text-[10px] font-mono px-2 py-0.5 rounded ${plan.status === 'Active' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-white/5'} font-bold uppercase">${plan.status}</span>
+                            </div>
+                            <h3 class="text-xl font-bold text-white">${plan.title}</h3>
+                            <p class="text-sm text-slate-400 mt-1 mb-4">Pastor Speaker: <span class="text-slate-300 font-semibold">${plan.speaker}</span></p>
+                            
+                            <!-- Breakdown list -->
+                            <div class="space-y-2 mb-6">
+                                ${plan.items.slice(0, 4).map((item) => `
+                                    <div class="flex justify-between text-xs text-slate-300 p-2 rounded bg-slate-950/40 border border-white/5">
+                                        <span class="font-semibold text-slate-200">${item.name}</span>
+                                        <span class="font-mono text-slate-500 text-[10px]">${item.time} (${item.type})</span>
+                                    </div>
+                                `).join('')}
+                                ${plan.items.length > 4 ? `
+                                    <div class="text-[11px] text-center text-slate-500 font-mono">+ ${plan.items.length - 4} more timeline items</div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <button onclick="loadPlanToService(${plan.id})" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs px-4 py-2 rounded-lg font-bold flex-1 text-center">
+                                Launch Service Deck
+                            </button>
+                            <button onclick="triggerToast('Service timeline configuration locked.')" class="btn-action bg-slate-900 border border-white/10 hover:border-white/20 text-slate-300 text-xs px-4 py-2 rounded-lg font-semibold flex-1 text-center">
+                                Edit Elements
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        `;
+    }
+
+    function getLiveServiceViewTemplate() {
+        return `
+        <div class="view-pane grid grid-cols-12 gap-5">
+            <!-- Left Panel OBS control interface -->
+            <div class="col-span-12 xl:col-span-5 space-y-5">
+                <div class="glass-panel p-5 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-300 border-b border-white/5 pb-2 font-mono uppercase tracking-wider">OBS Downstream Keys</h3>
+                    
+                    <div>
+                        <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Overlay Heading</label>
+                        <input id="overlayHeadingInput" type="text" value="${state.overlay.title}" oninput="updateOverlayState()" class="w-full search-input px-3.5 py-2 text-xs text-slate-200">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Overlay Subtitle Details</label>
+                        <input id="overlaySubtitleInput" type="text" value="${state.overlay.subtitle}" oninput="updateOverlayState()" class="w-full search-input px-3.5 py-2 text-xs text-slate-200">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Color Scheme</label>
+                            <select id="overlayColorSelector" onchange="updateOverlayState()" class="w-full search-input p-2 text-xs">
+                                <option value="#facc15" ${state.overlay.color === '#facc15' ? 'selected' : ''}>Bright Yellow</option>
+                                <option value="#10b981" ${state.overlay.color === '#10b981' ? 'selected' : ''}>Emerald Sanctum</option>
+                                <option value="#3b82f6" ${state.overlay.color === '#3b82f6' ? 'selected' : ''}>Royal Sapphire</option>
+                                <option value="#a78bfa" ${state.overlay.color === '#a78bfa' ? 'selected' : ''}>Amethyst Purple</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Format Template</label>
+                            <select id="overlayStyleSelector" onchange="updateOverlayState()" class="w-full search-input p-2 text-xs">
+                                <option value="lower-third" ${state.overlay.template === 'lower-third' ? 'selected' : ''}>Classic Lower Third</option>
+                                <option value="centered-overlay" ${state.overlay.template === 'centered-overlay' ? 'selected' : ''}>Full Centered Banner</option>
+                                <option value="lyrics-top" ${state.overlay.template === 'lyrics-top' ? 'selected' : ''}>Top-Left Lyrics Banner</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 flex gap-3">
+                        <button onclick="toggleOverlayOnAir()" id="overlayLiveToggleButton" class="btn-action flex-1 font-bold py-2.5 rounded-xl text-center text-xs live-ping-button ${state.overlay.onAir ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-yellow-400 hover:bg-yellow-500 text-slate-950'}">
+                            ${state.overlay.onAir ? 'Take OFF AIR (Blackout Overlay)' : 'Send Broadcast Overlay ON AIR'}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5">
+                    <h3 class="text-xs font-bold text-slate-300 border-b border-white/5 pb-2 uppercase tracking-wider font-mono">Preset Cards Hot-keys</h3>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                        <button onclick="triggerQuickOverlay('Sabbath Worship Program', 'Divine service stream is broadcasting')" class="p-2.5 rounded bg-slate-950 text-left text-[11px] hover:bg-slate-900 border border-white/5 transition-all text-slate-200">✨ Standard Welcome Card</button>
+                        <button onclick="triggerQuickOverlay('Mission and Tithes', 'Visit sabbathcue.org/give to support')" class="p-2.5 rounded bg-slate-950 text-left text-[11px] hover:bg-slate-900 border border-white/5 transition-all text-slate-200">💰 Tithes lower-third</button>
+                        <button onclick="triggerQuickOverlay('Hymn of Praise', 'Join us as we stand together')" class="p-2.5 rounded bg-slate-950 text-left text-[11px] hover:bg-slate-900 border border-white/5 transition-all text-slate-200">🎶 Lyrics intro card</button>
+                        <button onclick="triggerQuickOverlay('Fellowship Discussion Group', 'Will commence immediately following service')" class="p-2.5 rounded bg-slate-950 text-left text-[11px] hover:bg-slate-900 border border-white/5 transition-all text-slate-200">🍽️ Dinner Notice</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulated live OBS stream card -->
+            <div class="col-span-12 xl:col-span-7 flex flex-col gap-5">
+                <div class="glass-panel p-5 flex flex-col justify-between h-[450px]">
+                    <div>
+                        <h3 class="text-lg font-bold text-white mb-2">Simulated Live Broadcast Output Feed</h3>
+                        <p class="text-sm text-slate-400">Verifies how downstream keys combine with video feeds</p>
+                    </div>
+
+                    <!-- Video simulated container -->
+                    <div class="relative w-full h-[300px] rounded-xl overflow-hidden border border-white/15 bg-slate-950 flex flex-col justify-between p-5">
+                        <div class="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-yellow-900/30 via-slate-950 to-slate-950 pointer-events-none"></div>
+                        <div class="absolute top-5 left-5 z-10 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></span>
+                            <span class="text-[10px] font-mono text-white bg-black/60 px-2 py-0.5 rounded tracking-widest uppercase">OBS feed-1 live</span>
+                        </div>
+
+                        <div></div>
+
+                        <!-- Dynamic container overlay preview -->
+                        <div id="simulatedOverlayContainer" class="z-10 transition-all duration-300 w-full" style="opacity: ${state.overlay.onAir ? 1 : 0};">
+                            ${state.overlay.template === 'lower-third' ? `
+                                <div class="max-w-[70%] bg-slate-950/95 border-l-4 p-4 rounded-r-lg shadow-2xl backdrop-blur-md animate-pulse" style="border-left-color: ${state.overlay.color}">
+                                    <h4 class="text-white text-sm font-bold tracking-wide">${state.overlay.title}</h4>
+                                    <p class="text-slate-300 text-[11px] mt-1 font-body">${state.overlay.subtitle}</p>
+                                </div>
+                            ` : state.overlay.template === 'lyrics-top' ? `
+                                <div class="w-full bg-black/90 p-3 rounded-lg flex items-center justify-between border-b" style="border-bottom-color: ${state.overlay.color}">
+                                    <span class="text-[10px] font-mono text-slate-400">LOWER BANNER</span>
+                                    <span class="text-white text-xs font-bold tracking-wide">${state.overlay.title} — ${state.overlay.subtitle}</span>
+                                </div>
+                            ` : `
+                                <div class="w-full bg-slate-950/95 p-8 rounded-xl border border-white/5 text-center shadow-2xl">
+                                    <h4 class="text-xl text-white font-display mb-3" style="color: ${state.overlay.color}">${state.overlay.title}</h4>
+                                    <p class="text-slate-300 text-xs italic font-body">${state.overlay.subtitle}</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    function getHymnsViewTemplate() {
+        return `
+        <div class="view-pane flex flex-col gap-5">
+            <div class="glass-panel p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">SDA Hymns Catalog</h2>
+                    <p class="text-sm text-slate-400 mt-1">Search, index, and cue Adventist Hymnal lyrics immediately to live monitors</p>
+                </div>
+                <div class="relative w-full sm:w-[280px]">
+                    <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input id="hymnCatalogSearchInput" type="text" oninput="filterHymnsDatabase()" placeholder="Filter lyrics, category, number..." class="w-full search-input py-2 pl-10 pr-4 text-xs text-slate-200">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-5">
+                <div class="col-span-12 xl:col-span-7 space-y-3" id="hymnsListContainer">
+                    ${state.hymns.map((hymn, idx) => `
+                        <div onclick="selectCatalogHymn(${idx})" class="glass-panel p-4 flex justify-between items-center cursor-pointer hover:border-yellow-500/20 transition-all ${state.activeHymnIndex === idx ? 'border-yellow-500/40 bg-yellow-400/5' : ''}">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center font-mono font-bold text-yellow-400 text-xs">
+                                    #${hymn.number}
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-white text-sm">${hymn.title}</h3>
+                                    <span class="text-[9px] font-mono uppercase bg-slate-900 px-2 py-0.5 rounded border border-white/5 text-slate-400">${hymn.category}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="event.stopPropagation(); loadHymnToLyricPresenter(${idx})" class="btn-action bg-yellow-400 text-slate-950 hover:bg-yellow-500 text-xs px-3.5 py-1.5 rounded-lg font-bold">Present Lyricist</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="col-span-12 xl:col-span-5">
+                    <div class="glass-panel p-5 flex flex-col h-[400px] justify-between">
+                        <div>
+                            <h4 class="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-widest mb-1">Active Preview Sheet</h4>
+                            <h3 id="sheetSelectedHymnTitle" class="text-lg font-bold text-white border-b border-white/5 pb-2">${state.hymns[state.activeHymnIndex].title} (SDA ${state.hymns[state.activeHymnIndex].number})</h3>
+                            
+                            <div id="sheetSelectedHymnVerses" class="space-y-4 mt-4 overflow-y-auto max-h-[220px] scrollbar-thin">
+                                ${state.hymns[state.activeHymnIndex].verses.map((verse, idx) => `
+                                    <div class="p-3 bg-slate-950/40 rounded-lg border border-white/5 font-body text-xs text-slate-300">
+                                        <span class="text-[9px] font-mono text-slate-500 font-bold block mb-1">VERSE ${idx + 1}</span>
+                                        <p class="leading-relaxed font-semibold">"${verse}"</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <button onclick="loadHymnToLyricPresenter(${state.activeHymnIndex})" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold py-2.5 rounded-xl text-center text-xs flex-1">
+                                Launch Lyric Presenter Deck
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    function getLiveHymnsViewTemplate() {
+        const currentHymn = state.hymns[state.activeHymnIndex];
+        return `
+        <div class="view-pane flex flex-col gap-5">
+            <div class="glass-panel p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <span class="font-mono text-xs text-yellow-400 font-bold uppercase tracking-wider">Active Presentation Desk</span>
+                    <h2 class="text-2xl font-bold text-white mt-1">Live Presentation: ${currentHymn.title}</h2>
+                    <p class="text-sm text-slate-400 mt-1">SDA Hymnal: Number ${currentHymn.number} • Theme category: ${currentHymn.category}</p>
+                </div>
+                <button onclick="changeView('hymns', document.getElementById('nav-hymns'))" class="btn-action bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2">
+                    <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    <span>Change Hymn selection</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-12 gap-5">
+                <div class="col-span-12 xl:col-span-8 space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-300">Select verse block below to transition screens immediately</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${currentHymn.verses.map((verse, idx) => `
+                            <div onclick="presentLyricVerse(${idx})" class="glass-panel p-5 cursor-pointer hover:border-yellow-500/30 hover:scale-[1.01] transition-all duration-200 flex flex-col justify-between h-[180px] ${state.activeHymnVerseIndex === idx ? 'border-yellow-400 bg-yellow-400/5 ring-1 ring-yellow-400/20' : ''}">
+                                <div>
+                                    <span class="text-[9px] font-mono text-slate-500 block mb-2 font-bold uppercase">VERSE ${idx + 1}</span>
+                                    <p class="text-xs font-semibold text-slate-200 leading-relaxed font-body">"${verse}"</p>
+                                </div>
+                                <div class="text-[9px] font-mono text-right mt-3 text-yellow-500 uppercase tracking-wider font-semibold">Project Live</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="col-span-12 xl:col-span-4 space-y-4">
+                    <div class="glass-panel p-5 flex flex-col h-[280px]">
+                        <span class="text-xs font-mono text-yellow-400 uppercase font-bold tracking-widest mb-1">Live Monitor Output</span>
+                        <div class="flex-1 w-full rounded-xl border border-white/5 bg-slate-900 flex flex-col items-center justify-center text-center p-6 shadow-neon-gold" style="background: ${state.currentLiveBg}">
+                            <div class="max-w-[85%]">
+                                <h3 id="hymnsLiveScreenVerse" class="font-display text-xs text-white drop-shadow-md leading-relaxed mb-3">"${currentHymn.verses[state.activeHymnVerseIndex]}"</h3>
+                                <p class="font-mono text-[9px] text-yellow-400 tracking-wider">${currentHymn.title} • Verse ${state.activeHymnVerseIndex + 1}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    function getSermonSlidesViewTemplate() {
+        return `
+        <div class="view-pane flex flex-col gap-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Sermon Slide Studio</h2>
+                    <p class="text-sm text-slate-400 mt-1">Compose, design, and direct sermon outlines from our real-time editor workspace</p>
+                </div>
+                <button onclick="addNewSermonSlide()" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    <span>Create Slide Outline</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-12 gap-5">
+                <!-- Outlines and thumbnails -->
+                <div class="col-span-12 xl:col-span-4 space-y-3">
+                    <h3 class="text-xs font-mono text-slate-400 uppercase font-bold tracking-widest border-b border-white/5 pb-2">Slide Outlines</h3>
+                    <div id="sermonSlideThumbnails" class="space-y-3 max-h-[460px] overflow-y-auto pr-1 scrollbar-thin">
+                        ${state.sermonSlides.map((slide, idx) => `
+                            <div onclick="selectSermonSlide(${idx})" class="glass-panel p-4 flex gap-4 cursor-pointer hover:border-yellow-500/20 transition-all ${state.sermonActiveIndex === idx ? 'border-yellow-500/40 bg-yellow-400/5' : ''}">
+                                <div class="w-16 h-12 rounded bg-slate-900 flex-shrink-0 flex items-center justify-center font-mono text-[10px] text-slate-500 border border-white/5 uppercase">
+                                    SLIDE #${idx + 1}
+                                </div>
+                                <div class="min-w-0">
+                                    <h4 class="font-bold text-white text-xs truncate">${slide.title}</h4>
+                                    <p class="text-[10px] text-slate-400 truncate mt-1">${slide.scripture}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <!-- Slide details editor -->
+                <div class="col-span-12 xl:col-span-8 flex flex-col gap-5">
+                    <div class="glass-panel p-5 space-y-4">
+                        <div class="flex justify-between items-center border-b border-white/5 pb-2">
+                            <h3 class="text-sm font-bold text-slate-200">Outline Draft Engine</h3>
+                            <button onclick="pushActiveSermonSlideToLive()" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 text-xs px-3.5 py-1.5 rounded-lg font-bold">Present Slide Now</button>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Slide Title / Outline Reference</label>
+                                    <input id="editSermonTitle" type="text" oninput="updateActiveSermonContent()" value="${state.sermonSlides[state.sermonActiveIndex].title}" class="w-full search-input px-3 py-2 text-xs text-slate-200">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Bible Verse Citation</label>
+                                    <input id="editSermonScripture" type="text" oninput="updateActiveSermonContent()" value="${state.sermonSlides[state.sermonActiveIndex].scripture}" class="w-full search-input px-3 py-2 text-xs text-slate-200">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Primary Text Outline Content</label>
+                                <textarea id="editSermonContent" oninput="updateActiveSermonContent()" rows="4" class="w-full search-input p-3 text-xs text-slate-200 font-body">${state.sermonSlides[state.sermonActiveIndex].content}</textarea>
+                            </div>
+
+                            <div class="p-4 bg-slate-950/40 rounded-xl border border-white/5">
+                                <span class="text-[9px] font-mono text-slate-500 block mb-2 uppercase">Slide Canvas Preview</span>
+                                <div class="w-full h-[220px] rounded-lg flex flex-col items-center justify-center text-center p-6 shadow-neon-gold bg-slate-900" style="background: linear-gradient(135deg, #1e293b, #030712);">
+                                    <div class="max-w-[85%]">
+                                        <h3 class="font-display text-sm text-white leading-relaxed mb-4" id="sermonEditorMockupBody">"${state.sermonSlides[state.sermonActiveIndex].content}"</h3>
+                                        <p class="font-mono text-xs text-yellow-400/80 tracking-wider" id="sermonEditorMockupRef">${state.sermonSlides[state.sermonActiveIndex].title} • ${state.sermonSlides[state.sermonActiveIndex].scripture}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+    }
+
+    function getSettingsViewTemplate() {
+        return `
+        <div class="view-pane flex flex-col gap-5">
+            <div class="glass-panel p-5">
+                <h2 class="text-2xl font-bold text-white mb-2">Configuration and Hardware Setup</h2>
+                <p class="text-sm text-slate-400">Manage audio capture feeds, interface endpoints, downstream configurations, and keyboard shortcuts</p>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                <div class="glass-panel p-5 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-200 border-b border-white/5 pb-2 font-mono uppercase tracking-wider">Acoustic Feeds & Thresholds</h3>
+                    
+                    <div>
+                        <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Input Endpoint Source</label>
+                        <select class="w-full search-input p-2 text-xs bg-slate-900 border border-white/10 text-slate-300">
+                            <option>System Microphone Core Input (Default Device)</option>
+                            <option>Focusrite Sound Interface (Line Channel 1)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-2">Sound Capture Trigger Squelch</label>
+                        <input type="range" class="w-full accent-yellow-400 mt-2" min="1" max="100" value="82">
+                        <div class="flex justify-between text-[10px] font-mono text-slate-500 mt-1">
+                            <span>Squelch: Normal</span>
+                            <span>Acoustic Trigger Squelch: 82%</span>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-white/5 my-3"></div>
+
+                    <h3 class="text-xs font-bold text-slate-200 border-b border-white/5 pb-2 font-mono uppercase tracking-wider">Automation Settings</h3>
+
+                    <div class="space-y-3 pt-1">
+                        <label class="flex items-center gap-3 text-xs text-slate-300 font-semibold cursor-pointer">
+                            <input type="checkbox" checked class="w-4 h-4 rounded border-white/15 bg-slate-900 accent-yellow-400">
+                            <span>Auto-fetch scriptures identified by Speech-to-text engine</span>
+                        </label>
+                        <label class="flex items-center gap-3 text-xs text-slate-300 font-semibold cursor-pointer">
+                            <input type="checkbox" class="w-4 h-4 rounded border-white/15 bg-slate-900 accent-yellow-400">
+                            <span>Directly transition preview items to live stream automatically</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 space-y-4">
+                    <h3 class="text-xs font-bold text-slate-200 border-b border-white/5 pb-2 font-mono uppercase tracking-wider">Operational Keyboard Shortcuts</h3>
+                    
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-xs p-2.5 rounded bg-slate-950/40 border border-white/5">
+                            <span class="text-slate-300 font-semibold">Blackout screen output</span>
+                            <kbd class="font-mono text-[9px] bg-slate-900 border border-white/10 px-2 py-0.5 rounded text-yellow-400 uppercase font-bold">Escape</kbd>
+                        </div>
+                        <div class="flex justify-between text-xs p-2.5 rounded bg-slate-950/40 border border-white/5">
+                            <span class="text-slate-300 font-semibold">Cue Next Slide element</span>
+                            <kbd class="font-mono text-[9px] bg-slate-900 border border-white/10 px-2 py-0.5 rounded text-yellow-400 uppercase font-bold">Spacebar</kbd>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button onclick="triggerToast('Operational backup file written successfully.')" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs w-full">
+                            Export Configuration Profile (.json)
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        `;
+    }
+</script>
+
+<script>
+    // Theme accent manager
+    function switchTheme(theme) {
+        state.theme = theme;
+        const container = document.getElementById('bodyThemeContainer');
+        container.className = '';
+        container.classList.add('theme-' + theme);
+        triggerToast(`Accent Theme changed to ${theme.toUpperCase()}.`);
+    }
+
+    // Dynamic router switching with smooth DOM cleanups
+    function changeView(viewName, element) {
+        state.activeTab = viewName;
+        
+        document.querySelectorAll('.nav-item').forEach((nav) => {
+            nav.classList.remove('active');
+            nav.classList.remove('text-slate-100');
+            nav.classList.add('text-slate-400');
+        });
+
+        if(element) {
+            element.classList.add('active');
+            element.classList.remove('text-slate-400');
+            element.classList.add('text-slate-100');
+        }
+
+        renderActivePane();
+    }
+
+    function renderActivePane() {
+        const wrapper = document.getElementById('viewsContentWrapper');
+        if (!wrapper) return;
+        
+        // Stagger clean logic before injecting template to allow CSS animation reset
+        wrapper.innerHTML = ""; 
+        setTimeout(() => {
+            if (state.activeTab === 'live') {
+                wrapper.innerHTML = getLiveViewTemplate();
+            } else if (state.activeTab === 'runService') {
+                wrapper.innerHTML = getRunServiceViewTemplate();
+            } else if (state.activeTab === 'servicePlans') {
+                wrapper.innerHTML = getServicePlansViewTemplate();
+            } else if (state.activeTab === 'liveService') {
+                wrapper.innerHTML = getLiveServiceViewTemplate();
+            } else if (state.activeTab === 'hymns') {
+                wrapper.innerHTML = getHymnsViewTemplate();
+            } else if (state.activeTab === 'liveHymns') {
+                wrapper.innerHTML = getLiveHymnsViewTemplate();
+            } else if (state.activeTab === 'sermonSlides') {
+                wrapper.innerHTML = getSermonSlidesViewTemplate();
+            } else if (state.activeTab === 'settings') {
+                wrapper.innerHTML = getSettingsViewTemplate();
+            }
+        }, 30);
+    }
+
+    // Toast alert mechanism (no alert dialog breaks!)
+    function triggerToast(message) {
+        const toast = document.getElementById('toastNotification');
+        const msg = document.getElementById('toastMessage');
+        if (!toast || !msg) return;
+        msg.textContent = message;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(12px)';
+        }, 3000);
+    }
+</script>
+
+<script>
+    // Live Presentation Actions & Triggers
+    function applyPreviewToLive() {
+        state.currentLiveText = state.previewText;
+        state.currentLiveTitle = state.previewTitle;
+        state.currentLiveVersion = state.previewVersion;
+        state.currentLiveBg = state.previewBg;
+        
+        const liveBox = document.getElementById('deckLiveBox');
+        if (liveBox) {
+            liveBox.style.background = state.currentLiveBg;
+            document.getElementById('liveSlideTitle').innerText = `"${state.currentLiveText}"`;
+            document.getElementById('liveSlideSubtitle').innerText = `${state.currentLiveTitle} (${state.currentLiveVersion})`;
+            
+            // Add momentary animation trigger
+            liveBox.classList.remove('live-glowing-active');
+            void liveBox.offsetWidth; // trigger reflow
+            liveBox.classList.add('live-glowing-active');
+        }
+        
+        const activeRef = document.getElementById('statusBarActiveSlideRef');
+        if (activeRef) activeRef.innerText = state.currentLiveTitle;
+        triggerToast("Draft slide successfully projected to screen.");
+    }
+
+    function clearActiveLive() {
+        state.currentLiveText = "— Display Output Hidden (Blackout Mode) —";
+        state.currentLiveTitle = "SabbathCue Broadcast Screen";
+        state.currentLiveVersion = "Manual Override";
+        state.currentLiveBg = "linear-gradient(135deg, #020409, #05070f)";
+        
+        const liveBox = document.getElementById('deckLiveBox');
+        if (liveBox) {
+            liveBox.style.background = state.currentLiveBg;
+            document.getElementById('liveSlideTitle').innerText = state.currentLiveText;
+            document.getElementById('liveSlideSubtitle').innerText = `${state.currentLiveTitle} (${state.currentLiveVersion})`;
+            liveBox.classList.remove('live-glowing-active');
+        }
+        
+        const activeRef = document.getElementById('statusBarActiveSlideRef');
+        if (activeRef) activeRef.innerText = "Blackout mode active";
+        triggerToast("Projector cleared successfully.");
+    }
+
+    // Queue functional improvements (adding, moving, and removing items)
+    function addCurrentPreviewToQueue() {
+        const newItem = {
+            id: state.queue.length + 1,
+            title: `${state.previewTitle} (${state.previewVersion})`,
+            subtitle: "Custom Queued Slide",
+            length: "Manual",
+            type: "Custom",
+            text: state.previewText,
+            ref: state.previewTitle
+        };
+        state.queue.push(newItem);
+        renderActivePane();
+        triggerToast("Slide added to queue.");
+    }
+
+    function clearAllQueue() {
+        state.queue = [];
+        renderActivePane();
+        triggerToast("Presentation queue cleared.");
+    }
+
+    function removeQueueItem(idx) {
+        state.queue.splice(idx, 1);
+        renderActivePane();
+        triggerToast("Item removed from queue.");
+    }
+
+    function moveQueueItem(idx, direction) {
+        const targetIdx = idx + direction;
+        if (targetIdx < 0 || targetIdx >= state.queue.length) return;
+        const temp = state.queue[idx];
+        state.queue[idx] = state.queue[targetIdx];
+        state.queue[targetIdx] = temp;
+        renderActivePane();
+        triggerToast("Queue sequence updated.");
+    }
+
+    function activateQueueItem(idx) {
+        const item = state.queue[idx];
+        if (item) {
+            pushTextToLive(item.text || item.title, item.ref || item.title);
+        }
+    }
+
+    function pushTextToPreview(text, ref) {
+        state.previewText = text;
+        state.previewTitle = ref;
+        state.previewVersion = "ESV";
+        state.previewBg = "linear-gradient(135deg, #1e3a8a, #0b132b)";
+        
+        const previewBox = document.getElementById('deckPreviewBox');
+        if (previewBox) {
+            previewBox.style.background = state.previewBg;
+            document.getElementById('previewSlideTitle').innerText = `"${state.previewText}"`;
+            document.getElementById('previewSlideSubtitle').innerText = `${state.previewTitle} (${state.previewVersion})`;
+        }
+        triggerToast(`Draft loaded for ${ref}`);
+    }
+
+    function pushTextToLive(text, ref) {
+        state.currentLiveText = text;
+        state.currentLiveTitle = ref;
+        state.currentLiveVersion = "ESV";
+        state.currentLiveBg = "linear-gradient(135deg, #ca8a04, #0f172a)";
+        
+        const liveBox = document.getElementById('deckLiveBox');
+        if (liveBox) {
+            liveBox.style.background = state.currentLiveBg;
+            document.getElementById('liveSlideTitle').innerText = `"${state.currentLiveText}"`;
+            document.getElementById('liveSlideSubtitle').innerText = `${state.currentLiveTitle} (${state.currentLiveVersion})`;
+            
+            liveBox.classList.remove('live-glowing-active');
+            void liveBox.offsetWidth;
+            liveBox.classList.add('live-glowing-active');
+        }
+        
+        const activeRef = document.getElementById('statusBarActiveSlideRef');
+        if (activeRef) activeRef.innerText = ref;
+        triggerToast(`Direct presentation active with ${ref}`);
+    }
+</script>
+
+<script>
+    // Transcription simulation functionalities
+    function handleMockTranscriptionKeydown(e) {
+        if (e.key === 'Enter') {
+            triggerSimulatedSpeech();
+        }
+    }
+
+    function triggerSimulatedSpeech() {
+        const input = document.getElementById('speechSimulatorInput');
+        if (!input || !input.value.trim()) return;
+        
+        const textStr = input.value.trim();
+        const now = new Date();
+        const timeStr = String(now.getHours()).padStart(2, '0') + ":" + String(now.getMinutes()).padStart(2, '0') + ":" + String(now.getSeconds()).padStart(2, '0');
+        
+        // Add to transcript list
+        state.transcriptList.push({
+            id: state.transcriptList.length + 1,
+            time: timeStr,
+            text: textStr
+        });
+
+        // Scan for keyword matches to pop dynamic matching scripture suggestion
+        const lower = textStr.toLowerCase();
+        let identified = false;
+
+        if (lower.includes("john 3") || lower.includes("3:16")) {
+            state.recentDetections.unshift({
+                verse: "John 3:16",
+                snippet: "For God so loved the world, that he gave his only Son...",
+                confidence: 99
+            });
+            identified = true;
+        } else if (lower.includes("romans 8") || lower.includes("8:28")) {
+            state.recentDetections.unshift({
+                verse: "Romans 8:28",
+                snippet: "And we know that for those who love God all things work together...",
+                confidence: 96
+            });
+            identified = true;
+        } else if (lower.includes("psalm 23") || lower.includes("shepherd")) {
+            state.recentDetections.unshift({
+                verse: "Psalm 23:1",
+                snippet: "The Lord is my shepherd; I shall not want. He makes me lie down...",
+                confidence: 94
+            });
+            identified = true;
+        } else if (lower.includes("genesis 1")) {
+            state.recentDetections.unshift({
+                verse: "Genesis 1:1",
+                snippet: "In the beginning, God created the heavens and the earth.",
+                confidence: 98
+            });
+            identified = true;
+        }
+
+        input.value = '';
+        renderActivePane();
+        
+        if (identified) {
+            triggerToast("Voice identification match: Scripture detected and loaded!");
+        } else {
+            triggerToast("Transcript added to stream.");
+        }
+
+        // Scroll terminal to bottom
+        setTimeout(() => {
+            const term = document.getElementById('transcriptTerminalFeed');
+            if (term) term.scrollTop = term.scrollHeight;
+        }, 50);
+    }
+</script>
+
+<script>
+    // Run Service Chronometer / Timer Logic
+    function formatTimer(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        return [
+            String(h).padStart(2, '0'),
+            String(m).padStart(2, '0'),
+            String(s).padStart(2, '0')
+        ].join(':');
+    }
+
+    function toggleServiceTimer() {
+        state.timerIsActive = !state.timerIsActive;
+        const btn = document.getElementById('timerControlBtn');
+        if (btn) {
+            btn.innerText = state.timerIsActive ? 'Pause Count' : 'Resume Count';
+            btn.className = state.timerIsActive 
+                ? "btn-action bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/20 text-emerald-300 px-3 py-1 rounded text-xs font-semibold"
+                : "btn-action bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/20 text-amber-300 px-3 py-1 rounded text-xs font-semibold";
+        }
+        triggerToast(state.timerIsActive ? "Timeline running clock resumed." : "Timeline running clock paused.");
+    }
+
+    function resetServiceTimer() {
+        state.timerValue = 0;
+        const timerLabel = document.getElementById('serviceTimer');
+        if (timerLabel) timerLabel.innerText = formatTimer(0);
+        triggerToast("Timeline clock reset to zero.");
+    }
+
+    // Initialize background interval clock
+    setInterval(() => {
+        if (state.timerIsActive) {
+            state.timerValue++;
+            const timerLabel = document.getElementById('serviceTimer');
+            if (timerLabel) {
+                timerLabel.innerText = formatTimer(state.timerValue);
+            }
+        }
+    }, 1000);
+</script>
+
+<script>
+    // Catalog Selector
+    function selectCatalogHymn(idx) {
+        state.activeHymnIndex = idx;
+        
+        const titleRef = document.getElementById('sheetSelectedHymnTitle');
+        if (titleRef) {
+            titleRef.innerText = `${state.hymns[idx].title} (SDA ${state.hymns[idx].number})`;
+            
+            const versesWrapper = document.getElementById('sheetSelectedHymnVerses');
+            versesWrapper.innerHTML = state.hymns[idx].verses.map((verse, vIdx) => `
+                <div class="p-3 bg-slate-950/40 rounded-lg border border-white/5 font-body text-xs text-slate-300">
+                    <span class="text-[9px] font-mono text-slate-500 font-bold block mb-1">VERSE ${vIdx + 1}</span>
+                    <p class="leading-relaxed font-semibold">"${verse}"</p>
+                </div>
+            `).join('');
+        }
+        renderActivePane();
+    }
+
+    function loadHymnToLyricPresenter(idx) {
+        state.activeHymnIndex = idx;
+        state.activeHymnVerseIndex = 0;
+        changeView('liveHymns', document.getElementById('nav-liveHymns'));
+        presentLyricVerse(0);
+    }
+
+    function presentLyricVerse(verseIdx) {
+        state.activeHymnVerseIndex = verseIdx;
+        const currentHymn = state.hymns[state.activeHymnIndex];
+        const text = currentHymn.verses[verseIdx];
+        
+        state.currentLiveText = text;
+        state.currentLiveTitle = currentHymn.title;
+        state.currentLiveVersion = `Verse ${verseIdx + 1}`;
+        state.currentLiveBg = "linear-gradient(135deg, #090e1a, #03050c)";
+        
+        const liveScreen = document.getElementById('hymnsLiveScreenVerse');
+        if (liveScreen) {
+            liveScreen.innerText = `"${text}"`;
+        }
+        
+        const activeRef = document.getElementById('statusBarActiveSlideRef');
+        if (activeRef) activeRef.innerText = `Hymn ${currentHymn.number} v${verseIdx + 1}`;
+        triggerToast(`Projecting Lyric Verse ${verseIdx + 1} of SDA Hymn ${currentHymn.number}`);
+        renderActivePane();
+    }
+
+    function filterHymnsDatabase() {
+        const query = document.getElementById('hymnCatalogSearchInput').value.toLowerCase();
+        const container = document.getElementById('hymnsListContainer');
+        
+        const filtered = state.hymns.filter(h => 
+            h.title.toLowerCase().includes(query) || 
+            h.number.toString().includes(query) || 
+            h.category.toLowerCase().includes(query)
+        );
+        
+        if (container) {
+            container.innerHTML = filtered.map((hymn, idx) => `
+                <div onclick="selectCatalogHymn(${idx})" class="glass-panel p-4 flex justify-between items-center cursor-pointer hover:border-yellow-500/20 transition-all ${state.activeHymnIndex === idx ? 'border-yellow-500/40 bg-yellow-400/5' : ''}">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-lg bg-slate-900 border border-white/5 flex items-center justify-center font-mono font-bold text-yellow-400 text-xs">
+                            #${hymn.number}
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-sm">${hymn.title}</h3>
+                            <span class="text-[9px] font-mono uppercase bg-slate-900 px-2 py-0.5 rounded border border-white/5 text-slate-400">${hymn.category}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="event.stopPropagation(); loadHymnToLyricPresenter(${idx})" class="btn-action bg-yellow-400 text-slate-950 hover:bg-yellow-500 text-xs px-3.5 py-1.5 rounded-lg font-bold">Present Lyricist</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+</script>
+
+<script>
+    // Sermon Slide Studio Functionalities
+    function selectSermonSlide(idx) {
+        state.sermonActiveIndex = idx;
+        renderActivePane();
+    }
+
+    function updateActiveSermonContent() {
+        const title = document.getElementById('editSermonTitle').value;
+        const ref = document.getElementById('editSermonScripture').value;
+        const body = document.getElementById('editSermonContent').value;
+        
+        state.sermonSlides[state.sermonActiveIndex].title = title;
+        state.sermonSlides[state.sermonActiveIndex].scripture = ref;
+        state.sermonSlides[state.sermonActiveIndex].content = body;
+        
+        document.getElementById('sermonEditorMockupBody').innerText = `"${body}"`;
+        document.getElementById('sermonEditorMockupRef').innerText = `${title} • ${ref}`;
+    }
+
+    function addNewSermonSlide() {
+        const newSlide = {
+            id: state.sermonSlides.length + 1,
+            title: "Scripture Reference Outline",
+            scripture: "Genesis 1:2",
+            content: "The earth was without form and void, and darkness was over the face of the deep.",
+            bg: "midnight"
+        };
+        state.sermonSlides.push(newSlide);
+        state.sermonActiveIndex = state.sermonSlides.length - 1;
+        renderActivePane();
+        triggerToast("Sermon outline cue slide created.");
+    }
+
+    function pushActiveSermonSlideToLive() {
+        const slide = state.sermonSlides[state.sermonActiveIndex];
+        state.currentLiveText = slide.content;
+        state.currentLiveTitle = slide.scripture;
+        state.currentLiveVersion = slide.title;
+        state.currentLiveBg = "linear-gradient(135deg, #1e293b, #030712)";
+        
+        const activeRef = document.getElementById('statusBarActiveSlideRef');
+        if (activeRef) activeRef.innerText = slide.scripture;
+        triggerToast(`Live Projector output is displaying ${slide.scripture}`);
+    }
+
+    function pushServiceItemToLive(name, type) {
+        state.currentLiveText = `Service Event: ${name}`;
+        state.currentLiveTitle = "Sabbath Program Flow";
+        state.currentLiveVersion = type;
+        state.currentLiveBg = "linear-gradient(135deg, #0d1424, #050812)";
+        
+        const activeRef = document.getElementById('statusBarActiveSlideRef');
+        if (activeRef) activeRef.innerText = name;
+        triggerToast(`Live output update: ${name}`);
+    }
+
+    function loadPlanToService(id) {
+        const plan = state.servicePlans.find(p => p.id === id);
+        triggerToast(`Plan "${plan.title}" activated into presentation desk.`);
+        changeView('runService', document.getElementById('nav-runService'));
+    }
+</script>
+
+<script>
+    // Broadcast Overlay Control logic
+    function updateOverlayState() {
+        state.overlay.title = document.getElementById('overlayHeadingInput').value;
+        state.overlay.subtitle = document.getElementById('overlaySubtitleInput').value;
+        state.overlay.color = document.getElementById('overlayColorSelector').value;
+        state.overlay.template = document.getElementById('overlayStyleSelector').value;
+        
+        const container = document.getElementById('simulatedOverlayContainer');
+        if (container) {
+            if (state.overlay.template === 'lower-third') {
+                container.innerHTML = `
+                    <div class="max-w-[70%] bg-slate-950/95 border-l-4 p-4 rounded-r-lg shadow-2xl backdrop-blur-md animate-pulse" style="border-left-color: ${state.overlay.color}">
+                        <h4 class="text-white text-sm font-bold tracking-wide">${state.overlay.title}</h4>
+                        <p class="text-slate-300 text-[11px] mt-1 font-body">${state.overlay.subtitle}</p>
+                    </div>
+                `;
+            } else if (state.overlay.template === 'lyrics-top') {
+                container.innerHTML = `
+                    <div class="w-full bg-black/90 p-3 rounded-lg flex items-center justify-between border-b" style="border-bottom-color: ${state.overlay.color}">
+                        <span class="text-[10px] font-mono text-slate-400">LOWER BANNER</span>
+                        <span class="text-white text-xs font-bold tracking-wide">${state.overlay.title} — ${state.overlay.subtitle}</span>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="w-full bg-slate-950/95 p-8 rounded-xl border border-white/5 text-center shadow-2xl">
+                        <h4 class="text-xl text-white font-display mb-3" style="color: ${state.overlay.color}">${state.overlay.title}</h4>
+                        <p class="text-slate-300 text-xs italic font-body">${state.overlay.subtitle}</p>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    function toggleOverlayOnAir() {
+        state.overlay.onAir = !state.overlay.onAir;
+        const container = document.getElementById('simulatedOverlayContainer');
+        const button = document.getElementById('overlayLiveToggleButton');
+        
+        if (container && button) {
+            container.style.opacity = state.overlay.onAir ? '1' : '0';
+            button.className = `btn-action flex-1 font-bold py-2.5 rounded-xl text-center text-xs live-ping-button ${state.overlay.onAir ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-yellow-400 hover:bg-yellow-500 text-slate-950'}`;
+            button.innerHTML = state.overlay.onAir ? 'Take OFF AIR (Blackout Overlay)' : 'Send Broadcast Overlay ON AIR';
+        }
+        triggerToast(state.overlay.onAir ? "Overlay sent live to OBS downstream." : "Overlay removed from live broadcast feed.");
+    }
+
+    function triggerQuickOverlay(title, subtitle) {
+        state.overlay.title = title;
+        state.overlay.subtitle = subtitle;
+        state.overlay.onAir = true;
+        
+        const headingInput = document.getElementById('overlayHeadingInput');
+        const subtitleInput = document.getElementById('overlaySubtitleInput');
+        if (headingInput && subtitleInput) {
+            headingInput.value = title;
+            subtitleInput.value = subtitle;
+        }
+        
+        updateOverlayState();
+        triggerToast(`Quick overlay triggered: ${title}`);
+    }
+
+    function openPlanCreatorModal() {
+        const modal = document.getElementById('actionModal');
+        modal.innerHTML = `
+        <div class="glass-panel p-6 w-[95%] max-w-[480px] space-y-4 border-yellow-500/30 modal-body-anim shadow-neon-gold">
+            <h3 class="text-lg font-bold text-white font-display border-b border-white/5 pb-2">Compile Sabbath Worship Plan</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-1.5">Worship Plan Title</label>
+                    <input id="modalPlanTitle" type="text" value="Special Fellowship Worship Program" class="w-full search-input px-3 py-2 text-xs text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-1.5">Pastor Preacher</label>
+                    <input id="modalPlanSpeaker" type="text" value="Elder Joshua Kim" class="w-full search-input px-3 py-2 text-xs text-slate-200">
+                </div>
+                <div>
+                    <label class="block text-xs font-mono text-slate-400 uppercase font-bold mb-1.5">Scheduled Date</label>
+                    <input id="modalPlanDate" type="text" value="Sabbath, June 20, 2026" class="w-full search-input px-3 py-2 text-xs text-slate-200">
+                </div>
+            </div>
+            <div class="flex items-center gap-3 pt-3">
+                <button onclick="closeActionModal()" class="btn-action bg-slate-900 border border-white/10 hover:border-white/20 text-slate-300 text-xs px-4 py-2 rounded-lg font-semibold flex-1 text-center">Cancel</button>
+                <button onclick="confirmCreateWorshipPlan()" class="btn-action bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs flex-1 text-center">Save Program Schedule</button>
+            </div>
+        </div>
+        `;
+        
+        modal.style.opacity = '1';
+        modal.style.pointerEvents = 'auto';
+    }
+
+    function closeActionModal() {
+        const modal = document.getElementById('actionModal');
+        modal.style.opacity = '0';
+        modal.style.pointerEvents = 'none';
+    }
+
+    function confirmCreateWorshipPlan() {
+        const title = document.getElementById('modalPlanTitle').value;
+        const speaker = document.getElementById('modalPlanSpeaker').value;
+        const date = document.getElementById('modalPlanDate').value;
+        
+        const newPlan = {
+            id: state.servicePlans.length + 1,
+            date: date,
+            title: title,
+            speaker: speaker,
+            status: "Upcoming",
+            items: [
+                { time: "11:00 AM", name: "Opening Praise and Song Leaders Service", type: "Music" },
+                { time: "11:15 AM", name: "Divine Lesson Sermon meditation", type: "Sermon" }
+            ]
+        };
+        
+        state.servicePlans.push(newPlan);
+        closeActionModal();
+        renderActivePane();
+        triggerToast(`Plan "${title}" created successfully.`);
+    }
+</script>
+
+<script>
+    window.onload = function() {
+        renderActivePane();
+        
+        // Background System Live Clock
+        setInterval(() => {
+            const clock = document.getElementById('topBarClock');
+            if (clock) {
+                const now = new Date();
+                let hrs = now.getHours();
+                const mns = String(now.getMinutes()).padStart(2, '0');
+                const scs = String(now.getSeconds()).padStart(2, '0');
+                const suffix = hrs >= 12 ? 'PM' : 'AM';
+                hrs = hrs % 12 || 12;
+                clock.textContent = `${String(hrs).padStart(2, '0')}:${mns}:${scs} ${suffix}`;
+            }
+        }, 1000);
+
+        // Sound Capturing Interactive Audio visualizer nodes generator
+        const visualizer = document.getElementById('audioVisualizer');
+        const barCount = 14;
+        const barColors = ['#eab308', '#ca8a04', '#eab308', '#fef08a'];
+        
+        for (let i = 0; i < barCount; i++) {
+            const node = document.createElement('div');
+            node.style.width = '3px';
+            node.style.borderRadius = '1.5px';
+            node.style.backgroundColor = barColors[Math.floor(Math.random() * barColors.length)];
+            node.style.height = '3px';
+            node.style.transition = 'height 0.1s cubic-bezier(0.16, 1, 0.3, 1)';
+            visualizer.appendChild(node);
+        }
+
+        setInterval(() => {
+            const elements = visualizer.children;
+            for (let i = 0; i < elements.length; i++) {
+                const h = Math.random() * 12 + 3;
+                elements[i].style.height = `${h}px`;
+            }
+        }, 120);
+    };
+</script>
+</body>
+</html>

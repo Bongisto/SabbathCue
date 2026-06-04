@@ -1037,7 +1037,7 @@ function HelpSection() {
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center justify-between glass-panel relative rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <GraduationCapIcon className="size-4 text-primary" />
@@ -1064,7 +1064,7 @@ function HelpSection() {
           </Button>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center justify-between glass-panel relative rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
               <KeyIcon className="size-4 text-muted-foreground" />
@@ -1110,7 +1110,11 @@ const sectionComponents: Record<NavSection, React.FC> = {
 /*  Main dialog                                                               */
 /* -------------------------------------------------------------------------- */
 
-export function SettingsDialog() {
+export function SettingsDialog({
+  triggerVariant = "ghost",
+}: {
+  triggerVariant?: "ghost" | "chrome"
+}) {
   const open = useSettingsDialogStore((s) => s.isOpen)
   const activeSection = useSettingsDialogStore((s) => s.activeSection)
   const setActiveSection = useSettingsDialogStore((s) => s.setActiveSection)
@@ -1131,21 +1135,26 @@ export function SettingsDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" data-tour="settings">
+        <Button
+          variant={triggerVariant}
+          size="icon-sm"
+          title="Settings"
+          data-tour="settings"
+        >
           <SettingsIcon className="size-3.5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[800px] lg:max-w-[900px]">
+      <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[800px] lg:max-w-[900px] dark:border-white/10">
         <DialogTitle className="sr-only">Settings</DialogTitle>
         <DialogDescription className="sr-only">
           Configure audio, display mode, and API keys.
         </DialogDescription>
         <SidebarProvider className="items-start">
           <Sidebar collapsible="none" className="hidden md:flex">
-            <div className="flex h-14 items-center border-r border-b border-border px-4">
+            <div className="controller-headboard glass-panel-header flex h-14 items-center border-r border-b border-white/[0.06] px-4 font-medium">
               Settings
             </div>
-            <SidebarContent className="border-r border-border">
+            <SidebarContent className="controller-sidebar border-r border-white/[0.06]">
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -1166,7 +1175,7 @@ export function SettingsDialog() {
             </SidebarContent>
           </Sidebar>
           <main className="flex h-[580px] flex-1 flex-col overflow-hidden">
-            <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border">
+            <header className="glass-panel-header flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.06]">
               <div className="flex items-center gap-2 px-4">
                 {sectionTitles[activeSection]}
               </div>

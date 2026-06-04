@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ApiKeyPrompt } from "@/components/ui/api-key-prompt"
 import { MicIcon, MicOffIcon, Trash2Icon } from "lucide-react"
 import { profileDetectionEvent } from "@/lib/detection-profiler"
+import { cn } from "@/lib/utils"
 import { useAudioStore } from "@/stores/audio-store"
 import { useBibleStore } from "@/stores/bible-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
@@ -103,7 +104,7 @@ export function TranscriptPanel() {
   return (
     <div
       data-slot="transcript-panel"
-      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="glass-panel relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
     >
       <PanelHeader
         title="Live transcript"
@@ -123,7 +124,8 @@ export function TranscriptPanel() {
           )}
           {isTranscribing && (
             <span
-              className={`mb-1 size-1.5 rounded-full ${
+              className={cn(
+                "transcript-recording-dot mb-1 size-1.5 rounded-full",
                 connectionStatus === "connected"
                   ? "bg-emerald-500"
                   : connectionStatus === "connecting"
@@ -131,7 +133,7 @@ export function TranscriptPanel() {
                     : connectionStatus === "error"
                       ? "bg-red-500"
                       : "bg-muted-foreground/40"
-              }`}
+              )}
               title={connectionStatus}
             />
           )}

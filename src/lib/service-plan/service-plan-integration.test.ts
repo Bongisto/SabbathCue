@@ -10,7 +10,8 @@ describe("service plan shell integration", () => {
   it("mounts the service plan workspace from the dashboard shell", () => {
     const dashboard = readSource("src/components/layout/dashboard.tsx")
     expect(dashboard).toContain("LazyServicePlanWorkspace")
-    expect(dashboard).toContain("Service Plans")
+    const nav = readSource("src/lib/dashboard-workspace-nav.ts")
+    expect(nav).toContain("Service Plans")
     expect(dashboard).not.toContain("LazyServicePlanDialog")
   })
 
@@ -46,10 +47,10 @@ describe("service plan shell integration", () => {
     expect(runService).toContain("RunServicePage")
   })
 
-  it("opens the planner from the transport bar", () => {
-    const transport = readSource("src/components/controls/transport-bar.tsx")
-    expect(transport).toContain("openPlanner")
-    expect(transport).toContain("Service Plan")
+  it("opens the planner from the app header", () => {
+    const header = readSource("src/components/layout/app-controller-header.tsx")
+    expect(header).toContain("openPlanner")
+    expect(header).toContain("Service plan")
   })
 
   it("validates service plan attachments through the backend command", () => {
@@ -89,7 +90,8 @@ describe("service plan shell integration", () => {
   it("mounts the run service workspace from the dashboard shell", () => {
     const dashboard = readSource("src/components/layout/dashboard.tsx")
     expect(dashboard).toContain("LazyRunServicePage")
-    expect(dashboard).toContain("Run Service")
+    const nav = readSource("src/lib/dashboard-workspace-nav.ts")
+    expect(nav).toContain("Run Service")
   })
 
   it("uses backend-derived attachment limit copy in sermon slide uploads", () => {

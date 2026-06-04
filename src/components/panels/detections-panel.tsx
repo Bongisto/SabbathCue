@@ -119,7 +119,7 @@ export function DetectionsPanel() {
   return (
     <div
       data-slot="detections-panel"
-      className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card"
+      className="glass-panel relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card"
     >
       <PanelHeader title="Recent detections" icon={<RadarIcon className="size-3" />} step={6}>
         <div className="flex items-center gap-2">

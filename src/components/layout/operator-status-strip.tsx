@@ -7,6 +7,7 @@ import { useAudioStore } from "@/stores/audio-store"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
+import { useServicePlanStore } from "@/stores/service-plan-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { detectionActions } from "@/hooks/use-detection"
 import { transcriptionActions } from "@/hooks/use-transcription"
@@ -36,6 +37,7 @@ export function OperatorStatusStrip() {
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
   const activeTheme = themes.find((t) => t.id === activeThemeId)
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
+  const activePlan = useServicePlanStore((s) => s.activePlan)
 
   const [detectionPaused, setDetectionPaused] = useState(false)
 
@@ -67,131 +69,168 @@ export function OperatorStatusStrip() {
     }).catch((e) => console.error("[operator-strip] toggle detection paused failed", e))
   }
 
+  const stripActionClass = (enabled: boolean, tone: "amber" | "emerald" | "red") =>
+    cn(
+      "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
+      enabled
+        ? tone === "emerald"
+          ? "text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400"
+          : tone === "red"
+            ? "text-red-500 hover:bg-red-500/15 hover:text-red-400"
+            : "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
+        : "cursor-not-allowed text-muted-foreground/30"
+    )
+
   return (
-    <div className="flex h-8 items-center gap-3 border-b border-border bg-card/80 px-3 text-xs text-muted-foreground">
-      <div className="flex items-center gap-2">
-        <MicIcon className="size-3.5" />
-        <LevelMeter level={audioLevel.rms} bars={5} />
-        <span>{isTranscribing ? "Listening" : "Idle"}</span>
+    <section
+      data-slot="operator-status-strip"
+      className="controller-status-strip flex h-11 shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-white/[0.06] px-5 text-xs select-none"
+    >
+      <div className="flex min-w-max items-center gap-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <MicIcon className="size-3.5" />
+          <LevelMeter level={audioLevel.rms} bars={5} />
+          <span className="font-mono text-[11px]">
+            {isTranscribing ? "Listening" : "Idle"}
+          </span>
+        </div>
+
+        <div className="h-4 w-px bg-white/10" />
+
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[11px] text-muted-foreground">
+            Active program:
+          </span>
+          <span className="text-[11px] font-bold text-foreground">
+            {activePlan?.name ?? "No service plan"}
+          </span>
+        </div>
+
+        <div className="h-4 w-px bg-white/10" />
+
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[11px] text-muted-foreground">
+            Current live:
+          </span>
+          <span className="font-mono text-[11px] font-bold text-[var(--brand-accent)]">
+            {liveItem?.reference ?? "—"}
+          </span>
+        </div>
+
+        <div className="h-4 w-px bg-white/10" />
+
+        <div className="flex items-center gap-2">
+          <RadioIcon
+            className={cn("size-3.5", isLive && "text-emerald-500")}
+          />
+          <Badge
+            variant={isLive ? "default" : "outline"}
+            className={cn(
+              "h-5 text-[0.5625rem] uppercase",
+              isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
+            )}
+          >
+            {isLive ? "On air" : "Hidden"}
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <Rows3Icon className="size-3.5" />
+          <span>{queueLength} queued</span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <RadioIcon
-          className={cn("size-3.5", isLive && "text-emerald-500")}
-        />
-        <Badge
-          variant={isLive ? "default" : "outline"}
-          className={cn(
-            "h-5 text-[0.5625rem] uppercase",
-            isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
-          )}
-        >
-          {isLive ? "On air" : "Hidden"}
-        </Badge>
-        <span className="max-w-[280px] truncate">
-          {liveItem?.reference ?? "No live verse"}
-        </span>
-      </div>
+      <div className="flex min-w-max shrink-0 items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-md border border-white/5 bg-slate-900/60 px-2.5 py-0.5 text-[10px]">
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              isLive ? "bg-emerald-500 animate-pulse" : "bg-red-500",
+            )}
+          />
+          <span className="font-mono text-muted-foreground">Broadcast:</span>
+          <span className="font-semibold uppercase text-foreground">
+            {isLive ? "On air" : "Standby"}
+          </span>
+        </div>
 
-      <div className="flex items-center gap-1.5">
-        <Rows3Icon className="size-3.5" />
-        <span>{queueLength} queued</span>
-      </div>
+        <div className="hidden items-center gap-1 lg:flex">
+          <SwatchBookIcon className="size-3.5 text-muted-foreground" />
+          <span className="max-w-[120px] truncate text-muted-foreground">
+            {activeTheme?.name ?? "No theme"}
+          </span>
+        </div>
 
-      <div className="flex items-center gap-1">
-        <button
-          onClick={clearLiveOutput}
-          disabled={!liveItem}
-          title="Clear Live Output"
-          className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            liveItem
-              ? "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
-              : "cursor-not-allowed text-muted-foreground/30"
-          )}
-        >
-          <Trash2Icon className="size-3" />
-          Clear Live
-        </button>
-        <button
-          onClick={clearPreview}
-          disabled={!previewItem && !selectedVerse}
-          title="Clear Preview"
-          className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            previewItem || selectedVerse
-              ? "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
-              : "cursor-not-allowed text-muted-foreground/30"
-          )}
-        >
-          <XIcon className="size-3" />
-          Clear Preview
-        </button>
-        <button
-          onClick={pauseAutoLive}
-          disabled={!readingModeAutoLive}
-          title="Pause Auto-Live"
-          className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            readingModeAutoLive
-              ? "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
-              : "cursor-not-allowed text-muted-foreground/30"
-          )}
-        >
-          <PauseCircleIcon className="size-3" />
-          Pause Auto-Live
-        </button>
-        <button
-          onClick={toggleDetectionPaused}
-          title={detectionPaused ? "Resume Suggestions" : "Pause Suggestions"}
-          className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            detectionPaused
-              ? "text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400"
-              : "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
-          )}
-        >
-          {detectionPaused ? (
-            <BellRingIcon className="size-3" />
-          ) : (
-            <BellOffIcon className="size-3" />
-          )}
-          {detectionPaused ? "Resume Suggestions" : "Pause Suggestions"}
-        </button>
-      </div>
+        <div className="h-4 w-px bg-white/10" />
 
-      <div className="ml-auto flex min-w-0 items-center gap-1.5">
-        <button
-          onClick={() => useBroadcastStore.getState().setLive(false)}
-          disabled={!isLive}
-          title="Hide Live Output"
-          className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            isLive
-              ? "text-red-500 hover:bg-red-500/15 hover:text-red-400"
-              : "cursor-not-allowed text-muted-foreground/30"
-          )}
-        >
-          <EyeOffIcon className="size-3" />
-          Hide Live Output
-        </button>
-        <button
-          onClick={() => { void transcriptionActions.stop() }}
-          disabled={!isTranscribing}
-          title="Stop Transcription"
-          className={cn(
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-            isTranscribing
-              ? "text-red-500 hover:bg-red-500/15 hover:text-red-400"
-              : "cursor-not-allowed text-muted-foreground/30"
-          )}
-        >
-          <StopCircleIcon className="size-3" />
-          Stop Transcription
-        </button>
-        <SwatchBookIcon className="size-3.5" />
-        <span className="truncate">{activeTheme?.name ?? "No theme"}</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={clearLiveOutput}
+            disabled={!liveItem}
+            title="Clear Live Output"
+            className={stripActionClass(Boolean(liveItem), "amber")}
+          >
+            <Trash2Icon className="size-3" />
+            Clear Live
+          </button>
+          <button
+            type="button"
+            onClick={clearPreview}
+            disabled={!previewItem && !selectedVerse}
+            title="Clear Preview"
+            className={stripActionClass(
+              Boolean(previewItem || selectedVerse),
+              "amber"
+            )}
+          >
+            <XIcon className="size-3" />
+            Preview
+          </button>
+          <button
+            type="button"
+            onClick={pauseAutoLive}
+            disabled={!readingModeAutoLive}
+            title="Pause Auto-Live"
+            className={stripActionClass(readingModeAutoLive, "amber")}
+          >
+            <PauseCircleIcon className="size-3" />
+            Auto-live
+          </button>
+          <button
+            type="button"
+            onClick={toggleDetectionPaused}
+            title={detectionPaused ? "Resume Suggestions" : "Pause Suggestions"}
+            className={stripActionClass(true, detectionPaused ? "emerald" : "amber")}
+          >
+            {detectionPaused ? (
+              <BellRingIcon className="size-3" />
+            ) : (
+              <BellOffIcon className="size-3" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => useBroadcastStore.getState().setLive(false)}
+            disabled={!isLive}
+            title="Hide Live Output"
+            className={stripActionClass(isLive, "red")}
+          >
+            <EyeOffIcon className="size-3" />
+            Hide
+          </button>
+          <button
+            type="button"
+            onClick={() => { void transcriptionActions.stop() }}
+            disabled={!isTranscribing}
+            title="Stop Transcription"
+            className={stripActionClass(isTranscribing, "red")}
+          >
+            <StopCircleIcon className="size-3" />
+            Stop mic
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   )
 }
