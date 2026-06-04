@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { invoke } from "@tauri-apps/api/core"
 import { Badge } from "@/components/ui/badge"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { cn } from "@/lib/utils"
@@ -10,22 +9,15 @@ import { useQueueStore } from "@/stores/queue-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { detectionActions } from "@/hooks/use-detection"
-import { transcriptionActions } from "@/hooks/use-transcription"
-import {
-  MicIcon,
-  RadioIcon,
-  Rows3Icon,
-  SwatchBookIcon,
-  EyeOffIcon,
-  StopCircleIcon,
-  Trash2Icon,
-  XIcon,
-  PauseCircleIcon,
-  BellOffIcon,
-  BellRingIcon,
-} from "lucide-react"
+import { OperatorStatusActions } from "@/components/layout/operator-status-actions"
+import { MicIcon, Rows3Icon, SwatchBookIcon } from "lucide-react"
 
-export function OperatorStatusStrip() {
+export function OperatorStatusStrip({
+  actionsLayout = "responsive",
+}: {
+  /** Force inline action buttons (used in tests). */
+  actionsLayout?: "responsive" | "inline"
+}) {
   const audioLevel = useAudioStore((s) => s.level)
   const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
   const isLive = useBroadcastStore((s) => s.isLive)
@@ -42,194 +34,110 @@ export function OperatorStatusStrip() {
   const [detectionPaused, setDetectionPaused] = useState(false)
 
   useEffect(() => {
-    detectionActions.getDetectionControlStatus().then(
-      (status) => setDetectionPaused(status.detection_paused)
-    ).catch((e) => console.error("[operator-strip] detection control status failed", e))
+    detectionActions
+      .getDetectionControlStatus()
+      .then((status) => setDetectionPaused(status.detection_paused))
+      .catch((e) =>
+        console.error("[operator-strip] detection control status failed", e)
+      )
   }, [])
 
-  const clearLiveOutput = () => {
-    useBroadcastStore.getState().setLiveItem(null)
-    useBroadcastStore.getState().setLive(false)
+  const actionProps = {
+    liveItem,
+    previewItem,
+    selectedVerse,
+    readingModeAutoLive,
+    detectionPaused,
+    isLive,
+    isTranscribing,
+    onDetectionPausedChange: setDetectionPaused,
   }
-
-  const clearPreview = () => {
-    useBroadcastStore.getState().setPreviewItem?.(null)
-    useBibleStore.getState().selectVerse(null)
-  }
-
-  const pauseAutoLive = () => {
-    useBroadcastStore.getState().setReadingModeAutoLive(false)
-    invoke("stop_reading_mode").catch((e) => console.error("[operator-strip] stop reading mode failed", e))
-  }
-
-  const toggleDetectionPaused = () => {
-    const next = !detectionPaused
-    detectionActions.setDetectionPaused(next).then(() => {
-      setDetectionPaused(next)
-    }).catch((e) => console.error("[operator-strip] toggle detection paused failed", e))
-  }
-
-  const stripActionClass = (enabled: boolean, tone: "amber" | "emerald" | "red") =>
-    cn(
-      "flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wider transition-colors",
-      enabled
-        ? tone === "emerald"
-          ? "text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400"
-          : tone === "red"
-            ? "text-red-500 hover:bg-red-500/15 hover:text-red-400"
-            : "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
-        : "cursor-not-allowed text-muted-foreground/30"
-    )
 
   return (
     <section
       data-slot="operator-status-strip"
-      className="controller-status-strip flex h-11 shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-white/[0.06] px-5 text-xs select-none"
+      className="controller-status-strip flex h-9 shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-white/[0.06] px-4 text-xs select-none"
     >
-      <div className="flex min-w-max items-center gap-4">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <MicIcon className="size-3.5" />
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
+        <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
+          <MicIcon className="size-3" />
           <LevelMeter level={audioLevel.rms} bars={5} />
-          <span className="font-mono text-[11px]">
+          <span className="font-mono text-[10px]">
             {isTranscribing ? "Listening" : "Idle"}
           </span>
         </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-3.5 w-px shrink-0 bg-white/10" />
 
-        <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[11px] text-muted-foreground">
-            Active program:
+        <div className="flex min-w-0 shrink items-center gap-1">
+          <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
+            Program:
           </span>
-          <span className="text-[11px] font-bold text-foreground">
-            {activePlan?.name ?? "No service plan"}
+          <span className="truncate text-[10px] font-semibold text-foreground">
+            {activePlan?.title ?? "No plan"}
           </span>
         </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-3.5 w-px shrink-0 bg-white/10" />
 
-        <div className="flex items-center gap-1.5">
-          <span className="font-mono text-[11px] text-muted-foreground">
-            Current live:
-          </span>
-          <span className="font-mono text-[11px] font-bold text-[var(--brand-accent)]">
+        <div className="flex min-w-0 shrink items-center gap-1">
+          <span className="font-mono text-[10px] text-muted-foreground">Live:</span>
+          <span className="truncate font-mono text-[10px] font-bold text-[var(--brand-accent)]">
             {liveItem?.reference ?? "—"}
           </span>
         </div>
 
-        <div className="h-4 w-px bg-white/10" />
+        <div className="h-3.5 w-px shrink-0 bg-white/10" />
 
-        <div className="flex items-center gap-2">
-          <RadioIcon
-            className={cn("size-3.5", isLive && "text-emerald-500")}
-          />
-          <Badge
-            variant={isLive ? "default" : "outline"}
-            className={cn(
-              "h-5 text-[0.5625rem] uppercase",
-              isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
-            )}
-          >
-            {isLive ? "On air" : "Hidden"}
-          </Badge>
-        </div>
+        <Badge
+          variant={isLive ? "default" : "outline"}
+          className={cn(
+            "h-5 shrink-0 font-mono text-[0.5rem] uppercase",
+            isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
+          )}
+        >
+          {isLive ? "On air" : "Hidden"}
+        </Badge>
 
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <Rows3Icon className="size-3.5" />
-          <span>{queueLength} queued</span>
+        <div className="hidden items-center gap-1 text-muted-foreground md:flex">
+          <Rows3Icon className="size-3" />
+          <span className="font-mono text-[10px]">{queueLength}</span>
         </div>
       </div>
 
-      <div className="flex min-w-max shrink-0 items-center gap-2">
-        <div className="flex items-center gap-1.5 rounded-md border border-white/5 bg-slate-900/60 px-2.5 py-0.5 text-[10px]">
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-1 rounded-md border border-white/5 bg-slate-900/60 px-2 py-0.5 font-mono text-[10px]">
           <span
             className={cn(
               "size-1.5 rounded-full",
-              isLive ? "bg-emerald-500 animate-pulse" : "bg-red-500",
+              isLive ? "bg-emerald-500 animate-pulse" : "bg-red-500/80",
             )}
           />
-          <span className="font-mono text-muted-foreground">Broadcast:</span>
+          <span className="text-muted-foreground">Broadcast</span>
           <span className="font-semibold uppercase text-foreground">
             {isLive ? "On air" : "Standby"}
           </span>
         </div>
 
-        <div className="hidden items-center gap-1 lg:flex">
-          <SwatchBookIcon className="size-3.5 text-muted-foreground" />
-          <span className="max-w-[120px] truncate text-muted-foreground">
-            {activeTheme?.name ?? "No theme"}
+        <div className="hidden max-w-[100px] items-center gap-1 lg:flex">
+          <SwatchBookIcon className="size-3 shrink-0 text-muted-foreground" />
+          <span className="truncate font-mono text-[10px] text-muted-foreground">
+            {activeTheme?.name ?? "Theme"}
           </span>
         </div>
 
-        <div className="h-4 w-px bg-white/10" />
-
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={clearLiveOutput}
-            disabled={!liveItem}
-            title="Clear Live Output"
-            className={stripActionClass(Boolean(liveItem), "amber")}
-          >
-            <Trash2Icon className="size-3" />
-            Clear Live
-          </button>
-          <button
-            type="button"
-            onClick={clearPreview}
-            disabled={!previewItem && !selectedVerse}
-            title="Clear Preview"
-            className={stripActionClass(
-              Boolean(previewItem || selectedVerse),
-              "amber"
-            )}
-          >
-            <XIcon className="size-3" />
-            Preview
-          </button>
-          <button
-            type="button"
-            onClick={pauseAutoLive}
-            disabled={!readingModeAutoLive}
-            title="Pause Auto-Live"
-            className={stripActionClass(readingModeAutoLive, "amber")}
-          >
-            <PauseCircleIcon className="size-3" />
-            Auto-live
-          </button>
-          <button
-            type="button"
-            onClick={toggleDetectionPaused}
-            title={detectionPaused ? "Resume Suggestions" : "Pause Suggestions"}
-            className={stripActionClass(true, detectionPaused ? "emerald" : "amber")}
-          >
-            {detectionPaused ? (
-              <BellRingIcon className="size-3" />
-            ) : (
-              <BellOffIcon className="size-3" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => useBroadcastStore.getState().setLive(false)}
-            disabled={!isLive}
-            title="Hide Live Output"
-            className={stripActionClass(isLive, "red")}
-          >
-            <EyeOffIcon className="size-3" />
-            Hide
-          </button>
-          <button
-            type="button"
-            onClick={() => { void transcriptionActions.stop() }}
-            disabled={!isTranscribing}
-            title="Stop Transcription"
-            className={stripActionClass(isTranscribing, "red")}
-          >
-            <StopCircleIcon className="size-3" />
-            Stop mic
-          </button>
-        </div>
+        {actionsLayout === "inline" ? (
+          <OperatorStatusActions {...actionProps} layout="inline" />
+        ) : (
+          <>
+            <div className="hidden 2xl:block">
+              <OperatorStatusActions {...actionProps} layout="inline" />
+            </div>
+            <div className="2xl:hidden">
+              <OperatorStatusActions {...actionProps} layout="menu" />
+            </div>
+          </>
+        )}
       </div>
     </section>
   )

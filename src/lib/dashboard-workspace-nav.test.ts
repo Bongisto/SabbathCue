@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   DASHBOARD_WORKSPACE_NAV,
+  DASHBOARD_WORKSPACE_NAV_GROUPS,
   workspaceNavLabel,
 } from "./dashboard-workspace-nav"
 import type { DashboardWorkspace } from "@/stores/dashboard-workspace-store"
@@ -20,6 +21,15 @@ describe("dashboard-workspace-nav", () => {
     expect(DASHBOARD_WORKSPACE_NAV.map((item) => item.id)).toEqual(
       EXPECTED_IDS
     )
+  })
+
+  it("groups core and media sections", () => {
+    expect(DASHBOARD_WORKSPACE_NAV_GROUPS.map((g) => g.id)).toEqual([
+      "core",
+      "media",
+    ])
+    expect(DASHBOARD_WORKSPACE_NAV_GROUPS[0]?.items).toHaveLength(4)
+    expect(DASHBOARD_WORKSPACE_NAV_GROUPS[1]?.items).toHaveLength(3)
   })
 
   it("opens planner only for service plans", () => {

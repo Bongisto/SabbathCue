@@ -41,7 +41,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   }
 
   return (
-    <div className="border-b border-border p-3 last:border-0">
+    <div className="interactive-row border-b border-border p-3 last:border-0">
       <div className="flex items-center gap-2">
         <ConfidenceDot confidence={detection.confidence} />
         <span className="text-xs font-medium text-muted-foreground">

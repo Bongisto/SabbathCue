@@ -39,6 +39,7 @@ vi.mock("@/stores/broadcast-store", () => {
     setLive: mockSetLive,
     setLiveItem: mockSetLiveVerse,
     setReadingModeAutoLive: mockSetReadingModeAutoLive,
+    setPreviewItem: vi.fn(),
   })
   return { useBroadcastStore }
 })
@@ -61,6 +62,11 @@ vi.mock("@/stores/bible-store", () => {
   useBibleStore.getState = () => ({ selectVerse: mockSelectVerse })
   return { useBibleStore }
 })
+
+vi.mock("@/stores/service-plan-store", () => ({
+  useServicePlanStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ activePlan: null }),
+}))
 
 vi.mock("@/hooks/use-detection", () => ({
   detectionActions: {
@@ -111,19 +117,25 @@ describe("OperatorStatusStrip emergency controls", () => {
     document.body.appendChild(container)
     root = createRoot(container)
     await act(async () => {
-      root?.render(React.createElement(OperatorStatusStrip))
+      root?.render(
+        React.createElement(OperatorStatusStrip, { actionsLayout: "inline" })
+      )
     })
   }
 
   function getButtonByTitle(title: string): HTMLButtonElement {
-    const button = document.querySelector<HTMLButtonElement>(`button[title="${title}"]`)
+    const button = document.querySelector<HTMLButtonElement>(
+      `button[title="${title}"]`
+    )
     expect(button).toBeTruthy()
     return button as HTMLButtonElement
   }
 
   async function click(button: HTMLButtonElement) {
     await act(async () => {
-      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }))
+      button.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true })
+      )
     })
   }
 
@@ -131,7 +143,7 @@ describe("OperatorStatusStrip emergency controls", () => {
     it("is disabled when not live", async () => {
       broadcastIsLive = false
       await renderStrip()
-      const btn = getButtonByTitle("Hide Live Output")
+      const btn = getButtonByTitle("Hide live output")
       expect(btn.disabled).toBe(true)
     })
 
@@ -139,7 +151,7 @@ describe("OperatorStatusStrip emergency controls", () => {
       broadcastIsLive = true
       broadcastLiveVerse = { reference: "John 3:16" }
       await renderStrip()
-      const btn = getButtonByTitle("Hide Live Output")
+      const btn = getButtonByTitle("Hide live output")
       expect(btn.disabled).toBe(false)
       await click(btn)
       expect(mockSetLive).toHaveBeenCalledWith(false)
@@ -150,7 +162,7 @@ describe("OperatorStatusStrip emergency controls", () => {
     it("is disabled when not transcribing", async () => {
       transcriptIsTranscribing = false
       await renderStrip()
-      const btn = getButtonByTitle("Stop Transcription")
+      const btn = getButtonByTitle("Stop transcription")
       expect(btn.disabled).toBe(true)
     })
 
@@ -158,7 +170,7 @@ describe("OperatorStatusStrip emergency controls", () => {
       transcriptIsTranscribing = true
       broadcastLiveVerse = { reference: "John 3:16" }
       await renderStrip()
-      const btn = getButtonByTitle("Stop Transcription")
+      const btn = getButtonByTitle("Stop transcription")
       expect(btn.disabled).toBe(false)
       await click(btn)
       expect(mockStop).toHaveBeenCalled()
@@ -169,7 +181,7 @@ describe("OperatorStatusStrip emergency controls", () => {
     it("is disabled when no live verse", async () => {
       broadcastLiveVerse = null
       await renderStrip()
-      const btn = getButtonByTitle("Clear Live Output")
+      const btn = getButtonByTitle("Clear live")
       expect(btn.disabled).toBe(true)
     })
 
@@ -177,7 +189,7 @@ describe("OperatorStatusStrip emergency controls", () => {
       broadcastLiveVerse = { reference: "John 3:16" }
       broadcastIsLive = true
       await renderStrip()
-      const btn = getButtonByTitle("Clear Live Output")
+      const btn = getButtonByTitle("Clear live")
       expect(btn.disabled).toBe(false)
       await click(btn)
       expect(mockSetLiveVerse).toHaveBeenCalledWith(null)
@@ -189,14 +201,14 @@ describe("OperatorStatusStrip emergency controls", () => {
     it("is disabled when no preview verse", async () => {
       bibleSelectedVerse = null
       await renderStrip()
-      const btn = getButtonByTitle("Clear Preview")
+      const btn = getButtonByTitle("Clear preview")
       expect(btn.disabled).toBe(true)
     })
 
     it("calls selectVerse(null) when clicked", async () => {
       bibleSelectedVerse = { book_number: 1, chapter: 1, verse: 1 }
       await renderStrip()
-      const btn = getButtonByTitle("Clear Preview")
+      const btn = getButtonByTitle("Clear preview")
       expect(btn.disabled).toBe(false)
       await click(btn)
       expect(mockSelectVerse).toHaveBeenCalledWith(null)
@@ -207,14 +219,14 @@ describe("OperatorStatusStrip emergency controls", () => {
     it("is disabled when auto-live is off", async () => {
       broadcastReadingModeAutoLive = false
       await renderStrip()
-      const btn = getButtonByTitle("Pause Auto-Live")
+      const btn = getButtonByTitle("Pause auto-live")
       expect(btn.disabled).toBe(true)
     })
 
     it("sets readingModeAutoLive false and invokes stop_reading_mode", async () => {
       broadcastReadingModeAutoLive = true
       await renderStrip()
-      const btn = getButtonByTitle("Pause Auto-Live")
+      const btn = getButtonByTitle("Pause auto-live")
       expect(btn.disabled).toBe(false)
       await click(btn)
       expect(mockSetReadingModeAutoLive).toHaveBeenCalledWith(false)
@@ -223,17 +235,19 @@ describe("OperatorStatusStrip emergency controls", () => {
   })
 
   describe("Pause/Resume Suggestions", () => {
-    it("calls setDetectionPaused(true) when Pause Suggestions is clicked", async () => {
+    it("calls setDetectionPaused(true) when Pause suggestions is clicked", async () => {
       await renderStrip()
-      await click(getButtonByTitle("Pause Suggestions"))
+      await click(getButtonByTitle("Pause suggestions"))
       expect(mockSetDetectionPaused).toHaveBeenCalledWith(true)
     })
 
-    it("calls setDetectionPaused(false) when Resume Suggestions is clicked", async () => {
+    it("calls setDetectionPaused(false) when Resume suggestions is clicked", async () => {
       await renderStrip()
-      await click(getButtonByTitle("Pause Suggestions"))
-      const resumeButton = getButtonByTitle("Resume Suggestions")
-      await click(resumeButton)
+      await click(getButtonByTitle("Pause suggestions"))
+      await act(async () => {
+        await Promise.resolve()
+      })
+      await click(getButtonByTitle("Resume suggestions"))
       expect(mockSetDetectionPaused).toHaveBeenCalledWith(false)
     })
   })

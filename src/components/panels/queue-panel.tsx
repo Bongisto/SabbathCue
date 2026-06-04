@@ -102,7 +102,7 @@ function QueueItemRow({
         onDrop(index)
       }}
       className={cn(
-        "group flex h-10 cursor-grab items-center gap-2 rounded-md px-2.5 transition-colors active:cursor-grabbing",
+        "interactive-row group flex h-10 cursor-grab items-center gap-2 rounded-md px-2.5 transition-colors active:cursor-grabbing",
         isDragging && "opacity-50",
         isDropTarget && "ring-1 ring-primary/60",
         isHighlighted

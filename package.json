@@ -45,6 +45,7 @@
     "@dnd-kit/react": "^0.3.2",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/source-sans-3": "^5.2.9",
     "@fontsource-variable/source-serif-4": "^5.2.9",
     "@fontsource/geist-mono": "^5.2.7",
     "@tailwindcss/vite": "^4.2.1",

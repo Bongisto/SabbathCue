@@ -370,7 +370,7 @@ export function Dashboard() {
 
           <div
             key={workspace}
-            className="view-pane-enter flex min-h-0 flex-1 flex-col overflow-hidden p-4"
+            className="view-pane-enter scrollbar-controller flex min-h-0 flex-1 flex-col overflow-hidden p-4"
           >
             {workspaceContent}
           </div>

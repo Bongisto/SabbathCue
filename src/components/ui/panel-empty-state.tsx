@@ -28,7 +28,7 @@ function PanelEmptyState({
         <div className="text-muted-foreground/50">{icon}</div>
       )}
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium text-foreground/70">
+        <p className="font-serif text-sm font-medium tracking-wide text-foreground/80">
           {title}
         </p>
         {description && (
