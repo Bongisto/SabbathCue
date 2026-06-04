@@ -8,6 +8,7 @@ export type DashboardWorkspace =
   | "live-service"
   | "live-hymns"
   | "sermon-slides"
+  | "settings"
 
 interface DashboardWorkspaceState {
   workspace: DashboardWorkspace

@@ -1,30 +1,43 @@
 import { create } from "zustand"
+import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 
-type SettingsSection = "audio" | "speech" | "bible" | "display" | "api-keys" | "remote" | "help"
+export type SettingsSection =
+  | "audio"
+  | "speech"
+  | "bible"
+  | "display"
+  | "api-keys"
+  | "remote"
+  | "help"
 
-interface SettingsDialogState {
-  isOpen: boolean
+interface SettingsNavigationState {
   activeSection: SettingsSection
+  pendingScroll: boolean
   openSettings: (section?: SettingsSection) => void
-  closeSettings: () => void
   setActiveSection: (section: SettingsSection) => void
+  clearPendingScroll: () => void
 }
 
-const useSettingsDialogStore = create<SettingsDialogState>((set) => ({
-  isOpen: false,
+const useSettingsNavigationStore = create<SettingsNavigationState>((set) => ({
   activeSection: "audio",
+  pendingScroll: false,
   openSettings: (section) =>
     set((state) => ({
-      isOpen: true,
       activeSection: section ?? state.activeSection,
+      pendingScroll: true,
     })),
-  closeSettings: () => set({ isOpen: false }),
-  setActiveSection: (activeSection) => set({ activeSection }),
+  setActiveSection: (activeSection) =>
+    set({ activeSection, pendingScroll: true }),
+  clearPendingScroll: () => set({ pendingScroll: false }),
 }))
 
 export function openSettings(section?: SettingsSection) {
-  useSettingsDialogStore.getState().openSettings(section)
+  const nav = useSettingsNavigationStore.getState()
+  nav.openSettings(section)
+  useDashboardWorkspaceStore.getState().setWorkspace("settings")
 }
 
-export { useSettingsDialogStore }
-export type { SettingsSection }
+/** @deprecated Use useSettingsNavigationStore */
+export const useSettingsDialogStore = useSettingsNavigationStore
+
+export { useSettingsNavigationStore }

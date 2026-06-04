@@ -16,7 +16,7 @@ import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
 import { EyeIcon, EyeOffIcon, RadioIcon, SendIcon, Maximize2Icon, Minimize2Icon } from "lucide-react"
 import { toast } from "sonner"
 
-export function LiveOutputPanel() {
+export function LiveOutputPanel({ className }: { className?: string }) {
   const isLive = useBroadcastStore((s) => s.isLive)
   const liveItem = useBroadcastStore((s) => s.liveItem)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
@@ -85,9 +85,9 @@ export function LiveOutputPanel() {
       ref={panelRef}
       data-slot="live-output-panel"
       className={cn(
-        "glass-panel relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card",
-        isLive && "live-glowing-active shadow-[inset_0_2px_0_0_rgba(16,185,129,0.35)]",
+        "glass-panel relative flex min-h-0 flex-col overflow-hidden",
         isFullscreen && "!rounded-none !border-0 !h-screen !w-screen",
+        className,
       )}
     >
       {!isFullscreen && (
@@ -176,24 +176,31 @@ export function LiveOutputPanel() {
 
       <div
         className={cn(
-          "flex min-h-0 flex-1 items-center justify-center p-4 transition-opacity",
+          "flex min-h-0 flex-1 bg-slate-950/50 p-4 transition-opacity",
           isFullscreen && "bg-black p-0",
           !isLive && "opacity-45",
         )}
       >
-        {visibleItem ? (
-          <CanvasPresentation
-            theme={activeTheme}
-            item={visibleItem}
-            className={isFullscreen ? "[&_canvas]:rounded-none" : undefined}
-          />
-        ) : (
-          <PanelEmptyState
-            icon={<EyeOffIcon className="size-8" />}
-            title="Nothing live"
-            description="Send a verse, hymn, or song slide to show audience output."
-          />
-        )}
+        <div
+          className={cn(
+            "flex h-full w-full items-center justify-center rounded-xl border border-white/5 p-6 text-center",
+            isLive && "live-glowing-active border-yellow-500/20",
+          )}
+        >
+          {visibleItem ? (
+            <CanvasPresentation
+              theme={activeTheme}
+              item={visibleItem}
+              className={isFullscreen ? "[&_canvas]:rounded-none" : undefined}
+            />
+          ) : (
+            <PanelEmptyState
+              icon={<EyeOffIcon className="size-8" />}
+              title="Nothing live"
+              description="Send a verse, hymn, or song slide to show audience output."
+            />
+          )}
+        </div>
       </div>
 
       <div className={cn("truncate border-t border-border px-4 py-2 text-xs text-muted-foreground", isFullscreen && "hidden")}>

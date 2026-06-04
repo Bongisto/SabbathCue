@@ -17,8 +17,9 @@ import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { PresentationDeckControls } from "@/components/panels/presentation-deck-controls"
 import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-export function PreviewPanel() {
+export function PreviewPanel({ className }: { className?: string }) {
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
   const previewItem = useBroadcastStore((s) => s.previewItem)
   const themes = useBroadcastStore((s) => s.themes)
@@ -71,7 +72,10 @@ export function PreviewPanel() {
   return (
     <div
       data-slot="preview-panel"
-      className="glass-panel relative flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-card"
+      className={cn(
+        "glass-panel relative flex min-h-0 flex-col overflow-hidden",
+        className,
+      )}
     >
       <PanelHeader title="Program preview" icon={<MonitorIcon className="size-3" />} step={2}>
         <Badge variant="outline" className="h-5 text-[0.5625rem] uppercase">

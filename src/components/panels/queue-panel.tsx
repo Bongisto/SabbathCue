@@ -102,7 +102,7 @@ function QueueItemRow({
         onDrop(index)
       }}
       className={cn(
-        "interactive-row group flex h-10 cursor-grab items-center gap-2 rounded-md px-2.5 transition-colors active:cursor-grabbing",
+        "queue-item group flex w-full cursor-grab items-center justify-between p-3 text-left active:cursor-grabbing",
         isDragging && "opacity-50",
         isDropTarget && "ring-1 ring-primary/60",
         isHighlighted
@@ -153,7 +153,7 @@ function QueueItemRow({
   )
 }
 
-export function QueuePanel() {
+export function QueuePanel({ className }: { className?: string }) {
   const items = useQueueStore((s) => s.items)
   const activeIndex = useQueueStore((s) => s.activeIndex)
   const highlightedId = useQueueStore((s) => s.highlightedId)
@@ -175,7 +175,10 @@ export function QueuePanel() {
   return (
     <div
       data-slot="queue-panel"
-      className="glass-panel relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card"
+      className={cn(
+        "glass-panel relative flex min-h-0 flex-col overflow-hidden",
+        className,
+      )}
     >
       <PanelHeader title="Queue" icon={<ListOrderedIcon className="size-3" />} step={4}>
         <div className="flex items-center gap-2">

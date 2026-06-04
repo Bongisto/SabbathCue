@@ -73,7 +73,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   )
 }
 
-export function SearchPanel() {
+export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
   const [activeTab, setActiveTab] = useState<SearchTab>("book")
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [chapter, setChapter] = useState(1)
@@ -391,7 +391,12 @@ export function SearchPanel() {
     <div
       ref={panelRef}
       data-slot="search-panel"
-      className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card outline-none"
+      className={cn(
+        "relative flex min-h-0 flex-col overflow-hidden outline-none",
+        embedded
+          ? "flex-1"
+          : "glass-panel min-h-0 flex-1 rounded-2xl border border-border bg-card",
+      )}
       onKeyDown={activeTab === "book" ? handleKeyDown : undefined}
       tabIndex={-1}
     >

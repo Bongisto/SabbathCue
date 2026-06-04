@@ -1,6 +1,36 @@
 import { createRoot } from "react-dom/client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import "@/index.css"
 import { useBroadcastOutputRuntime } from "@/hooks/use-broadcast-output-runtime"
+import { accentThemeClassName, type AccentTheme } from "@/stores/accent-theme-store"
+
+const ACCENT_STORAGE_KEY = "sabbathcue-accent-theme"
+
+function readAccentTheme(): AccentTheme {
+  try {
+    const raw = localStorage.getItem(ACCENT_STORAGE_KEY)
+    if (
+      raw === "gold" ||
+      raw === "emerald" ||
+      raw === "purple" ||
+      raw === "aurora"
+    ) {
+      return raw
+    }
+  } catch {
+    /* ignore */
+  }
+  return "gold"
+}
+
+function applyAccentThemeToDocument() {
+  const theme = readAccentTheme()
+  const root = document.documentElement
+  root.id = "bodyThemeContainer"
+  root.className = accentThemeClassName(theme)
+  document.body.style.margin = "0"
+  document.body.style.background = "var(--bg-deep)"
+}
 
 /** Read output ID from URL query param (?output=main or ?output=alt). Defaults to "main". */
 const outputId =
@@ -9,6 +39,17 @@ const outputId =
 function BroadcastCanvas() {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   useBroadcastOutputRuntime({ canvas, outputId })
+
+  useEffect(() => {
+    applyAccentThemeToDocument()
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === ACCENT_STORAGE_KEY) {
+        applyAccentThemeToDocument()
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
+  }, [])
 
   return (
     <canvas
@@ -25,6 +66,8 @@ function BroadcastCanvas() {
     />
   )
 }
+
+applyAccentThemeToDocument()
 
 const root = document.getElementById("broadcast-root")!
 createRoot(root).render(<BroadcastCanvas />)

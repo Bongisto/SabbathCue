@@ -56,7 +56,7 @@ export function OperatorStatusStrip({
   return (
     <section
       data-slot="operator-status-strip"
-      className="controller-status-strip flex h-9 shrink-0 items-center justify-between gap-3 overflow-x-auto border-b border-white/[0.06] px-4 text-xs select-none"
+      className="flex h-11 shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-[rgba(255,255,255,0.06)] bg-slate-950/80 px-5 text-xs select-none scrollbar-thin"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
         <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
@@ -82,7 +82,7 @@ export function OperatorStatusStrip({
 
         <div className="flex min-w-0 shrink items-center gap-1">
           <span className="font-mono text-[10px] text-muted-foreground">Live:</span>
-          <span className="truncate font-mono text-[10px] font-bold text-[var(--brand-accent)]">
+          <span className="truncate font-mono text-[10px] font-bold text-[var(--accent)]">
             {liveItem?.reference ?? "—"}
           </span>
         </div>

@@ -1,123 +1,111 @@
-import { lazy, Suspense, useState } from "react"
-import {
-  CastIcon,
-  ClipboardListIcon,
-  MoonIcon,
-  SunIcon,
-  PaletteIcon,
-} from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { SettingsDialog } from "@/components/settings-dialog"
-import { useBroadcastStore } from "@/stores/broadcast-store"
-import { useServicePlanStore } from "@/stores/service-plan-store"
-import { useTheme } from "@/components/theme-provider"
+import { useEffect, useState } from "react"
+import { ZapIcon, Trash2Icon } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
+import { useAccentThemeStore, type AccentTheme } from "@/stores/accent-theme-store"
+import { useBroadcastStore } from "@/stores/broadcast-store"
+import { isTauriRuntime } from "@/lib/tauri-runtime"
+import packageJson from "../../../package.json"
 
-const LazyBroadcastSettings = lazy(() =>
-  import("@/components/broadcast/broadcast-settings").then((mod) => ({
-    default: mod.BroadcastSettings,
-  }))
-)
+const ACCENT_SWATCHES: { id: AccentTheme; className: string; title: string }[] =
+  [
+    { id: "gold", className: "bg-yellow-400", title: "Sunrise Gold" },
+    { id: "emerald", className: "bg-emerald-500", title: "Emerald Sanctuary" },
+    {
+      id: "purple",
+      className: "bg-purple-400",
+      title: "Royal Amethyst",
+    },
+    { id: "aurora", className: "bg-sky-400", title: "Midnight Aurora" },
+  ]
 
-const LazyThemeDesigner = lazy(() =>
-  import("@/components/broadcast/theme-designer").then((mod) => ({
-    default: mod.ThemeDesigner,
-  }))
-)
+function formatClock(date: Date): string {
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+}
 
 export function AppControllerHeader() {
-  const { theme, setTheme } = useTheme()
-  const [broadcastOpen, setBroadcastOpen] = useState(false)
-  const [broadcastSettingsMounted, setBroadcastSettingsMounted] = useState(false)
-  const [themeDesignerMounted, setThemeDesignerMounted] = useState(false)
+  const theme = useAccentThemeStore((s) => s.theme)
+  const setTheme = useAccentThemeStore((s) => s.setTheme)
+  const [clock, setClock] = useState(() => formatClock(new Date()))
+
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(formatClock(new Date())), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const blackoutOutput = () => {
+    useBroadcastStore.getState().setLiveItem(null)
+    useBroadcastStore.getState().setLive(false)
+  }
+
+  const versionLabel = `v${packageJson.version}`
 
   return (
-    <header
-      data-slot="transport-bar"
-      className="controller-headboard z-50 flex h-14 shrink-0 items-center justify-between border-b border-white/[0.06] px-5 backdrop-blur-xl"
-    >
-      <div className="flex items-center gap-4">
-        <img
-          src="/app-logo.png"
-          alt={APP_DISPLAY_NAME}
-          className="h-9 w-auto object-contain"
-        />
-        <div className="flex flex-col leading-none">
-          <span className="font-serif text-lg tracking-wide text-foreground">
-            {APP_DISPLAY_NAME}
-          </span>
-          <span className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-            Presentation controller
+    <header className="z-50 flex h-[56px] shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[#02040a]/90 px-6 backdrop-blur-xl">
+      <div className="flex items-center gap-5">
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-tr from-yellow-400 to-amber-500 shadow-lg shadow-yellow-500/20 transition-transform duration-300 hover:rotate-12">
+            <ZapIcon className="size-[18px] text-black" strokeWidth={2.5} />
+          </div>
+          <div className="flex flex-col leading-none">
+            <span className="font-display text-xl tracking-wide text-white">
+              {APP_DISPLAY_NAME}
+            </span>
+            <span className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-slate-500">
+              Automated Presentation Space
+            </span>
+          </div>
+          <span className="ml-2 rounded-md border border-yellow-400/20 bg-yellow-400/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-yellow-400">
+            {versionLabel}
           </span>
         </div>
-        <Badge
-          variant="outline"
-          className="hidden border-[var(--brand-border)] bg-[var(--brand-accent-glow)] text-[0.5625rem] uppercase text-[var(--brand-accent)] sm:inline-flex"
-        >
-          Desktop
-        </Badge>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <SettingsDialog triggerVariant="chrome" />
-        <Button
-          variant="chrome"
-          size="icon-sm"
-          title="Broadcast settings"
-          data-tour="broadcast"
-          onClick={() => {
-            setBroadcastSettingsMounted(true)
-            setBroadcastOpen(true)
-          }}
-        >
-          <CastIcon className="size-3.5" />
-        </Button>
-        {broadcastSettingsMounted && (
-          <Suspense fallback={null}>
-            <LazyBroadcastSettings
-              open={broadcastOpen}
-              onOpenChange={setBroadcastOpen}
+      <div className="hidden items-center gap-6 font-mono text-sm text-slate-400 md:flex">
+        <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-slate-900/50 px-3 py-1 text-xs">
+          <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
+          <span>
+            {isTauriRuntime() ? "DESKTOP CORE: ACTIVE" : "WEB PREVIEW: ACTIVE"}
+          </span>
+        </div>
+        <div className="rounded-lg border border-white/5 bg-slate-950/60 px-3 py-1 text-xs font-semibold tracking-wider text-slate-100">
+          {clock}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 p-1">
+          <span className="hidden px-2 font-mono text-[10px] font-bold uppercase text-slate-400 sm:inline">
+            Theme:
+          </span>
+          {ACCENT_SWATCHES.map((swatch) => (
+            <button
+              key={swatch.id}
+              type="button"
+              title={swatch.title}
+              aria-label={swatch.title}
+              aria-pressed={theme === swatch.id}
+              onClick={() => setTheme(swatch.id)}
+              className={cn(
+                "btn-action size-[18px] rounded-md border border-white/10 transition-all hover:scale-125",
+                swatch.className,
+                theme === swatch.id && "ring-2 ring-white/40",
+              )}
             />
-          </Suspense>
-        )}
-        <Button
-          variant="chrome"
-          size="icon-sm"
-          title="Theme designer"
-          data-tour="theme"
-          onClick={() => {
-            setThemeDesignerMounted(true)
-            useBroadcastStore.getState().setDesignerOpen(true)
-          }}
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={blackoutOutput}
+          className="btn-action flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/25"
         >
-          <PaletteIcon className="size-3.5" />
-        </Button>
-        {themeDesignerMounted && (
-          <Suspense fallback={null}>
-            <LazyThemeDesigner />
-          </Suspense>
-        )}
-        <Button
-          variant="chrome"
-          size="icon-sm"
-          title="Toggle light/dark theme"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          {theme === "dark" ? (
-            <SunIcon className="size-3.5" />
-          ) : (
-            <MoonIcon className="size-3.5" />
-          )}
-        </Button>
-        <Button
-          variant="chrome"
-          size="icon-sm"
-          title="Service plan"
-          onClick={() => useServicePlanStore.getState().openPlanner()}
-        >
-          <ClipboardListIcon className="size-3.5" />
-        </Button>
+          <Trash2Icon className="size-[13px]" strokeWidth={2} />
+          <span>Blackout Output</span>
+        </button>
       </div>
     </header>
   )

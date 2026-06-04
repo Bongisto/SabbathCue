@@ -11,7 +11,7 @@ describe("service plan shell integration", () => {
     const dashboard = readSource("src/components/layout/dashboard.tsx")
     expect(dashboard).toContain("LazyServicePlanWorkspace")
     const nav = readSource("src/lib/dashboard-workspace-nav.ts")
-    expect(nav).toContain("Service Plans")
+    expect(nav).toContain("Service Schedules")
     expect(dashboard).not.toContain("LazyServicePlanDialog")
   })
 
@@ -47,10 +47,10 @@ describe("service plan shell integration", () => {
     expect(runService).toContain("RunServicePage")
   })
 
-  it("opens the planner from the app header", () => {
-    const header = readSource("src/components/layout/app-controller-header.tsx")
-    expect(header).toContain("openPlanner")
-    expect(header).toContain("Service plan")
+  it("opens the planner from the workspace sidebar", () => {
+    const sidebar = readSource("src/components/layout/workspace-sidebar.tsx")
+    expect(sidebar).toContain("openPlanner")
+    expect(sidebar).toContain("service-plans")
   })
 
   it("validates service plan attachments through the backend command", () => {
@@ -91,7 +91,7 @@ describe("service plan shell integration", () => {
     const dashboard = readSource("src/components/layout/dashboard.tsx")
     expect(dashboard).toContain("LazyRunServicePage")
     const nav = readSource("src/lib/dashboard-workspace-nav.ts")
-    expect(nav).toContain("Run Service")
+    expect(nav).toContain("Run Service Flow")
   })
 
   it("uses backend-derived attachment limit copy in sermon slide uploads", () => {

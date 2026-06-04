@@ -6,11 +6,10 @@
       "name": "rhema",
       "dependencies": {
         "@dnd-kit/react": "^0.3.2",
-        "@fontsource-variable/geist": "^5.2.8",
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource-variable/source-sans-3": "^5.2.9",
-        "@fontsource-variable/source-serif-4": "^5.2.9",
-        "@fontsource/geist-mono": "^5.2.7",
+        "@fontsource/dm-mono": "^5.2.7",
+        "@fontsource/dm-serif-display": "^5.2.8",
         "@tailwindcss/vite": "^4.2.1",
         "@tauri-apps/api": "2.10.1",
         "@tauri-apps/plugin-dialog": "~2",
@@ -229,15 +228,13 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
-    "@fontsource-variable/geist": ["@fontsource-variable/geist@5.2.8", "", {}, "sha512-cJ6m9e+8MQ5dCYJsLylfZrgBh6KkG4bOLckB35Tr9J/EqdkEM6QllH5PxqP1dhTvFup+HtMRPuz9xOjxXJggxw=="],
-
     "@fontsource-variable/inter": ["@fontsource-variable/inter@5.2.8", "", {}, "sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ=="],
 
     "@fontsource-variable/source-sans-3": ["@fontsource-variable/source-sans-3@5.2.9", "", {}, "sha512-K9fkQbb0BNnRmmaU+Gpr6U4IaYKpNzA8t07J6aam2i+6v84RT72MVpar8OBr3yYAEznj4riKivPQ2nAF2fPKsw=="],
 
-    "@fontsource-variable/source-serif-4": ["@fontsource-variable/source-serif-4@5.2.9", "", {}, "sha512-PPcxjLFk/fS0WHg79pDM2YNvz61kC+oYZ5cWZZyCS0DHpJncmuYOuiZAsvj4tDxlWPBEvxxcRLQQNmSaRbPkqw=="],
+    "@fontsource/dm-mono": ["@fontsource/dm-mono@5.2.7", "", {}, "sha512-Ma1az2atTVgQWuOWwjuxx26p/6A6CU9HBNKq1CFV6YKpKhpswnf9ry9Ql4+T6bTZzkdtSfS6tjJvqZOljVzIFQ=="],
 
-    "@fontsource/geist-mono": ["@fontsource/geist-mono@5.2.7", "", {}, "sha512-xVPVFISJg/K0VVd+aQN0Y7X/sw9hUcJPyDWFJ5GpyU3bHELhoRsJkPSRSHXW32mOi0xZCUQDOaPj1sqIFJ1FGg=="],
+    "@fontsource/dm-serif-display": ["@fontsource/dm-serif-display@5.2.8", "", {}, "sha512-GYSDSlGU6vyhv9a5MwaiVNf9HCuSVpK8hEFRyG4NNDHCDeHiX7YHDAcWsaoLKKcfXLgWG9YkBkk9T3SxM4rAjQ=="],
 
     "@gilbarbara/deep-equal": ["@gilbarbara/deep-equal@0.4.1", "", {}, "sha512-QF2BGeQjsa59T59XvFdR3is5jrl28Eg0J6giXAC5919bcqvR8XP4B+07tpbs6Y6/IQd4FBncaL2WVXIBgSxt4w=="],
 

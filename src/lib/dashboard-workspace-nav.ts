@@ -7,6 +7,7 @@ import {
   PlayCircleIcon,
   PresentationIcon,
   RadioIcon,
+  SettingsIcon,
 } from "lucide-react"
 import type { DashboardWorkspace } from "@/stores/dashboard-workspace-store"
 
@@ -14,47 +15,33 @@ export type DashboardWorkspaceNavItem = {
   id: DashboardWorkspace
   label: string
   icon: LucideIcon
+  /** Insert a divider before this item (reference flat nav). */
+  dividerBefore?: boolean
   opensPlanner?: boolean
 }
 
-export type DashboardWorkspaceNavGroup = {
-  id: "core" | "media"
-  label: string
-  items: DashboardWorkspaceNavItem[]
-}
-
-export const DASHBOARD_WORKSPACE_NAV_GROUPS: DashboardWorkspaceNavGroup[] = [
+/** Flat sidebar order matching reference HTML. */
+export const DASHBOARD_WORKSPACE_NAV: DashboardWorkspaceNavItem[] = [
+  { id: "live", label: "Live Desk", icon: LayoutGridIcon },
+  { id: "run-service", label: "Run Service Flow", icon: PlayCircleIcon },
   {
-    id: "core",
-    label: "Core",
-    items: [
-      { id: "live", label: "Live", icon: LayoutGridIcon },
-      { id: "run-service", label: "Run Service", icon: PlayCircleIcon },
-      {
-        id: "service-plans",
-        label: "Service Plans",
-        icon: ClipboardListIcon,
-        opensPlanner: true,
-      },
-      { id: "live-service", label: "Live Service", icon: RadioIcon },
-    ],
+    id: "service-plans",
+    label: "Service Schedules",
+    icon: ClipboardListIcon,
+    opensPlanner: true,
   },
+  { id: "live-service", label: "Broadcast Overlays", icon: RadioIcon },
+  { id: "hymns", label: "SDA Hymns Search", icon: BookOpenIcon, dividerBefore: true },
+  { id: "live-hymns", label: "Lyric Presenter", icon: Music2Icon },
+  { id: "sermon-slides", label: "Sermon Slide Studio", icon: PresentationIcon },
   {
-    id: "media",
-    label: "Media",
-    items: [
-      { id: "hymns", label: "Hymns", icon: BookOpenIcon },
-      { id: "live-hymns", label: "Live Hymns", icon: Music2Icon },
-      { id: "sermon-slides", label: "Sermon Slides", icon: PresentationIcon },
-    ],
+    id: "settings",
+    label: "System Settings",
+    icon: SettingsIcon,
+    dividerBefore: true,
   },
 ]
 
-export const DASHBOARD_WORKSPACE_NAV: DashboardWorkspaceNavItem[] =
-  DASHBOARD_WORKSPACE_NAV_GROUPS.flatMap((group) => group.items)
-
 export function workspaceNavLabel(id: DashboardWorkspace): string {
-  return (
-    DASHBOARD_WORKSPACE_NAV.find((item) => item.id === id)?.label ?? id
-  )
+  return DASHBOARD_WORKSPACE_NAV.find((item) => item.id === id)?.label ?? id
 }

@@ -15,26 +15,19 @@ function PanelHeader({
   step?: number
 }) {
   return (
-    <div
-      data-slot="panel-header"
-      className={cn(
-        "glass-panel-header relative z-[3] flex min-h-11 items-center justify-between border-b border-border bg-card px-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]",
-        className
-      )}
-      {...props}
-    >
-      <span className="flex items-center gap-2 text-[0.6875rem] font-medium uppercase tracking-wider text-muted-foreground">
+    <div className={cn("panel-header", className)} {...props}>
+      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-300">
         {step !== undefined && (
-          <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-muted-foreground/15 text-[0.5625rem] font-bold text-muted-foreground">
+          <span className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-slate-400">
             {step}
           </span>
         )}
         {icon}
         {title}
       </span>
-      {children && (
+      {children ? (
         <div className="flex items-center gap-1">{children}</div>
-      )}
+      ) : null}
     </div>
   )
 }

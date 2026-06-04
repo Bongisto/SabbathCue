@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { cn } from "@/lib/utils"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
@@ -90,7 +91,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   )
 }
 
-export function DetectionsPanel() {
+export function DetectionsPanel({ className }: { className?: string }) {
   const { detections } = useDetection()
   const confidenceThreshold = useSettingsStore((s) => s.confidenceThreshold)
   const [semanticStatus, setSemanticStatus] = useState<{
@@ -119,7 +120,10 @@ export function DetectionsPanel() {
   return (
     <div
       data-slot="detections-panel"
-      className="glass-panel relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card"
+      className={cn(
+        "glass-panel relative flex min-h-0 flex-col overflow-hidden",
+        className,
+      )}
     >
       <PanelHeader title="Recent detections" icon={<RadarIcon className="size-3" />} step={6}>
         <div className="flex items-center gap-2">

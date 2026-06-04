@@ -1,28 +1,34 @@
 import {
   lazy,
   Suspense,
-  useCallback,
   useEffect,
   useMemo,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PanelHeader } from "@/components/ui/panel-header"
-import { ResizeHandle } from "@/components/layout/dashboard"
-import {
-  clampNumber,
-  loadDashboardLayoutState,
-  saveDashboardLayoutState,
-} from "@/lib/dashboard-layout"
 import { LiveOutputPanel } from "@/components/panels/live-output-panel"
 import { PreviewPanel } from "@/components/panels/preview-panel"
 import { QueuePanel } from "@/components/panels/queue-panel"
 import { TranscriptPanel } from "@/components/panels/transcript-panel"
 import { SERVICE_PLAN_TEMPLATES } from "@/lib/service-plan/service-plan-templates"
 import { useServicePlanStore } from "@/stores/service-plan-store"
+import { useBroadcastStore } from "@/stores/broadcast-store"
+import { CastIcon, PaletteIcon } from "lucide-react"
+
+const LazyBroadcastSettings = lazy(() =>
+  import("@/components/broadcast/broadcast-settings").then((mod) => ({
+    default: mod.BroadcastSettings,
+  })),
+)
+
+const LazyThemeDesigner = lazy(() =>
+  import("@/components/broadcast/theme-designer").then((mod) => ({
+    default: mod.ThemeDesigner,
+  })),
+)
 import {
   CalendarClockIcon,
   ClipboardListIcon,
@@ -47,7 +53,6 @@ import {
   loadActiveSermonSlideDeck,
   presentSermonSlideAt,
 } from "@/services/slides/sermon-slide-voice-control"
-import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { getPresentationRenderData } from "@/types"
@@ -352,53 +357,14 @@ export function ServicePlanLibraryPanel() {
 
 export function ServicePlanWorkspace() {
   const activePlan = useServicePlanStore((s) => s.activePlan)
-  const [libraryWidth, setLibraryWidth] = useState(
-    () => loadDashboardLayoutState().servicePlanLibraryWidth
-  )
-
-  useEffect(() => {
-    const layout = loadDashboardLayoutState()
-    if (layout.servicePlanLibraryWidth !== libraryWidth) {
-      layout.servicePlanLibraryWidth = libraryWidth
-      saveDashboardLayoutState(layout)
-    }
-  }, [libraryWidth])
-
-  const startLibraryResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      const startX = event.clientX
-      const startWidth = libraryWidth
-      const onMove = (moveEvent: PointerEvent) => {
-        setLibraryWidth(
-          clampNumber(startWidth + moveEvent.clientX - startX, 240, 480)
-        )
-      }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
-    },
-    [libraryWidth]
-  )
 
   return (
     <div
-      className="grid h-full min-h-0 gap-3 p-4"
-      style={{
-        gridTemplateColumns: `${libraryWidth}px 6px minmax(0, 1fr)`,
-      }}
+      className="view-pane grid min-h-full grid-cols-1 gap-5 xl:grid-cols-[300px_minmax(0,1fr)]"
       data-slot="service-plan-workspace"
     >
       <ServicePlanLibraryPanel />
-      <ResizeHandle
-        axis="x"
-        label="Resize service plan library"
-        onPointerDown={startLibraryResize}
-      />
-      <div className="min-h-0 overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+      <div className="glass-panel relative min-h-[520px] overflow-hidden">
         {activePlan ? (
           <Suspense
             fallback={
@@ -458,37 +424,6 @@ export function RunServicePage() {
     [activePlan],
   )
   const slideDeck = useMemo(() => buildSermonSlideDeck(activeItem), [activeItem])
-  const [timelineWidth, setTimelineWidth] = useState(
-    () => loadDashboardLayoutState().liveServiceContextWidth,
-  )
-
-  useEffect(() => {
-    const layout = loadDashboardLayoutState()
-    if (layout.liveServiceContextWidth !== timelineWidth) {
-      layout.liveServiceContextWidth = timelineWidth
-      saveDashboardLayoutState(layout)
-    }
-  }, [timelineWidth])
-
-  const startTimelineResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      const startX = event.clientX
-      const startWidth = timelineWidth
-      const onMove = (moveEvent: PointerEvent) => {
-        setTimelineWidth(
-          clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520),
-        )
-      }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
-    },
-    [timelineWidth],
-  )
 
   const previewSlide = (index: number) => {
     const slide = slideDeck[index]
@@ -531,13 +466,8 @@ export function RunServicePage() {
       <ServiceLiveContextPanel />
       <LiveProductionGrid />
 
-      <div
-        className="grid min-h-0 flex-1 gap-3"
-        style={{
-          gridTemplateColumns: `minmax(0, 1fr) 6px ${timelineWidth}px`,
-        }}
-      >
-        <section className="flex min-h-0 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="glass-panel relative flex min-h-0 flex-col overflow-hidden">
           <PanelHeader title="Run Service" icon={<RadioIcon className="size-4" />}>
             <Badge variant="outline" className="text-[0.5625rem] uppercase">
               {activeItemContentLabel(activeItem)}
@@ -655,13 +585,7 @@ export function RunServicePage() {
           )}
         </section>
 
-        <ResizeHandle
-          axis="x"
-          label="Resize run service timeline"
-          onPointerDown={startTimelineResize}
-        />
-
-        <section className="flex min-h-0 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+        <section className="glass-panel relative flex min-h-0 flex-col overflow-hidden">
           <PanelHeader
             title="Service timeline"
             icon={<ClipboardListIcon className="size-4" />}
@@ -687,55 +611,67 @@ export function RunServicePage() {
 }
 
 export function LiveServicePlanPage() {
+  const [broadcastOpen, setBroadcastOpen] = useState(false)
+  const [broadcastSettingsMounted, setBroadcastSettingsMounted] = useState(false)
+  const [themeDesignerMounted, setThemeDesignerMounted] = useState(false)
   const activePlan = useServicePlanStore((s) => s.activePlan)
   const serviceContext = useServicePlanStore((s) => s.serviceContext)
   const orderedItems = useMemo(
     () => [...(activePlan?.items ?? [])].sort((a, b) => a.order - b.order),
     [activePlan?.items]
   )
-  const [contextWidth, setContextWidth] = useState(
-    () => loadDashboardLayoutState().liveServiceContextWidth
-  )
-
-  useEffect(() => {
-    const layout = loadDashboardLayoutState()
-    if (layout.liveServiceContextWidth !== contextWidth) {
-      layout.liveServiceContextWidth = contextWidth
-      saveDashboardLayoutState(layout)
-    }
-  }, [contextWidth])
-
-  const startContextResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      const startX = event.clientX
-      const startWidth = contextWidth
-      const onMove = (moveEvent: PointerEvent) => {
-        setContextWidth(
-          clampNumber(startWidth - (moveEvent.clientX - startX), 240, 480)
-        )
-      }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
-    },
-    [contextWidth]
-  )
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4">
+    <div className="view-pane flex h-full min-h-0 flex-col gap-5 overflow-hidden">
+      <div className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          Downstream broadcast
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="chrome"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              setBroadcastSettingsMounted(true)
+              setBroadcastOpen(true)
+            }}
+          >
+            <CastIcon className="size-3.5" />
+            Broadcast settings
+          </Button>
+          <Button
+            variant="chrome"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              setThemeDesignerMounted(true)
+              useBroadcastStore.getState().setDesignerOpen(true)
+            }}
+          >
+            <PaletteIcon className="size-3.5" />
+            Theme designer
+          </Button>
+        </div>
+      </div>
+      {broadcastSettingsMounted && (
+        <Suspense fallback={null}>
+          <LazyBroadcastSettings
+            open={broadcastOpen}
+            onOpenChange={setBroadcastOpen}
+          />
+        </Suspense>
+      )}
+      {themeDesignerMounted && (
+        <Suspense fallback={null}>
+          <LazyThemeDesigner />
+        </Suspense>
+      )}
+
       <LiveProductionGrid />
 
-      <div
-        className="grid min-h-0 flex-1 gap-3"
-        style={{
-          gridTemplateColumns: `minmax(0, 1fr) 6px ${contextWidth}px`,
-        }}
-      >
-        <section className="min-h-0 overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="glass-panel relative min-h-0 overflow-hidden">
           <PanelHeader
             title="Live Service Plan"
             icon={<ClipboardListIcon className="size-4" />}
@@ -802,12 +738,7 @@ export function LiveServicePlanPage() {
             </div>
           </div>
         </section>
-        <ResizeHandle
-          axis="x"
-          label="Resize live service context panel"
-          onPointerDown={startContextResize}
-        />
-        <section className="min-h-0 overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+        <section className="glass-panel relative min-h-0 overflow-hidden">
           <PanelHeader
             title="Live Context"
             icon={<FileTextIcon className="size-4" />}
@@ -852,49 +783,13 @@ export function LiveHymnPage() {
   const deck = useHymnSlideStore((s) => s.deck)
   const activeIndex = useHymnSlideStore((s) => s.activeIndex)
   const activeSlide = deck[activeIndex] ?? null
-  const [lyricsWidth, setLyricsWidth] = useState(
-    () => loadDashboardLayoutState().liveHymnLyricsWidth
-  )
-
-  useEffect(() => {
-    const layout = loadDashboardLayoutState()
-    if (layout.liveHymnLyricsWidth !== lyricsWidth) {
-      layout.liveHymnLyricsWidth = lyricsWidth
-      saveDashboardLayoutState(layout)
-    }
-  }, [lyricsWidth])
-
-  const startLyricsResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      const startX = event.clientX
-      const startWidth = lyricsWidth
-      const onMove = (moveEvent: PointerEvent) => {
-        setLyricsWidth(
-          clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520)
-        )
-      }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
-    },
-    [lyricsWidth]
-  )
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4">
       <LiveProductionGrid />
 
-      <div
-        className="grid min-h-0 flex-1 gap-3"
-        style={{
-          gridTemplateColumns: `minmax(0, 1fr) 6px ${lyricsWidth}px`,
-        }}
-      >
-        <section className="min-h-0 overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="glass-panel relative min-h-0 overflow-hidden">
           <PanelHeader
             title="Live Hymns"
             icon={<ListMusicIcon className="size-4" />}
@@ -969,12 +864,7 @@ export function LiveHymnPage() {
             </div>
           </div>
         </section>
-        <ResizeHandle
-          axis="x"
-          label="Resize lyrics panel"
-          onPointerDown={startLyricsResize}
-        />
-        <section className="min-h-0 overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+        <section className="glass-panel relative min-h-0 overflow-hidden">
           <PanelHeader
             title="Current Lyrics"
             icon={<FileTextIcon className="size-4" />}
@@ -1051,49 +941,12 @@ export function SermonSlidesPage() {
     updateItem(activeItem.id, { attachments: [...slides, ...others] })
   }
 
-  const [editorWidth, setEditorWidth] = useState(
-    () => loadDashboardLayoutState().sermonSlidesEditorWidth
-  )
-
-  useEffect(() => {
-    const layout = loadDashboardLayoutState()
-    if (layout.sermonSlidesEditorWidth !== editorWidth) {
-      layout.sermonSlidesEditorWidth = editorWidth
-      saveDashboardLayoutState(layout)
-    }
-  }, [editorWidth])
-
-  const startEditorResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault()
-      const startX = event.clientX
-      const startWidth = editorWidth
-      const onMove = (moveEvent: PointerEvent) => {
-        setEditorWidth(
-          clampNumber(startWidth - (moveEvent.clientX - startX), 280, 520)
-        )
-      }
-      const onUp = () => {
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-      }
-      window.addEventListener("pointermove", onMove)
-      window.addEventListener("pointerup", onUp)
-    },
-    [editorWidth]
-  )
-
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3">
       <LiveProductionGrid />
 
-      <div
-        className="grid min-h-0 flex-1 gap-2"
-        style={{
-          gridTemplateColumns: `minmax(0, 1fr) 6px ${editorWidth}px`,
-        }}
-      >
-        <section className="flex min-h-0 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="glass-panel relative flex min-h-0 flex-col overflow-hidden">
           <PanelHeader
             title="Sermon Slides"
             icon={<ImagesIcon className="size-4" />}
@@ -1163,13 +1016,7 @@ export function SermonSlidesPage() {
           </div>
         </section>
 
-        <ResizeHandle
-          axis="x"
-          label="Resize slide editor panel"
-          onPointerDown={startEditorResize}
-        />
-
-        <section className="flex min-h-0 flex-col overflow-hidden glass-panel relative rounded-2xl border border-border bg-card">
+        <section className="glass-panel relative flex min-h-0 flex-col overflow-hidden">
           <PanelHeader
             title="Slide List"
             icon={<FileTextIcon className="size-4" />}
@@ -1189,7 +1036,7 @@ export function SermonSlidesPage() {
                   onChange={(event) =>
                     void setActiveItem(event.target.value || null)
                   }
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                  className="search-input h-8 w-full px-2 text-xs"
                 >
                   <option value="">Select an item</option>
                   {orderedItems.map((item) => (

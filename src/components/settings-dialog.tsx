@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, type ComponentType } from "react"
 import { invoke } from "@tauri-apps/api/core"
 
 import { Button } from "@/components/ui/button"
@@ -14,27 +14,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Slider } from "@/components/ui/slider"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
-import {
   MicIcon,
   TvIcon,
   KeyIcon,
-  SettingsIcon,
   CheckIcon,
   BookOpenIcon,
   RadioIcon,
@@ -50,24 +32,19 @@ import { useTranscriptStore } from "@/stores/transcript-store"
 import { useAssets } from "@/hooks/use-assets"
 import { transcriptionActions } from "@/hooks/use-transcription"
 import { useTutorialStore } from "@/stores/tutorial-store"
-import { useSettingsDialogStore } from "@/lib/settings-dialog"
+import {
+  useSettingsNavigationStore,
+  type SettingsSection,
+} from "@/lib/settings-dialog"
 import type { DeviceInfo } from "@/types/audio"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
+import { cn } from "@/lib/utils"
 
 /* -------------------------------------------------------------------------- */
 /*  Nav definition                                                            */
 /* -------------------------------------------------------------------------- */
 
-type NavSection =
-  | "audio"
-  | "speech"
-  | "bible"
-  | "display"
-  | "api-keys"
-  | "remote"
-  | "help"
-
-const navItems: { name: string; id: NavSection; icon: React.ReactNode }[] = [
+const navItems: { name: string; id: SettingsSection; icon: React.ReactNode }[] = [
   {
     name: "Audio",
     id: "audio",
@@ -583,7 +560,7 @@ function ApiKeysSection() {
 /*  Section titles                                                            */
 /* -------------------------------------------------------------------------- */
 
-const sectionTitles: Record<NavSection, string> = {
+const sectionTitles: Record<SettingsSection, string> = {
   audio: "Audio",
   speech: "Speech Recognition",
   bible: "Bible Translation",
@@ -1026,8 +1003,6 @@ function RemoteControlSection() {
 /* -------------------------------------------------------------------------- */
 
 function HelpSection() {
-  const closeSettings = useSettingsDialogStore((s) => s.closeSettings)
-
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -1053,10 +1028,7 @@ function HelpSection() {
             variant="outline"
             size="sm"
             onClick={() => {
-              closeSettings()
-              setTimeout(() => {
-                useTutorialStore.getState().startTutorial()
-              }, 300)
+              useTutorialStore.getState().startTutorial()
             }}
           >
             <GraduationCapIcon className="mr-1.5 size-3.5" />
@@ -1097,7 +1069,7 @@ function StatusDot({ running }: { running: boolean }) {
   )
 }
 
-const sectionComponents: Record<NavSection, React.FC> = {
+const sectionComponents: Record<SettingsSection, ComponentType> = {
   audio: AudioSection,
   speech: SpeechSection,
   bible: BibleSection,
@@ -1107,85 +1079,72 @@ const sectionComponents: Record<NavSection, React.FC> = {
   help: HelpSection,
 }
 
-/*  Main dialog                                                               */
+/*  Full-page System Settings workspace                                         */
 /* -------------------------------------------------------------------------- */
 
-export function SettingsDialog({
-  triggerVariant = "ghost",
-}: {
-  triggerVariant?: "ghost" | "chrome"
-}) {
-  const open = useSettingsDialogStore((s) => s.isOpen)
-  const activeSection = useSettingsDialogStore((s) => s.activeSection)
-  const setActiveSection = useSettingsDialogStore((s) => s.setActiveSection)
-  const openSettingsFn = useSettingsDialogStore((s) => s.openSettings)
-  const closeSettings = useSettingsDialogStore((s) => s.closeSettings)
+export function SettingsPage() {
+  const activeSection = useSettingsNavigationStore((s) => s.activeSection)
+  const setActiveSection = useSettingsNavigationStore((s) => s.setActiveSection)
+  const pendingScroll = useSettingsNavigationStore((s) => s.pendingScroll)
+  const clearPendingScroll = useSettingsNavigationStore(
+    (s) => s.clearPendingScroll,
+  )
 
   const ActiveContent = sectionComponents[activeSection]
 
+  useEffect(() => {
+    if (!pendingScroll) return
+    const el = document.getElementById(`settings-section-${activeSection}`)
+    el?.scrollIntoView({ behavior: "smooth", block: "start" })
+    clearPendingScroll()
+  }, [activeSection, pendingScroll, clearPendingScroll])
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (nextOpen) {
-          openSettingsFn()
-        } else {
-          closeSettings()
-        }
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button
-          variant={triggerVariant}
-          size="icon-sm"
-          title="Settings"
-          data-tour="settings"
+    <div className="view-pane flex flex-col gap-5">
+      <div className="glass-panel p-5">
+        <h2 className="mb-2 text-2xl font-bold text-white">
+          Configuration and Hardware Setup
+        </h2>
+        <p className="text-sm text-slate-400">
+          Manage audio capture feeds, interface endpoints, downstream
+          configurations, and keyboard shortcuts.
+        </p>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 xl:grid-cols-[220px_1fr]">
+        <nav
+          className="glass-panel flex flex-col gap-1 p-3"
+          aria-label="Settings sections"
         >
-          <SettingsIcon className="size-3.5" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="overflow-hidden p-0 md:max-h-[600px] md:max-w-[800px] lg:max-w-[900px] dark:border-white/10">
-        <DialogTitle className="sr-only">Settings</DialogTitle>
-        <DialogDescription className="sr-only">
-          Configure audio, display mode, and API keys.
-        </DialogDescription>
-        <SidebarProvider className="items-start">
-          <Sidebar collapsible="none" className="hidden md:flex">
-            <div className="controller-headboard glass-panel-header flex h-14 items-center border-r border-b border-white/[0.06] px-4 font-medium">
-              Settings
-            </div>
-            <SidebarContent className="controller-sidebar border-r border-white/[0.06]">
-              <SidebarGroup>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {navItems.map((item) => (
-                      <SidebarMenuItem key={item.id}>
-                        <SidebarMenuButton
-                          isActive={item.id === activeSection}
-                          onClick={() => setActiveSection(item.id)}
-                        >
-                          {item.icon}
-                          <span>{item.name}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </SidebarContent>
-          </Sidebar>
-          <main className="flex h-[580px] flex-1 flex-col overflow-hidden">
-            <header className="glass-panel-header flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.06]">
-              <div className="flex items-center gap-2 px-4">
-                {sectionTitles[activeSection]}
-              </div>
-            </header>
-            <div className="flex flex-1 flex-col overflow-y-auto p-4">
-              <ActiveContent />
-            </div>
-          </main>
-        </SidebarProvider>
-      </DialogContent>
-    </Dialog>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveSection(item.id)}
+              className={cn(
+                "btn-tab flex items-center gap-2 rounded-lg border border-transparent px-3 py-2.5 text-left text-xs",
+                activeSection === item.id && "active",
+                activeSection === item.id
+                  ? "text-[var(--accent)]"
+                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+              )}
+            >
+              {item.icon}
+              <span>{item.name}</span>
+            </button>
+          ))}
+        </nav>
+
+        <section
+          id={`settings-section-${activeSection}`}
+          className="glass-panel min-h-0 overflow-y-auto p-5 scrollbar-thin"
+        >
+          <h3 className="mb-4 border-b border-white/5 pb-2 font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
+            {sectionTitles[activeSection]}
+          </h3>
+          <ActiveContent />
+        </section>
+      </div>
+    </div>
   )
 }
