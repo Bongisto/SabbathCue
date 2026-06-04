@@ -2,11 +2,11 @@ import { create } from "zustand"
 
 export type AccentTheme = "gold" | "emerald" | "purple" | "aurora"
 
-const STORAGE_KEY = "sabbathcue-accent-theme"
+export const ACCENT_THEME_STORAGE_KEY = "sabbathcue-accent-theme"
 
 function readStoredTheme(): AccentTheme {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(ACCENT_THEME_STORAGE_KEY)
     if (
       raw === "gold" ||
       raw === "emerald" ||
@@ -31,7 +31,7 @@ export const useAccentThemeStore = create<AccentThemeState>((set) => ({
   theme: "gold",
   setTheme: (theme) => {
     try {
-      localStorage.setItem(STORAGE_KEY, theme)
+      localStorage.setItem(ACCENT_THEME_STORAGE_KEY, theme)
     } catch {
       /* ignore */
     }

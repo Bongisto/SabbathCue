@@ -2,13 +2,15 @@ import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
 import "@/index.css"
 import { useBroadcastOutputRuntime } from "@/hooks/use-broadcast-output-runtime"
-import { accentThemeClassName, type AccentTheme } from "@/stores/accent-theme-store"
-
-const ACCENT_STORAGE_KEY = "sabbathcue-accent-theme"
+import {
+  ACCENT_THEME_STORAGE_KEY,
+  accentThemeClassName,
+  type AccentTheme,
+} from "@/stores/accent-theme-store"
 
 function readAccentTheme(): AccentTheme {
   try {
-    const raw = localStorage.getItem(ACCENT_STORAGE_KEY)
+    const raw = localStorage.getItem(ACCENT_THEME_STORAGE_KEY)
     if (
       raw === "gold" ||
       raw === "emerald" ||
@@ -43,7 +45,7 @@ function BroadcastCanvas() {
   useEffect(() => {
     applyAccentThemeToDocument()
     const onStorage = (event: StorageEvent) => {
-      if (event.key === ACCENT_STORAGE_KEY) {
+      if (event.key === ACCENT_THEME_STORAGE_KEY) {
         applyAccentThemeToDocument()
       }
     }

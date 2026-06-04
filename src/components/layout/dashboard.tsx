@@ -11,6 +11,7 @@ import { SearchPanel } from "@/components/panels/search-panel"
 import { useDashboardKeyboardControls } from "@/hooks/use-dashboard-keyboard-controls"
 import { cn } from "@/lib/utils"
 import {
+  ACCENT_THEME_STORAGE_KEY,
   accentThemeClassName,
   useAccentThemeStore,
 } from "@/stores/accent-theme-store"
@@ -66,9 +67,7 @@ function WorkspaceFallback() {
 function LiveDeskPage() {
   return (
     <div className="view-pane grid grid-cols-12 gap-5">
-      <div className="glass-panel col-span-12 flex h-[520px] flex-col xl:col-span-3">
-        <TranscriptPanel />
-      </div>
+      <TranscriptPanel className="glass-panel col-span-12 h-[520px] xl:col-span-3" />
 
       <div className="col-span-12 grid h-fit grid-cols-1 gap-5 md:grid-cols-2 xl:col-span-9">
         <PreviewPanel className="h-[330px]" />
@@ -95,6 +94,13 @@ export function Dashboard() {
 
   useEffect(() => {
     hydrateAccent()
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === ACCENT_THEME_STORAGE_KEY) {
+        hydrateAccent()
+      }
+    }
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
   }, [hydrateAccent])
 
   useEffect(() => {

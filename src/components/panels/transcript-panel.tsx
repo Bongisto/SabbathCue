@@ -50,7 +50,7 @@ function LivePartialLine({ scrollRef }: { scrollRef: RefObject<HTMLDivElement | 
   )
 }
 
-export function TranscriptPanel() {
+export function TranscriptPanel({ className }: { className?: string }) {
   const [showKeyPrompt, setShowKeyPrompt] = useState(false)
   const onMissingApiKey = useCallback(() => setShowKeyPrompt(true), [])
   const {
@@ -104,7 +104,10 @@ export function TranscriptPanel() {
   return (
     <div
       data-slot="transcript-panel"
-      className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      className={cn(
+        "relative flex min-h-0 flex-1 flex-col overflow-hidden",
+        className,
+      )}
     >
       <PanelHeader
         title="Live transcript"
