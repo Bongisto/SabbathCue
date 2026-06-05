@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { listen, type UnlistenFn } from "@tauri-apps/api/event"
+import { isTauriRuntime } from "@/lib/tauri-runtime"
 
 export function useTauriEvent<T>(
   event: string,
@@ -12,6 +13,8 @@ export function useTauriEvent<T>(
   }, [handler])
 
   useEffect(() => {
+    if (!isTauriRuntime()) return
+
     // Track whether this effect has been cleaned up.
     // React StrictMode unmounts/remounts effects, and the listen() Promise
     // may resolve after cleanup — the cancelled flag prevents stale listeners.

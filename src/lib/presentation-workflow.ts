@@ -169,12 +169,37 @@ export function egwReference(p: EgwParagraph): string {
   return `${p.book_title} ${p.chapter}:${p.paragraph}`
 }
 
+function splitEgwTextForSlides(text: string): { text: string }[] {
+  const normalized = text.replace(/\s+/g, " ").trim()
+  if (!normalized) return [{ text: "" }]
+
+  const sentences = normalized.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) ?? [normalized]
+  const chunks: string[] = []
+  let current = ""
+
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim()
+    if (!trimmed) continue
+    const next = current ? `${current} ${trimmed}` : trimmed
+
+    if (current && next.length > 230) {
+      chunks.push(current)
+      current = trimmed
+    } else {
+      current = next
+    }
+  }
+
+  if (current) chunks.push(current)
+  return (chunks.length > 0 ? chunks : [normalized]).map((chunk) => ({ text: chunk }))
+}
+
 export function createEgwPresentationItem(p: EgwParagraph): EgwPresentationItemData {
   return {
     kind: "egw",
     paragraph: p,
     reference: egwReference(p),
-    segments: [{ text: p.text }],
+    segments: splitEgwTextForSlides(p.text),
   }
 }
 

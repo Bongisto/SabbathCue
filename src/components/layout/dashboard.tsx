@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from "react"
+import { useEffect, lazy, Suspense, useRef } from "react"
 import { AppControllerHeader } from "@/components/layout/app-controller-header"
 import { OperatorStatusStrip } from "@/components/layout/operator-status-strip"
 import { WorkspaceSidebar } from "@/components/layout/workspace-sidebar"
@@ -67,13 +67,13 @@ function WorkspaceFallback() {
 function LiveDeskPage() {
   return (
     <div className="view-pane grid grid-cols-12 gap-5">
-      <TranscriptPanel className="glass-panel col-span-12 h-[520px] xl:col-span-3" />
+      <TranscriptPanel className="glass-panel col-span-12 h-[620px] xl:col-span-3" />
 
-      <div className="col-span-12 grid h-fit grid-cols-1 gap-5 md:grid-cols-2 xl:col-span-9">
-        <PreviewPanel className="h-[330px]" />
-        <LiveOutputPanel className="h-[330px]" />
-        <QueuePanel className="h-[290px]" />
-        <DetectionsPanel className="h-[290px]" />
+      <div className="col-span-12 grid h-fit grid-cols-12 gap-5 xl:col-span-9">
+        <PreviewPanel className="col-span-12 h-[380px] lg:col-span-5" />
+        <LiveOutputPanel className="col-span-12 h-[380px] lg:col-span-7" />
+        <QueuePanel className="col-span-12 h-[250px] lg:col-span-6" />
+        <DetectionsPanel className="col-span-12 h-[250px] lg:col-span-6" />
       </div>
 
       <div className="glass-panel col-span-12 p-5">
@@ -89,6 +89,7 @@ export function Dashboard() {
   const plannerOpen = useServicePlanStore((s) => s.plannerOpen)
   const accentTheme = useAccentThemeStore((s) => s.theme)
   const hydrateAccent = useAccentThemeStore((s) => s.hydrate)
+  const workspaceScrollRef = useRef<HTMLDivElement>(null)
 
   useDashboardKeyboardControls()
 
@@ -108,6 +109,10 @@ export function Dashboard() {
       setWorkspace("service-plans")
     }
   }, [plannerOpen, setWorkspace, workspace])
+
+  useEffect(() => {
+    workspaceScrollRef.current?.scrollTo({ top: 0, left: 0 })
+  }, [workspace])
 
   const workspaceContent =
     workspace === "live" ? (
@@ -160,7 +165,7 @@ export function Dashboard() {
             <OperatorStatusStrip />
 
             <div
-              key={workspace}
+              ref={workspaceScrollRef}
               className="scrollbar-thin flex-1 overflow-y-auto p-5"
             >
               {workspaceContent}

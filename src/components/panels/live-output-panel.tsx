@@ -170,14 +170,14 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
       <div
         className={cn(
-          "flex min-h-0 flex-1 bg-slate-950/50 p-4 transition-opacity",
+          "flex min-h-0 flex-1 bg-slate-950/50 p-2 transition-opacity",
           isFullscreen && "bg-black p-0",
           !isLive && "opacity-45",
         )}
       >
         <div
           className={cn(
-            "flex h-full w-full items-center justify-center rounded-xl border border-white/5 p-6 text-center",
+            "flex h-full w-full items-center justify-center rounded-md border border-white/5 p-2 text-center",
             isLive && !isFullscreen && "live-glowing-active",
             isFullscreen && "rounded-none border-0 p-0",
           )}

@@ -25,6 +25,7 @@ export const CanvasPresentation = memo(function CanvasPresentation({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  const pendingSizeFrameRef = useRef<number | null>(null)
   const renderKey = useMemo(
     () => getBroadcastRenderKey(theme, item),
     [theme, item],
@@ -39,13 +40,32 @@ export const CanvasPresentation = memo(function CanvasPresentation({
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
       if (!rect) return
-      setContainerSize({
-        width: rect.width,
-        height: rect.height,
+
+      const nextSize = {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      }
+
+      if (pendingSizeFrameRef.current !== null) {
+        cancelAnimationFrame(pendingSizeFrameRef.current)
+      }
+      pendingSizeFrameRef.current = requestAnimationFrame(() => {
+        pendingSizeFrameRef.current = null
+        setContainerSize((current) =>
+          current.width === nextSize.width && current.height === nextSize.height
+            ? current
+            : nextSize,
+        )
       })
     })
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (pendingSizeFrameRef.current !== null) {
+        cancelAnimationFrame(pendingSizeFrameRef.current)
+        pendingSizeFrameRef.current = null
+      }
+    }
   }, [])
 
   const draw = useCallback((force = false) => {

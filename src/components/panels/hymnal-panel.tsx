@@ -23,6 +23,7 @@ import { generateHymnScreens } from "@/services/hymnal/generate-hymn-screens"
 import {
   getHymnById,
   getInitialHymns,
+  preloadHymnById,
   searchHymns,
 } from "@/services/hymnal/hymnal-repository"
 import { SDA_HYMNAL_INDEX } from "@/data/sda-hymnal-index"
@@ -93,11 +94,13 @@ export function HymnalPanel() {
     [selectedHymn, selectedSectionIds],
   )
 
-  const activeScreen = screens[Math.min(activeScreenIndex, Math.max(0, screens.length - 1))]
+  const clampedActiveScreenIndex = Math.min(activeScreenIndex, Math.max(0, screens.length - 1))
+  const activeScreen = screens[clampedActiveScreenIndex]
   const presentationDeck = useMemo(
     () => screens.map((screen) => createHymnPresentationItem(screen)),
     [screens],
   )
+  const activePresentationItem = presentationDeck[clampedActiveScreenIndex] ?? null
 
   const goToPreviousScreen = () => {
     setActiveScreenIndex((current) => Math.max(0, current - 1))
@@ -174,22 +177,22 @@ export function HymnalPanel() {
   }
 
   const previewActiveScreen = () => {
-    if (!activeScreen) return
-    useHymnSlideStore.getState().setDeck(presentationDeck, activeScreenIndex)
-    selectPreviewItem(createHymnPresentationItem(activeScreen))
+    if (!activeScreen || !activePresentationItem) return
+    useHymnSlideStore.getState().setDeck(presentationDeck, clampedActiveScreenIndex)
+    selectPreviewItem(activePresentationItem)
   }
 
   const presentActiveScreen = () => {
-    if (!activeScreen) return
-    useHymnSlideStore.getState().setDeck(presentationDeck, activeScreenIndex)
-    presentItem(createHymnPresentationItem(activeScreen))
+    if (!activeScreen || !activePresentationItem) return
+    useHymnSlideStore.getState().setDeck(presentationDeck, clampedActiveScreenIndex)
+    presentItem(activePresentationItem)
   }
 
   const queueScreens = () => {
     const queue = useQueueStore.getState()
     const queueItems = createGroupedHymnQueueItems(screens)
     queue.addItems(queueItems)
-    useHymnSlideStore.getState().setDeck(presentationDeck, activeScreenIndex)
+    useHymnSlideStore.getState().setDeck(presentationDeck, clampedActiveScreenIndex)
   }
 
   const selectedHymnIsFavorite = selectedHymn ? favoriteHymnIds.includes(selectedHymn.id) : false
@@ -274,6 +277,8 @@ export function HymnalPanel() {
             {results.map((result) => (
               <button
                 key={result.id}
+                onFocus={() => preloadHymnById(result.id)}
+                onMouseEnter={() => preloadHymnById(result.id)}
                 onClick={() => selectHymn(result)}
                 className={cn(
                   "flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors",
@@ -452,7 +457,7 @@ export function HymnalPanel() {
               {activeScreen ? (
                 <div className="flex min-h-full flex-col gap-3">
                   <div className="flex aspect-video items-center justify-center rounded-md border border-white/5 bg-black p-8 text-center">
-                    <div className="max-w-[80%] space-y-3 text-balance text-2xl font-semibold leading-snug text-white">
+                    <div className="max-w-[82%] space-y-1.5 text-balance text-2xl font-semibold leading-tight text-white">
                       {activeScreen.lines.map((line) => (
                         <p key={line}>{line}</p>
                       ))}

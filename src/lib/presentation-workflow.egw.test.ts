@@ -21,12 +21,26 @@ describe("EGW presentation helpers", () => {
     expect(egwReference(para)).toBe("Patriarchs and Prophets 2:5")
   })
 
-  it("builds an egw presentation item with one segment", () => {
+  it("builds an egw presentation item with readable segments", () => {
     const item = createEgwPresentationItem(para)
     expect(item.kind).toBe("egw")
     expect(item.reference).toBe("Patriarchs and Prophets 2:5")
     expect(item.segments).toEqual([{ text: "God is love." }])
     expect(item.paragraph).toBe(para)
+  })
+
+  it("splits long EGW paragraphs at sentence boundaries", () => {
+    const item = createEgwPresentationItem({
+      ...para,
+      text: [
+        "This is a long opening sentence that sets up the first thought and continues with enough words to make the paragraph heavy.",
+        "This second sentence carries the same paragraph forward with another complete thought that should not be glued to everything else.",
+        "This final sentence gives the renderer a separate block to balance on the slide.",
+      ].join(" "),
+    })
+
+    expect(item.segments.length).toBeGreaterThan(1)
+    expect(item.segments.every((segment) => segment.text.length > 0)).toBe(true)
   })
 
   it("builds a manual queue item wrapping the presentation", () => {

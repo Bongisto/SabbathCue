@@ -2,6 +2,9 @@ import { SDA_HYMNAL_CHUNKS } from "@/data/sda-hymnal-chunks"
 import { SDA_HYMNAL_INDEX } from "@/data/sda-hymnal-index"
 import type { Hymn, HymnSearchResult } from "@/types"
 
+const chunkCache = new Map<number, Promise<readonly Hymn[]>>()
+const hymnCache = new Map<number, Hymn | null>()
+
 function normalized(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
 }
@@ -39,15 +42,31 @@ export async function getHymnById(id: string): Promise<Hymn | null> {
 }
 
 export async function getHymnByNumber(number: number): Promise<Hymn | null> {
+  if (hymnCache.has(number)) return hymnCache.get(number) ?? null
+
   const chunk = SDA_HYMNAL_CHUNKS.find(
     (candidate) => number >= candidate.start && number <= candidate.end,
   )
   if (!chunk) return null
 
-  const hymns = await chunk.load()
-  return hymns.find((hymn) => hymn.number === number) ?? null
+  const cacheKey = chunk.start
+  let loadPromise = chunkCache.get(cacheKey)
+  if (!loadPromise) {
+    loadPromise = chunk.load()
+    chunkCache.set(cacheKey, loadPromise)
+  }
+
+  const hymns = await loadPromise
+  const hymn = hymns.find((candidate) => candidate.number === number) ?? null
+  hymnCache.set(number, hymn)
+  return hymn
 }
 
 export function getInitialHymns(limit = 12): HymnSearchResult[] {
   return SDA_HYMNAL_INDEX.slice(0, limit)
+}
+
+export function preloadHymnById(id: string): void {
+  const result = SDA_HYMNAL_INDEX.find((hymn) => hymn.id === id)
+  if (result) void getHymnByNumber(result.number)
 }

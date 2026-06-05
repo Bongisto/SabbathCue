@@ -305,7 +305,6 @@
   overflow: hidden;
   box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.85);
   transition:
-    transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
     border-color 0.4s ease,
     box-shadow 0.4s ease;
 }
@@ -436,19 +435,6 @@
 .live-glowing-active {
   border: 1.5px solid var(--accent) !important;
   box-shadow: 0 0 25px var(--accent-glow);
-  animation: slide-pulse 4s infinite ease-in-out;
-}
-
-@keyframes slide-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.005);
-    opacity: 0.97;
-  }
 }
 
 @keyframes fade-in-up {
@@ -465,7 +451,7 @@
 }
 
 .view-pane {
-  animation: fade-in-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fade-in-up 0.18s ease-out forwards;
 }
 
 @keyframes modal-pop {

@@ -25,32 +25,38 @@ export function wrapText(
   text: string,
   maxWidth: number
 ): string[] {
-  const paragraphs = text.split("\n")
   const lines: string[] = []
+  const paragraphs = text.split(/\n{2,}/)
 
   for (const [paragraphIndex, paragraph] of paragraphs.entries()) {
     if (paragraphIndex > 0) {
       lines.push("")
     }
 
-    const words = paragraph.split(/\s+/).filter(Boolean)
-    if (words.length === 0) continue
-
-    let currentLine = ""
-    for (const word of words) {
-      const testLine = currentLine ? `${currentLine} ${word}` : word
-      const metrics = ctx.measureText(testLine)
-
-      if (metrics.width > maxWidth && currentLine) {
-        lines.push(currentLine)
-        currentLine = word
-      } else {
-        currentLine = testLine
+    const explicitLines = paragraph.split(/\n/)
+    for (const explicitLine of explicitLines) {
+      const words = explicitLine.split(/\s+/).filter(Boolean)
+      if (words.length === 0) {
+        lines.push("")
+        continue
       }
-    }
 
-    if (currentLine) {
-      lines.push(currentLine)
+      let currentLine = ""
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word
+        const metrics = ctx.measureText(testLine)
+
+        if (metrics.width > maxWidth && currentLine) {
+          lines.push(currentLine)
+          currentLine = word
+        } else {
+          currentLine = testLine
+        }
+      }
+
+      if (currentLine) {
+        lines.push(currentLine)
+      }
     }
   }
 
@@ -144,6 +150,51 @@ function applyTextTransform(
     default:
       return text
   }
+}
+
+function presentationKind(data: VerseRenderData | PresentationRenderData): PresentationRenderData["kind"] | undefined {
+  return "kind" in data ? data.kind : undefined
+}
+
+function lineHeightForPresentation(
+  theme: BroadcastTheme,
+  data: VerseRenderData | PresentationRenderData,
+  fontSize: number
+): number {
+  const kind = presentationKind(data)
+  const lineHeight =
+    kind === "hymn"
+      ? Math.min(theme.verseText.lineHeight, 1.14)
+      : kind === "egw"
+        ? Math.min(theme.verseText.lineHeight, 1.32)
+        : theme.verseText.lineHeight
+
+  return fontSize * lineHeight
+}
+
+function textForPresentation(
+  data: VerseRenderData | PresentationRenderData,
+  showVerseNumbers: boolean
+): string {
+  const kind = presentationKind(data)
+
+  if (kind === "hymn") {
+    return data.segments.map((segment) => segment.text.trim()).filter(Boolean).join("\n")
+  }
+
+  if (kind === "egw") {
+    return data.segments.map((segment) => segment.text.trim()).filter(Boolean).join("\n\n")
+  }
+
+  let fullText = ""
+  for (const segment of data.segments) {
+    if (showVerseNumbers && segment.verseNumber !== undefined) {
+      fullText += `${segment.verseNumber} `
+    }
+    fullText += `${segment.text} `
+  }
+
+  return fullText.trim()
 }
 
 function drawTextDecorationLine(
@@ -497,7 +548,7 @@ function drawSlideDeckImage(
 function drawVerseText(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
-  verse: VerseRenderData,
+  verse: VerseRenderData | PresentationRenderData,
   textRectX: number,
   textRectWidth: number,
   startY: number,
@@ -512,7 +563,7 @@ function drawVerseText(
   )
   const verseDecoration = resolveTextDecoration(vt.textDecoration)
   const actualFontSize = scaledFontSize ?? vt.fontSize
-  const lineHeightPx = actualFontSize * vt.lineHeight
+  const lineHeightPx = lineHeightForPresentation(theme, verse, actualFontSize)
 
   ctx.save()
   ctx.font = `${vt.fontWeight} ${actualFontSize}px "${vt.fontFamily}", serif`
@@ -528,16 +579,8 @@ function drawVerseText(
     }
   }
 
-  // Build full text with verse numbers inline
-  let fullText = ""
-  for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined) {
-      fullText += `${segment.verseNumber} `
-    }
-    fullText += segment.text + " "
-  }
-  fullText = applyTextTransform(
-    fullText.trim(),
+  const fullText = applyTextTransform(
+    textForPresentation(verse, vn.visible),
     resolveTextTransform(vt.textTransform)
   )
 
@@ -733,7 +776,7 @@ function calculateMaxAvailableVerseHeight(
 function calculateScaledFontSize(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
-  verse: VerseRenderData,
+  verse: VerseRenderData | PresentationRenderData,
   textRectWidth: number,
   maxHeight: number
 ): number {
@@ -777,7 +820,7 @@ function calculateScaledFontSize(
 function measureVerseHeight(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,
-  verse: VerseRenderData,
+  verse: VerseRenderData | PresentationRenderData,
   textRectWidth: number
 ): { height: number; maxLineWidth: number } {
   const vt = theme.verseText
@@ -787,7 +830,7 @@ function measureVerseHeight(
     theme.layout.textAlign,
     true
   )
-  const lineHeightPx = vt.fontSize * vt.lineHeight
+  const lineHeightPx = lineHeightForPresentation(theme, verse, vt.fontSize)
   ctx.save()
   ctx.font = `${vt.fontWeight} ${vt.fontSize}px "${vt.fontFamily}", serif`
   if (vt.letterSpacing > 0) {
@@ -797,14 +840,8 @@ function measureVerseHeight(
       /* unsupported in some WebViews */
     }
   }
-  let fullText = ""
-  for (const segment of verse.segments) {
-    if (vn.visible && segment.verseNumber !== undefined)
-      fullText += `${segment.verseNumber} `
-    fullText += `${segment.text} `
-  }
   const transformed = applyTextTransform(
-    fullText.trim(),
+    textForPresentation(verse, vn.visible),
     resolveTextTransform(vt.textTransform)
   )
   const lines = wrapText(ctx, transformed, textRectWidth)
