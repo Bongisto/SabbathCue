@@ -298,7 +298,10 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
   const runContextSearch = useCallback(async (query: string, translationId: number) => {
     const requestId = ++contextSearchRequestIdRef.current
     const isStale = () => requestId !== contextSearchRequestIdRef.current
-    const contextSearch = import("@/lib/context-search")
+    const contextSearchModule = await import("@/lib/context-search").catch((e) => {
+      console.error("[context-search] fallback module import failed", e)
+      return null
+    })
 
     // Primary: hybrid search backend (combines vector + FTS5 BM25)
     const hybridResults = await invoke<SemanticSearchResult[]>(
@@ -309,11 +312,15 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
     })
 
     if (isStale()) return
+    if (!contextSearchModule) {
+      useBibleStore.getState().setSemanticResults(hybridResults ?? [])
+      return
+    }
 
     // Client-side Fuse.js supplements backend vector/FTS5 results and acts as
     // fallback when semantic assets are not loaded.
     const { mergeContextSearchResults, searchContextWithFuse } =
-      await contextSearch
+      contextSearchModule
     const fuseResults = await searchContextWithFuse(query, translationId, 15).catch(() => [])
     if (isStale()) return
     useBibleStore
