@@ -187,6 +187,39 @@ fn enqueue_final_semantic_job(
     notify.notify_one();
 }
 
+fn enqueue_direct_detection_job(
+    detect_tx: &tokio::sync::mpsc::Sender<(u64, String)>,
+    latest_accepted_seq: &Arc<AtomicU64>,
+    sent_counter: &Arc<AtomicU64>,
+    dropped_counter: &Arc<AtomicU64>,
+    seq: u64,
+    text: String,
+    source: &str,
+) {
+    match detect_tx.try_send((seq, text)) {
+        Ok(()) => {
+            latest_accepted_seq.store(seq, Ordering::Release);
+            let n = sent_counter.fetch_add(1, Ordering::Relaxed) + 1;
+            if n % 25 == 0 {
+                let depth = detect_tx.max_capacity() - detect_tx.capacity();
+                let dropped = dropped_counter.load(Ordering::Relaxed);
+                log::info!(
+                    "[QUEUE] detect_tx source={source} sent={n} dropped={dropped} depth={depth}/{}",
+                    detect_tx.max_capacity()
+                );
+            }
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+            let dropped = dropped_counter.fetch_add(1, Ordering::Relaxed) + 1;
+            let sent = sent_counter.load(Ordering::Relaxed);
+            log::warn!(
+                "[QUEUE] detect_tx DROPPED source={source} (consumer behind) sent={sent} dropped={dropped}"
+            );
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
+    }
+}
+
 #[derive(Debug, Default)]
 struct DeepgramSemanticBuffer {
     parts: Vec<String>,
@@ -315,7 +348,12 @@ fn build_stt_provider(
                 worker_path.display()
             );
 
-            Ok(Box::new(VoskProvider::new(model_path, worker_path)))
+            let provider = VoskProvider::new(model_path, worker_path);
+            provider
+                .check_ready()
+                .map_err(|e| format!("Vosk startup check failed: {e}"))?;
+
+            Ok(Box::new(provider))
         }
         #[cfg(feature = "whisper")]
         "legacy-whisper" => {
@@ -557,6 +595,8 @@ pub async fn start_transcription(
     let mut task_handles = Vec::new();
 
     let conn_active = stt_active.clone();
+    let conn_audio_active = audio_active.clone();
+    let provider_app = app.clone();
     let provider_log_name = stt_provider.name().to_string();
     let provider_log_name_task_a = provider_log_name.clone();
 
@@ -565,8 +605,11 @@ pub async fn start_transcription(
         let result = stt_provider.start(audio_send_rx, event_tx).await;
         if let Err(e) = result {
             log::error!("[STT-{provider_log_name_task_a}] Provider failed: {e}");
+            let _ = provider_app.emit("stt_error", e.to_string());
+            let _ = provider_app.emit("stt_disconnected", ());
         }
         conn_active.store(false, Ordering::SeqCst);
+        conn_audio_active.store(false, Ordering::SeqCst);
         log::info!("[STT-{provider_log_name_task_a}] Provider task exited");
     }));
 
@@ -776,6 +819,18 @@ pub async fn start_transcription(
                                 }
                             }
 
+                            if let Some(detection_text) = route.authoritative_detection {
+                                enqueue_direct_detection_job(
+                                    &detect_tx,
+                                    &latest_accepted_seq,
+                                    &detect_sent_evt,
+                                    &detect_dropped_evt,
+                                    seq,
+                                    detection_text,
+                                    "deepgram_partial",
+                                );
+                            }
+
                             if partial_semantic_enabled
                                 && word_count(&transcript) >= PARTIAL_SEMANTIC_MIN_WORDS
                                 && last_partial_semantic_at.elapsed() >= PARTIAL_SEMANTIC_DEBOUNCE
@@ -881,24 +936,15 @@ pub async fn start_transcription(
                             // Fire-and-forget: detection runs in background thread pool.
                             // Event consumer proceeds immediately to next transcript.
                             if let Some(detection_text) = route.authoritative_detection {
-                                if let Ok(()) = detect_tx.try_send((seq, detection_text.clone())) {
-                                    latest_accepted_seq.store(seq, Ordering::Release);
-                                    let n = detect_sent_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                    if n % 25 == 0 {
-                                        let depth = detect_tx.max_capacity() - detect_tx.capacity();
-                                        let dropped = detect_dropped_evt.load(Ordering::Relaxed);
-                                        log::info!(
-                                        "[QUEUE] detect_tx sent={n} dropped={dropped} depth={depth}/{}",
-                                        detect_tx.max_capacity()
-                                    );
-                                    }
-                                } else {
-                                    let d = detect_dropped_evt.fetch_add(1, Ordering::Relaxed) + 1;
-                                    let sent = detect_sent_evt.load(Ordering::Relaxed);
-                                    log::warn!(
-                                    "[QUEUE] detect_tx DROPPED (consumer behind) sent={sent} dropped={d}"
+                                enqueue_direct_detection_job(
+                                    &detect_tx,
+                                    &latest_accepted_seq,
+                                    &detect_sent_evt,
+                                    &detect_dropped_evt,
+                                    seq,
+                                    detection_text.clone(),
+                                    "final",
                                 );
-                                }
 
                                 // Deepgram waits for speech_final before semantic search.
                                 // Non-Deepgram providers keep the rolling final window.

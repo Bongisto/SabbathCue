@@ -69,6 +69,63 @@ impl VoskProvider {
         }
     }
 
+    pub fn check_ready(&self) -> Result<(), SttError> {
+        if !self.model_path.exists() {
+            return Err(SttError::ConnectionFailed(format!(
+                "Vosk model not found: {}",
+                self.model_path.display()
+            )));
+        }
+        if !self.worker_path.exists() {
+            return Err(SttError::ConnectionFailed(format!(
+                "Vosk worker not found: {}",
+                self.worker_path.display()
+            )));
+        }
+
+        let grammar_json = vosk_grammar_json()?;
+        let grammar_file = write_grammar_temp_file(&grammar_json)?;
+        let mut command = Command::new(python_executable());
+        command
+            .arg(&self.worker_path)
+            .arg("--model")
+            .arg(&self.model_path)
+            .arg("--sample-rate")
+            .arg("16000");
+        push_grammar_file_args(&mut command, grammar_file.path());
+        let output = command
+            .stdin(Stdio::null())
+            .output()
+            .map_err(|e| SttError::ConnectionFailed(format!("failed to start Vosk worker: {e}")))?;
+
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            let Ok(event) = serde_json::from_str::<WorkerEvent>(line) else {
+                continue;
+            };
+            match event {
+                WorkerEvent::Ready => return Ok(()),
+                WorkerEvent::Error { message } => {
+                    return Err(SttError::ConnectionFailed(message));
+                }
+                WorkerEvent::Partial { .. } | WorkerEvent::Final { .. } => {}
+            }
+        }
+
+        let stderr = first_nonempty_lines(&output.stderr, 6);
+        if output.status.success() {
+            Err(SttError::ConnectionFailed(format!(
+                "Vosk worker exited without reporting ready.{}",
+                stderr_suffix(&stderr)
+            )))
+        } else {
+            Err(SttError::ConnectionFailed(format!(
+                "Vosk worker preflight failed with status {}.{}",
+                output.status,
+                stderr_suffix(&stderr)
+            )))
+        }
+    }
+
     fn spawn_worker(&self, grammar_file: &GrammarTempFile) -> Result<Child, SttError> {
         if !self.model_path.exists() {
             return Err(SttError::ConnectionFailed(format!(
@@ -147,6 +204,24 @@ fn python_executable() -> String {
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "python".to_string())
+}
+
+fn first_nonempty_lines(bytes: &[u8], limit: usize) -> String {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .take(limit)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn stderr_suffix(stderr: &str) -> String {
+    if stderr.is_empty() {
+        String::new()
+    } else {
+        format!(" Stderr:\n{stderr}")
+    }
 }
 
 fn write_samples(stdin: &mut ChildStdin, samples: &[i16]) -> Result<(), SttError> {
@@ -556,5 +631,32 @@ mod tests {
             !args.iter().any(|arg| arg == "--grammar-json"),
             "worker args must not use --grammar-json"
         );
+    }
+
+    #[test]
+    #[ignore = "requires Python, the vosk package, and a local model download"]
+    fn local_worker_preflight_succeeds_when_model_is_installed() {
+        let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("..");
+        let model_path = project_root
+            .join("models")
+            .join("vosk")
+            .join("vosk-model-small-en-us");
+        let worker_path = project_root.join("scripts").join("vosk_worker.py");
+
+        if !model_path.exists() || !worker_path.exists() {
+            eprintln!(
+                "Skipping local Vosk preflight: model={} worker={}",
+                model_path.display(),
+                worker_path.display()
+            );
+            return;
+        }
+
+        VoskProvider::new(model_path, worker_path)
+            .check_ready()
+            .expect("local Vosk worker/model preflight should report ready");
     }
 }

@@ -67,11 +67,12 @@ impl TranscriptRouter {
                 };
             }
             self.last_partial = Some(normalized);
+            let complete_reference = looks_like_complete_reference(cleaned);
             return TranscriptRoute {
                 emit_transcript: true,
-                preview_candidate: looks_like_complete_reference(cleaned)
+                preview_candidate: complete_reference.then(|| cleaned.to_string()),
+                authoritative_detection: (input.provider == "deepgram" && complete_reference)
                     .then(|| cleaned.to_string()),
-                authoritative_detection: None,
                 suppress_reason: None,
             };
         }
@@ -339,6 +340,32 @@ mod tests {
             route.preview_candidate.as_deref(),
             Some("John three sixteen")
         );
+        assert!(route.authoritative_detection.is_none());
+    }
+
+    #[test]
+    fn deepgram_partial_complete_reference_can_detect_authoritatively() {
+        let mut router = TranscriptRouter::default();
+        let route = router.route(TranscriptRouteInput {
+            provider: "deepgram",
+            kind: TranscriptEventKind::Partial,
+            transcript: "John 3 16",
+            confidence: Some(0.9),
+        });
+
+        assert_eq!(route.authoritative_detection.as_deref(), Some("John 3 16"));
+    }
+
+    #[test]
+    fn deepgram_partial_without_complete_reference_does_not_detect_authoritatively() {
+        let mut router = TranscriptRouter::default();
+        let route = router.route(TranscriptRouteInput {
+            provider: "deepgram",
+            kind: TranscriptEventKind::Partial,
+            transcript: "we are turning to John",
+            confidence: Some(0.9),
+        });
+
         assert!(route.authoritative_detection.is_none());
     }
 
