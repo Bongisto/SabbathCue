@@ -105,9 +105,25 @@ jobs:
 
       - name: Generate checksums
         run: |
+          function Get-Sha256Hex {
+            param([string]$Path)
+
+            $stream = [System.IO.File]::OpenRead($Path)
+            try {
+              $sha256 = [System.Security.Cryptography.SHA256]::Create()
+              try {
+                return ([System.BitConverter]::ToString($sha256.ComputeHash($stream)) -replace "-", "").ToLowerInvariant()
+              } finally {
+                $sha256.Dispose()
+              }
+            } finally {
+              $stream.Dispose()
+            }
+          }
+
           Get-ChildItem -Path src-tauri/target/release/bundle -Recurse -File |
             ForEach-Object {
-              $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash
+              $hash = Get-Sha256Hex $_.FullName
               "$hash  $($_.Name)" | Out-File -FilePath src-tauri/target/release/bundle/SHA256SUMS.txt -Append
             }
 

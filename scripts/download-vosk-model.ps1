@@ -24,6 +24,22 @@ function Test-VoskModelDir {
   )
 }
 
+function Get-Sha256Hex {
+  param([string]$Path)
+
+  $Stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $Sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      return ([System.BitConverter]::ToString($Sha256.ComputeHash($Stream)) -replace "-", "").ToLowerInvariant()
+    } finally {
+      $Sha256.Dispose()
+    }
+  } finally {
+    $Stream.Dispose()
+  }
+}
+
 if ((-not $Force) -and (Test-VoskModelDir $ModelDir)) {
   Write-Host "Vosk model already exists: $ModelDir"
   exit 0
@@ -33,7 +49,7 @@ New-Item -ItemType Directory -Force -Path $ModelsRoot | Out-Null
 
 if ((-not $Force) -and (Test-Path $ArchivePath)) {
   Write-Host "Using cached Vosk archive: $ArchivePath"
-  $CachedSha256 = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  $CachedSha256 = Get-Sha256Hex $ArchivePath
   if ($CachedSha256 -ne $ExpectedSha256) {
     Write-Warning "Cached Vosk archive checksum mismatch. Redownloading."
     Remove-Item -LiteralPath $ArchivePath -Force
@@ -47,7 +63,7 @@ if ((-not $Force) -and (Test-Path $ArchivePath)) {
   Invoke-WebRequest -Uri $ModelUrl -OutFile $ArchivePath -UseBasicParsing
 }
 
-$ActualSha256 = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+$ActualSha256 = Get-Sha256Hex $ArchivePath
 if ($ActualSha256 -ne $ExpectedSha256) {
   Remove-Item -LiteralPath $ArchivePath -Force
   throw "Downloaded Vosk model checksum mismatch. Expected $ExpectedSha256, got $ActualSha256."
