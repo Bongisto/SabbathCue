@@ -1,4 +1,5 @@
 import type { Hymn, HymnScreen } from "@/types"
+import { splitLyricLineForReadableSlides } from "@/lib/text-slide-chunking"
 
 export interface GenerateHymnScreensOptions {
   hymn: Hymn
@@ -8,10 +9,11 @@ export interface GenerateHymnScreensOptions {
 
 function splitSectionLines(lines: string[], maxLinesPerScreen: number): string[][] {
   const normalizedLimit = Math.max(1, maxLinesPerScreen)
+  const readableLines = lines.flatMap((line) => splitLyricLineForReadableSlides(line))
   const screens: string[][] = []
 
-  for (let index = 0; index < lines.length; index += normalizedLimit) {
-    screens.push(lines.slice(index, index + normalizedLimit))
+  for (let index = 0; index < readableLines.length; index += normalizedLimit) {
+    screens.push(readableLines.slice(index, index + normalizedLimit))
   }
 
   return screens.length > 0 ? screens : [[]]
@@ -20,7 +22,7 @@ function splitSectionLines(lines: string[], maxLinesPerScreen: number): string[]
 export function generateHymnScreens({
   hymn,
   selectedSectionIds,
-  maxLinesPerScreen = 4,
+  maxLinesPerScreen = 3,
 }: GenerateHymnScreensOptions): HymnScreen[] {
   const screens: HymnScreen[] = []
   const sectionsById = new Map(hymn.sections.map((section) => [section.id, section]))

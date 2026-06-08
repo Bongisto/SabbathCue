@@ -59,6 +59,12 @@ function ThemeCard({
         if (isRenaming) return
         onSelect()
       }}
+      onKeyDown={(event) => {
+        if (isRenaming) return
+        if (event.key !== "Enter" && event.key !== " ") return
+        event.preventDefault()
+        onSelect()
+      }}
       className={cn(
         "group relative flex w-full flex-col gap-1.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted/50",
         isSelected && "ring-2 ring-primary"
@@ -229,6 +235,12 @@ export function ThemeLibrary() {
     useBroadcastStore.getState().createNewTheme()
   }
 
+  const handleSelectTheme = (themeId: string) => {
+    const store = useBroadcastStore.getState()
+    store.startEditing(themeId)
+    store.setActiveTheme(themeId)
+  }
+
   return (
     <div className="controller-sidebar flex h-full min-h-0 flex-col overflow-hidden border-r border-white/[0.06] bg-card/80">
       {/* Header */}
@@ -339,9 +351,7 @@ export function ThemeLibrary() {
                   isActive={theme.id === activeThemeId}
                   isRenaming={theme.id === renamingThemeId}
                   isSelected={theme.id === editingThemeId}
-                  onSelect={() =>
-                    useBroadcastStore.getState().startEditing(theme.id)
-                  }
+                  onSelect={() => handleSelectTheme(theme.id)}
                 />
               ))}
             </>
@@ -360,9 +370,7 @@ export function ThemeLibrary() {
                   isActive={theme.id === activeThemeId}
                   isRenaming={theme.id === renamingThemeId}
                   isSelected={theme.id === editingThemeId}
-                  onSelect={() =>
-                    useBroadcastStore.getState().startEditing(theme.id)
-                  }
+                  onSelect={() => handleSelectTheme(theme.id)}
                 />
               ))}
             </>

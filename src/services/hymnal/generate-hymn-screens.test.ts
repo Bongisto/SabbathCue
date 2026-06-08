@@ -58,8 +58,32 @@ describe("hymnal services", () => {
       sectionScreenIndex: 0,
       sectionScreenCount: screens.length,
     })
-    expect(screens.every((screen) => screen.lines.length <= 4)).toBe(true)
+    expect(screens.every((screen) => screen.lines.length <= 3)).toBe(true)
     expect(screens.flatMap((screen) => screen.lines)).toEqual(hymn.sections[0].lines)
+  })
+
+  it("splits very long lyric lines before creating screens", () => {
+    const hymn = makeHymn([
+      {
+        id: "v1",
+        kind: "verse",
+        label: "Verse 1",
+        number: 1,
+        lines: [
+          "This is a very long lyric line that should be divided so the projected words stay readable",
+        ],
+      },
+    ])
+
+    const screens = generateHymnScreens({
+      hymn,
+      selectedSectionIds: ["v1"],
+    })
+
+    expect(screens.flatMap((screen) => screen.lines).length).toBeGreaterThan(1)
+    expect(
+      screens.flatMap((screen) => screen.lines).every((line) => line.length <= 42),
+    ).toBe(true)
   })
 
   it("preserves verse and refrain order from selected sections", () => {
@@ -148,10 +172,10 @@ describe("hymnal services", () => {
     expect(screens.map((screen) => screen.sectionScreenCount)).toEqual([2, 2, 2, 2])
     expect(screens.map((screen) => screen.sectionScreenIndex)).toEqual([0, 1, 0, 1])
     expect(screens.map((screen) => screen.lines)).toEqual([
-      ["Line one", "Line two", "Line three", "Line four"],
-      ["Line five", "Line six"],
-      ["Line one", "Line two", "Line three", "Line four"],
-      ["Line five", "Line six"],
+      ["Line one", "Line two", "Line three"],
+      ["Line four", "Line five", "Line six"],
+      ["Line one", "Line two", "Line three"],
+      ["Line four", "Line five", "Line six"],
     ])
   })
 })

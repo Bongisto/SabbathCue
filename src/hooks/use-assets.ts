@@ -5,6 +5,8 @@ export interface AssetStatus {
   bible_db: boolean
   vosk_model: boolean
   vosk_worker: boolean
+  vosk_runtime: boolean
+  vosk_runtime_error: string | null
   onnx_model: boolean
   tokenizer: boolean
   embeddings: boolean

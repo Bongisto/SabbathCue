@@ -186,6 +186,19 @@ function textForPresentation(
     return data.segments.map((segment) => segment.text.trim()).filter(Boolean).join("\n\n")
   }
 
+  if ((kind === "scripture" || !kind) && data.segments.length > 1) {
+    return data.segments
+      .map((segment) => {
+        const prefix =
+          showVerseNumbers && segment.verseNumber !== undefined
+            ? `${segment.verseNumber} `
+            : ""
+        return `${prefix}${segment.text}`.trim()
+      })
+      .filter(Boolean)
+      .join("\n\n")
+  }
+
   let fullText = ""
   for (const segment of data.segments) {
     if (showVerseNumbers && segment.verseNumber !== undefined) {
@@ -1154,7 +1167,7 @@ function renderPresentationImpl(
       ctx,
       scaledTheme,
       data,
-      metrics.textAreaRect.width,
+      metrics.textRect.width,
       maxAvailableVerseHeight
     )
 

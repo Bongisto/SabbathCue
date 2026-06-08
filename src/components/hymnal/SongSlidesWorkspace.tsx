@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { presentItem, selectPreviewItem } from "@/lib/presentation-workflow"
+import { splitLyricLineForReadableSlides } from "@/lib/text-slide-chunking"
 import { cn } from "@/lib/utils"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useQueueStore } from "@/stores/queue-store"
@@ -27,7 +28,7 @@ I once was lost, but now am found
 Was blind, but now I see`
 
 function splitSlides(text: string): string[][] {
-  return text
+  const manualSlides = text
     .split(/\n\s*(?:---+|\n)\s*\n/g)
     .map((block) =>
       block
@@ -36,6 +37,18 @@ function splitSlides(text: string): string[][] {
         .filter(Boolean),
     )
     .filter((lines) => lines.length > 0)
+
+  const slides: string[][] = []
+  for (const lines of manualSlides) {
+    const readableLines = lines.flatMap((line) =>
+      splitLyricLineForReadableSlides(line),
+    )
+    for (let index = 0; index < readableLines.length; index += 3) {
+      slides.push(readableLines.slice(index, index + 3))
+    }
+  }
+
+  return slides
 }
 
 function fileNameWithoutExtension(name: string): string {

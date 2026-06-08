@@ -38,6 +38,8 @@ data/verses-for-embedding.json
 
 # ML models and embeddings (downloaded, not committed)
 models/*
+sidecars/*
+!sidecars/.gitkeep
 .env
 .venv/
 .superpowers/

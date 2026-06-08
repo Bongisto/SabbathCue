@@ -11,7 +11,7 @@ SabbathCue listens to a live sermon audio feed, transcribes speech in real time,
 ## Free Desktop Distribution
 
 SabbathCue's public desktop installer is local-first and free to operate. It ships
-with redistributable Bible content only, defaults to local Whisper speech-to-text,
+with redistributable Bible content only, defaults to local Vosk speech-to-text,
 does not require Deepgram, and does not bundle NDI SDK binaries. Deepgram and NDI
 remain optional integrations that users configure separately.
 
@@ -21,7 +21,8 @@ To build the public release version with only redistributable content:
 
 ```bash
 bun run build:bible:public
-bun run download:whisper
+bun run download:vosk
+bun run build:vosk-sidecar
 bun run download:model
 bun run export:verses
 bun run precompute:embeddings
@@ -30,12 +31,12 @@ bun run tauri build
 
 This creates an installer that includes only public-domain Bible translations
 (KJV, Reina-Valera 1909, J.N. Darby French 1885, Biblia Livre) and defaults
-to local Whisper speech recognition with the local model bundled.
+to local Vosk speech recognition with the model and self-contained worker bundled.
 
 ## Features
 
-- **Real-time speech-to-text** via local Whisper or cloud Deepgram (WebSocket streaming + REST fallback)
-  - Whisper runs locally with no API costs; Deepgram streams via WebSocket with REST fallback
+- **Real-time speech-to-text** via local Vosk or cloud Deepgram (WebSocket streaming + REST fallback)
+  - Vosk runs locally with no API costs; Deepgram streams via WebSocket with REST fallback
 - **Voice-controlled translation switching** — say "read in NIV" or "switch to ESV" to change translations instantly during a sermon
 - **Multi-strategy verse detection**
   - Direct reference parsing (Aho-Corasick automaton + fuzzy matching)
@@ -68,14 +69,14 @@ to local Whisper speech recognition with the local model bundled.
 | **AI/ML** | ONNX Runtime (MiniLM-L6-v2 embeddings), Aho-Corasick, Fuse.js |
 | **Database** | SQLite via rusqlite (bundled) with FTS5 |
 | **Broadcast** | NDI 6 SDK via dynamic loading (libloading FFI) |
-| **STT** | Local Whisper via `whisper-rs`; Deepgram WebSocket + REST (`tokio-tungstenite`) |
+| **STT** | Local Vosk worker; Deepgram WebSocket + REST (`tokio-tungstenite`) |
 
 ### Rust Crates
 
 | Crate | Purpose |
 |---|---|
 | `rhema-audio` | Audio device enumeration, capture, VAD (cpal) |
-| `rhema-stt` | Local Whisper (gated behind `whisper` Cargo feature) and Deepgram STT streaming + REST fallback |
+| `rhema-stt` | Local Vosk STT, legacy Whisper behind the `whisper` Cargo feature, and Deepgram STT streaming + REST fallback |
 | `rhema-bible` | SQLite Bible DB, FTS5 search, cross-references |
 | `rhema-detection` | Verse detection pipeline: direct, semantic, quotation, ensemble merger, sentence buffer, sermon context, reading mode |
 | `rhema-broadcast` | NDI video frame output via FFI |
@@ -88,12 +89,11 @@ to local Whisper speech recognition with the local model bundled.
 - [Rust](https://rustup.rs/) toolchain (stable, 1.77.2+)
 - [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (platform-specific system dependencies)
 - [Python 3](https://www.python.org/) (for downloading copyrighted translations and embedding model export)
-- CMake + LLVM/libclang (required for local Whisper STT) — see [Platform-specific setup](#platform-specific-setup) below
-- [Deepgram API key](https://deepgram.com/) (optional, for cloud speech-to-text instead of Whisper)
+- [Deepgram API key](https://deepgram.com/) (optional, for cloud speech-to-text instead of Vosk)
 
 ### Platform-specific setup
 
-The local Whisper STT build compiles `whisper.cpp` from source, which requires CMake and `libclang` (via `bindgen`). Pick the command block for your OS:
+Legacy local Whisper builds compile `whisper.cpp` from source, which requires CMake and `libclang` (via `bindgen`). Current public builds use the bundled Vosk worker, so this setup is only needed when working on the legacy Whisper feature.
 
 **macOS**
 
@@ -137,7 +137,7 @@ bun install
 
 ### Quick Setup (recommended)
 
-One command sets up everything — Python virtual environment, Bible data, database, ONNX model, precomputed embeddings, and the local Whisper model:
+One command sets up the development data pipeline: Python virtual environment, Bible data, database, ONNX model, precomputed embeddings, and speech assets:
 
 > **Windows:** run `bun run setup:windows` *before* `setup:all` and restart your terminal. See [Platform-specific setup](#platform-specific-setup) above.
 
@@ -153,7 +153,7 @@ This runs 7 idempotent phases in sequence, skipping any whose output artifacts a
 4. Download & export ONNX model (`all-MiniLM-L6-v2`) + INT8 quantization for ARM64
 5. Export KJV verses to JSON for embedding precomputation
 6. Precompute verse embeddings (GPU sentence-transformers when available, ONNX CPU fallback otherwise)
-7. Download Whisper model (`ggml-tiny.en.bin`) into `models/whisper/`
+7. Download local speech assets into `models/`
 
 ### Environment
 
@@ -161,10 +161,11 @@ This runs 7 idempotent phases in sequence, skipping any whose output artifacts a
 
 SabbathCue supports two speech-to-text engines:
 
-**Option 1: Whisper (Local, Free)**
-Whisper runs locally on your machine with no API costs or per-minute billing.
-- Requires CMake + libclang — see [Platform-specific setup](#platform-specific-setup) above
-- The model (`ggml-tiny.en.bin`) is fetched as phase 7 of `setup:all`. Run `bun run download:whisper` to grab it on its own.
+**Option 1: Vosk (Local, Free)**
+Vosk runs locally on your machine with no API costs or per-minute billing.
+- Development builds can use Python plus `pip install vosk`.
+- Public release builds run `bun run build:vosk-sidecar` so the installed app has a self-contained `vosk_worker.exe`.
+- The model is fetched with `bun run download:vosk`.
 
 **Option 2: Deepgram (Cloud, Paid)**
 Create a `.env` file in the project root:
@@ -195,7 +196,8 @@ bun run build:egw                    # Import EGW JSON into data/rhema.db (run a
 bun run download:model               # Download & export ONNX model
 bun run export:verses                # Export verses to JSON
 bun run precompute:embeddings        # Rust ONNX (recommended); see also -onnx and -py variants
-bun run download:whisper             # Whisper STT model
+bun run download:vosk                # Vosk STT model
+bun run build:vosk-sidecar           # Self-contained Vosk worker for release builds
 ```
 
 ### EGW import workflow
@@ -274,7 +276,7 @@ sabbathcue/
 
 | Script | Description |
 |---|---|
-| `setup:all` | **Full setup** — runs all 7 data/model/embedding/whisper phases (idempotent; pass `--force` to re-run) |
+| `setup:all` | **Full setup** — runs the data/model/embedding/speech phases (idempotent; pass `--force` to re-run) |
 | `setup:windows` | Windows bootstrap — installs LLVM + CMake via `winget` and persists `LIBCLANG_PATH` |
 | `dev` | Start Vite dev server |
 | `build` | TypeScript check + Vite production build |
@@ -292,7 +294,9 @@ sabbathcue/
 | `precompute:embeddings-onnx` | Precompute embeddings via Python ONNX Runtime |
 | `precompute:embeddings-py` | Precompute embeddings via Python sentence-transformers (GPU path) |
 | `quantize:model` | Quantize ONNX model to INT8 for ARM64 |
-| `download:whisper` | Download `ggml-tiny.en.bin` for local Whisper STT |
+| `download:vosk` | Download the small English Vosk model for local STT |
+| `build:vosk-sidecar` | Build the self-contained Vosk worker executable bundled in public installers |
+| `download:whisper` | Download `ggml-tiny.en.bin` for legacy Whisper STT development |
 | `download:ndi-sdk` | Download NDI 6 SDK headers and platform libraries |
 | `web:dev`, `web:build`, `web:start`, `web:lint` | Marketing + Fumadocs documentation site under `web/` |
 

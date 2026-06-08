@@ -41,6 +41,17 @@ describe("EGW presentation helpers", () => {
 
     expect(item.segments.length).toBeGreaterThan(1)
     expect(item.segments.every((segment) => segment.text.length > 0)).toBe(true)
+    expect(item.segments.every((segment) => segment.text.length <= 150)).toBe(true)
+  })
+
+  it("splits a single oversized EGW sentence into readable segments", () => {
+    const item = createEgwPresentationItem({
+      ...para,
+      text: "This unusually long sentence keeps moving through several related clauses, with a first complete thought, with a second clarifying thought, and with a final practical application that would otherwise be too dense for one projected slide.",
+    })
+
+    expect(item.segments.length).toBeGreaterThan(1)
+    expect(item.segments.every((segment) => segment.text.length <= 150)).toBe(true)
   })
 
   it("builds a manual queue item wrapping the presentation", () => {

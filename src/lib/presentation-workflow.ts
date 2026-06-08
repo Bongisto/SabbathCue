@@ -16,6 +16,7 @@ import {
   getPresentationRenderData,
   getScriptureVerse,
 } from "@/types"
+import { splitTextForReadableSlides } from "@/lib/text-slide-chunking"
 
 function activeTranslationLabel(): string {
   const bible = useBibleStore.getState()
@@ -168,28 +169,10 @@ export function egwReference(p: EgwParagraph): string {
 }
 
 function splitEgwTextForSlides(text: string): { text: string }[] {
-  const normalized = text.replace(/\s+/g, " ").trim()
-  if (!normalized) return [{ text: "" }]
-
-  const sentences = normalized.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) ?? [normalized]
-  const chunks: string[] = []
-  let current = ""
-
-  for (const sentence of sentences) {
-    const trimmed = sentence.trim()
-    if (!trimmed) continue
-    const next = current ? `${current} ${trimmed}` : trimmed
-
-    if (current && next.length > 230) {
-      chunks.push(current)
-      current = trimmed
-    } else {
-      current = next
-    }
-  }
-
-  if (current) chunks.push(current)
-  return (chunks.length > 0 ? chunks : [normalized]).map((chunk) => ({ text: chunk }))
+  return splitTextForReadableSlides(text, {
+    maxChars: 150,
+    softChars: 125,
+  }).map((chunk) => ({ text: chunk }))
 }
 
 export function createEgwPresentationItem(p: EgwParagraph): EgwPresentationItemData {

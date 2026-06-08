@@ -238,6 +238,19 @@ function SpeechSection() {
       ? savedKeyDisplay
       : keyValue
   const keyActionLabel = hasDeepgramApiKey ? "Update" : "Save"
+  const voskReady = Boolean(
+    assetStatus?.vosk_model &&
+      assetStatus?.vosk_worker &&
+      assetStatus?.vosk_runtime,
+  )
+  const voskMissingMessage = !assetStatus?.vosk_model
+    ? "Vosk model files are missing from the app resources or configured model path."
+    : !assetStatus?.vosk_worker
+      ? "Vosk worker script is missing from the app resources."
+      : !assetStatus?.vosk_runtime
+        ? assetStatus?.vosk_runtime_error ||
+          "Python is available, but the Vosk package could not be loaded."
+        : null
 
   const handleKeyAction = async () => {
     if (hasDeepgramApiKey && !editingSavedKey && !keyValue) {
@@ -364,27 +377,28 @@ function SpeechSection() {
               </span>
             </div>
             <Badge variant="outline" className="text-[0.5rem]">
-              {assetsLoading
-                ? "Checking"
-                : assetStatus?.vosk_model && assetStatus?.vosk_worker
-                  ? "Installed"
-                  : "Missing"}
+              {assetsLoading ? "Checking" : voskReady ? "Installed" : "Missing"}
             </Badge>
           </div>
 
           <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
-              Vosk runs with a verse-focused constrained grammar. It recognizes
-              Bible book names, numbers, and navigation keywords for fast verse
-              reference detection. For full-sermon transcript quality, switch to
-              Deepgram. Place the model folder here or set{" "}
-              <code className="text-[0.5625rem]">SABBATHCUE_VOSK_MODEL_DIR</code>.
+            Vosk runs with a verse-focused constrained grammar. It recognizes
+            Bible book names, numbers, and navigation keywords for fast verse
+            reference detection. This build also needs Python with the{" "}
+            <code className="text-[0.5625rem]">vosk</code> package installed.
+            Place the model folder here or set{" "}
+            <code className="text-[0.5625rem]">SABBATHCUE_VOSK_MODEL_DIR</code>.
+          </p>
+          {!assetsLoading && voskMissingMessage && (
+            <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
+              {voskMissingMessage}
             </p>
-          {!assetsLoading &&
-            (!assetStatus?.vosk_model || !assetStatus?.vosk_worker) && (
-              <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
-                C:\Users\fanel\Downloads\vosk-model-small-en-us
-              </p>
-            )}
+          )}
+          {!assetsLoading && !assetStatus?.vosk_model && (
+            <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
+              C:\Users\fanel\Downloads\vosk-model-small-en-us
+            </p>
+          )}
 
           <Button
             size="sm"

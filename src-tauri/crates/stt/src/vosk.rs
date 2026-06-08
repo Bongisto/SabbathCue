@@ -1,9 +1,8 @@
 //! Offline Vosk STT provider.
 //!
-//! The provider streams 16 kHz mono PCM to a small Python worker. Keeping the
-//! binding out-of-process avoids native linker friction in the desktop build
-//! while still giving the app a real streaming, offline STT path when the
-//! `vosk` Python package and model are installed.
+//! The provider streams 16 kHz mono PCM to a small worker process. Production
+//! builds can bundle the worker as a self-contained executable; development
+//! builds can still run the Python script directly.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -85,13 +84,8 @@ impl VoskProvider {
 
         let grammar_json = vosk_grammar_json()?;
         let grammar_file = write_grammar_temp_file(&grammar_json)?;
-        let mut command = Command::new(python_executable());
-        command
-            .arg(&self.worker_path)
-            .arg("--model")
-            .arg(&self.model_path)
-            .arg("--sample-rate")
-            .arg("16000");
+        let mut command = worker_command(&self.worker_path);
+        push_worker_args(&mut command, &self.model_path);
         push_grammar_file_args(&mut command, grammar_file.path());
         let output = command
             .stdin(Stdio::null())
@@ -140,13 +134,8 @@ impl VoskProvider {
             )));
         }
 
-        let mut command = Command::new(python_executable());
-        command
-            .arg(&self.worker_path)
-            .arg("--model")
-            .arg(&self.model_path)
-            .arg("--sample-rate")
-            .arg("16000");
+        let mut command = worker_command(&self.worker_path);
+        push_worker_args(&mut command, &self.model_path);
         push_grammar_file_args(&mut command, grammar_file.path());
         command
             .stdin(Stdio::piped())
@@ -176,6 +165,31 @@ impl Drop for GrammarTempFile {
 
 fn push_grammar_file_args(command: &mut Command, grammar_file: &Path) {
     command.arg("--grammar-json-file").arg(grammar_file);
+}
+
+fn worker_is_executable(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("exe"))
+        .unwrap_or(false)
+}
+
+fn worker_command(worker_path: &Path) -> Command {
+    if worker_is_executable(worker_path) {
+        Command::new(worker_path)
+    } else {
+        let mut command = Command::new(python_executable());
+        command.arg(worker_path);
+        command
+    }
+}
+
+fn push_worker_args(command: &mut Command, model_path: &Path) {
+    command
+        .arg("--model")
+        .arg(model_path)
+        .arg("--sample-rate")
+        .arg("16000");
 }
 
 fn write_grammar_temp_file(json: &str) -> Result<GrammarTempFile, SttError> {

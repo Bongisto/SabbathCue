@@ -4,6 +4,7 @@
 )]
 
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use serde::Serialize;
 use tauri::AppHandle;
@@ -46,6 +47,8 @@ pub struct AssetStatus {
     pub bible_db: bool,
     pub vosk_model: bool,
     pub vosk_worker: bool,
+    pub vosk_runtime: bool,
+    pub vosk_runtime_error: Option<String>,
     pub onnx_model: bool,
     pub tokenizer: bool,
     pub embeddings: bool,
@@ -58,7 +61,9 @@ pub struct AssetStatus {
 pub fn asset_status(app: AppHandle) -> AssetStatus {
     let bible_db = asset_paths::bible_db_path(&app).exists();
     let vosk_model = asset_paths::vosk_model_path(&app).exists();
-    let vosk_worker = asset_paths::vosk_worker_path(&app).exists();
+    let vosk_worker_path = asset_paths::vosk_worker_path(&app);
+    let vosk_worker = vosk_worker_path.exists();
+    let (vosk_runtime, vosk_runtime_error) = vosk_runtime_status(&vosk_worker_path);
     let onnx_model = asset_paths::onnx_model_path(&app).exists();
     let tokenizer = asset_paths::tokenizer_path(&app).exists();
     let embeddings = asset_paths::embeddings_path(&app).exists();
@@ -69,12 +74,75 @@ pub fn asset_status(app: AppHandle) -> AssetStatus {
         bible_db,
         vosk_model,
         vosk_worker,
+        vosk_runtime,
+        vosk_runtime_error,
         onnx_model,
         tokenizer,
         embeddings,
         embedding_ids,
         semantic_ready: onnx_model && tokenizer && embeddings && embedding_ids,
         ndi_sdk,
+    }
+}
+
+fn python_executable() -> String {
+    std::env::var("SABBATHCUE_PYTHON")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "python".to_string())
+}
+
+fn first_nonempty_lines(bytes: &[u8], limit: usize) -> String {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .take(limit)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn worker_is_executable(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("exe"))
+        .unwrap_or(false)
+}
+
+fn vosk_runtime_status(worker_path: &Path) -> (bool, Option<String>) {
+    if worker_path.exists() && worker_is_executable(worker_path) {
+        return (true, None);
+    }
+
+    let python = python_executable();
+    match Command::new(&python)
+        .arg("-c")
+        .arg("import vosk")
+        .stdin(Stdio::null())
+        .output()
+    {
+        Ok(output) if output.status.success() => (true, None),
+        Ok(output) => {
+            let stderr = first_nonempty_lines(&output.stderr, 3);
+            let stdout = first_nonempty_lines(&output.stdout, 3);
+            let detail = if !stderr.is_empty() {
+                stderr
+            } else if !stdout.is_empty() {
+                stdout
+            } else {
+                format!("Python exited with status {}", output.status)
+            };
+            (
+                false,
+                Some(format!("Python can run, but the Vosk package is unavailable: {detail}")),
+            )
+        }
+        Err(error) => (
+            false,
+            Some(format!(
+                "Python runtime unavailable via '{python}': {error}"
+            )),
+        ),
     }
 }
 

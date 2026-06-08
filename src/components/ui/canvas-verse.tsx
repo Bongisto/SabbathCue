@@ -23,6 +23,7 @@ export const CanvasPresentation = memo(function CanvasPresentation({
 }: CanvasPresentationProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const bufferCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const pendingSizeFrameRef = useRef<number | null>(null)
@@ -71,8 +72,8 @@ export const CanvasPresentation = memo(function CanvasPresentation({
   const draw = useCallback((force = false) => {
     const canvas = canvasRef.current
     if (!canvas || containerSize.width === 0 || containerSize.height === 0) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    const visibleCtx = canvas.getContext("2d")
+    if (!visibleCtx) return
 
     const dpr = window.devicePixelRatio || 1
     const aspectRatio = theme.resolution.width / theme.resolution.height
@@ -90,17 +91,30 @@ export const CanvasPresentation = memo(function CanvasPresentation({
     if (!force && lastDrawKeyRef.current === drawKey) return
     lastDrawKeyRef.current = drawKey
 
-    canvas.width = displayW * dpr
-    canvas.height = displayH * dpr
-    canvas.style.width = `${displayW}px`
-    canvas.style.height = `${displayH}px`
+    const buffer = bufferCanvasRef.current ?? document.createElement("canvas")
+    bufferCanvasRef.current = buffer
+    buffer.width = Math.max(1, Math.round(displayW * dpr))
+    buffer.height = Math.max(1, Math.round(displayH * dpr))
+    const bufferCtx = buffer.getContext("2d")
+    if (!bufferCtx) return
 
-    ctx.scale(dpr, dpr)
+    bufferCtx.setTransform(1, 0, 0, 1, 0, 0)
+    bufferCtx.clearRect(0, 0, buffer.width, buffer.height)
+    bufferCtx.scale(dpr, dpr)
     const scale = displayW / theme.resolution.width
-    renderPresentation(ctx, theme, item, {
+    renderPresentation(bufferCtx, theme, item, {
       scale,
       imageCache: imageCacheRef.current,
     })
+
+    if (canvas.width !== buffer.width) canvas.width = buffer.width
+    if (canvas.height !== buffer.height) canvas.height = buffer.height
+    canvas.style.width = `${displayW}px`
+    canvas.style.height = `${displayH}px`
+
+    visibleCtx.setTransform(1, 0, 0, 1, 0, 0)
+    visibleCtx.clearRect(0, 0, canvas.width, canvas.height)
+    visibleCtx.drawImage(buffer, 0, 0)
   }, [theme, item, containerSize, renderKey])
 
   // Preload background image so the renderer can find it in the cache.
