@@ -18,7 +18,7 @@ export function SabbathCueLogo({
   className?: string;
   wordmarkClassName?: string;
   size?: keyof typeof HEIGHT_CLASS;
-  /** Full logo image already includes the wordmark; enable for compact text-only layouts. */
+  /** Show the SabbathCue wordmark beside the logo mark. */
   showWordmark?: boolean;
 }) {
   return (

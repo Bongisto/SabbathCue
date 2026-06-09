@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
-import { ZapIcon, Trash2Icon } from "lucide-react"
+import { Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
+import { AppLogo } from "@/components/ui/app-logo"
 import { useAccentThemeStore, type AccentTheme } from "@/stores/accent-theme-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
@@ -48,9 +49,7 @@ export function AppControllerHeader() {
     <header className="z-50 flex h-[56px] shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[#02040a]/90 px-6 backdrop-blur-xl">
       <div className="flex items-center gap-5">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-tr from-yellow-400 to-amber-500 shadow-lg shadow-yellow-500/20 transition-transform duration-300 hover:rotate-12">
-            <ZapIcon className="size-[18px] text-black" strokeWidth={2.5} />
-          </div>
+          <AppLogo size="sm" className="transition-transform duration-300 hover:rotate-3" />
           <div className="flex flex-col leading-none">
             <span className="font-display text-xl tracking-wide text-white">
               {APP_DISPLAY_NAME}

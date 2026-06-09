@@ -5,7 +5,7 @@ import { SabbathCueLogo } from "@/app/_components/ui/sabbathcue-logo";
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: <SabbathCueLogo size="sm" />,
+      title: <SabbathCueLogo size="sm" showWordmark />,
       url: "/",
     },
     githubUrl: SITE.repo.url,

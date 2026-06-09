@@ -47,7 +47,7 @@ export function SiteFooter() {
       <Container>
         <div className="grid grid-cols-1 gap-12 md:grid-cols-[minmax(0,1.4fr)_repeat(4,minmax(0,1fr))] md:gap-8">
           <div className="flex flex-col gap-3">
-            <SabbathCueLogo />
+            <SabbathCueLogo showWordmark />
             <p className="max-w-[280px] text-lg leading-6 tracking-[-0.01em] text-muted-foreground">
               AI-powered real-time Bible verse detection for churches. Scripture
               on screen, the instant it&apos;s spoken.
