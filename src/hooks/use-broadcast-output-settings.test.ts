@@ -82,6 +82,16 @@ function baseDeps() {
   }
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
+
 async function loadCommandModule() {
   vi.resetModules()
   return import("./use-broadcast-output-settings")
@@ -89,6 +99,7 @@ async function loadCommandModule() {
 
 describe("use-broadcast-output-settings commands", () => {
   beforeEach(() => {
+    vi.useRealTimers()
     vi.clearAllMocks()
     mockInvoke.mockReset()
     mockEmitTo.mockReset()
@@ -134,7 +145,9 @@ describe("use-broadcast-output-settings commands", () => {
 
       await runToggleBroadcastPreview(baseState({ isPreviewOpen: true }), deps)
 
-      expect(mockInvoke).toHaveBeenCalledWith("close_broadcast_window", { outputId: "main" })
+      expect(mockInvoke).toHaveBeenCalledWith("close_broadcast_window", {
+        outputId: "main",
+      })
       expect(deps.onPreviewOpenChange).toHaveBeenCalledWith(false)
     })
   })
@@ -161,7 +174,9 @@ describe("use-broadcast-output-settings commands", () => {
         "ensure_broadcast_window",
         "start_ndi",
       ])
-      expect(mockInvoke).toHaveBeenCalledWith("ensure_broadcast_window", { outputId: "main" })
+      expect(mockInvoke).toHaveBeenCalledWith("ensure_broadcast_window", {
+        outputId: "main",
+      })
       expect(mockInvoke).toHaveBeenCalledWith("start_ndi", {
         outputId: "main",
         request: {
@@ -226,6 +241,7 @@ describe("use-broadcast-output-settings commands", () => {
       )
 
       expect(mockInvoke.mock.calls.map((call) => call[0])).toEqual([
+        "get_ndi_status",
         "close_broadcast_window",
         "stop_ndi",
         "get_ndi_status",
@@ -237,7 +253,8 @@ describe("use-broadcast-output-settings commands", () => {
 
     it("reconciles preview and NDI state before reporting disabled", async () => {
       mockInvoke.mockImplementation(async (command: string) => {
-        if (command === "get_ndi_status") return { active: true, width: 1920, height: 1080, fps: 24 }
+        if (command === "get_ndi_status")
+          return { active: true, width: 1920, height: 1080, fps: 24 }
         return undefined
       })
       mockGetAllWindows.mockResolvedValue([])
@@ -264,6 +281,59 @@ describe("use-broadcast-output-settings commands", () => {
       expect(onPreviewOpenChange).toHaveBeenCalledWith(false)
       expect(onNdiActiveChange).toHaveBeenCalledWith(true)
     })
+
+    it("closes a preview discovered during disable reconciliation", async () => {
+      mockInvoke.mockResolvedValue(undefined)
+      mockGetAllWindows.mockResolvedValueOnce([{ label: "broadcast" }]).mockResolvedValueOnce([])
+
+      const { runDisableBroadcastOutput } = await loadCommandModule()
+      const deps = baseDeps()
+
+      await runDisableBroadcastOutput(
+        {
+          outputId: "main",
+          isPreviewOpen: false,
+          ndiActive: false,
+          ndiFrameRate: "fps24",
+          ndiResolution: "r1080p",
+        },
+        deps,
+      )
+
+      expect(mockInvoke).toHaveBeenCalledWith("close_broadcast_window", {
+        outputId: "main",
+      })
+      expect(deps.onPreviewOpenChange).toHaveBeenCalledWith(false)
+    })
+
+    it("does not emit inactive NDI config when stop fails", async () => {
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "get_ndi_status") {
+          return { active: true, width: 1920, height: 1080, fps: 24 }
+        }
+        if (command === "stop_ndi") throw new Error("stop failed")
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { runDisableBroadcastOutput } = await loadCommandModule()
+      const deps = baseDeps()
+
+      await runDisableBroadcastOutput(
+        {
+          outputId: "main",
+          isPreviewOpen: false,
+          ndiActive: true,
+          ndiFrameRate: "fps24",
+          ndiResolution: "r1080p",
+        },
+        deps,
+      )
+
+      expect(deps.emitNdiConfig).not.toHaveBeenCalled()
+      expect(deps.onError).toHaveBeenCalledWith("Could not stop NDI output", expect.any(Error))
+      expect(deps.onNdiActiveChange).toHaveBeenCalledWith(true)
+    })
   })
 
   describe("useBroadcastOutputSettings hook", () => {
@@ -272,7 +342,9 @@ describe("use-broadcast-output-settings commands", () => {
       const container = document.createElement("div")
       document.body.appendChild(container)
       const root = createRoot(container)
-      const result: { current: ReturnType<typeof useBroadcastOutputSettings> | null } = {
+      const result: {
+        current: ReturnType<typeof useBroadcastOutputSettings> | null
+      } = {
         current: null,
       }
 
@@ -314,7 +386,39 @@ describe("use-broadcast-output-settings commands", () => {
       const { result, cleanup } = await renderHookResult(true)
       expect(result.current?.enabled).toBe(true)
       expect(result.current?.ndiActive).toBe(true)
+      expect(result.current?.outputType).toBe("ndi")
       cleanup()
+    })
+
+    it("polls NDI status while the dialog stays open", async () => {
+      vi.useFakeTimers()
+      let pollCount = 0
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "get_ndi_status") {
+          pollCount += 1
+          if (pollCount > 1) {
+            return { active: true, width: 1280, height: 720, fps: 60 }
+          }
+          return null
+        }
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { result, cleanup } = await renderHookResult(true)
+      expect(result.current?.ndiActive).toBe(false)
+
+      await act(async () => {
+        vi.advanceTimersByTime(750)
+        await Promise.resolve()
+      })
+
+      expect(result.current?.ndiActive).toBe(true)
+      expect(result.current?.outputType).toBe("ndi")
+      expect(result.current?.ndiResolution).toBe("r720p")
+      expect(result.current?.ndiFrameRate).toBe("fps60")
+      cleanup()
+      vi.useRealTimers()
     })
 
     it("ignores duplicate NDI toggle calls while the first command is pending", async () => {
@@ -345,6 +449,168 @@ describe("use-broadcast-output-settings commands", () => {
       })
 
       expect(startCalls).toBe(1)
+      cleanup()
+    })
+
+    it("keeps the master toggle pending while joining an in-flight preview toggle", async () => {
+      const openWindow = createDeferred<void>()
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "open_broadcast_window") return openWindow.promise
+        if (command === "get_ndi_status") return null
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { result, cleanup } = await renderHookResult(true)
+      const togglePreview = result.current?.handleTogglePreview
+      const toggleEnabled = result.current?.handleToggleEnabled
+      expect(togglePreview).toBeDefined()
+      expect(toggleEnabled).toBeDefined()
+
+      let previewToggle: Promise<void> | undefined
+      await act(async () => {
+        previewToggle = togglePreview?.()
+        await Promise.resolve()
+      })
+
+      let enabledToggle: Promise<void> | undefined
+      await act(async () => {
+        enabledToggle = toggleEnabled?.(true)
+        await Promise.resolve()
+      })
+
+      expect(result.current?.previewPending).toBe(true)
+      expect(result.current?.enabledPending).toBe(true)
+      expect(
+        mockInvoke.mock.calls.filter((call) => call[0] === "open_broadcast_window"),
+      ).toHaveLength(1)
+
+      let duplicateEnabledToggle: Promise<void> | undefined
+      await act(async () => {
+        duplicateEnabledToggle = result.current?.handleToggleEnabled(true)
+        await Promise.resolve()
+      })
+      expect(
+        mockInvoke.mock.calls.filter((call) => call[0] === "open_broadcast_window"),
+      ).toHaveLength(1)
+
+      openWindow.resolve()
+      await act(async () => {
+        await Promise.all([previewToggle, enabledToggle, duplicateEnabledToggle])
+      })
+
+      expect(result.current?.previewPending).toBe(false)
+      expect(result.current?.enabledPending).toBe(false)
+      cleanup()
+    })
+
+    it("turns off after an in-flight master preview open completes", async () => {
+      const openWindow = createDeferred<void>()
+      let previewExists = false
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "open_broadcast_window") return openWindow.promise
+        if (command === "close_broadcast_window") {
+          previewExists = false
+          return undefined
+        }
+        if (command === "get_ndi_status") return null
+        return undefined
+      })
+      mockGetAllWindows.mockImplementation(async () =>
+        previewExists ? [{ label: "broadcast" }] : [],
+      )
+
+      const { result, cleanup } = await renderHookResult(true)
+      const toggleEnabled = result.current?.handleToggleEnabled
+      expect(toggleEnabled).toBeDefined()
+
+      let enableToggle: Promise<void> | undefined
+      await act(async () => {
+        enableToggle = toggleEnabled?.(true)
+        await Promise.resolve()
+      })
+
+      let disableToggle: Promise<void> | undefined
+      await act(async () => {
+        disableToggle = toggleEnabled?.(false)
+        await Promise.resolve()
+      })
+
+      expect(result.current?.enabledPending).toBe(true)
+      expect(
+        mockInvoke.mock.calls.filter((call) => call[0] === "close_broadcast_window"),
+      ).toHaveLength(0)
+
+      previewExists = true
+      openWindow.resolve()
+      await act(async () => {
+        await Promise.all([enableToggle, disableToggle])
+      })
+
+      expect(mockInvoke.mock.calls.map((call) => call[0])).toContain("close_broadcast_window")
+      expect(result.current?.isPreviewOpen).toBe(false)
+      expect(result.current?.enabledPending).toBe(false)
+      cleanup()
+    })
+
+    it("keeps the master toggle pending while joining an in-flight NDI toggle", async () => {
+      const startNdi = createDeferred<NdiSessionInfo>()
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "start_ndi") return startNdi.promise
+        if (command === "get_ndi_status") return null
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { result, cleanup } = await renderHookResult(true)
+      await act(async () => {
+        result.current?.setOutputType("ndi")
+      })
+
+      const toggleNdi = result.current?.handleToggleNdi
+      const toggleEnabled = result.current?.handleToggleEnabled
+      expect(toggleNdi).toBeDefined()
+      expect(toggleEnabled).toBeDefined()
+
+      let ndiToggle: Promise<void> | undefined
+      await act(async () => {
+        ndiToggle = toggleNdi?.()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      let enabledToggle: Promise<void> | undefined
+      await act(async () => {
+        enabledToggle = toggleEnabled?.(true)
+        await Promise.resolve()
+      })
+
+      expect(result.current?.ndiPending).toBe(true)
+      expect(result.current?.enabledPending).toBe(true)
+      expect(mockInvoke.mock.calls.filter((call) => call[0] === "start_ndi")).toHaveLength(1)
+
+      let duplicateEnabledToggle: Promise<void> | undefined
+      await act(async () => {
+        duplicateEnabledToggle = result.current?.handleToggleEnabled(true)
+        await Promise.resolve()
+      })
+      expect(mockInvoke.mock.calls.filter((call) => call[0] === "start_ndi")).toHaveLength(1)
+
+      startNdi.resolve({
+        sourceName: "SabbathCue Output",
+        resolution: "r1080p",
+        frameRate: "fps24",
+        alphaMode: "straightAlpha",
+        width: 1920,
+        height: 1080,
+        fps: 24,
+      })
+      await act(async () => {
+        await Promise.all([ndiToggle, enabledToggle, duplicateEnabledToggle])
+      })
+
+      expect(result.current?.ndiPending).toBe(false)
+      expect(result.current?.enabledPending).toBe(false)
       cleanup()
     })
   })

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import {
   createNdiFrameRequest,
+  NDI_FRAME_FAILURE_STOP_THRESHOLD,
   NDI_HEARTBEAT_INTERVAL_MS,
   notifyNdiPushFailure,
   resolveNdiFrameSource,
@@ -60,6 +61,7 @@ export function useBroadcastOutputRuntime({
   const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const lastPushRef = useRef(0)
   const pushingRef = useRef(false)
+  const ndiAutoStoppingRef = useRef(false)
   const consecutiveFailuresRef = useRef(0)
   const lastErrorEmittedAtRef = useRef(0)
   const lastRenderKeyRef = useRef<string | null>(null)
@@ -180,6 +182,30 @@ export function useBroadcastOutputRuntime({
         lastErrorEmittedAtRef.current,
         (event) => emitTo("main", "broadcast:output-error", event),
       )
+      if (
+        consecutiveFailuresRef.current >= NDI_FRAME_FAILURE_STOP_THRESHOLD &&
+        !ndiAutoStoppingRef.current
+      ) {
+        ndiAutoStoppingRef.current = true
+        try {
+          await invokeTauri("stop_ndi", { outputId })
+          ndiConfigRef.current = {
+            ...ndiConfigRef.current,
+            active: false,
+          }
+          consecutiveFailuresRef.current = 0
+          void emitTo("main", "broadcast:output-error", {
+            outputId: outputId as BroadcastOutputId,
+            kind: "ndi-frame",
+            title: "NDI output stopped",
+            description: `Stopped after ${NDI_FRAME_FAILURE_STOP_THRESHOLD} consecutive frame transmission failures.`,
+          })
+        } catch (stopError) {
+          console.warn("[broadcast-output] stop_ndi after frame failures failed", stopError)
+        } finally {
+          ndiAutoStoppingRef.current = false
+        }
+      }
     } finally {
       pushingRef.current = false
     }

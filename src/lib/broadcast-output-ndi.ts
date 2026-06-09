@@ -95,6 +95,7 @@ export function shouldPushNdiHeartbeat(
 }
 
 export const NDI_FRAME_ERROR_RATE_LIMIT_MS = 30_000
+export const NDI_FRAME_FAILURE_STOP_THRESHOLD = 3
 
 export function shouldEmitNdiFrameError(
   now: number,

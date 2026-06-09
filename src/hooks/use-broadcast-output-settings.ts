@@ -59,6 +59,13 @@ export async function reconcileBroadcastPreviewState(
   return windows.some((w) => w.label === label)
 }
 
+async function getBroadcastNdiStatus(
+  invoke: typeof invokeTauri,
+  outputId: BroadcastOutputId,
+): Promise<NdiStatusResponse | null> {
+  return invoke<NdiStatusResponse | null>("get_ndi_status", { outputId })
+}
+
 export interface BroadcastOutputCommandState {
   outputId: BroadcastOutputId
   isPreviewOpen: boolean
@@ -79,11 +86,7 @@ export async function runToggleBroadcastPreview(
   deps: {
     invoke: typeof invokeTauri
     syncBroadcastOutputFor: (outputId: string) => void
-    emitNdiConfig: (
-      active: boolean,
-      frameRate: NdiFrameRate,
-      resolution: NdiResolution,
-    ) => void
+    emitNdiConfig: (active: boolean, frameRate: NdiFrameRate, resolution: NdiResolution) => void
     onPreviewOpenChange: (open: boolean) => void
     onError: (title: string, error: unknown) => void
   },
@@ -125,7 +128,9 @@ export async function runToggleBroadcastPreview(
     }
   } catch (error) {
     deps.onError(
-      outputId === "alt" ? "Could not toggle alternate preview" : "Could not toggle broadcast preview",
+      outputId === "alt"
+        ? "Could not toggle alternate preview"
+        : "Could not toggle broadcast preview",
       error,
     )
   }
@@ -136,11 +141,7 @@ export async function runToggleBroadcastNdi(
   deps: {
     invoke: typeof invokeTauri
     syncBroadcastOutputFor: (outputId: string) => void
-    emitNdiConfig: (
-      active: boolean,
-      frameRate: NdiFrameRate,
-      resolution: NdiResolution,
-    ) => void
+    emitNdiConfig: (active: boolean, frameRate: NdiFrameRate, resolution: NdiResolution) => void
     emitPostStartNdiConfig: (session: NdiSessionInfo) => void
     onNdiActiveChange: (active: boolean) => void
     onError: (title: string, error: unknown) => void
@@ -171,22 +172,22 @@ export async function runToggleBroadcastNdi(
       deps.emitNdiConfig(false, ndiFrameRate, ndiResolution)
       deps.onNdiActiveChange(false)
       if (!isPreviewOpen) {
-        await deps.invoke("close_broadcast_window", { outputId }).catch((error) =>
-          console.warn(
-            `[broadcast-settings] close ${outputId} window after NDI stop failed`,
-            error,
-          ),
-        )
+        await deps
+          .invoke("close_broadcast_window", { outputId })
+          .catch((error) =>
+            console.warn(
+              `[broadcast-settings] close ${outputId} window after NDI stop failed`,
+              error,
+            ),
+          )
       }
     } else {
       await deps.invoke("ensure_broadcast_window", { outputId })
-      const request = buildNdiStartRequest(
-        ndiSourceName,
-        ndiResolution,
-        ndiFrameRate,
-        ndiAlphaMode,
-      )
-      const session = await deps.invoke<NdiSessionInfo>("start_ndi", { outputId, request })
+      const request = buildNdiStartRequest(ndiSourceName, ndiResolution, ndiFrameRate, ndiAlphaMode)
+      const session = await deps.invoke<NdiSessionInfo>("start_ndi", {
+        outputId,
+        request,
+      })
       deps.onNdiActiveChange(true)
       deps.syncBroadcastOutputFor(outputId)
       void emitTo(windowLabel, "broadcast:ndi-config", {
@@ -195,10 +196,7 @@ export async function runToggleBroadcastNdi(
         width: session.width,
         height: session.height,
       }).catch((error) =>
-        console.warn(
-          `[broadcast-settings] emit post-start sync (${outputId}) failed`,
-          error,
-        ),
+        console.warn(`[broadcast-settings] emit post-start sync (${outputId}) failed`, error),
       )
       setTimeout(() => {
         deps.syncBroadcastOutputFor(outputId)
@@ -220,11 +218,7 @@ export async function runDisableBroadcastOutput(
   >,
   deps: {
     invoke: typeof invokeTauri
-    emitNdiConfig: (
-      active: boolean,
-      frameRate: NdiFrameRate,
-      resolution: NdiResolution,
-    ) => void
+    emitNdiConfig: (active: boolean, frameRate: NdiFrameRate, resolution: NdiResolution) => void
     onPreviewOpenChange: (open: boolean) => void
     onNdiActiveChange: (active: boolean) => void
     onError: (title: string, error: unknown) => void
@@ -232,7 +226,22 @@ export async function runDisableBroadcastOutput(
 ): Promise<void> {
   const { outputId, isPreviewOpen, ndiActive, ndiFrameRate, ndiResolution } = state
 
-  if (isPreviewOpen) {
+  let previewOpenBefore = isPreviewOpen
+  try {
+    previewOpenBefore = isPreviewOpen || (await reconcileBroadcastPreviewState(outputId))
+  } catch {
+    previewOpenBefore = isPreviewOpen
+  }
+
+  let ndiActiveBefore = ndiActive
+  try {
+    const status = await getBroadcastNdiStatus(deps.invoke, outputId)
+    ndiActiveBefore = ndiActive || Boolean(status?.active)
+  } catch {
+    ndiActiveBefore = ndiActive
+  }
+
+  if (previewOpenBefore) {
     try {
       await deps.invoke("close_broadcast_window", { outputId })
     } catch (error) {
@@ -245,16 +254,16 @@ export async function runDisableBroadcastOutput(
     }
   }
 
-  if (ndiActive) {
+  if (ndiActiveBefore) {
     try {
       await deps.invoke("stop_ndi", { outputId })
+      deps.emitNdiConfig(false, ndiFrameRate, ndiResolution)
     } catch (error) {
       deps.onError(
         outputId === "alt" ? "Could not stop alternate NDI output" : "Could not stop NDI output",
         error,
       )
     }
-    deps.emitNdiConfig(false, ndiFrameRate, ndiResolution)
   }
 
   const previewOpen = await reconcileBroadcastPreviewState(outputId)
@@ -262,7 +271,7 @@ export async function runDisableBroadcastOutput(
 
   let ndiStillActive = false
   try {
-    const status = await deps.invoke<NdiStatusResponse | null>("get_ndi_status", { outputId })
+    const status = await getBroadcastNdiStatus(deps.invoke, outputId)
     ndiStillActive = Boolean(status?.active)
   } catch {
     ndiStillActive = false
@@ -306,6 +315,9 @@ export function useBroadcastOutputSettings(
   const previewPendingRef = useRef(false)
   const ndiPendingRef = useRef(false)
   const enabledPendingRef = useRef(false)
+  const previewPendingPromiseRef = useRef<Promise<void> | null>(null)
+  const ndiPendingPromiseRef = useRef<Promise<void> | null>(null)
+  const enabledPendingPromiseRef = useRef<Promise<void> | null>(null)
 
   const enabled = isPreviewOpen || ndiActive
 
@@ -357,16 +369,18 @@ export function useBroadcastOutputSettings(
       if (!cancelled) setIsPreviewOpen(previewOpen)
 
       try {
-        const status = await invokeTauri<NdiStatusResponse | null>("get_ndi_status", { outputId })
+        const status = await getBroadcastNdiStatus(invokeTauri, outputId)
         if (cancelled) return
         if (status?.active) {
           setNdiActive(true)
+          setOutputType("ndi")
           const mappedResolution = mapNdiResolution(status.width, status.height)
           const mappedFrameRate = mapNdiFrameRate(status.fps)
           if (mappedResolution) setNdiResolution(mappedResolution)
           if (mappedFrameRate) setNdiFrameRate(mappedFrameRate)
         } else {
           setNdiActive(false)
+          if (previewOpen) setOutputType("display")
         }
       } catch {
         if (!cancelled) setNdiActive(false)
@@ -376,6 +390,36 @@ export function useBroadcastOutputSettings(
     void reconcile()
     return () => {
       cancelled = true
+    }
+  }, [open, outputId])
+
+  useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+    const intervalId = setInterval(() => {
+      void getBroadcastNdiStatus(invokeTauri, outputId)
+        .then((status) => {
+          if (cancelled) return
+          if (status?.active) {
+            setNdiActive(true)
+            setOutputType("ndi")
+            const mappedResolution = mapNdiResolution(status.width, status.height)
+            const mappedFrameRate = mapNdiFrameRate(status.fps)
+            if (mappedResolution) setNdiResolution(mappedResolution)
+            if (mappedFrameRate) setNdiFrameRate(mappedFrameRate)
+          } else {
+            setNdiActive(false)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setNdiActive(false)
+        })
+    }, 750)
+
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
     }
   }, [open, outputId])
 
@@ -479,35 +523,52 @@ export function useBroadcastOutputSettings(
   )
 
   const handleTogglePreview = useCallback(async () => {
-    if (previewPendingRef.current) return
+    if (previewPendingRef.current) return previewPendingPromiseRef.current
     previewPendingRef.current = true
     setPreviewPending(true)
-    try {
+    const pending = (async () => {
       await runToggleBroadcastPreview(buildCommandState(), buildCommandDeps())
+    })()
+    previewPendingPromiseRef.current = pending
+    try {
+      await pending
     } finally {
       previewPendingRef.current = false
+      previewPendingPromiseRef.current = null
       setPreviewPending(false)
     }
   }, [buildCommandState, buildCommandDeps])
 
   const handleToggleNdi = useCallback(async () => {
-    if (ndiPendingRef.current) return
+    if (ndiPendingRef.current) return ndiPendingPromiseRef.current
     ndiPendingRef.current = true
     setNdiPending(true)
-    try {
+    const pending = (async () => {
       await runToggleBroadcastNdi(buildCommandState(), buildCommandDeps())
+    })()
+    ndiPendingPromiseRef.current = pending
+    try {
+      await pending
     } finally {
       ndiPendingRef.current = false
+      ndiPendingPromiseRef.current = null
       setNdiPending(false)
     }
   }, [buildCommandState, buildCommandDeps])
 
   const handleToggleEnabled = useCallback(
     async (nextEnabled: boolean) => {
-      if (enabledPendingRef.current) return
+      if (enabledPendingRef.current) {
+        const pending = enabledPendingPromiseRef.current
+        if (!nextEnabled && pending) {
+          await pending
+        } else {
+          return pending
+        }
+      }
       enabledPendingRef.current = true
       setEnabledPending(true)
-      try {
+      const pending = (async () => {
         if (nextEnabled) {
           if (outputType === "display") {
             await handleTogglePreview()
@@ -516,9 +577,19 @@ export function useBroadcastOutputSettings(
           }
           return
         }
+        await Promise.all(
+          [previewPendingPromiseRef.current, ndiPendingPromiseRef.current].filter(
+            (promise): promise is Promise<void> => Boolean(promise),
+          ),
+        )
         await runDisableBroadcastOutput(buildCommandState(), buildCommandDeps())
+      })()
+      enabledPendingPromiseRef.current = pending
+      try {
+        await pending
       } finally {
         enabledPendingRef.current = false
+        enabledPendingPromiseRef.current = null
         setEnabledPending(false)
       }
     },
