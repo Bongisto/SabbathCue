@@ -153,6 +153,63 @@ test.describe("operator flow harness", () => {
       )
   })
 
+  test("queue navigation presents non-scripture queue items", async ({ page }) => {
+    await page.evaluate(() => {
+      const harness = window.__SABBATHCUE_OPERATOR_E2E__!
+      harness.queue.clear()
+      harness.queue.addItems([
+        {
+          id: "q-scripture",
+          confidence: 1,
+          source: "manual",
+          added_at: 0,
+          presentation: {
+            kind: "scripture",
+            reference: "John 3:16 (KJV)",
+            verse: {
+              id: 1,
+              translation_id: 1,
+              book_number: 43,
+              book_name: "John",
+              book_abbreviation: "Jn",
+              chapter: 3,
+              verse: 16,
+              text: "For God so loved the world.",
+            },
+          },
+        },
+        {
+          id: "q-hymn",
+          confidence: 1,
+          source: "hymn",
+          added_at: 0,
+          presentation: {
+            kind: "hymn",
+            hymnId: "hymn-1",
+            hymnNumber: 1,
+            hymnTitle: "Praise to the Lord",
+            screenId: "hymn-1-screen-1",
+            slideIndex: 1,
+            slideCount: 2,
+            reference: "#1 Praise to the Lord",
+            segments: [{ text: "Praise to the Lord, the Almighty" }],
+          },
+        },
+      ])
+      harness.queue.setActive(0)
+      harness.remote.next()
+    })
+
+    await expect
+      .poll(async () => page.evaluate(() => window.__SABBATHCUE_OPERATOR_E2E__!.snapshot()))
+      .toEqual(
+        expect.objectContaining({
+          activeIndex: 1,
+          liveReference: "#1 Praise to the Lord",
+        }),
+      )
+  })
+
   test("go-live and hide toggles live state", async ({ page }) => {
     await page.evaluate(() => {
       const harness = window.__SABBATHCUE_OPERATOR_E2E__!

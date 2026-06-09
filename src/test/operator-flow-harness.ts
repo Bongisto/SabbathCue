@@ -2,6 +2,7 @@ import {
   createPresentationItem,
   createScriptureQueueItem,
   detectionToVerse,
+  presentItem,
   presentVerse,
   selectPreviewVerse,
 } from "@/lib/presentation-workflow"
@@ -121,7 +122,7 @@ function navigateQueue(direction: "next" | "prev") {
       const liveReference = useBroadcastStore.getState().liveItem?.reference
       if (!liveReference) return 0
       const index = queue.items.findIndex(
-        (item) => item.presentation.kind === "scripture" && item.presentation.reference === liveReference,
+        (item) => item.presentation.reference === liveReference,
       )
       return index >= 0 ? index : 0
     })()
@@ -136,6 +137,8 @@ function navigateQueue(direction: "next" | "prev") {
   if (!item) return
   if (item.presentation.kind === "scripture") {
     presentVerse(item.presentation.verse, { navigate: false })
+  } else {
+    presentItem(item.presentation, { navigate: false })
   }
 }
 

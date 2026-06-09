@@ -40,6 +40,18 @@ export function BroadcastSettings({
 
   const mainOutput = useBroadcastOutputSettings("main", { open, ndiSdkInstalled })
   const altOutput = useBroadcastOutputSettings("alt", { open, ndiSdkInstalled })
+  const {
+    syncNdiConfigToOutput: syncMainNdiConfigToOutput,
+    ndiActive: mainNdiActive,
+    ndiFrameRate: mainNdiFrameRate,
+    ndiResolution: mainNdiResolution,
+  } = mainOutput
+  const {
+    syncNdiConfigToOutput: syncAltNdiConfigToOutput,
+    ndiActive: altNdiActive,
+    ndiFrameRate: altNdiFrameRate,
+    ndiResolution: altNdiResolution,
+  } = altOutput
 
   const fetchMonitors = useCallback(async () => {
     setRefreshing(true)
@@ -74,15 +86,15 @@ export function BroadcastSettings({
     let timeoutId: ReturnType<typeof setTimeout> | null = null
     const unlistenPromise = listen("broadcast:output-ready", () => {
       useBroadcastStore.getState().syncBroadcastOutput()
-      mainOutput.syncNdiConfigToOutput(
-        mainOutput.ndiActive,
-        mainOutput.ndiFrameRate,
-        mainOutput.ndiResolution,
+      syncMainNdiConfigToOutput(
+        mainNdiActive,
+        mainNdiFrameRate,
+        mainNdiResolution,
       )
-      altOutput.syncNdiConfigToOutput(
-        altOutput.ndiActive,
-        altOutput.ndiFrameRate,
-        altOutput.ndiResolution,
+      syncAltNdiConfigToOutput(
+        altNdiActive,
+        altNdiFrameRate,
+        altNdiResolution,
       )
       timeoutId = setTimeout(() => {
         useBroadcastStore.getState().syncBroadcastOutput()
@@ -95,8 +107,14 @@ export function BroadcastSettings({
     }
   }, [
     open,
-    mainOutput,
-    altOutput,
+    syncMainNdiConfigToOutput,
+    mainNdiActive,
+    mainNdiFrameRate,
+    mainNdiResolution,
+    syncAltNdiConfigToOutput,
+    altNdiActive,
+    altNdiFrameRate,
+    altNdiResolution,
   ])
 
   return (
