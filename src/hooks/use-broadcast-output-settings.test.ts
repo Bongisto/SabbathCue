@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react"
+import { act, useEffect } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createRoot } from "react-dom/client"
 import React from "react"
@@ -397,18 +397,23 @@ describe("use-broadcast-output-settings commands", () => {
       const container = document.createElement("div")
       document.body.appendChild(container)
       const root = createRoot(container)
-      const resultRef: {
+      const resultHolder: {
         current: ReturnType<typeof useBroadcastOutputSettings> | null
       } = {
         current: null,
       }
 
       function Probe() {
-        resultRef.current = useBroadcastOutputSettings("main", {
+        const hookResult = useBroadcastOutputSettings("main", {
           open,
           ndiSdkInstalled: true,
           monitors: sampleMonitors,
         })
+
+        useEffect(() => {
+          resultHolder.current = hookResult
+        })
+
         return null
       }
 
@@ -419,7 +424,7 @@ describe("use-broadcast-output-settings commands", () => {
       })
 
       return {
-        result: resultRef,
+        result: resultHolder,
         cleanup: () => {
           act(() => {
             root.unmount()
