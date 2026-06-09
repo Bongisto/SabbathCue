@@ -1,4 +1,9 @@
-import type { NdiConfigEventPayload, NdiFrameRequest } from "@/types"
+import type {
+  BroadcastOutputErrorEvent,
+  BroadcastOutputId,
+  NdiConfigEventPayload,
+  NdiFrameRequest,
+} from "@/types"
 
 export function uint8ToBase64(bytes: Uint8Array | Uint8ClampedArray): string {
   const chunk = 0x8000
@@ -89,11 +94,51 @@ export function shouldPushNdiHeartbeat(
   return now - lastPushAt > NDI_HEARTBEAT_STALE_MS
 }
 
+export const NDI_FRAME_ERROR_RATE_LIMIT_MS = 30_000
+
+export function shouldEmitNdiFrameError(
+  now: number,
+  lastEmittedAt: number,
+): boolean {
+  if (lastEmittedAt <= 0) return true
+  return now - lastEmittedAt >= NDI_FRAME_ERROR_RATE_LIMIT_MS
+}
+
+export function buildNdiFrameErrorEvent(
+  outputId: BroadcastOutputId,
+  error: unknown,
+  consecutiveFailures: number,
+): BroadcastOutputErrorEvent {
+  return {
+    outputId,
+    kind: "ndi-frame",
+    title: "NDI frame push failed",
+    description: `Frame transmission failed (${consecutiveFailures} consecutive): ${String(error)}`,
+  }
+}
+
 export function warnNdiPushFailure(
   error: unknown,
   warn: (message: string, error: unknown) => void = console.warn,
 ): void {
   warn("[broadcast-output] push_ndi_frame failed", error)
+}
+
+export function notifyNdiPushFailure(
+  outputId: BroadcastOutputId,
+  error: unknown,
+  consecutiveFailures: number,
+  now: number,
+  lastEmittedAt: number,
+  emit: (event: BroadcastOutputErrorEvent) => void | Promise<void>,
+  warn: (message: string, error: unknown) => void = console.warn,
+): number {
+  warnNdiPushFailure(error, warn)
+  if (!shouldEmitNdiFrameError(now, lastEmittedAt)) {
+    return lastEmittedAt
+  }
+  void emit(buildNdiFrameErrorEvent(outputId, error, consecutiveFailures))
+  return now
 }
 
 export function isNdiActive(config: NdiConfigEventPayload): boolean {

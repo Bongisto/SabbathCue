@@ -1,8 +1,11 @@
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useEffect } from "react"
+import { listen } from "@tauri-apps/api/event"
 import { Dashboard } from "@/components/layout/dashboard"
 import { useRemoteControl } from "@/hooks/use-remote-control"
 import { useDetectionSettingsSync } from "@/hooks/use-detection-settings-sync"
 import { Toaster } from "sonner"
+import type { BroadcastOutputErrorEvent, BroadcastOutputIssueKind } from "@/types"
+import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useApiKeyPromptStore } from "@/lib/api-key-prompt"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { useSettingsStore } from "@/stores/settings-store"
@@ -20,9 +23,61 @@ const LazyApiKeyPrompt = lazy(() =>
   })),
 )
 
+const VALID_OUTPUT_ERROR_KINDS = new Set<BroadcastOutputIssueKind>([
+  "broadcast-sync",
+  "ndi-config",
+  "ndi-frame",
+  "detection-settings",
+  "manual-detection",
+  "verse-lookup",
+  "persistence",
+])
+
+function isValidOutputErrorPayload(
+  payload: unknown,
+): payload is BroadcastOutputErrorEvent {
+  if (!payload || typeof payload !== "object") return false
+  const event = payload as BroadcastOutputErrorEvent
+  return (
+    (event.outputId === "main" || event.outputId === "alt") &&
+    VALID_OUTPUT_ERROR_KINDS.has(event.kind) &&
+    typeof event.title === "string" &&
+    typeof event.description === "string"
+  )
+}
+
+function useBroadcastOutputErrorListener() {
+  useEffect(() => {
+    if (!isTauriRuntime()) return
+
+    let unlisten: (() => void) | undefined
+
+    void listen<BroadcastOutputErrorEvent>("broadcast:output-error", (event) => {
+      if (!isValidOutputErrorPayload(event.payload)) return
+      useBroadcastStore.getState().reportOutputIssue({
+        outputId: event.payload.outputId,
+        kind: event.payload.kind,
+        title: event.payload.title,
+        description: event.payload.description,
+      })
+    })
+      .then((dispose) => {
+        unlisten = dispose
+      })
+      .catch(() => {
+        // Non-Tauri or listener registration failure should not crash the app.
+      })
+
+    return () => {
+      unlisten?.()
+    }
+  }, [])
+}
+
 export function App() {
   useRemoteControl()
   useDetectionSettingsSync()
+  useBroadcastOutputErrorListener()
   const apiKeyPromptOpen = useApiKeyPromptStore((s) => s.isOpen)
   const setApiKeyPromptOpen = useApiKeyPromptStore((s) => s.setOpen)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)

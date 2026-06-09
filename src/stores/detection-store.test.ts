@@ -29,8 +29,6 @@ describe("detection store", () => {
     vi.spyOn(Date, "now").mockImplementation(() => now)
     useDetectionStore.setState({
       detections: [],
-      autoMode: false,
-      confidenceThreshold: 0.8,
     })
   })
 
@@ -284,6 +282,48 @@ describe("detection store", () => {
 
     store.clearDetections()
     expect(useDetectionStore.getState().detections).toHaveLength(0)
+  })
+
+  it("preserves resolved coordinates when stale state merges with incoming semantic hit", () => {
+    const store = useDetectionStore.getState()
+    const nowMs = Date.now()
+
+    useDetectionStore.setState({
+      detections: [
+        {
+          ...makeDetection({
+            verse_ref: "John 3:16",
+            source: "semantic",
+            confidence: 0.7,
+            book_number: 43,
+            chapter: 3,
+            verse: 16,
+            verse_text: "Resolved verse text",
+          }),
+          received_at: nowMs - 60_000,
+        },
+      ],
+    })
+
+    store.addDetections([
+      makeDetection({
+        verse_ref: "John 3:16",
+        source: "semantic",
+        confidence: 0.8,
+        book_number: 0,
+        chapter: 0,
+        verse: 0,
+        verse_text: "Incoming semantic text",
+      }),
+    ])
+
+    const merged = useDetectionStore.getState().detections[0]
+    expect(merged.source).toBe("semantic")
+    expect(merged.confidence).toBe(0.8)
+    expect(merged.book_number).toBe(43)
+    expect(merged.chapter).toBe(3)
+    expect(merged.verse).toBe(16)
+    expect(merged.verse_text).toBe("Incoming semantic text")
   })
 
   it("deduplicates the same resolved verse even when the label changes", () => {

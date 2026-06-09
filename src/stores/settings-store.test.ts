@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+const reportOutputIssueMock = vi.fn()
+
+vi.mock("@/stores/broadcast-store", () => ({
+  useBroadcastStore: {
+    getState: () => ({
+      reportOutputIssue: reportOutputIssueMock,
+    }),
+  },
+}))
+
 const mockGet = vi.fn()
 const mockSet = vi.fn()
 const mockSave = vi.fn()
@@ -20,6 +30,7 @@ async function flushSave(): Promise<void> {
 describe("settings store", () => {
   beforeEach(async () => {
     vi.useFakeTimers()
+    reportOutputIssueMock.mockReset()
     mockGet.mockReset()
     mockSet.mockReset()
     mockSave.mockReset()
@@ -161,6 +172,13 @@ describe("settings store", () => {
     expect(warnSpy).toHaveBeenCalledWith(
       "[settings] Failed to load persisted state, using defaults"
     )
+    expect(reportOutputIssueMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputId: "global",
+        kind: "persistence",
+        title: "Settings load failed",
+      }),
+    )
     warnSpy.mockRestore()
   })
 
@@ -195,6 +213,13 @@ describe("settings store", () => {
     await flushSave()
 
     expect(warnSpy).toHaveBeenCalledWith("[settings] Failed to persist settings")
+    expect(reportOutputIssueMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputId: "global",
+        kind: "persistence",
+        title: "Settings save failed",
+      }),
+    )
     warnSpy.mockRestore()
   })
 })

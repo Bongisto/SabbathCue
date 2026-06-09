@@ -17,16 +17,12 @@ const RECENCY_BONUS_WINDOW_MS = 30_000
 
 interface DetectionState {
   detections: DetectionResultWithMeta[]
-  autoMode: boolean
-  confidenceThreshold: number
 
   addDetection: (detection: DetectionResult) => void
   addDetections: (detections: DetectionResult[]) => void
   setDetections: (detections: DetectionResult[]) => void
   removeDetection: (verseRef: string) => void
   clearDetections: () => void
-  setAutoMode: (auto: boolean) => void
-  setConfidenceThreshold: (threshold: number) => void
 }
 
 function detectionRank(detection: DetectionResultWithMeta, now: number): number {
@@ -153,8 +149,6 @@ function withReceivedAt(
 
 export const useDetectionStore = create<DetectionState>((set) => ({
   detections: [],
-  autoMode: false,
-  confidenceThreshold: 0.8,
 
   addDetection: (detection) =>
     set((state) => {
@@ -220,10 +214,8 @@ export const useDetectionStore = create<DetectionState>((set) => ({
               received_at: dReceivedAt,
             })
           } else {
-            // Incoming won on confidence, so make it the second arg so
-            // mergeDetection's preferred rule picks it. The non-zero sentinel
-            // checks for book_number/chapter/verse still fall through to the
-            // state detection when the incoming batch is unresolved.
+            // Incoming map entry remains preferred while stale existing state
+            // contributes non-zero coordinates and text fallback via mergeDetection.
             map.set(key, {
               detection: mergeDetection(d, existing.detection),
               received_at: Math.max(existing.received_at, dReceivedAt),
@@ -256,7 +248,4 @@ export const useDetectionStore = create<DetectionState>((set) => ({
       }
     }),
   clearDetections: () => set({ detections: [] }),
-  setAutoMode: (autoMode) => set({ autoMode }),
-  setConfidenceThreshold: (confidenceThreshold) =>
-    set({ confidenceThreshold }),
 }))

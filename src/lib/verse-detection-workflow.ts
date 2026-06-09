@@ -5,6 +5,7 @@ import {
 } from "@/lib/presentation-workflow"
 import { bibleActions } from "@/hooks/use-bible"
 import { useBibleStore } from "@/stores/bible-store"
+import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useQueueStore } from "@/stores/queue-store"
 import type { DetectionResult, ReadingAdvance, Verse } from "@/types"
@@ -58,7 +59,15 @@ function findCurrentChapterVerse(detection: DetectionResult): Verse | null {
   )
 }
 
-async function resolveDetectionVerse(detection: DetectionResult): Promise<Verse> {
+interface ResolvedDetectionVerse {
+  verse: Verse
+  usedFallback: boolean
+  fallbackReason?: string
+}
+
+async function resolveDetectionVerse(
+  detection: DetectionResult,
+): Promise<ResolvedDetectionVerse> {
   if (detection.book_number > 0 && detection.chapter > 0 && detection.verse > 0) {
     try {
       const verse = await bibleActions.fetchVerse(
@@ -66,19 +75,71 @@ async function resolveDetectionVerse(detection: DetectionResult): Promise<Verse>
         detection.chapter,
         detection.verse,
       )
-      if (verse) return verse
-    } catch {
-      // Queueing should still work when a translation lookup is unavailable.
+      if (verse) {
+        return { verse, usedFallback: false }
+      }
+    } catch (error) {
+      const currentVerse = findCurrentChapterVerse(detection)
+      if (currentVerse) {
+        useBroadcastStore.getState().reportOutputIssue({
+          outputId: "global",
+          kind: "verse-lookup",
+          title: "Verse lookup failed",
+          description: `Used loaded chapter text for ${detection.verse_ref}: ${String(error)}`,
+        })
+        return {
+          verse: currentVerse,
+          usedFallback: true,
+          fallbackReason: "chapter-cache",
+        }
+      }
+
+      useBroadcastStore.getState().reportOutputIssue({
+        outputId: "global",
+        kind: "verse-lookup",
+        title: "Verse lookup failed",
+        description: `Used detection text for ${detection.verse_ref}: ${String(error)}`,
+      })
+      return {
+        verse: detectionLikeToVerse(detection),
+        usedFallback: true,
+        fallbackReason: "detection-text",
+      }
     }
 
     const currentVerse = findCurrentChapterVerse(detection)
-    if (currentVerse) return currentVerse
+    if (currentVerse) {
+      return { verse: currentVerse, usedFallback: false }
+    }
   }
-  return detectionLikeToVerse(detection)
+  return {
+    verse: detectionLikeToVerse(detection),
+    usedFallback: true,
+    fallbackReason: "unresolved-detection",
+  }
+}
+
+function selectPreviewDirectHit(detections: DetectionResult[]): DetectionResult | null {
+  const directHits = detections.filter(
+    (d) =>
+      d.source === "direct" &&
+      !d.is_chapter_only &&
+      d.book_number > 0,
+  )
+  if (directHits.length === 0) return null
+
+  let best = directHits[0]
+  for (let i = 1; i < directHits.length; i += 1) {
+    const candidate = directHits[i]
+    if (candidate.confidence > best.confidence) {
+      best = candidate
+    }
+  }
+  return best
 }
 
 async function queueDetectedVerse(detection: DetectionResult): Promise<void> {
-  const verse = await resolveDetectionVerse(detection)
+  const { verse } = await resolveDetectionVerse(detection)
   if (
     !detection.is_chapter_only &&
     detection.source === "direct" &&
@@ -107,23 +168,26 @@ async function queueDetectedVerse(detection: DetectionResult): Promise<void> {
   )
 }
 
-export async function handleVerseDetections(detections: DetectionResult[]) {
+let detectionHandlingChain: Promise<void> = Promise.resolve()
+
+async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
   useDetectionStore.getState().addDetections(detections)
 
-  // Preview from the incoming event's newest direct non-chapter-only detection
-  // (not from the full persisted detection store)
-  const directHits = detections.filter(
-    (d) => d.source === "direct" && !d.is_chapter_only
-  )
-  // Use the first direct hit (newest in the incoming batch)
-  if (directHits.length > 0) {
-    const directHit = directHits[0]
-    if (directHit.book_number > 0) {
-      selectDetectedVerse(directHit)
-    }
+  const directHit = selectPreviewDirectHit(detections)
+  if (directHit) {
+    selectDetectedVerse(directHit)
   }
 
-  await Promise.all(detections.map(queueDetectedVerse))
+  for (const detection of detections) {
+    await queueDetectedVerse(detection)
+  }
+}
+
+export async function handleVerseDetections(detections: DetectionResult[]) {
+  detectionHandlingChain = detectionHandlingChain
+    .catch(() => undefined)
+    .then(() => handleVerseDetectionsInternal(detections))
+  return detectionHandlingChain
 }
 
 export function handleReadingAdvance(advance: ReadingAdvance) {

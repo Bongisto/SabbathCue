@@ -1,7 +1,14 @@
 import { create } from "zustand"
 import { emitTo } from "@tauri-apps/api/event"
 import { load, type Store } from "@tauri-apps/plugin-store"
-import type { BroadcastTheme, PresentationRenderData } from "@/types"
+import { toast } from "sonner"
+import type {
+  BroadcastIssueOutputId,
+  BroadcastOutputIssue,
+  BroadcastOutputIssueKind,
+  BroadcastTheme,
+  PresentationRenderData,
+} from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 
@@ -20,8 +27,12 @@ interface BroadcastState {
   // Projector display settings
   mainDisplayMonitorIndex: number
   altDisplayMonitorIndex: number
+  mainDisplayMonitorKey: string
+  altDisplayMonitorKey: string
   mainProjectorFullscreen: boolean
   altProjectorFullscreen: boolean
+
+  outputIssues: BroadcastOutputIssue[]
 
   // Designer state
   isDesignerOpen: boolean
@@ -48,10 +59,21 @@ interface BroadcastState {
   setOpacity: (opacity: number) => void
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
+  reportOutputIssue: (input: {
+    outputId: BroadcastIssueOutputId
+    kind: BroadcastOutputIssueKind
+    title: string
+    description: string
+    id?: string
+  }) => void
+  clearOutputIssue: (id: string) => void
+  clearOutputIssuesFor: (outputId: BroadcastIssueOutputId) => void
 
   // Projector display setters
   setMainDisplayMonitorIndex: (index: number) => void
   setAltDisplayMonitorIndex: (index: number) => void
+  setMainDisplayMonitorKey: (key: string) => void
+  setAltDisplayMonitorKey: (key: string) => void
   setMainProjectorFullscreen: (fullscreen: boolean) => void
   setAltProjectorFullscreen: (fullscreen: boolean) => void
 
@@ -74,8 +96,19 @@ interface BroadcastHydrationPatchInput {
   readingModeAutoLive?: boolean
   mainDisplayMonitorIndex?: number
   altDisplayMonitorIndex?: number
+  mainDisplayMonitorKey?: string
+  altDisplayMonitorKey?: string
   mainProjectorFullscreen?: boolean
   altProjectorFullscreen?: boolean
+}
+
+export function selectLatestOutputIssue(
+  state: Pick<BroadcastState, "outputIssues">,
+): BroadcastOutputIssue | null {
+  if (state.outputIssues.length === 0) return null
+  return state.outputIssues.reduce((latest, issue) =>
+    issue.lastSeenAt > latest.lastSeenAt ? issue : latest,
+  )
 }
 
 function findThemeById(themes: BroadcastTheme[], id: string): BroadcastTheme | null {
@@ -89,6 +122,8 @@ export function buildBroadcastHydrationPatch({
   readingModeAutoLive,
   mainDisplayMonitorIndex,
   altDisplayMonitorIndex,
+  mainDisplayMonitorKey,
+  altDisplayMonitorKey,
   mainProjectorFullscreen,
   altProjectorFullscreen,
 }: BroadcastHydrationPatchInput): Partial<BroadcastState> {
@@ -106,6 +141,12 @@ export function buildBroadcastHydrationPatch({
   }
   if (typeof altDisplayMonitorIndex === "number") {
     patch.altDisplayMonitorIndex = altDisplayMonitorIndex
+  }
+  if (typeof mainDisplayMonitorKey === "string") {
+    patch.mainDisplayMonitorKey = mainDisplayMonitorKey
+  }
+  if (typeof altDisplayMonitorKey === "string") {
+    patch.altDisplayMonitorKey = altDisplayMonitorKey
   }
   if (typeof mainProjectorFullscreen === "boolean") {
     patch.mainProjectorFullscreen = mainProjectorFullscreen
@@ -147,17 +188,31 @@ function setNestedValue(obj: Record<string, unknown>, path: string, value: unkno
   return result
 }
 
+function reportSyncFailure(
+  report: BroadcastState["reportOutputIssue"],
+  outputId: "main" | "alt",
+  label: string,
+  error: unknown,
+): void {
+  console.warn(`[broadcast-store] emit draft to '${label}' failed`, error)
+  report({
+    outputId,
+    kind: "broadcast-sync",
+    title: "Broadcast sync failed",
+    description: `Could not sync draft to ${label}: ${String(error)}`,
+  })
+}
+
 function emitDraftToBroadcast(state: BroadcastState): void {
   if (!state.draftTheme) return
   const id = state.editingThemeId
+  const report = state.reportOutputIssue
   if (id === state.activeThemeId) {
     void emitTo("broadcast", "broadcast:verse-update", {
       theme: state.draftTheme,
       item: state.isLive ? state.liveItem : null,
       opacity: state.opacity,
-    }).catch((error) =>
-      console.warn("[broadcast-store] emit draft to 'broadcast' failed", error)
-    )
+    }).catch((error) => reportSyncFailure(report, "main", "broadcast", error))
   }
   if (id === state.altActiveThemeId) {
     void emitTo("broadcast-alt", "broadcast:verse-update", {
@@ -165,7 +220,7 @@ function emitDraftToBroadcast(state: BroadcastState): void {
       item: state.isLive ? state.liveItem : null,
       opacity: state.opacity,
     }).catch((error) =>
-      console.warn("[broadcast-store] emit draft to 'broadcast-alt' failed", error)
+      reportSyncFailure(report, "alt", "broadcast-alt", error),
     )
   }
 }
@@ -199,8 +254,11 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   opacity: 1,
   mainDisplayMonitorIndex: 0,
   altDisplayMonitorIndex: 0,
+  mainDisplayMonitorKey: "",
+  altDisplayMonitorKey: "",
   mainProjectorFullscreen: false,
   altProjectorFullscreen: false,
+  outputIssues: [],
   isDesignerOpen: false,
   editingThemeId: null,
   renamingThemeId: null,
@@ -291,9 +349,60 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       theme,
       item: s.isLive ? s.liveItem : null,
       opacity: s.opacity,
-    }).catch((error) =>
+    }).catch((error) => {
       console.warn(`[broadcast-store] sync emit to '${label}' failed`, error)
-    )
+      get().reportOutputIssue({
+        outputId: outputId === "alt" ? "alt" : "main",
+        kind: "broadcast-sync",
+        title: "Broadcast sync failed",
+        description: `Could not sync live output to ${label}: ${String(error)}`,
+      })
+    })
+  },
+  reportOutputIssue: (input) => {
+    const id = input.id ?? `${input.outputId}:${input.kind}`
+    const now = Date.now()
+    const existing = get().outputIssues.find((issue) => issue.id === id)
+
+    if (existing) {
+      set({
+        outputIssues: get().outputIssues.map((issue) =>
+          issue.id === id
+            ? { ...issue, lastSeenAt: now, count: issue.count + 1 }
+            : issue,
+        ),
+      })
+      return
+    }
+
+    const issue: BroadcastOutputIssue = {
+      id,
+      outputId: input.outputId,
+      kind: input.kind,
+      title: input.title,
+      description: input.description,
+      firstSeenAt: now,
+      lastSeenAt: now,
+      count: 1,
+    }
+    set({ outputIssues: [...get().outputIssues, issue] })
+    toast.error(issue.title, {
+      id,
+      description: issue.description,
+    })
+  },
+  clearOutputIssue: (id) => {
+    set({ outputIssues: get().outputIssues.filter((issue) => issue.id !== id) })
+    toast.dismiss(id)
+  },
+  clearOutputIssuesFor: (outputId) => {
+    const removed = get().outputIssues.filter((issue) => issue.outputId === outputId)
+    set({
+      outputIssues: get().outputIssues.filter((issue) => issue.outputId !== outputId),
+    })
+    for (const issue of removed) {
+      toast.dismiss(issue.id)
+    }
   },
   syncBroadcastOutput: () => {
     get().syncBroadcastOutputFor("main")
@@ -338,6 +447,12 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   },
   setAltDisplayMonitorIndex: (altDisplayMonitorIndex) => {
     set({ altDisplayMonitorIndex })
+  },
+  setMainDisplayMonitorKey: (mainDisplayMonitorKey) => {
+    set({ mainDisplayMonitorKey })
+  },
+  setAltDisplayMonitorKey: (altDisplayMonitorKey) => {
+    set({ altDisplayMonitorKey })
   },
   setMainProjectorFullscreen: (mainProjectorFullscreen) => {
     set({ mainProjectorFullscreen })
@@ -441,6 +556,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
       const readingModeAutoLive = (await store.get("readingModeAutoLive")) as boolean | undefined
       const mainDisplayMonitorIndex = (await store.get("mainDisplayMonitorIndex")) as number | undefined
       const altDisplayMonitorIndex = (await store.get("altDisplayMonitorIndex")) as number | undefined
+      const mainDisplayMonitorKey = (await store.get("mainDisplayMonitorKey")) as string | undefined
+      const altDisplayMonitorKey = (await store.get("altDisplayMonitorKey")) as string | undefined
       const mainProjectorFullscreen = (await store.get("mainProjectorFullscreen")) as boolean | undefined
       const altProjectorFullscreen = (await store.get("altProjectorFullscreen")) as boolean | undefined
 
@@ -451,6 +568,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
         readingModeAutoLive,
         mainDisplayMonitorIndex,
         altDisplayMonitorIndex,
+        mainDisplayMonitorKey,
+        altDisplayMonitorKey,
         mainProjectorFullscreen,
         altProjectorFullscreen,
       })
@@ -468,6 +587,8 @@ export function hydrateBroadcastThemes(): Promise<void> {
           state.readingModeAutoLive !== prevState.readingModeAutoLive ||
           state.mainDisplayMonitorIndex !== prevState.mainDisplayMonitorIndex ||
           state.altDisplayMonitorIndex !== prevState.altDisplayMonitorIndex ||
+          state.mainDisplayMonitorKey !== prevState.mainDisplayMonitorKey ||
+          state.altDisplayMonitorKey !== prevState.altDisplayMonitorKey ||
           state.mainProjectorFullscreen !== prevState.mainProjectorFullscreen ||
           state.altProjectorFullscreen !== prevState.altProjectorFullscreen
         if (!changed) return
@@ -482,6 +603,12 @@ export function hydrateBroadcastThemes(): Promise<void> {
     } catch {
       hydrationPromise = null
       console.warn("[broadcast] Failed to load persisted themes, using defaults")
+      useBroadcastStore.getState().reportOutputIssue({
+        outputId: "global",
+        kind: "persistence",
+        title: "Theme load failed",
+        description: "Could not load saved broadcast themes; using defaults.",
+      })
     }
   })()
   return hydrationPromise
@@ -509,10 +636,18 @@ async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
     await store.set("readingModeAutoLive", state.readingModeAutoLive)
     await store.set("mainDisplayMonitorIndex", state.mainDisplayMonitorIndex)
     await store.set("altDisplayMonitorIndex", state.altDisplayMonitorIndex)
+    await store.set("mainDisplayMonitorKey", state.mainDisplayMonitorKey)
+    await store.set("altDisplayMonitorKey", state.altDisplayMonitorKey)
     await store.set("mainProjectorFullscreen", state.mainProjectorFullscreen)
     await store.set("altProjectorFullscreen", state.altProjectorFullscreen)
     await store.save()
   } catch {
     console.warn("[broadcast] Failed to persist themes")
+    useBroadcastStore.getState().reportOutputIssue({
+      outputId: "global",
+      kind: "persistence",
+      title: "Theme save failed",
+      description: "Could not save broadcast theme settings to disk.",
+    })
   }
 }

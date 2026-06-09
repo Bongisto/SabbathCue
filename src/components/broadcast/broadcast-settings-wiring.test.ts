@@ -1,23 +1,71 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildMonitorKey,
   buildOpenBroadcastWindowArgs,
   clampMonitorIndex,
+  normalizeMonitorList,
+  resolveMonitorIndexFromKey,
+  type MonitorInfo,
 } from "./broadcast-settings-wiring"
 
+function makeMonitor(
+  overrides: Partial<MonitorInfo> & Pick<MonitorInfo, "name" | "width" | "height" | "x" | "y">,
+): MonitorInfo {
+  const key = buildMonitorKey(overrides)
+  return {
+    key,
+    ...overrides,
+  }
+}
+
 describe("broadcast settings wiring", () => {
-  it("builds main projector command args from the selected monitor and fullscreen state", () => {
-    expect(buildOpenBroadcastWindowArgs("main", "2", true)).toEqual({
+  it("builds main projector command args from the selected monitor key", () => {
+    const monitors = [
+      makeMonitor({ name: "HDMI-1", width: 1920, height: 1080, x: 0, y: 0 }),
+      makeMonitor({ name: "HDMI-2", width: 1280, height: 720, x: 1920, y: 0 }),
+    ]
+
+    expect(
+      buildOpenBroadcastWindowArgs("main", monitors, monitors[1].key, 0, true),
+    ).toEqual({
       outputId: "main",
-      monitorIndex: 2,
+      monitorIndex: 1,
       fullscreen: true,
     })
   })
 
-  it("builds alternate projector command args without changing the output id", () => {
-    expect(buildOpenBroadcastWindowArgs("alt", "1", false)).toEqual({
-      outputId: "alt",
-      monitorIndex: 1,
-      fullscreen: false,
+  it("resolves a reordered monitor array by stable key", () => {
+    const monitors = [
+      makeMonitor({ name: "HDMI-2", width: 1280, height: 720, x: 1920, y: 0 }),
+      makeMonitor({ name: "HDMI-1", width: 1920, height: 1080, x: 0, y: 0 }),
+    ]
+    const selectedKey = buildMonitorKey({
+      name: "HDMI-1",
+      width: 1920,
+      height: 1080,
+      x: 0,
+      y: 0,
+    })
+
+    expect(resolveMonitorIndexFromKey(monitors, selectedKey, 0)).toBe(1)
+  })
+
+  it("falls back to the saved index when the key is missing", () => {
+    const monitors = [
+      makeMonitor({ name: "HDMI-1", width: 1920, height: 1080, x: 0, y: 0 }),
+      makeMonitor({ name: "HDMI-2", width: 1280, height: 720, x: 1920, y: 0 }),
+    ]
+
+    expect(resolveMonitorIndexFromKey(monitors, "missing-key", 1)).toBe(1)
+  })
+
+  it("falls back to the primary monitor for invalid persisted selections", () => {
+    expect(
+      buildOpenBroadcastWindowArgs("main", [], "missing", 0, true),
+    ).toEqual({
+      outputId: "main",
+      monitorIndex: 0,
+      fullscreen: true,
     })
   })
 
@@ -29,11 +77,13 @@ describe("broadcast settings wiring", () => {
     expect(clampMonitorIndex(Number.NaN, 2)).toBe(0)
   })
 
-  it("falls back to the primary monitor for invalid persisted selections", () => {
-    expect(buildOpenBroadcastWindowArgs("main", "missing", true)).toEqual({
-      outputId: "main",
-      monitorIndex: 0,
-      fullscreen: true,
-    })
+  it("suffixes duplicate monitor keys internally", () => {
+    const monitors = normalizeMonitorList([
+      makeMonitor({ name: "Display", width: 1920, height: 1080, x: 0, y: 0 }),
+      makeMonitor({ name: "Display", width: 1920, height: 1080, x: 0, y: 0 }),
+    ])
+
+    expect(monitors[0].key).not.toBe(monitors[1].key)
+    expect(monitors[1].name).toContain("(2)")
   })
 })

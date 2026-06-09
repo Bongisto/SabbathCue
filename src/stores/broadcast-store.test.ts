@@ -1,15 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const emitToMock = vi.fn()
+const toastErrorMock = vi.fn()
 
 vi.mock("@tauri-apps/api/event", () => ({
   emitTo: emitToMock,
+}))
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => toastErrorMock(...args),
+    dismiss: vi.fn(),
+  },
 }))
 
 describe("broadcast store sync", () => {
   beforeEach(async () => {
     emitToMock.mockReset()
     emitToMock.mockResolvedValue(undefined)
+    toastErrorMock.mockReset()
     vi.resetModules()
   })
 
@@ -232,6 +241,68 @@ describe("broadcast store sync", () => {
     expect(state.editingThemeId).not.toBe(builtin.id)
     expect(state.draftTheme?.builtin).toBe(false)
     expect(state.themes.some((theme) => !theme.builtin && theme.name === "Edited Builtin (Custom)")).toBe(true)
+  })
+
+  it("reports a broadcast sync issue when emitTo rejects", async () => {
+    emitToMock.mockRejectedValueOnce(new Error("webview missing"))
+    const { useBroadcastStore } = await import("./broadcast-store")
+
+    useBroadcastStore.getState().syncBroadcastOutputFor("main")
+
+    await Promise.resolve()
+
+    const issue = useBroadcastStore
+      .getState()
+      .outputIssues.find((entry) => entry.kind === "broadcast-sync")
+    expect(issue).toMatchObject({
+      outputId: "main",
+      kind: "broadcast-sync",
+      count: 1,
+    })
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.any(Object),
+    )
+  })
+
+  it("dedupes repeated output issues and increments count", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const report = useBroadcastStore.getState().reportOutputIssue
+
+    report({
+      outputId: "main",
+      kind: "ndi-frame",
+      title: "NDI frame push failed",
+      description: "first",
+    })
+    report({
+      outputId: "main",
+      kind: "ndi-frame",
+      title: "NDI frame push failed",
+      description: "second",
+    })
+
+    const issues = useBroadcastStore.getState().outputIssues
+    expect(issues).toHaveLength(1)
+    expect(issues[0].count).toBe(2)
+    expect(toastErrorMock).toHaveBeenCalledTimes(1)
+    expect(toastErrorMock.mock.calls[0][1]).toMatchObject({ id: "main:ndi-frame" })
+  })
+
+  it("clears a single output issue by id", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    useBroadcastStore.getState().reportOutputIssue({
+      outputId: "global",
+      kind: "persistence",
+      title: "Save failed",
+      description: "disk error",
+    })
+
+    const issueId = useBroadcastStore.getState().outputIssues[0].id
+    useBroadcastStore.getState().clearOutputIssue(issueId)
+
+    expect(useBroadcastStore.getState().outputIssues).toHaveLength(0)
   })
 
   it("clamps opacity and syncs the projector output", async () => {

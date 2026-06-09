@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
+import { act } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createRoot } from "react-dom/client"
+import React from "react"
 import type { NdiSessionInfo } from "@/types"
 import type { BroadcastOutputCommandState } from "./use-broadcast-output-settings"
 
@@ -27,13 +30,34 @@ vi.mock("sonner", () => ({
   },
 }))
 
+const sampleMonitors = [
+  {
+    name: "HDMI-1",
+    width: 1920,
+    height: 1080,
+    x: 0,
+    y: 0,
+    key: "hdmi-1|1920x1080|0,0",
+  },
+  {
+    name: "HDMI-2",
+    width: 1280,
+    height: 720,
+    x: 1920,
+    y: 0,
+    key: "hdmi-2|1280x720|1920,0",
+  },
+]
+
 function baseState(
   overrides: Partial<BroadcastOutputCommandState> = {},
 ): BroadcastOutputCommandState {
   return {
     outputId: "main",
     isPreviewOpen: false,
-    selectedMonitor: "0",
+    selectedMonitor: sampleMonitors[1].key,
+    monitors: sampleMonitors,
+    fallbackMonitorIndex: 0,
     projectorFullscreen: false,
     ndiActive: false,
     ndiSourceName: "SabbathCue Output",
@@ -84,7 +108,10 @@ describe("use-broadcast-output-settings commands", () => {
       const deps = baseDeps()
 
       await runToggleBroadcastPreview(
-        baseState({ projectorFullscreen: true, selectedMonitor: "1" }),
+        baseState({
+          projectorFullscreen: true,
+          selectedMonitor: sampleMonitors[1].key,
+        }),
         deps,
       )
 
@@ -201,10 +228,124 @@ describe("use-broadcast-output-settings commands", () => {
       expect(mockInvoke.mock.calls.map((call) => call[0])).toEqual([
         "close_broadcast_window",
         "stop_ndi",
+        "get_ndi_status",
       ])
       expect(deps.onPreviewOpenChange).toHaveBeenCalledWith(false)
       expect(deps.emitNdiConfig).toHaveBeenCalledWith(false, "fps30", "r720p")
       expect(deps.onNdiActiveChange).toHaveBeenCalledWith(false)
+    })
+
+    it("reconciles preview and NDI state before reporting disabled", async () => {
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "get_ndi_status") return { active: true, width: 1920, height: 1080, fps: 24 }
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { runDisableBroadcastOutput } = await loadCommandModule()
+      const onPreviewOpenChange = vi.fn()
+      const onNdiActiveChange = vi.fn()
+
+      await runDisableBroadcastOutput(
+        {
+          outputId: "main",
+          isPreviewOpen: true,
+          ndiActive: true,
+          ndiFrameRate: "fps24",
+          ndiResolution: "r1080p",
+        },
+        {
+          ...baseDeps(),
+          onPreviewOpenChange,
+          onNdiActiveChange,
+        },
+      )
+
+      expect(onPreviewOpenChange).toHaveBeenCalledWith(false)
+      expect(onNdiActiveChange).toHaveBeenCalledWith(true)
+    })
+  })
+
+  describe("useBroadcastOutputSettings hook", () => {
+    async function renderHookResult(open = true) {
+      const { useBroadcastOutputSettings } = await loadCommandModule()
+      const container = document.createElement("div")
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      const result: { current: ReturnType<typeof useBroadcastOutputSettings> | null } = {
+        current: null,
+      }
+
+      function Probe() {
+        result.current = useBroadcastOutputSettings("main", {
+          open,
+          ndiSdkInstalled: true,
+          monitors: sampleMonitors,
+        })
+        return null
+      }
+
+      await act(async () => {
+        root.render(React.createElement(Probe))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      return {
+        result,
+        cleanup: () => {
+          act(() => {
+            root.unmount()
+          })
+          container.remove()
+        },
+      }
+    }
+
+    it("derives enabled from active NDI status when the dialog opens", async () => {
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "get_ndi_status") {
+          return { active: true, width: 1920, height: 1080, fps: 24 }
+        }
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { result, cleanup } = await renderHookResult(true)
+      expect(result.current?.enabled).toBe(true)
+      expect(result.current?.ndiActive).toBe(true)
+      cleanup()
+    })
+
+    it("ignores duplicate NDI toggle calls while the first command is pending", async () => {
+      let startCalls = 0
+      mockInvoke.mockImplementation(async (command: string) => {
+        if (command === "start_ndi") {
+          startCalls += 1
+          return {
+            sourceName: "SabbathCue Output",
+            resolution: "r1080p",
+            frameRate: "fps24",
+            alphaMode: "straightAlpha",
+            width: 1920,
+            height: 1080,
+            fps: 24,
+          }
+        }
+        return undefined
+      })
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { result, cleanup } = await renderHookResult(true)
+      const toggle = result.current?.handleToggleNdi
+      expect(toggle).toBeDefined()
+
+      await act(async () => {
+        await Promise.all([toggle?.(), toggle?.()])
+      })
+
+      expect(startCalls).toBe(1)
+      cleanup()
     })
   })
 })

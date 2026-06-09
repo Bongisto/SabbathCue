@@ -1,3 +1,33 @@
+export type BroadcastOutputId = "main" | "alt"
+export type BroadcastIssueOutputId = BroadcastOutputId | "global"
+
+export type BroadcastOutputIssueKind =
+  | "broadcast-sync"
+  | "ndi-config"
+  | "ndi-frame"
+  | "detection-settings"
+  | "manual-detection"
+  | "verse-lookup"
+  | "persistence"
+
+export interface BroadcastOutputIssue {
+  id: string
+  outputId: BroadcastIssueOutputId
+  kind: BroadcastOutputIssueKind
+  title: string
+  description: string
+  firstSeenAt: number
+  lastSeenAt: number
+  count: number
+}
+
+export interface BroadcastOutputErrorEvent {
+  outputId: "main" | "alt"
+  kind: BroadcastOutputIssueKind
+  title: string
+  description: string
+}
+
 export interface VerseSegment {
   verseNumber?: number
   text: string

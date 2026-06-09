@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { load, type Store } from "@tauri-apps/plugin-store"
 import { isTauriRuntime, invokeTauri } from "@/lib/tauri-runtime"
+import { useBroadcastStore } from "@/stores/broadcast-store"
 
 type SttProvider = "deepgram" | "vosk"
 
@@ -119,6 +120,12 @@ export function hydrateSettings(): Promise<void> {
       ensureSettingsPersistenceSubscription()
     } catch {
       console.warn("[settings] Failed to load persisted state, using defaults")
+      useBroadcastStore.getState().reportOutputIssue({
+        outputId: "global",
+        kind: "persistence",
+        title: "Settings load failed",
+        description: "Could not load saved settings; using defaults.",
+      })
     }
   })()
   return hydrationPromise
@@ -137,5 +144,11 @@ async function persistAll(state: SettingsState): Promise<void> {
     await store.save()
   } catch {
     console.warn("[settings] Failed to persist settings")
+    useBroadcastStore.getState().reportOutputIssue({
+      outputId: "global",
+      kind: "persistence",
+      title: "Settings save failed",
+      description: "Could not save settings to disk.",
+    })
   }
 }

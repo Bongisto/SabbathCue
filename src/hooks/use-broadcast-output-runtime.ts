@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef } from "react"
 import {
   createNdiFrameRequest,
   NDI_HEARTBEAT_INTERVAL_MS,
+  notifyNdiPushFailure,
   resolveNdiFrameSource,
   scheduleNdiBurst,
   shouldPushNdiHeartbeat,
-  warnNdiPushFailure,
 } from "@/lib/broadcast-output-ndi"
 import { invokeTauri } from "@/lib/tauri-runtime"
+import { emitTo } from "@tauri-apps/api/event"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
+import type { BroadcastOutputId } from "@/types"
 import { getBroadcastRenderKey } from "@/lib/broadcast-render-key"
 import { renderPresentation } from "@/lib/verse-renderer"
 import type { BroadcastTheme, PresentationRenderData } from "@/types"
@@ -58,6 +60,8 @@ export function useBroadcastOutputRuntime({
   const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const lastPushRef = useRef(0)
   const pushingRef = useRef(false)
+  const consecutiveFailuresRef = useRef(0)
+  const lastErrorEmittedAtRef = useRef(0)
   const lastRenderKeyRef = useRef<string | null>(null)
   const ndiBurstTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
@@ -164,8 +168,18 @@ export function useBroadcastOutputRuntime({
 
       await invokeTauri("push_ndi_frame", { request })
       lastPushRef.current = Date.now()
+      consecutiveFailuresRef.current = 0
     } catch (error) {
-      warnNdiPushFailure(error)
+      consecutiveFailuresRef.current += 1
+      const now = Date.now()
+      lastErrorEmittedAtRef.current = notifyNdiPushFailure(
+        outputId as BroadcastOutputId,
+        error,
+        consecutiveFailuresRef.current,
+        now,
+        lastErrorEmittedAtRef.current,
+        (event) => emitTo("main", "broadcast:output-error", event),
+      )
     } finally {
       pushingRef.current = false
     }

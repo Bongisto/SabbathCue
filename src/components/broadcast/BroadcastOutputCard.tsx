@@ -112,7 +112,11 @@ export function BroadcastOutputCard({
           >
             {model.enabled ? "On" : "Off"}
           </span>
-          <Switch checked={model.enabled} onCheckedChange={model.handleToggleEnabled} />
+          <Switch
+            checked={model.enabled}
+            disabled={model.enabledPending}
+            onCheckedChange={model.handleToggleEnabled}
+          />
         </div>
       </div>
 
@@ -193,8 +197,8 @@ export function BroadcastOutputCard({
                 />
               </SelectTrigger>
               <SelectContent>
-                {monitors.map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>
+                {monitors.map((m) => (
+                  <SelectItem key={m.key} value={m.key}>
                     {m.name} ({m.width}&times;{m.height})
                   </SelectItem>
                 ))}
@@ -217,7 +221,7 @@ export function BroadcastOutputCard({
             variant="outline"
             size="sm"
             className="w-full gap-1.5"
-            disabled={monitors.length === 0}
+            disabled={monitors.length === 0 || model.previewPending}
             onClick={model.handleTogglePreview}
           >
             {model.isPreviewOpen ? (
@@ -318,7 +322,10 @@ export function BroadcastOutputCard({
                 "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-400",
             )}
             onClick={model.handleToggleNdi}
-            disabled={!model.ndiActive && !assetsLoading && !ndiSdkInstalled}
+            disabled={
+              model.ndiPending ||
+              (!model.ndiActive && !assetsLoading && !ndiSdkInstalled)
+            }
           >
             {model.ndiActive ? (
               <>

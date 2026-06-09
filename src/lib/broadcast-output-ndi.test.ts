@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   createNdiFrameRequest,
   NDI_BURST_DELAYS_MS,
+  NDI_FRAME_ERROR_RATE_LIMIT_MS,
   NDI_HEARTBEAT_STALE_MS,
+  notifyNdiPushFailure,
   resolveNdiFrameSource,
   scheduleNdiBurst,
+  shouldEmitNdiFrameError,
   shouldPushNdiHeartbeat,
   uint8ToBase64,
   warnNdiPushFailure,
@@ -104,5 +107,43 @@ describe("warnNdiPushFailure", () => {
       "[broadcast-output] push_ndi_frame failed",
       expect.any(Error),
     )
+  })
+})
+
+describe("ndi frame error rate limiting", () => {
+  it("allows the first emission and blocks repeats inside the window", () => {
+    const now = 10_000
+    expect(shouldEmitNdiFrameError(now, 0)).toBe(true)
+    expect(shouldEmitNdiFrameError(now + 1_000, now)).toBe(false)
+    expect(
+      shouldEmitNdiFrameError(now + NDI_FRAME_ERROR_RATE_LIMIT_MS, now),
+    ).toBe(true)
+  })
+
+  it("notifies the main window with a rate-limited payload", () => {
+    const emit = vi.fn()
+    const warn = vi.fn()
+    const now = 5_000
+
+    const first = notifyNdiPushFailure("main", new Error("ndi down"), 1, now, 0, emit, warn)
+    const second = notifyNdiPushFailure(
+      "main",
+      new Error("ndi down"),
+      2,
+      now + 1_000,
+      first,
+      emit,
+      warn,
+    )
+
+    expect(emit).toHaveBeenCalledTimes(1)
+    expect(emit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputId: "main",
+        kind: "ndi-frame",
+        title: "NDI frame push failed",
+      }),
+    )
+    expect(second).toBe(now)
   })
 })

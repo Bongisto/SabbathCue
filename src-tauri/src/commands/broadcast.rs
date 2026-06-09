@@ -61,6 +61,14 @@ pub struct MonitorInfo {
     pub name: String,
     pub width: u32,
     pub height: u32,
+    pub x: i32,
+    pub y: i32,
+    pub key: String,
+}
+
+pub fn build_monitor_key(name: &str, width: u32, height: u32, x: i32, y: i32) -> String {
+    let normalized_name = name.trim().to_lowercase();
+    format!("{normalized_name}|{width}x{height}|{x},{y}")
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,10 +87,15 @@ pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> 
         .iter()
         .map(|m| {
             let size = m.size();
+            let pos = m.position();
+            let name = m.name().cloned().unwrap_or_else(|| "Unknown".to_string());
             MonitorInfo {
-                name: m.name().cloned().unwrap_or_else(|| "Unknown".to_string()),
+                key: build_monitor_key(&name, size.width, size.height, pos.x, pos.y),
+                name,
                 width: size.width,
                 height: size.height,
+                x: pos.x,
+                y: pos.y,
             }
         })
         .collect())
@@ -241,7 +254,15 @@ fn decode_ndi_frame_base64(encoded: &str) -> Result<Vec<u8>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_ndi_frame_base64, window_label, window_url};
+    use super::{build_monitor_key, decode_ndi_frame_base64, window_label, window_url};
+
+    #[test]
+    fn build_monitor_key_normalizes_name_and_includes_geometry() {
+        assert_eq!(
+            build_monitor_key("  HDMI-1  ", 1920, 1080, 100, 200),
+            "hdmi-1|1920x1080|100,200"
+        );
+    }
 
     #[test]
     fn window_label_maps_main_and_alt() {

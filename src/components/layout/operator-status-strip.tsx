@@ -4,13 +4,17 @@ import { LevelMeter } from "@/components/ui/level-meter"
 import { cn } from "@/lib/utils"
 import { useAudioStore } from "@/stores/audio-store"
 import { useBibleStore } from "@/stores/bible-store"
-import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import {
+  selectActiveTheme,
+  selectLatestOutputIssue,
+  useBroadcastStore,
+} from "@/stores/broadcast-store"
 import { useQueueStore } from "@/stores/queue-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { detectionActions } from "@/hooks/use-detection"
 import { OperatorStatusActions } from "@/components/layout/operator-status-actions"
-import { MicIcon, Rows3Icon, SwatchBookIcon } from "lucide-react"
+import { AlertTriangleIcon, MicIcon, Rows3Icon, SwatchBookIcon } from "lucide-react"
 
 export function OperatorStatusStrip({
   actionsLayout = "responsive",
@@ -28,8 +32,16 @@ export function OperatorStatusStrip({
   const activeTheme = useBroadcastStore(selectActiveTheme)
   const selectedVerse = useBibleStore((s) => s.selectedVerse)
   const activePlan = useServicePlanStore((s) => s.activePlan)
+  const latestOutputIssue = useBroadcastStore(selectLatestOutputIssue)
 
   const [detectionPaused, setDetectionPaused] = useState(false)
+
+  const outputIssueLabel =
+    latestOutputIssue?.outputId === "alt"
+      ? "Alt"
+      : latestOutputIssue?.outputId === "main"
+        ? "Main"
+        : "Output"
 
   useEffect(() => {
     detectionActions
@@ -101,6 +113,25 @@ export function OperatorStatusStrip({
           <Rows3Icon className="size-3" />
           <span className="font-mono text-[10px]">{queueLength}</span>
         </div>
+
+        {latestOutputIssue ? (
+          <>
+            <div className="h-3.5 w-px shrink-0 bg-white/10" />
+            <button
+              type="button"
+              title={latestOutputIssue.description}
+              onClick={() =>
+                useBroadcastStore.getState().clearOutputIssue(latestOutputIssue.id)
+              }
+              className="flex max-w-[180px] shrink-0 items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-300"
+            >
+              <AlertTriangleIcon className="size-3 shrink-0" />
+              <span className="truncate font-mono">
+                {outputIssueLabel}: {latestOutputIssue.title}
+              </span>
+            </button>
+          </>
+        ) : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-2">

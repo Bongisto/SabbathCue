@@ -8,13 +8,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { clampMonitorIndex } from "@/components/broadcast/broadcast-settings-wiring"
+import {
+  clampMonitorIndex,
+  normalizeMonitorList,
+  resolveMonitorIndexFromKey,
+  type MonitorInfo,
+} from "@/components/broadcast/broadcast-settings-wiring"
 import { BroadcastOutputCard } from "@/components/broadcast/BroadcastOutputCard"
 import { useAssets } from "@/hooks/use-assets"
-import {
-  useBroadcastOutputSettings,
-  type MonitorInfo,
-} from "@/hooks/use-broadcast-output-settings"
+import { useBroadcastOutputSettings } from "@/hooks/use-broadcast-output-settings"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { CastIcon, MonitorIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -32,14 +34,16 @@ export function BroadcastSettings({
 }) {
   const mainDisplayMonitorIndex = useBroadcastStore((s) => s.mainDisplayMonitorIndex)
   const altDisplayMonitorIndex = useBroadcastStore((s) => s.altDisplayMonitorIndex)
+  const mainDisplayMonitorKey = useBroadcastStore((s) => s.mainDisplayMonitorKey)
+  const altDisplayMonitorKey = useBroadcastStore((s) => s.altDisplayMonitorKey)
   const { status: assetStatus, loading: assetsLoading, refresh: refreshAssets } = useAssets()
   const ndiSdkInstalled = Boolean(assetStatus?.ndi_sdk)
 
   const [monitors, setMonitors] = useState<MonitorInfo[]>([])
   const [refreshing, setRefreshing] = useState(false)
 
-  const mainOutput = useBroadcastOutputSettings("main", { open, ndiSdkInstalled })
-  const altOutput = useBroadcastOutputSettings("alt", { open, ndiSdkInstalled })
+  const mainOutput = useBroadcastOutputSettings("main", { open, ndiSdkInstalled, monitors })
+  const altOutput = useBroadcastOutputSettings("alt", { open, ndiSdkInstalled, monitors })
   const {
     syncNdiConfigToOutput: syncMainNdiConfigToOutput,
     ndiActive: mainNdiActive,
@@ -56,19 +60,38 @@ export function BroadcastSettings({
   const fetchMonitors = useCallback(async () => {
     setRefreshing(true)
     try {
-      const result = await invokeTauri<MonitorInfo[]>("list_monitors")
+      const result = normalizeMonitorList(await invokeTauri<MonitorInfo[]>("list_monitors"))
       setMonitors(result)
-      const mainIndex = clampMonitorIndex(mainDisplayMonitorIndex, result.length)
-      const altIndex = clampMonitorIndex(altDisplayMonitorIndex, result.length)
-      useBroadcastStore.getState().setMainDisplayMonitorIndex(mainIndex)
-      useBroadcastStore.getState().setAltDisplayMonitorIndex(altIndex)
+
+      const mainIndex = resolveMonitorIndexFromKey(
+        result,
+        mainDisplayMonitorKey,
+        clampMonitorIndex(mainDisplayMonitorIndex, result.length),
+      )
+      const altIndex = resolveMonitorIndexFromKey(
+        result,
+        altDisplayMonitorKey,
+        clampMonitorIndex(altDisplayMonitorIndex, result.length),
+      )
+      const store = useBroadcastStore.getState()
+      store.setMainDisplayMonitorIndex(mainIndex)
+      store.setAltDisplayMonitorIndex(altIndex)
+      const mainMonitor = result[mainIndex]
+      const altMonitor = result[altIndex]
+      if (mainMonitor) store.setMainDisplayMonitorKey(mainMonitor.key)
+      if (altMonitor) store.setAltDisplayMonitorKey(altMonitor.key)
     } catch (error) {
       setMonitors([])
       showBroadcastError("Could not load display monitors", error)
     } finally {
       setRefreshing(false)
     }
-  }, [mainDisplayMonitorIndex, altDisplayMonitorIndex])
+  }, [
+    mainDisplayMonitorIndex,
+    altDisplayMonitorIndex,
+    mainDisplayMonitorKey,
+    altDisplayMonitorKey,
+  ])
 
   useEffect(() => {
     if (!open) return

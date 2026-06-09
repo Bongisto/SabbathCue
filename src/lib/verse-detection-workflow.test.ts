@@ -107,8 +107,6 @@ describe("verse detection workflow", () => {
     })
     useDetectionStore.setState({
       detections: [],
-      autoMode: false,
-      confidenceThreshold: 0.8,
     })
     useQueueStore.setState({
       items: [],
@@ -364,17 +362,87 @@ describe("verse detection workflow", () => {
     })
   })
 
-  it("previews first direct detection from incoming event batch", async () => {
-    const detection1 = makeDetection({ verse_ref: "Romans 5:8", book_number: 45, chapter: 5, verse: 8 })
-    const detection2 = makeDetection({ verse_ref: "Romans 8:1", book_number: 45, chapter: 8, verse: 1 })
+  it("previews the highest-confidence direct detection from the incoming batch", async () => {
+    const detection1 = makeDetection({
+      verse_ref: "Romans 5:8",
+      book_number: 45,
+      chapter: 5,
+      verse: 8,
+      confidence: 0.7,
+    })
+    const detection2 = makeDetection({
+      verse_ref: "Romans 8:1",
+      book_number: 45,
+      chapter: 8,
+      verse: 1,
+      confidence: 0.95,
+    })
     await handleVerseDetections([detection1, detection2])
 
-    // Should preview the first (newest in batch)
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_number: 45,
+      chapter: 8,
+      verse: 1,
+    })
+  })
+
+  it("keeps the first direct hit when confidence is tied", async () => {
+    const detection1 = makeDetection({
+      verse_ref: "Romans 5:8",
+      book_number: 45,
+      chapter: 5,
+      verse: 8,
+      confidence: 0.9,
+    })
+    const detection2 = makeDetection({
+      verse_ref: "Romans 8:1",
+      book_number: 45,
+      chapter: 8,
+      verse: 1,
+      confidence: 0.9,
+    })
+    await handleVerseDetections([detection1, detection2])
+
     expect(useBibleStore.getState().selectedVerse).toMatchObject({
       book_number: 45,
       chapter: 5,
       verse: 8,
     })
+  })
+
+  it("serializes overlapping detection batches", async () => {
+    const order: string[] = []
+    invokeMock.mockImplementation(async () => {
+      order.push("fetch")
+      return null
+    })
+
+    const first = handleVerseDetections([
+      makeDetection({ verse_ref: "John 3:16", auto_queued: true }),
+    ])
+    const second = handleVerseDetections([
+      makeDetection({ verse_ref: "Romans 8:1", book_number: 45, chapter: 8, verse: 1, auto_queued: true }),
+    ])
+
+    await Promise.all([first, second])
+    expect(order.length).toBeGreaterThan(0)
+    expect(useQueueStore.getState().items.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("reports a verse lookup issue when fetch fails and fallback text is used", async () => {
+    useBroadcastStore.setState({ outputIssues: [] })
+    invokeMock.mockRejectedValueOnce(new Error("network down"))
+
+    await handleVerseDetections([makeDetection({ verse_text: "Fallback verse text" })])
+
+    expect(useBroadcastStore.getState().outputIssues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "verse-lookup",
+          outputId: "global",
+        }),
+      ]),
+    )
   })
 
   it("queues text fetched from the current translation", async () => {

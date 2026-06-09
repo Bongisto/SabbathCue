@@ -26,7 +26,17 @@ export type {
 } from "./verification"
 export { getVerseFromItem, getReferenceFromItem } from "./queue"
 export type { DetectionResult, DetectionStatus, ReadingAdvance, SemanticSearchResult } from "./detection"
-export type { BroadcastTheme, VerseRenderData, VerseSegment, RenderOptions } from "./broadcast"
+export type {
+  BroadcastIssueOutputId,
+  BroadcastOutputErrorEvent,
+  BroadcastOutputId,
+  BroadcastOutputIssue,
+  BroadcastOutputIssueKind,
+  BroadcastTheme,
+  VerseRenderData,
+  VerseSegment,
+  RenderOptions,
+} from "./broadcast"
 export type {
   PresentationItemKind,
   PresentationSegment,

@@ -1,0 +1,73 @@
+// @vitest-environment jsdom
+import { act } from "react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { createRoot } from "react-dom/client"
+import React from "react"
+
+const invokeMock = vi.fn()
+const reportOutputIssueMock = vi.fn()
+
+vi.mock("@/lib/tauri-runtime", () => ({
+  isTauriRuntime: () => true,
+  invokeTauri: (...args: unknown[]) => invokeMock(...args),
+}))
+
+vi.mock("@/stores/broadcast-store", () => ({
+  useBroadcastStore: {
+    getState: () => ({
+      reportOutputIssue: reportOutputIssueMock,
+    }),
+  },
+}))
+
+describe("useDetectionSettingsSync", () => {
+  let container: HTMLDivElement
+  let root: ReturnType<typeof createRoot>
+
+  beforeEach(() => {
+    invokeMock.mockReset()
+    reportOutputIssueMock.mockReset()
+    invokeMock.mockResolvedValue(undefined)
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(() => {
+    act(() => {
+      root.unmount()
+    })
+    container.remove()
+    vi.resetModules()
+  })
+
+  it("reports a detection-settings issue when backend sync fails", async () => {
+    invokeMock.mockRejectedValueOnce(new Error("backend offline"))
+
+    const { useSettingsStore } = await import("@/stores/settings-store")
+    const { useDetectionSettingsSync } = await import("./use-detection-settings-sync")
+
+    function Probe() {
+      useDetectionSettingsSync()
+      return null
+    }
+
+    await act(async () => {
+      root.render(React.createElement(Probe))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith("update_detection_settings", {
+      autoMode: useSettingsStore.getState().autoMode,
+      confidenceThreshold: useSettingsStore.getState().confidenceThreshold,
+      cooldownMs: useSettingsStore.getState().cooldownMs,
+    })
+    expect(reportOutputIssueMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputId: "global",
+        kind: "detection-settings",
+      }),
+    )
+  })
+})

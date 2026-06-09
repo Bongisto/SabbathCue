@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
+import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useSettingsStore } from "@/stores/settings-store"
 
 export function useDetectionSettingsSync() {
@@ -19,6 +20,12 @@ export function useDetectionSettingsSync() {
         cooldownMs: next.cooldownMs,
       }).catch((e) => {
         console.warn("[detection-settings] sync failed", e)
+        useBroadcastStore.getState().reportOutputIssue({
+          outputId: "global",
+          kind: "detection-settings",
+          title: "Detection settings sync failed",
+          description: `Could not sync detection settings to backend: ${String(e)}`,
+        })
       })
     }
 

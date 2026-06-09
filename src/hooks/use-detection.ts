@@ -1,4 +1,5 @@
 import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
+import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import type { DetectionResult } from "@/types"
 
@@ -18,6 +19,12 @@ async function detectVerses(text: string) {
     return results
   } catch (error) {
     console.warn("[detection] detect_verses failed", error)
+    useBroadcastStore.getState().reportOutputIssue({
+      outputId: "global",
+      kind: "manual-detection",
+      title: "Detection failed",
+      description: `Manual verse detection failed: ${String(error)}`,
+    })
     return []
   }
 }
@@ -66,13 +73,9 @@ export const detectionActions = {
 
 export function useDetection() {
   const detections = useDetectionStore((s) => s.detections)
-  const autoMode = useDetectionStore((s) => s.autoMode)
-  const confidenceThreshold = useDetectionStore((s) => s.confidenceThreshold)
 
   return {
     detections,
-    autoMode,
-    confidenceThreshold,
     ...detectionActions,
   }
 }

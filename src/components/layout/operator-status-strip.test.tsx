@@ -25,6 +25,15 @@ let broadcastLiveVerse: unknown = null
 let broadcastReadingModeAutoLive = false
 let transcriptIsTranscribing = false
 let bibleSelectedVerse: unknown = null
+let latestOutputIssue: {
+  id: string
+  outputId: "main" | "alt" | "global"
+  kind: string
+  title: string
+  description: string
+} | null = null
+
+const mockClearOutputIssue = vi.fn()
 
 vi.mock("@/stores/broadcast-store", () => {
   const useBroadcastStore = (selector: (s: Record<string, unknown>) => unknown) =>
@@ -35,16 +44,21 @@ vi.mock("@/stores/broadcast-store", () => {
       readingModeAutoLive: broadcastReadingModeAutoLive,
       themes: [],
       activeThemeId: "",
+      outputIssues: latestOutputIssue ? [latestOutputIssue] : [],
     })
   const selectActiveTheme = (state: { themes: Array<{ id: string }>; activeThemeId: string }) =>
     state.themes.find((theme) => theme.id === state.activeThemeId) ?? state.themes[0] ?? null
+  const selectLatestOutputIssue = (state: {
+    outputIssues: Array<NonNullable<typeof latestOutputIssue>>
+  }) => state.outputIssues[0] ?? null
   useBroadcastStore.getState = () => ({
     setLive: mockSetLive,
     setLiveItem: mockSetLiveVerse,
     setReadingModeAutoLive: mockSetReadingModeAutoLive,
     setPreviewItem: vi.fn(),
+    clearOutputIssue: mockClearOutputIssue,
   })
-  return { selectActiveTheme, useBroadcastStore }
+  return { selectActiveTheme, selectLatestOutputIssue, useBroadcastStore }
 })
 
 vi.mock("@/stores/transcript-store", () => ({
@@ -92,6 +106,7 @@ function resetState() {
   broadcastReadingModeAutoLive = false
   transcriptIsTranscribing = false
   bibleSelectedVerse = null
+  latestOutputIssue = null
 }
 
 describe("OperatorStatusStrip emergency controls", () => {
@@ -238,6 +253,40 @@ describe("OperatorStatusStrip emergency controls", () => {
       await click(btn)
       expect(mockSetReadingModeAutoLive).toHaveBeenCalledWith(false)
       expect(mockInvoke).toHaveBeenCalledWith("stop_reading_mode")
+    })
+  })
+
+  describe("Output issue warning", () => {
+    it("shows a warning chip when an unresolved output issue exists", async () => {
+      latestOutputIssue = {
+        id: "main:broadcast-sync",
+        outputId: "main",
+        kind: "broadcast-sync",
+        title: "Broadcast sync failed",
+        description: "Could not sync live output to broadcast",
+      }
+      await renderStrip()
+
+      const chip = container?.querySelector("button[title*='Could not sync']")
+      expect(chip?.textContent).toContain("Main: Broadcast sync failed")
+    })
+
+    it("clears the issue when the warning chip is clicked", async () => {
+      latestOutputIssue = {
+        id: "global:persistence",
+        outputId: "global",
+        kind: "persistence",
+        title: "Settings save failed",
+        description: "Could not save settings to disk.",
+      }
+      await renderStrip()
+
+      const chip = container?.querySelector<HTMLButtonElement>(
+        "button[title='Could not save settings to disk.']",
+      )
+      expect(chip).toBeTruthy()
+      await click(chip as HTMLButtonElement)
+      expect(mockClearOutputIssue).toHaveBeenCalledWith("global:persistence")
     })
   })
 
