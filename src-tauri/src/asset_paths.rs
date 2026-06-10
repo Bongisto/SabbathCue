@@ -326,10 +326,7 @@ mod tests {
             Some(present.clone())
         );
         assert_eq!(first_existing([missing.clone()]), None);
-        assert_eq!(
-            first_existing([present.clone(), missing]),
-            Some(present)
-        );
+        assert_eq!(first_existing([present.clone(), missing]), Some(present));
     }
 }
 

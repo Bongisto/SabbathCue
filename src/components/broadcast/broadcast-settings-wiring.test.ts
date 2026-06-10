@@ -30,6 +30,39 @@ describe("broadcast settings wiring", () => {
     ).toEqual({
       outputId: "main",
       monitorIndex: 1,
+      monitorKey: monitors[1].key,
+      fullscreen: true,
+    })
+  })
+
+  it("targets an HDMI screen extended to the right of the laptop display", () => {
+    const monitors = [
+      makeMonitor({ name: "Internal Display", width: 1920, height: 1080, x: 0, y: 0 }),
+      makeMonitor({ name: "HDMI Projector", width: 1920, height: 1080, x: 1920, y: 0 }),
+    ]
+
+    expect(
+      buildOpenBroadcastWindowArgs("main", monitors, monitors[1].key, 0, true),
+    ).toEqual({
+      outputId: "main",
+      monitorIndex: 1,
+      monitorKey: "hdmi projector|1920x1080|1920,0",
+      fullscreen: true,
+    })
+  })
+
+  it("targets an HDMI screen extended to the left with negative desktop coordinates", () => {
+    const monitors = [
+      makeMonitor({ name: "HDMI Projector", width: 1280, height: 720, x: -1280, y: 0 }),
+      makeMonitor({ name: "Internal Display", width: 1920, height: 1080, x: 0, y: 0 }),
+    ]
+
+    expect(
+      buildOpenBroadcastWindowArgs("main", monitors, monitors[0].key, 1, true),
+    ).toEqual({
+      outputId: "main",
+      monitorIndex: 0,
+      monitorKey: "hdmi projector|1280x720|-1280,0",
       fullscreen: true,
     })
   })
@@ -65,6 +98,7 @@ describe("broadcast settings wiring", () => {
     ).toEqual({
       outputId: "main",
       monitorIndex: 0,
+      monitorKey: "missing",
       fullscreen: true,
     })
   })

@@ -210,7 +210,8 @@ fn semantic_result_key(result: &crate::commands::detection::DetectionResult) -> 
 pub(crate) fn finalize_live_semantic_results(
     results: Vec<crate::commands::detection::DetectionResult>,
 ) -> Vec<crate::commands::detection::DetectionResult> {
-    let mut grouped: HashMap<String, (crate::commands::detection::DetectionResult, usize)> = HashMap::new();
+    let mut grouped: HashMap<String, (crate::commands::detection::DetectionResult, usize)> =
+        HashMap::new();
 
     for result in results {
         let key = semantic_result_key(&result);

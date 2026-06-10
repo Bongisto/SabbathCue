@@ -71,6 +71,20 @@ pub fn build_monitor_key(name: &str, width: u32, height: u32, x: i32, y: i32) ->
     format!("{normalized_name}|{width}x{height}|{x},{y}")
 }
 
+fn resolve_monitor_index(
+    monitor_keys: &[String],
+    monitor_key: Option<&str>,
+    fallback_index: usize,
+) -> Option<usize> {
+    if let Some(key) = monitor_key.filter(|key| !key.trim().is_empty()) {
+        if let Some(index) = monitor_keys.iter().position(|candidate| candidate == key) {
+            return Some(index);
+        }
+    }
+
+    monitor_keys.get(fallback_index).map(|_| fallback_index)
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NdiFrameRequest {
@@ -141,12 +155,28 @@ pub fn open_broadcast_window(
     app: tauri::AppHandle,
     output_id: String,
     monitor_index: usize,
+    monitor_key: Option<String>,
     fullscreen: Option<bool>,
 ) -> Result<(), String> {
     let label = window_label(&output_id);
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let monitor_keys = monitors
+        .iter()
+        .map(|monitor| {
+            let size = monitor.size();
+            let pos = monitor.position();
+            let name = monitor
+                .name()
+                .cloned()
+                .unwrap_or_else(|| "Unknown".to_string());
+            build_monitor_key(&name, size.width, size.height, pos.x, pos.y)
+        })
+        .collect::<Vec<_>>();
+    let resolved_monitor_index =
+        resolve_monitor_index(&monitor_keys, monitor_key.as_deref(), monitor_index)
+            .ok_or_else(|| format!("Monitor index {monitor_index} out of range"))?;
     let monitor = monitors
-        .get(monitor_index)
+        .get(resolved_monitor_index)
         .ok_or_else(|| format!("Monitor index {monitor_index} out of range"))?;
 
     let pos = monitor.position();
@@ -267,13 +297,59 @@ fn decode_ndi_frame_base64(encoded: &str) -> Result<Vec<u8>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_monitor_key, decode_ndi_frame_base64, window_label, window_url};
+    use super::{
+        build_monitor_key, decode_ndi_frame_base64, resolve_monitor_index, window_label, window_url,
+    };
 
     #[test]
     fn build_monitor_key_normalizes_name_and_includes_geometry() {
         assert_eq!(
             build_monitor_key("  HDMI-1  ", 1920, 1080, 100, 200),
             "hdmi-1|1920x1080|100,200"
+        );
+    }
+
+    #[test]
+    fn build_monitor_key_preserves_negative_extended_desktop_coordinates() {
+        assert_eq!(
+            build_monitor_key("HDMI Projector", 1280, 720, -1280, 0),
+            "hdmi projector|1280x720|-1280,0"
+        );
+    }
+
+    #[test]
+    fn resolve_monitor_index_prefers_stable_hdmi_key_over_stale_index() {
+        let monitor_keys = vec![
+            "internal display|1920x1080|0,0".to_string(),
+            "hdmi projector|1920x1080|1920,0".to_string(),
+        ];
+
+        assert_eq!(
+            resolve_monitor_index(&monitor_keys, Some("hdmi projector|1920x1080|1920,0"), 0,),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn resolve_monitor_index_falls_back_to_index_when_key_is_missing() {
+        let monitor_keys = vec![
+            "internal display|1920x1080|0,0".to_string(),
+            "hdmi projector|1920x1080|1920,0".to_string(),
+        ];
+
+        assert_eq!(
+            resolve_monitor_index(&monitor_keys, Some("missing"), 1),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn resolve_monitor_index_rejects_out_of_range_fallback() {
+        let monitor_keys = vec!["internal display|1920x1080|0,0".to_string()];
+
+        assert_eq!(
+            resolve_monitor_index(&monitor_keys, Some("missing"), 2),
+            None
         );
     }
 

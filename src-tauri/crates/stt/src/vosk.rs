@@ -174,14 +174,27 @@ fn worker_is_executable(path: &Path) -> bool {
 }
 
 fn worker_command(worker_path: &Path) -> Command {
-    if worker_is_executable(worker_path) {
+    let mut command = if worker_is_executable(worker_path) {
         Command::new(worker_path)
     } else {
         let mut command = Command::new(python_executable());
         command.arg(worker_path);
         command
-    }
+    };
+    suppress_console_window(&mut command);
+    command
 }
+
+#[cfg(windows)]
+fn suppress_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn suppress_console_window(_command: &mut Command) {}
 
 fn push_worker_args(command: &mut Command, model_path: &Path) {
     command
@@ -829,7 +842,11 @@ mod tests {
             panic!("expected error event, got {:?}", events[4]);
         };
         assert_eq!(message, "model exploded");
-        assert_eq!(events.len(), 5, "blank partials and bad JSON must be skipped");
+        assert_eq!(
+            events.len(),
+            5,
+            "blank partials and bad JSON must be skipped"
+        );
     }
 
     /// End-to-end preflight against the real bundled worker executable and

@@ -12,6 +12,7 @@ export interface MonitorInfo {
 export interface OpenBroadcastWindowArgs {
   outputId: BroadcastOutputId
   monitorIndex: number
+  monitorKey: string
   fullscreen: boolean
 }
 
@@ -75,6 +76,7 @@ export function buildOpenBroadcastWindowArgs(
       selectedMonitorKey,
       fallbackMonitorIndex,
     ),
+    monitorKey: selectedMonitorKey,
     fullscreen,
   }
 }

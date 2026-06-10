@@ -721,4 +721,3 @@ pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), Strin
     log::info!("Transcription stop requested");
     Ok(())
 }
-

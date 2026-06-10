@@ -130,6 +130,7 @@ describe("use-broadcast-output-settings commands", () => {
       expect(mockInvoke).toHaveBeenCalledWith("open_broadcast_window", {
         outputId: "main",
         monitorIndex: 1,
+        monitorKey: sampleMonitors[1].key,
         fullscreen: true,
       })
       expect(deps.onPreviewOpenChange).toHaveBeenCalledWith(true)

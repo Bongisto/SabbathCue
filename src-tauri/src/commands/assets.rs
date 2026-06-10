@@ -114,7 +114,9 @@ fn vosk_runtime_status(worker_path: &Path) -> (bool, Option<String>) {
     }
 
     let python = python_executable();
-    match Command::new(&python)
+    let mut command = Command::new(&python);
+    suppress_console_window(&mut command);
+    match command
         .arg("-c")
         .arg("import vosk")
         .stdin(Stdio::null())
@@ -146,6 +148,17 @@ fn vosk_runtime_status(worker_path: &Path) -> (bool, Option<String>) {
         ),
     }
 }
+
+#[cfg(windows)]
+fn suppress_console_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn suppress_console_window(_command: &mut Command) {}
 
 fn file_name_from_path(path: &str) -> String {
     Path::new(path)
