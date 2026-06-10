@@ -36,6 +36,7 @@
     "build:vosk-sidecar": "powershell -ExecutionPolicy Bypass -File scripts/build-vosk-sidecar.ps1",
     "download:whisper": "bun run data/download-whisper-model.ts",
     "download:ndi-sdk": "bun run data/download-ndi-sdk.ts",
+    "generate:icons": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-app-icons.ps1 && tauri icon public/app-icon.png -o src-tauri/icons",
     "setup:windows": "powershell -ExecutionPolicy Bypass -File scripts/setup-windows.ps1",
     "setup:all": "bun run data/prepare-embeddings.ts",
     "web:dev": "cd web && bun run dev",
