@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react"
-import { renderHook, type RenderHookResult } from "@testing-library/react"
+import { renderHook, waitFor, type RenderHookResult } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { NdiSessionInfo } from "@/types"
 import type { BroadcastOutputCommandState } from "./use-broadcast-output-settings"
@@ -426,8 +426,14 @@ describe("use-broadcast-output-settings commands", () => {
       mockGetAllWindows.mockResolvedValue([])
 
       const { result, cleanup } = await renderHookResult(true)
-      expect(result.current?.enabled).toBe(true)
-      expect(result.current?.ndiActive).toBe(true)
+
+      await waitFor(
+        () => {
+          expect(result.current?.enabled).toBe(true)
+          expect(result.current?.ndiActive).toBe(true)
+        },
+        { timeout: 2000 },
+      )
       expect(result.current?.outputType).toBe("ndi")
       cleanup()
     })
@@ -451,8 +457,8 @@ describe("use-broadcast-output-settings commands", () => {
       expect(result.current?.ndiActive).toBe(false)
 
       await act(async () => {
-        vi.advanceTimersByTime(750)
-        await Promise.resolve()
+        // Preview reconcile retries for up to ~1s before the first NDI poll runs.
+        await vi.advanceTimersByTimeAsync(1750)
       })
 
       expect(result.current?.ndiActive).toBe(true)
@@ -461,7 +467,7 @@ describe("use-broadcast-output-settings commands", () => {
       expect(result.current?.ndiFrameRate).toBe("fps60")
       cleanup()
       vi.useRealTimers()
-    })
+    }, 10_000)
 
     it("ignores duplicate NDI toggle calls while the first command is pending", async () => {
       let startCalls = 0

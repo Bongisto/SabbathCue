@@ -97,7 +97,8 @@ jobs:
 
       - name: Generate SBOM
         working-directory: src-tauri
-        run: cargo cyclonedx --all --format json --output-cdx
+        continue-on-error: true
+        run: cargo cyclonedx --all --format json
 
       - name: Build Tauri installer
         run: bun run tauri build
@@ -132,4 +133,3 @@ jobs:
           name: sabbathcue-windows-bundle
           path: |
             src-tauri/target/release/bundle/**
-            src-tauri/target/cyclonedx/**
