@@ -1,6 +1,7 @@
 mod asset_paths;
 mod commands;
 mod events;
+mod logging;
 mod memstats;
 mod state;
 
@@ -34,11 +35,7 @@ pub fn run() {
     install_panic_hook();
     let detection_cooldown = rhema_detection::AutoQueueCooldown::default();
     let run_result = tauri::Builder::default()
-        .plugin(
-            tauri_plugin_log::Builder::new()
-                .level(tauri_plugin_log::log::LevelFilter::Info)
-                .build(),
-        )
+        .plugin(logging::build_log_plugin())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -113,6 +110,26 @@ pub fn run() {
         ])
         .setup(|app| {
             use tauri::Manager;
+
+            // Startup banner: guarantees the session log is never empty and
+            // records the resolved STT asset paths for offline diagnosis.
+            log::info!(
+                "SabbathCue v{} starting (pid {})",
+                app.package_info().version,
+                std::process::id()
+            );
+            let vosk_model = asset_paths::vosk_model_path(app.handle());
+            let vosk_worker = asset_paths::vosk_worker_path(app.handle());
+            log::info!(
+                "Resolved Vosk model path: {} (exists={})",
+                vosk_model.display(),
+                vosk_model.exists()
+            );
+            log::info!(
+                "Resolved Vosk worker path: {} (exists={})",
+                vosk_worker.display(),
+                vosk_worker.exists()
+            );
 
             memstats::spawn();
 

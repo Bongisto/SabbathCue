@@ -440,14 +440,43 @@
 [data-slot="live-output-panel"][data-fullscreen-layout="true"],
 [data-slot="live-output-panel"]:fullscreen {
   background: #000 !important;
-  border-color: transparent !important;
+  border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+  /* Killing the blur + transitions here prevents the repaint glitch while
+     the browser animates into and out of fullscreen. */
+  backdrop-filter: none !important;
+  transition: none !important;
 }
 
 [data-slot="live-output-panel"][data-fullscreen-layout="true"]::before,
 [data-slot="live-output-panel"]:fullscreen::before {
   display: none;
+}
+
+/* Strip panel chrome at the compositor level the instant fullscreen engages,
+   without waiting for the React fullscreenchange re-render. Everything except
+   the presentation stage is hidden, and the stage frame loses its border so
+   no hairline shows at the top of the projector output. */
+[data-slot="live-output-panel"][data-fullscreen-layout="true"] > *:not([data-slot="live-output-stage"]),
+[data-slot="live-output-panel"]:fullscreen > *:not([data-slot="live-output-stage"]) {
+  display: none !important;
+}
+
+[data-slot="live-output-panel"][data-fullscreen-layout="true"] [data-slot="live-output-stage"],
+[data-slot="live-output-panel"]:fullscreen [data-slot="live-output-stage"] {
+  background: #000 !important;
+  padding: 0 !important;
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+[data-slot="live-output-panel"][data-fullscreen-layout="true"] [data-slot="live-output-frame"],
+[data-slot="live-output-panel"]:fullscreen [data-slot="live-output-frame"] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
 }
 
 @keyframes fade-in-up {

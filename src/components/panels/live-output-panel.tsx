@@ -65,6 +65,10 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         panel,
         document.fullscreenElement,
         () => document.exitFullscreen(),
+        (fullscreen) => {
+          setIsFullscreen(fullscreen)
+          setIsFullscreenLayout(fullscreen)
+        },
       )
     } catch (error) {
       toast.error("Fullscreen failed", {
@@ -185,6 +189,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
       </div>
 
       <div
+        data-slot="live-output-stage"
         className={cn(
           "flex min-h-0 flex-1 bg-slate-950/50 p-2",
           isFullscreenLayout && "bg-black p-0",
@@ -192,6 +197,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         )}
       >
         <div
+          data-slot="live-output-frame"
           className={cn(
             "flex h-full w-full items-center justify-center rounded-md border border-white/5 p-2 text-center",
             isLive && !isFullscreenLayout && "live-glowing-active",

@@ -155,13 +155,16 @@ describe("use-broadcast-output-settings commands", () => {
     })
 
     it("reports when the preview command succeeds but no window appears", async () => {
+      vi.useFakeTimers()
       mockInvoke.mockResolvedValue(undefined)
       mockGetAllWindows.mockResolvedValue([])
 
       const { runToggleBroadcastPreview } = await loadCommandModule()
       const deps = baseDeps()
 
-      await runToggleBroadcastPreview(baseState(), deps)
+      const pending = runToggleBroadcastPreview(baseState(), deps)
+      await vi.advanceTimersByTimeAsync(60_000)
+      await pending
 
       expect(deps.onPreviewOpenChange).toHaveBeenCalledWith(false)
       expect(deps.onIssue).toHaveBeenCalledWith(
@@ -176,6 +179,48 @@ describe("use-broadcast-output-settings commands", () => {
         "The open command completed, but the preview window was not found.",
       )
       expect(mockSyncBroadcastOutputFor).not.toHaveBeenCalled()
+    })
+
+    it("registers a projector window that takes seconds to appear", async () => {
+      // Regression: the open path used to give up after ~1s, while WebView2
+      // window creation on a freshly connected HDMI display can take several
+      // seconds — the connection opened but never "registered" in the UI.
+      vi.useFakeTimers()
+      mockInvoke.mockResolvedValue(undefined)
+      let windowChecks = 0
+      mockGetAllWindows.mockImplementation(() => {
+        windowChecks += 1
+        // The window only becomes visible ~3.5s into the wait.
+        return Promise.resolve(windowChecks >= 15 ? [{ label: "broadcast" }] : [])
+      })
+
+      const { runToggleBroadcastPreview } = await loadCommandModule()
+      const deps = baseDeps()
+
+      const pending = runToggleBroadcastPreview(baseState(), deps)
+      await vi.advanceTimersByTimeAsync(60_000)
+      await pending
+
+      expect(deps.onPreviewOpenChange).toHaveBeenCalledWith(true)
+      expect(deps.onIssue).not.toHaveBeenCalled()
+      expect(deps.onError).not.toHaveBeenCalled()
+    })
+
+    it("waits at least five seconds on the open path before giving up", async () => {
+      vi.useFakeTimers()
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { reconcileBroadcastPreviewState, OPEN_PREVIEW_RECONCILE_OPTIONS } =
+        await loadCommandModule()
+
+      const startedAt = Date.now()
+      const pending = reconcileBroadcastPreviewState(
+        "main",
+        OPEN_PREVIEW_RECONCILE_OPTIONS,
+      )
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(await pending).toBe(false)
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(5000)
     })
   })
 
@@ -502,12 +547,19 @@ describe("use-broadcast-output-settings commands", () => {
 
     it("keeps the master toggle pending while joining an in-flight preview toggle", async () => {
       const openWindow = createDeferred<void>()
+      let previewExists = false
       mockInvoke.mockImplementation(async (command: string) => {
-        if (command === "open_broadcast_window") return openWindow.promise
+        if (command === "open_broadcast_window") {
+          await openWindow.promise
+          previewExists = true
+          return undefined
+        }
         if (command === "get_ndi_status") return null
         return undefined
       })
-      mockGetAllWindows.mockResolvedValue([])
+      mockGetAllWindows.mockImplementation(async () =>
+        previewExists ? [{ label: "broadcast" }] : [],
+      )
 
       const { result, cleanup } = await renderHookResult(true)
       const togglePreview = result.current?.handleTogglePreview

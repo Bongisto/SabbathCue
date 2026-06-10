@@ -123,6 +123,9 @@ pub async fn start_transcription(
         match build_stt_provider(provider_name, &app, device_id.as_deref(), gain).await {
             Ok(provider) => provider,
             Err(error) => {
+                log::error!(
+                    "[STT] start_transcription failed to build provider {provider_name}: {error}"
+                );
                 stt_active.store(false, Ordering::SeqCst);
                 return Err(error);
             }

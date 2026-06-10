@@ -56,6 +56,13 @@ function mapNdiFrameRate(fps: number): NdiFrameRate | null {
   return null
 }
 
+// Creating the projector WebView window on a freshly connected HDMI display
+// can take several seconds (WebView2 cold start + display mode switch). The
+// open path waits with this budget, otherwise the open command succeeds but
+// the UI reports the connection as failed/not registered. Close/polling
+// checks keep the short default, where an absent window is the answer.
+export const OPEN_PREVIEW_RECONCILE_OPTIONS = { retries: 24, delayMs: 250 }
+
 export async function reconcileBroadcastPreviewState(
   outputId: BroadcastOutputId,
   options?: { retries?: number; delayMs?: number },
@@ -155,7 +162,10 @@ export async function runToggleBroadcastPreview(
           projectorFullscreen,
         ),
       })
-      const opened = await reconcileBroadcastPreviewState(outputId)
+      const opened = await reconcileBroadcastPreviewState(
+        outputId,
+        OPEN_PREVIEW_RECONCILE_OPTIONS,
+      )
       deps.onPreviewOpenChange(opened)
       if (!opened) {
         const title =

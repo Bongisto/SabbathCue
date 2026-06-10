@@ -1,8 +1,25 @@
+use std::path::Path;
+
 use tauri::AppHandle;
 
 use crate::asset_paths;
 use crate::commands::secrets;
 use rhema_stt::{DeepgramClient, SttConfig, SttProvider, VoskProvider};
+
+pub(crate) fn missing_vosk_model_error(model_path: &Path) -> String {
+    format!(
+        "Vosk model not found at {}. Reinstall the app, or place the small English Vosk model in <app data>\\models\\vosk\\{} (or set SABBATHCUE_VOSK_MODEL_DIR).",
+        model_path.display(),
+        asset_paths::VOSK_MODEL_DIRNAME
+    )
+}
+
+pub(crate) fn missing_vosk_worker_error(worker_path: &Path) -> String {
+    format!(
+        "Vosk worker not found at {}. Reinstall the app to restore scripts\\vosk_worker.exe.",
+        worker_path.display()
+    )
+}
 
 pub(crate) async fn build_stt_provider(
     provider_name: &str,
@@ -14,17 +31,15 @@ pub(crate) async fn build_stt_provider(
         "vosk" | "whisper" => {
             let model_path = asset_paths::vosk_model_path(app);
             if !model_path.exists() {
-                return Err(format!(
-                    "Vosk model not found at {}. Install the small English Vosk model at C:\\Users\\fanel\\Downloads\\vosk-model-small-en-us, set SABBATHCUE_VOSK_MODEL_DIR, or place it into models/vosk/vosk-model-small-en-us.",
-                    model_path.display()
-                ));
+                let error = missing_vosk_model_error(&model_path);
+                log::error!("[STT-vosk] {error}");
+                return Err(error);
             }
             let worker_path = asset_paths::vosk_worker_path(app);
             if !worker_path.exists() {
-                return Err(format!(
-                    "Vosk worker not found at {}",
-                    worker_path.display()
-                ));
+                let error = missing_vosk_worker_error(&worker_path);
+                log::error!("[STT-vosk] {error}");
+                return Err(error);
             }
 
             log::info!(
@@ -36,8 +51,16 @@ pub(crate) async fn build_stt_provider(
             let preflight = VoskProvider::new(model_path.clone(), worker_path.clone());
             tauri::async_runtime::spawn_blocking(move || preflight.check_ready())
                 .await
-                .map_err(|e| format!("Vosk startup check task failed: {e}"))?
-                .map_err(|e| format!("Vosk startup check failed: {e}"))?;
+                .map_err(|e| {
+                    let error = format!("Vosk startup check task failed: {e}");
+                    log::error!("[STT-vosk] {error}");
+                    error
+                })?
+                .map_err(|e| {
+                    let error = format!("Vosk startup check failed: {e}");
+                    log::error!("[STT-vosk] {error}");
+                    error
+                })?;
 
             Ok(Box::new(VoskProvider::new(model_path, worker_path)))
         }
@@ -71,5 +94,41 @@ pub(crate) async fn build_stt_provider(
 
             Ok(Box::new(DeepgramClient::new(stt_config)))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn missing_model_error_mentions_path_and_recovery_steps() {
+        let error = missing_vosk_model_error(&PathBuf::from("C:\\app\\models\\vosk\\missing"));
+        assert!(error.contains("C:\\app\\models\\vosk\\missing"));
+        assert!(error.contains("SABBATHCUE_VOSK_MODEL_DIR"));
+        assert!(error.contains(asset_paths::VOSK_MODEL_DIRNAME));
+    }
+
+    #[test]
+    fn vosk_errors_do_not_hardcode_a_user_profile_path() {
+        // A previous build baked a developer-machine Downloads path into the
+        // user-facing error, which sent users to a location that does not
+        // exist on their machine.
+        let model_error = missing_vosk_model_error(&PathBuf::from("C:\\anywhere"));
+        let worker_error = missing_vosk_worker_error(&PathBuf::from("C:\\anywhere"));
+        for error in [model_error, worker_error] {
+            assert!(
+                !error.contains("Users\\fanel") && !error.contains("Downloads"),
+                "error message must not reference a developer machine path: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_worker_error_mentions_path() {
+        let error =
+            missing_vosk_worker_error(&PathBuf::from("C:\\app\\scripts\\vosk_worker.exe"));
+        assert!(error.contains("vosk_worker.exe"));
     }
 }
