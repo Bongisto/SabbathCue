@@ -640,15 +640,11 @@ mod tests {
     #[test]
     #[ignore = "requires Python, the vosk package, and a local model download"]
     fn local_worker_preflight_succeeds_when_model_is_installed() {
-        let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("..");
-        let model_path = project_root
+        let model_path = project_root()
             .join("models")
             .join("vosk")
             .join("vosk-model-small-en-us");
-        let worker_path = project_root.join("scripts").join("vosk_worker.py");
+        let worker_path = project_root().join("scripts").join("vosk_worker.py");
 
         if !model_path.exists() || !worker_path.exists() {
             eprintln!(
@@ -662,5 +658,203 @@ mod tests {
         VoskProvider::new(model_path, worker_path)
             .check_ready()
             .expect("local Vosk worker/model preflight should report ready");
+    }
+
+    fn project_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("..")
+    }
+
+    #[test]
+    fn check_ready_reports_missing_model() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let worker_path = temp.path().join("vosk_worker.exe");
+        std::fs::write(&worker_path, b"stub").expect("stub worker");
+
+        let provider = VoskProvider::new(temp.path().join("missing-model"), worker_path);
+        let error = provider.check_ready().expect_err("missing model must fail");
+        assert!(
+            error.to_string().contains("Vosk model not found"),
+            "error should mention the missing model, got: {error}"
+        );
+    }
+
+    #[test]
+    fn check_ready_reports_missing_worker() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let model_path = temp.path().join("model");
+        std::fs::create_dir_all(&model_path).expect("model dir");
+
+        let provider = VoskProvider::new(model_path, temp.path().join("missing-worker.exe"));
+        let error = provider
+            .check_ready()
+            .expect_err("missing worker must fail");
+        assert!(
+            error.to_string().contains("Vosk worker not found"),
+            "error should mention the missing worker, got: {error}"
+        );
+    }
+
+    #[test]
+    fn worker_command_runs_exe_directly_and_py_through_python() {
+        let exe_command = worker_command(Path::new("C:/app/scripts/vosk_worker.exe"));
+        assert!(
+            exe_command
+                .get_program()
+                .to_string_lossy()
+                .ends_with("vosk_worker.exe"),
+            "bundled .exe worker must run directly"
+        );
+        assert_eq!(exe_command.get_args().count(), 0);
+
+        let py_command = worker_command(Path::new("C:/app/scripts/vosk_worker.py"));
+        let program = py_command.get_program().to_string_lossy().into_owned();
+        assert!(
+            !program.to_ascii_lowercase().ends_with(".py"),
+            ".py worker must run through a Python interpreter, got program: {program}"
+        );
+        let args = py_command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(
+            args.iter().any(|arg| arg.ends_with("vosk_worker.py")),
+            "python invocation must pass the script path"
+        );
+    }
+
+    #[test]
+    fn worker_args_include_model_and_sample_rate() {
+        let mut command = Command::new("worker");
+        push_worker_args(&mut command, Path::new("C:/models/vosk"));
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--model" && w[1].ends_with("vosk")));
+        assert!(args
+            .windows(2)
+            .any(|w| w[0] == "--sample-rate" && w[1] == "16000"));
+    }
+
+    #[test]
+    fn to_words_maps_vosk_fields() {
+        let words = to_words(vec![VoskWord {
+            word: "genesis".to_string(),
+            start: 1.5,
+            end: 2.0,
+            conf: 0.9,
+        }]);
+        assert_eq!(words.len(), 1);
+        assert_eq!(words[0].text, "genesis");
+        assert!((words[0].start - 1.5).abs() < f64::EPSILON);
+        assert!((words[0].end - 2.0).abs() < f64::EPSILON);
+        assert!((words[0].confidence - 0.9).abs() < f64::EPSILON);
+        assert_eq!(words[0].punctuated_word.as_deref(), Some("genesis"));
+    }
+
+    #[test]
+    fn average_confidence_defaults_when_unscored() {
+        assert!((average_confidence(&[]) - 0.75).abs() < f64::EPSILON);
+
+        let unscored = to_words(vec![VoskWord {
+            word: "john".to_string(),
+            start: 0.0,
+            end: 0.5,
+            conf: 0.0,
+        }]);
+        assert!((average_confidence(&unscored) - 0.75).abs() < f64::EPSILON);
+
+        let scored = to_words(vec![
+            VoskWord {
+                word: "john".to_string(),
+                start: 0.0,
+                end: 0.5,
+                conf: 0.8,
+            },
+            VoskWord {
+                word: "three".to_string(),
+                start: 0.5,
+                end: 1.0,
+                conf: 0.6,
+            },
+        ]);
+        assert!((average_confidence(&scored) - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reader_maps_worker_events_to_transcript_events() {
+        let stdout: &[u8] = concat!(
+            "{\"type\": \"ready\"}\n",
+            "not json at all\n",
+            "{\"type\": \"partial\", \"text\": \"  \"}\n",
+            "{\"type\": \"partial\", \"text\": \"john three\", \"words\": []}\n",
+            "{\"type\": \"final\", \"text\": \"john three sixteen\", \"words\": [{\"word\": \"john\", \"start\": 0.0, \"end\": 0.4, \"conf\": 0.9}]}\n",
+            "{\"type\": \"error\", \"message\": \"model exploded\"}\n",
+        )
+        .as_bytes();
+
+        let (tx, mut rx) = mpsc::channel(16);
+        let reader = spawn_vosk_reader(stdout, tx).expect("reader thread");
+        reader.join().expect("reader thread must not panic");
+
+        let mut events = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            events.push(event);
+        }
+
+        assert!(matches!(events[0], TranscriptEvent::Connected));
+        let TranscriptEvent::Partial { transcript, .. } = &events[1] else {
+            panic!("expected partial event, got {:?}", events[1]);
+        };
+        assert_eq!(transcript, "john three");
+        let TranscriptEvent::Final {
+            transcript,
+            words,
+            speech_final,
+            ..
+        } = &events[2]
+        else {
+            panic!("expected final event, got {:?}", events[2]);
+        };
+        assert_eq!(transcript, "john three sixteen");
+        assert_eq!(words.len(), 1);
+        assert!(speech_final);
+        assert!(matches!(events[3], TranscriptEvent::UtteranceEnd));
+        let TranscriptEvent::Error(message) = &events[4] else {
+            panic!("expected error event, got {:?}", events[4]);
+        };
+        assert_eq!(message, "model exploded");
+        assert_eq!(events.len(), 5, "blank partials and bad JSON must be skipped");
+    }
+
+    /// End-to-end preflight against the real bundled worker executable and
+    /// model. This is exactly what the installed app runs before starting
+    /// transcription, so it catches broken worker/model/grammar combinations.
+    /// Skips (with a note) when local assets are missing, e.g. on CI.
+    #[test]
+    fn bundled_worker_preflight_reports_ready() {
+        let model_path = project_root()
+            .join("models")
+            .join("vosk")
+            .join("vosk-model-small-en-us");
+        let worker_path = project_root().join("sidecars").join("vosk_worker.exe");
+
+        if !model_path.exists() || !worker_path.exists() {
+            eprintln!(
+                "Skipping bundled Vosk preflight: model={} worker={}",
+                model_path.display(),
+                worker_path.display()
+            );
+            return;
+        }
+
+        VoskProvider::new(model_path, worker_path)
+            .check_ready()
+            .expect("bundled Vosk worker/model preflight should report ready");
     }
 }

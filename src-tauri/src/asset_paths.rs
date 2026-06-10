@@ -254,6 +254,85 @@ pub fn embedding_ids_path(app: &AppHandle) -> PathBuf {
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_fake_vosk_model(root: &Path) {
+        std::fs::create_dir_all(root.join("conf")).expect("conf dir");
+        std::fs::write(root.join("conf").join("model.conf"), b"").expect("model.conf");
+        std::fs::create_dir_all(root.join("am")).expect("am dir");
+        std::fs::write(root.join("am").join("final.mdl"), b"").expect("final.mdl");
+        std::fs::create_dir_all(root.join("graph")).expect("graph dir");
+    }
+
+    #[test]
+    fn is_vosk_model_dir_requires_all_markers() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let model = temp.path().join("model");
+
+        assert!(!is_vosk_model_dir(&model), "empty dir is not a model");
+
+        make_fake_vosk_model(&model);
+        assert!(is_vosk_model_dir(&model), "complete layout is a model");
+
+        std::fs::remove_file(model.join("am").join("final.mdl")).expect("remove final.mdl");
+        assert!(
+            !is_vosk_model_dir(&model),
+            "missing acoustic model must be rejected"
+        );
+    }
+
+    #[test]
+    fn resolve_vosk_model_dir_accepts_direct_path() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let model = temp.path().join(VOSK_MODEL_DIRNAME);
+        make_fake_vosk_model(&model);
+
+        assert_eq!(resolve_vosk_model_dir(model.clone()), Some(model));
+    }
+
+    #[test]
+    fn resolve_vosk_model_dir_descends_into_known_dirnames() {
+        // Zip extractions often produce models/vosk/vosk-model-small-en-us-0.15/<model>,
+        // where the picked candidate is the parent directory.
+        let temp = tempfile::tempdir().expect("temp dir");
+        let nested = temp.path().join("vosk-model-small-en-us-0.15");
+        make_fake_vosk_model(&nested);
+
+        assert_eq!(
+            resolve_vosk_model_dir(temp.path().to_path_buf()),
+            Some(nested)
+        );
+    }
+
+    #[test]
+    fn resolve_vosk_model_dir_rejects_unrelated_dirs() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir_all(temp.path().join("random")).expect("random dir");
+
+        assert_eq!(resolve_vosk_model_dir(temp.path().to_path_buf()), None);
+    }
+
+    #[test]
+    fn first_existing_picks_first_present_path() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let present = temp.path().join("present.txt");
+        std::fs::write(&present, b"x").expect("present file");
+
+        let missing = temp.path().join("missing.txt");
+        assert_eq!(
+            first_existing([missing.clone(), present.clone()]),
+            Some(present.clone())
+        );
+        assert_eq!(first_existing([missing.clone()]), None);
+        assert_eq!(
+            first_existing([present.clone(), missing]),
+            Some(present)
+        );
+    }
+}
+
 pub fn ndi_library_path(app: &AppHandle) -> PathBuf {
     let sdk_dir = |root: PathBuf| root.join("sdk").join("ndi");
 
