@@ -60,6 +60,12 @@ const LazySettingsPage = lazy(() =>
   })),
 )
 
+const LazyHelpLegalPage = lazy(() =>
+  import("@/components/help/HelpLegalPage").then((mod) => ({
+    default: mod.HelpLegalPage,
+  })),
+)
+
 function WorkspaceFallback() {
   return <div className="glass-panel min-h-[200px] animate-pulse" />
 }
@@ -158,6 +164,10 @@ export function Dashboard() {
     ) : workspace === "settings" ? (
       <Suspense fallback={<WorkspaceFallback />}>
         <LazySettingsPage />
+      </Suspense>
+    ) : workspace === "help-legal" ? (
+      <Suspense fallback={<WorkspaceFallback />}>
+        <LazyHelpLegalPage />
       </Suspense>
     ) : null
 

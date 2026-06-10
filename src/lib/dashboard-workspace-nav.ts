@@ -8,6 +8,7 @@ import {
   PresentationIcon,
   RadioIcon,
   SettingsIcon,
+  LifeBuoyIcon,
 } from "lucide-react"
 import type { DashboardWorkspace } from "@/stores/dashboard-workspace-store"
 
@@ -40,6 +41,7 @@ export const DASHBOARD_WORKSPACE_NAV: DashboardWorkspaceNavItem[] = [
     icon: SettingsIcon,
     dividerBefore: true,
   },
+  { id: "help-legal", label: "Help & Legal", icon: LifeBuoyIcon },
 ]
 
 export function workspaceNavLabel(id: DashboardWorkspace): string {
