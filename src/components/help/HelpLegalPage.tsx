@@ -16,6 +16,7 @@ import {
   HELP_LEGAL_CLOSING_MESSAGE,
   HELP_LEGAL_COPYRIGHT_HOLDER,
   HELP_LEGAL_CREATOR,
+  HELP_LEGAL_TERMS_LAST_UPDATED,
   TERMS_SECTIONS,
 } from "@/content/help-legal"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
@@ -43,8 +44,9 @@ function SectionBlock({
 function ProseParagraph({ text }: { text: string }) {
   return (
     <>
-      {text.split("\n\n").map((paragraph) => (
-        <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+      {/* Paragraphs are static content, so index keys are stable. */}
+      {text.split("\n\n").map((paragraph, index) => (
+        <p key={index}>{paragraph}</p>
       ))}
     </>
   )
@@ -138,12 +140,7 @@ export function HelpLegalPage() {
           <SectionBlock title="Terms and conditions">
             <p className="text-slate-400">
               Effective for version {HELP_LEGAL_APP_VERSION}. Last updated{" "}
-              {new Date().toLocaleDateString("en-ZA", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-              .
+              {HELP_LEGAL_TERMS_LAST_UPDATED}.
             </p>
           </SectionBlock>
 

@@ -5,6 +5,9 @@ export const HELP_LEGAL_CREATOR = "Fanelesibonge Ndlovu"
 export const HELP_LEGAL_COPYRIGHT_HOLDER = HELP_LEGAL_CREATOR
 export const HELP_LEGAL_APP_VERSION = packageJson.version
 
+/** Update this when the Terms and Conditions text materially changes. */
+export const HELP_LEGAL_TERMS_LAST_UPDATED = "10 June 2026"
+
 export const HELP_LEGAL_AGREEMENT_NOTICE =
   `By downloading, installing, launching, or continuing to use ${APP_DISPLAY_NAME}, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions and the Copyright notice below. If you do not agree, do not install or use the application.`
 
@@ -131,7 +134,7 @@ export const COPYRIGHT_SECTIONS = [
 ] as const
 
 export const HELP_LEGAL_CLOSING_MESSAGE = {
-  greeting: "Thank you for using SabbathCue.",
+  greeting: `Thank you for using ${APP_DISPLAY_NAME}.`,
   body: `Whether you are behind the media desk on Sabbath morning, rehearsing midweek, or learning the app for the first time — thank you for labouring to lift up God's Word. May this tool lighten your load so you can focus on what matters most: helping people hear, see, and remember Scripture.`,
   verse: {
     reference: "Colossians 3:16 (KJV)",
