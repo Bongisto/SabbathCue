@@ -58,7 +58,29 @@ pub struct AssetStatus {
 }
 
 #[tauri::command]
-pub fn asset_status(app: AppHandle) -> AssetStatus {
+pub async fn asset_status(app: AppHandle) -> AssetStatus {
+    match tauri::async_runtime::spawn_blocking(move || build_asset_status(&app)).await {
+        Ok(status) => status,
+        Err(error) => {
+            log::error!("[ASSETS] asset_status task failed: {error}");
+            AssetStatus {
+                bible_db: false,
+                vosk_model: false,
+                vosk_worker: false,
+                vosk_runtime: false,
+                vosk_runtime_error: Some(format!("Asset status check failed: {error}")),
+                onnx_model: false,
+                tokenizer: false,
+                embeddings: false,
+                embedding_ids: false,
+                semantic_ready: false,
+                ndi_sdk: false,
+            }
+        }
+    }
+}
+
+fn build_asset_status(app: &AppHandle) -> AssetStatus {
     let bible_db = asset_paths::bible_db_path(&app).exists();
     let vosk_model = asset_paths::vosk_model_path(&app).exists();
     let vosk_worker_path = asset_paths::vosk_worker_path(&app);

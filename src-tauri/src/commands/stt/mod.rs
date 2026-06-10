@@ -119,13 +119,14 @@ pub async fn start_transcription(
     let provider_name = provider.as_deref().unwrap_or("vosk");
 
     // Build the STT provider.
-    let stt_provider = match build_stt_provider(provider_name, &app, device_id.as_deref(), gain) {
-        Ok(provider) => provider,
-        Err(error) => {
-            stt_active.store(false, Ordering::SeqCst);
-            return Err(error);
-        }
-    };
+    let stt_provider =
+        match build_stt_provider(provider_name, &app, device_id.as_deref(), gain).await {
+            Ok(provider) => provider,
+            Err(error) => {
+                stt_active.store(false, Ordering::SeqCst);
+                return Err(error);
+            }
+        };
 
     audio_active.store(true, Ordering::SeqCst);
 

@@ -4,7 +4,7 @@ use crate::asset_paths;
 use crate::commands::secrets;
 use rhema_stt::{DeepgramClient, SttConfig, SttProvider, VoskProvider};
 
-pub(crate) fn build_stt_provider(
+pub(crate) async fn build_stt_provider(
     provider_name: &str,
     app: &AppHandle,
     device_id: Option<&str>,
@@ -33,12 +33,13 @@ pub(crate) fn build_stt_provider(
                 worker_path.display()
             );
 
-            let provider = VoskProvider::new(model_path, worker_path);
-            provider
-                .check_ready()
+            let preflight = VoskProvider::new(model_path.clone(), worker_path.clone());
+            tauri::async_runtime::spawn_blocking(move || preflight.check_ready())
+                .await
+                .map_err(|e| format!("Vosk startup check task failed: {e}"))?
                 .map_err(|e| format!("Vosk startup check failed: {e}"))?;
 
-            Ok(Box::new(provider))
+            Ok(Box::new(VoskProvider::new(model_path, worker_path)))
         }
         #[cfg(feature = "whisper")]
         "legacy-whisper" => {
