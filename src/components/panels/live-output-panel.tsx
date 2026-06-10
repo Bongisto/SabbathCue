@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState, useEffect } from "react"
-import { flushSync } from "react-dom"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CanvasPresentation } from "@/components/ui/canvas-verse"
@@ -10,6 +9,7 @@ import { isPanelFullscreen, togglePanelFullscreen } from "@/components/panels/li
 import { commitPreviewToLive, presentItem } from "@/lib/presentation-workflow"
 import { cn } from "@/lib/utils"
 import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { PresentationDeckControls } from "@/components/panels/presentation-deck-controls"
@@ -32,12 +32,20 @@ export function LiveOutputPanel({ className }: { className?: string }) {
     [isLive, liveItem],
   )
   const canCommitPreview = Boolean(previewItem)
-  const navigateLiveDeck = (kind: "hymn" | "slideDeck", index: number) => {
+  const navigateLiveDeck = (kind: "hymn" | "slideDeck" | "egw", index: number) => {
     if (kind === "hymn") {
       const hymnSlides = useHymnSlideStore.getState()
       const next = hymnSlides.deck[index]
       if (!next) return
       hymnSlides.setDeck(hymnSlides.deck, index)
+      presentItem(next)
+      return
+    }
+    if (kind === "egw") {
+      const egwSlides = useEgwSlideStore.getState()
+      const next = egwSlides.deck[index]
+      if (!next) return
+      egwSlides.setDeck(egwSlides.deck, index)
       presentItem(next)
       return
     }
@@ -52,22 +60,13 @@ export function LiveOutputPanel({ className }: { className?: string }) {
     const panel = panelRef.current
     if (!panel) return
 
-    const panelOwnsFullscreen = isPanelFullscreen(panel, document.fullscreenElement)
-
     try {
-      if (!panelOwnsFullscreen) {
-        flushSync(() => setIsFullscreenLayout(true))
-      }
-
       await togglePanelFullscreen(
         panel,
         document.fullscreenElement,
         () => document.exitFullscreen(),
       )
     } catch (error) {
-      if (!panelOwnsFullscreen) {
-        setIsFullscreenLayout(false)
-      }
       toast.error("Fullscreen failed", {
         description: String(error),
       })
@@ -98,8 +97,12 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         className,
       )}
     >
-      {!isFullscreenLayout && (
-        <PanelHeader title="Live output" icon={<RadioIcon className="size-3" />} step={3}>
+      <PanelHeader
+        title="Live output"
+        icon={<RadioIcon className="size-3" />}
+        step={3}
+        className={cn(isFullscreenLayout && "hidden")}
+      >
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -124,7 +127,6 @@ export function LiveOutputPanel({ className }: { className?: string }) {
             </Badge>
           </div>
         </PanelHeader>
-      )}
 
       <div className={cn("flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2", isFullscreenLayout && "hidden")}>
         <div className="flex flex-wrap items-center gap-2">
@@ -184,9 +186,9 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
       <div
         className={cn(
-          "flex min-h-0 flex-1 bg-slate-950/50 p-2 transition-opacity",
+          "flex min-h-0 flex-1 bg-slate-950/50 p-2",
           isFullscreenLayout && "bg-black p-0",
-          !isLive && "opacity-45",
+          !isFullscreenLayout && !isLive && "opacity-45 transition-opacity",
         )}
       >
         <div

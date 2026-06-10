@@ -16,6 +16,9 @@ describe("EGW presentation render data", () => {
         text: "God is love.",
       },
       reference: "Patriarchs and Prophets 1:3",
+      slideId: "egw-1-0",
+      slideIndex: 0,
+      slideCount: 1,
       segments: [{ text: "God is love." }],
     }
     const render = getPresentationRenderData(item)

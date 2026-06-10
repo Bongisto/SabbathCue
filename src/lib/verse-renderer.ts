@@ -183,7 +183,7 @@ function textForPresentation(
   }
 
   if (kind === "egw") {
-    return data.segments.map((segment) => segment.text.trim()).filter(Boolean).join("\n\n")
+    return data.segments.map((segment) => segment.text.trim()).filter(Boolean).join("\n")
   }
 
   if ((kind === "scripture" || !kind) && data.segments.length > 1) {

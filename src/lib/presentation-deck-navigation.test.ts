@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest"
 import {
   canNavigateDeck,
   clampDeckIndex,
+  egwDeckSlides,
   findDeckIndex,
   hymnDeckSlides,
   presentationDeckKind,
   presentationDeckSlideId,
   sermonDeckSlides,
 } from "./presentation-deck-navigation"
-import type { HymnPresentationItemData, SlideDeckPresentationItemData } from "@/types"
+import type {
+  EgwPresentationItemData,
+  HymnPresentationItemData,
+  SlideDeckPresentationItemData,
+} from "@/types"
 
 function hymnSlide(index: number): HymnPresentationItemData {
   return {
@@ -21,6 +26,26 @@ function hymnSlide(index: number): HymnPresentationItemData {
     slideCount: 3,
     reference: `Slide ${index + 1}`,
     segments: [{ text: "line" }],
+  }
+}
+
+function egwSlide(index: number, count = 2): EgwPresentationItemData {
+  return {
+    kind: "egw",
+    paragraph: {
+      id: 1,
+      book_number: 1,
+      book_title: "Test Book",
+      chapter: 1,
+      chapter_title: "Chapter",
+      paragraph: 1,
+      text: "Sample text.",
+    },
+    reference: `Test Book 1:1 (${index + 1}/${count})`,
+    slideId: `egw-1-${index}`,
+    slideIndex: index,
+    slideCount: count,
+    segments: [{ text: "Sample text." }],
   }
 }
 
@@ -39,13 +64,17 @@ function sermonSlide(index: number): SlideDeckPresentationItemData {
 }
 
 describe("presentation deck navigation", () => {
-  it("maps hymn and sermon decks to a shared slide shape", () => {
+  it("maps hymn, sermon, and EGW decks to a shared slide shape", () => {
     expect(hymnDeckSlides([hymnSlide(0), hymnSlide(1)])).toEqual([
       expect.objectContaining({ slideId: "screen-0", slideIndex: 0 }),
       expect.objectContaining({ slideId: "screen-1", slideIndex: 1 }),
     ])
     expect(sermonDeckSlides([sermonSlide(0)])).toEqual([
       expect.objectContaining({ slideId: "slide-0", slideIndex: 0 }),
+    ])
+    expect(egwDeckSlides([egwSlide(0), egwSlide(1)])).toEqual([
+      expect.objectContaining({ slideId: "egw-1-0", slideIndex: 0 }),
+      expect.objectContaining({ slideId: "egw-1-1", slideIndex: 1 }),
     ])
   })
 
@@ -64,6 +93,14 @@ describe("presentation deck navigation", () => {
       segments: [],
       hymnSlide: { screenId: "screen-1", slideIndex: 1, slideCount: 3 },
     })).toBe("screen-1")
+    expect(
+      presentationDeckKind({
+        kind: "egw",
+        reference: "Test 1:1 (1/2)",
+        segments: [],
+        hymnSlide: { screenId: "egw-1-0", slideIndex: 0, slideCount: 2 },
+      }),
+    ).toBe("egw")
   })
 
   it("clamps next and previous indices", () => {

@@ -83,7 +83,7 @@ pub struct NdiFrameRequest {
 #[tauri::command]
 pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> {
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
-    Ok(monitors
+    let mut result: Vec<MonitorInfo> = monitors
         .iter()
         .map(|m| {
             let size = m.size();
@@ -98,7 +98,20 @@ pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> 
                 y: pos.y,
             }
         })
-        .collect())
+        .collect();
+
+    if result.is_empty() {
+        result.push(MonitorInfo {
+            key: build_monitor_key("Primary Display", 1920, 1080, 0, 0),
+            name: "Primary Display".to_string(),
+            width: 1920,
+            height: 1080,
+            x: 0,
+            y: 0,
+        });
+    }
+
+    Ok(result)
 }
 
 /// Ensure the broadcast window for a given output exists (creates hidden if not).

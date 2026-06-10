@@ -1,7 +1,11 @@
-import type { HymnPresentationItemData, SlideDeckPresentationItemData } from "@/types"
+import type {
+  EgwPresentationItemData,
+  HymnPresentationItemData,
+  SlideDeckPresentationItemData,
+} from "@/types"
 import type { PresentationRenderData } from "@/types"
 
-export type PresentationDeckKind = "hymn" | "slideDeck"
+export type PresentationDeckKind = "hymn" | "slideDeck" | "egw"
 
 export interface PresentationDeckSlide {
   slideId: string
@@ -32,10 +36,23 @@ export function sermonDeckSlides(
   }))
 }
 
+export function egwDeckSlides(
+  deck: EgwPresentationItemData[],
+): PresentationDeckSlide[] {
+  return deck.map((slide) => ({
+    slideId: slide.slideId,
+    slideIndex: slide.slideIndex,
+    slideCount: slide.slideCount,
+    reference: slide.reference,
+  }))
+}
+
 export function presentationDeckKind(
   item: PresentationRenderData | null,
 ): PresentationDeckKind | null {
-  if (item?.kind === "hymn" || item?.kind === "slideDeck") return item.kind
+  if (item?.kind === "hymn" || item?.kind === "slideDeck" || item?.kind === "egw") {
+    return item.kind
+  }
   return null
 }
 

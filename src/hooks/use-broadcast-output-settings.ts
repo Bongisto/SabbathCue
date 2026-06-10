@@ -123,6 +123,15 @@ export async function runToggleBroadcastPreview(
       await deps.invoke("close_broadcast_window", { outputId })
       deps.onPreviewOpenChange(await reconcileBroadcastPreviewState(outputId))
     } else {
+      if (monitors.length === 0) {
+        deps.onError(
+          outputId === "alt"
+            ? "Alternate display output unavailable"
+            : "Main display output unavailable",
+          "No monitors were detected. Refresh monitors, then try again.",
+        )
+        return
+      }
       await deps.invoke("open_broadcast_window", {
         ...buildOpenBroadcastWindowArgs(
           outputId,
@@ -390,17 +399,24 @@ export function useBroadcastOutputSettings(
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      if (displayMonitorKey) {
-        setSelectedMonitor(displayMonitorKey)
-        return
-      }
-      const fallbackMonitor = monitors[displayMonitorIndex]
+      if (monitors.length === 0) return
+
+      const hasSelectedMonitor = monitors.some(
+        (monitor) => monitor.key === selectedMonitor,
+      )
+      if (hasSelectedMonitor) return
+
+      const keyedMonitor = displayMonitorKey
+        ? monitors.find((monitor) => monitor.key === displayMonitorKey)
+        : undefined
+      const fallbackMonitor =
+        keyedMonitor ?? monitors[displayMonitorIndex] ?? monitors[0]
       if (fallbackMonitor) {
         setSelectedMonitor(fallbackMonitor.key)
       }
     }, 0)
     return () => clearTimeout(timeoutId)
-  }, [displayMonitorKey, displayMonitorIndex, monitors])
+  }, [displayMonitorKey, displayMonitorIndex, monitors, selectedMonitor])
 
   useEffect(() => {
     if (!open) return
@@ -615,6 +631,22 @@ export function useBroadcastOutputSettings(
       setEnabledPending(true)
       const pending = (async () => {
         if (nextEnabled) {
+          if (outputType === "display" && monitors.length === 0) {
+            showBroadcastError(
+              outputId === "alt"
+                ? "Alternate display output unavailable"
+                : "Main display output unavailable",
+              "No monitors were detected. Refresh monitors, then try again.",
+            )
+            return
+          }
+          if (outputType === "ndi" && !ndiSdkInstalled && !ndiActive) {
+            showBroadcastError(
+              "NDI SDK is missing",
+              "Run bun run download:ndi-sdk, then refresh SDK status.",
+            )
+            return
+          }
           if (outputType === "display") {
             await handleTogglePreview()
           } else {
@@ -638,7 +670,17 @@ export function useBroadcastOutputSettings(
         setEnabledPending(false)
       }
     },
-    [buildCommandState, buildCommandDeps, handleToggleNdi, handleTogglePreview, outputType],
+    [
+      buildCommandState,
+      buildCommandDeps,
+      handleToggleNdi,
+      handleTogglePreview,
+      monitors.length,
+      ndiActive,
+      ndiSdkInstalled,
+      outputId,
+      outputType,
+    ],
   )
 
   return useMemo(

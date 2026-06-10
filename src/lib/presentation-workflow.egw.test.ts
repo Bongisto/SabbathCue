@@ -26,6 +26,8 @@ describe("EGW presentation helpers", () => {
     expect(item.kind).toBe("egw")
     expect(item.reference).toBe("Patriarchs and Prophets 2:5")
     expect(item.segments).toEqual([{ text: "God is love." }])
+    expect(item.slideIndex).toBe(0)
+    expect(item.slideCount).toBe(1)
     expect(item.paragraph).toBe(para)
   })
 
@@ -39,9 +41,10 @@ describe("EGW presentation helpers", () => {
       ].join(" "),
     })
 
-    expect(item.segments.length).toBeGreaterThan(1)
-    expect(item.segments.every((segment) => segment.text.length > 0)).toBe(true)
-    expect(item.segments.every((segment) => segment.text.length <= 150)).toBe(true)
+    expect(item.slideCount).toBeGreaterThan(1)
+    expect(item.segments).toHaveLength(1)
+    expect(item.segments[0]?.text.length).toBeGreaterThan(0)
+    expect(item.segments[0]?.text.length).toBeLessThanOrEqual(150)
   })
 
   it("splits a single oversized EGW sentence into readable segments", () => {
@@ -50,8 +53,9 @@ describe("EGW presentation helpers", () => {
       text: "This unusually long sentence keeps moving through several related clauses, with a first complete thought, with a second clarifying thought, and with a final practical application that would otherwise be too dense for one projected slide.",
     })
 
-    expect(item.segments.length).toBeGreaterThan(1)
-    expect(item.segments.every((segment) => segment.text.length <= 150)).toBe(true)
+    expect(item.slideCount).toBeGreaterThan(1)
+    expect(item.segments).toHaveLength(1)
+    expect(item.segments[0]?.text.length).toBeLessThanOrEqual(150)
   })
 
   it("builds a manual queue item wrapping the presentation", () => {

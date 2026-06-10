@@ -32,6 +32,10 @@ import {
   DEFAULT_NDI_ALT_SOURCE_NAME,
   DEFAULT_NDI_SOURCE_NAME,
 } from "@/lib/app-brand"
+import {
+  broadcastOutputBlockedReason,
+  canEnableBroadcastOutput,
+} from "@/lib/broadcast-output-readiness"
 
 function NdiSdkStatus({
   installed,
@@ -95,6 +99,13 @@ export function BroadcastOutputCard({
 }: BroadcastOutputCardProps) {
   const defaultNdiSourceName =
     model.outputId === "alt" ? DEFAULT_NDI_ALT_SOURCE_NAME : DEFAULT_NDI_SOURCE_NAME
+  const canEnable = canEnableBroadcastOutput(model, monitors, ndiSdkInstalled)
+  const blockedReason = broadcastOutputBlockedReason(
+    model,
+    monitors,
+    ndiSdkInstalled,
+  )
+  const settingsLocked = model.enabled
 
   return (
     <div className="glass-panel relative space-y-4 p-4">
@@ -114,15 +125,26 @@ export function BroadcastOutputCard({
           </span>
           <Switch
             checked={model.enabled}
-            disabled={model.enabledPending}
+            disabled={model.enabledPending || (!model.enabled && !canEnable)}
+            title={blockedReason ?? undefined}
             onCheckedChange={model.handleToggleEnabled}
           />
         </div>
       </div>
 
+      {blockedReason && !model.enabled ? (
+        <p className="rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+          {blockedReason}
+        </p>
+      ) : null}
+
       <div className="space-y-1.5">
         <label className="text-xs text-muted-foreground">Theme</label>
-        <Select value={model.themeId} onValueChange={model.handleThemeChange}>
+        <Select
+          value={model.themeId}
+          onValueChange={model.handleThemeChange}
+          disabled={settingsLocked}
+        >
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -140,9 +162,12 @@ export function BroadcastOutputCard({
         <label className="text-xs text-muted-foreground">Output Type</label>
         <div className="grid grid-cols-2 gap-1.5">
           <button
+            type="button"
+            disabled={settingsLocked}
             onClick={() => model.setOutputType("display")}
             className={cn(
               "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
+              settingsLocked && "cursor-not-allowed opacity-50",
               model.outputType === "display"
                 ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
                 : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground",
@@ -152,9 +177,12 @@ export function BroadcastOutputCard({
             External Display
           </button>
           <button
+            type="button"
+            disabled={settingsLocked}
             onClick={() => model.setOutputType("ndi")}
             className={cn(
               "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
+              settingsLocked && "cursor-not-allowed opacity-50",
               model.outputType === "ndi"
                 ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
                 : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground",
@@ -187,7 +215,7 @@ export function BroadcastOutputCard({
             <Select
               value={model.selectedMonitor}
               onValueChange={model.handleMonitorChange}
-              disabled={monitors.length === 0}
+              disabled={settingsLocked || monitors.length === 0}
             >
               <SelectTrigger className="w-full" disabled={monitors.length === 0}>
                 <SelectValue
@@ -213,6 +241,7 @@ export function BroadcastOutputCard({
             </label>
             <Switch
               checked={model.projectorFullscreen}
+              disabled={settingsLocked}
               onCheckedChange={model.handleProjectorFullscreenChange}
             />
           </div>

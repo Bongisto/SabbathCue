@@ -17,6 +17,7 @@ import {
   getScriptureVerse,
 } from "@/types"
 import { splitTextForReadableSlides } from "@/lib/text-slide-chunking"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 
 function activeTranslationLabel(): string {
   const bible = useBibleStore.getState()
@@ -175,13 +176,32 @@ function splitEgwTextForSlides(text: string): { text: string }[] {
   }).map((chunk) => ({ text: chunk }))
 }
 
-export function createEgwPresentationItem(p: EgwParagraph): EgwPresentationItemData {
-  return {
-    kind: "egw",
+export function createEgwDeckItems(p: EgwParagraph): EgwPresentationItemData[] {
+  const segments = splitEgwTextForSlides(p.text)
+  const baseReference = egwReference(p)
+
+  return segments.map((segment, index) => ({
+    kind: "egw" as const,
     paragraph: p,
-    reference: egwReference(p),
-    segments: splitEgwTextForSlides(p.text),
-  }
+    reference:
+      segments.length > 1
+        ? `${baseReference} (${index + 1}/${segments.length})`
+        : baseReference,
+    segments: [segment],
+    slideId: `egw-${p.id}-${index}`,
+    slideIndex: index,
+    slideCount: segments.length,
+  }))
+}
+
+export function createEgwPresentationItem(p: EgwParagraph): EgwPresentationItemData {
+  return createEgwDeckItems(p)[0]!
+}
+
+function loadEgwDeck(p: EgwParagraph, activeIndex = 0) {
+  const deck = createEgwDeckItems(p)
+  useEgwSlideStore.getState().setDeck(deck, activeIndex)
+  return deck
 }
 
 export function createEgwQueueItem(p: EgwParagraph): QueueItem {
@@ -195,9 +215,13 @@ export function createEgwQueueItem(p: EgwParagraph): QueueItem {
 }
 
 export function previewEgwParagraph(p: EgwParagraph) {
-  selectPreviewItem(createEgwPresentationItem(p))
+  const deck = loadEgwDeck(p, 0)
+  const first = deck[0]
+  if (first) selectPreviewItem(first)
 }
 
 export function presentEgwParagraph(p: EgwParagraph) {
-  presentItem(createEgwPresentationItem(p))
+  const deck = loadEgwDeck(p, 0)
+  const first = deck[0]
+  if (first) presentItem(first)
 }

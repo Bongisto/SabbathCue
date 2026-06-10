@@ -32,10 +32,6 @@ export function BroadcastSettings({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const mainDisplayMonitorIndex = useBroadcastStore((s) => s.mainDisplayMonitorIndex)
-  const altDisplayMonitorIndex = useBroadcastStore((s) => s.altDisplayMonitorIndex)
-  const mainDisplayMonitorKey = useBroadcastStore((s) => s.mainDisplayMonitorKey)
-  const altDisplayMonitorKey = useBroadcastStore((s) => s.altDisplayMonitorKey)
   const { status: assetStatus, loading: assetsLoading, refresh: refreshAssets } = useAssets()
   const ndiSdkInstalled = Boolean(assetStatus?.ndi_sdk)
 
@@ -63,17 +59,17 @@ export function BroadcastSettings({
       const result = normalizeMonitorList(await invokeTauri<MonitorInfo[]>("list_monitors"))
       setMonitors(result)
 
+      const store = useBroadcastStore.getState()
       const mainIndex = resolveMonitorIndexFromKey(
         result,
-        mainDisplayMonitorKey,
-        clampMonitorIndex(mainDisplayMonitorIndex, result.length),
+        store.mainDisplayMonitorKey,
+        clampMonitorIndex(store.mainDisplayMonitorIndex, result.length),
       )
       const altIndex = resolveMonitorIndexFromKey(
         result,
-        altDisplayMonitorKey,
-        clampMonitorIndex(altDisplayMonitorIndex, result.length),
+        store.altDisplayMonitorKey,
+        clampMonitorIndex(store.altDisplayMonitorIndex, result.length),
       )
-      const store = useBroadcastStore.getState()
       store.setMainDisplayMonitorIndex(mainIndex)
       store.setAltDisplayMonitorIndex(altIndex)
       const mainMonitor = result[mainIndex]
@@ -86,12 +82,7 @@ export function BroadcastSettings({
     } finally {
       setRefreshing(false)
     }
-  }, [
-    mainDisplayMonitorIndex,
-    altDisplayMonitorIndex,
-    mainDisplayMonitorKey,
-    altDisplayMonitorKey,
-  ])
+  }, [])
 
   useEffect(() => {
     if (!open) return

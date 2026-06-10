@@ -31,6 +31,9 @@ export interface EgwPresentationItemData {
   paragraph: EgwParagraph
   reference: string
   segments: PresentationSegment[]
+  slideId: string
+  slideIndex: number
+  slideCount: number
 }
 
 export interface HymnPresentationItemData {
@@ -151,6 +154,11 @@ export function getPresentationRenderData(item: PresentationItem): PresentationR
       kind: "egw",
       reference: item.reference,
       segments: item.segments,
+      hymnSlide: {
+        screenId: item.slideId,
+        slideIndex: item.slideIndex,
+        slideCount: item.slideCount,
+      },
     }
   }
 

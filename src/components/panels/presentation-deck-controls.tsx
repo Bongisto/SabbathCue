@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import {
   canNavigateDeck,
   clampDeckIndex,
+  egwDeckSlides,
   findDeckIndex,
   hymnDeckSlides,
   presentationDeckKind,
@@ -10,6 +11,7 @@ import {
   sermonDeckSlides,
   type PresentationDeckKind,
 } from "@/lib/presentation-deck-navigation"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import type { PresentationRenderData } from "@/types"
@@ -28,12 +30,23 @@ export function PresentationDeckControls({
   const hymnActiveIndex = useHymnSlideStore((s) => s.activeIndex)
   const sermonDeck = useSermonSlideStore((s) => s.deck)
   const sermonActiveIndex = useSermonSlideStore((s) => s.activeIndex)
+  const egwDeck = useEgwSlideStore((s) => s.deck)
+  const egwActiveIndex = useEgwSlideStore((s) => s.activeIndex)
   const kind = presentationDeckKind(item)
   if (!kind) return null
 
   const deckSlides =
-    kind === "hymn" ? hymnDeckSlides(hymnDeck) : sermonDeckSlides(sermonDeck)
-  const fallbackIndex = kind === "hymn" ? hymnActiveIndex : sermonActiveIndex
+    kind === "hymn"
+      ? hymnDeckSlides(hymnDeck)
+      : kind === "egw"
+        ? egwDeckSlides(egwDeck)
+        : sermonDeckSlides(sermonDeck)
+  const fallbackIndex =
+    kind === "hymn"
+      ? hymnActiveIndex
+      : kind === "egw"
+        ? egwActiveIndex
+        : sermonActiveIndex
   const currentIndex = findDeckIndex(
     deckSlides,
     presentationDeckSlideId(item),
@@ -55,7 +68,13 @@ export function PresentationDeckControls({
         variant="outline"
         disabled={!canNavigate || !canNavigateDeck(deckSlides.length, currentIndex, -1)}
         onClick={() => navigate(-1)}
-        title={kind === "hymn" ? "Previous hymn slide" : "Previous sermon slide"}
+        title={
+          kind === "hymn"
+            ? "Previous hymn slide"
+            : kind === "egw"
+              ? "Previous EGW slide"
+              : "Previous sermon slide"
+        }
       >
         <ChevronLeftIcon className="size-3" />
       </Button>
@@ -71,7 +90,13 @@ export function PresentationDeckControls({
         variant="outline"
         disabled={!canNavigate || !canNavigateDeck(deckSlides.length, currentIndex, 1)}
         onClick={() => navigate(1)}
-        title={kind === "hymn" ? "Next hymn slide" : "Next sermon slide"}
+        title={
+          kind === "hymn"
+            ? "Next hymn slide"
+            : kind === "egw"
+              ? "Next EGW slide"
+              : "Next sermon slide"
+        }
       >
         <ChevronRightIcon className="size-3" />
       </Button>
