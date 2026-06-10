@@ -4,11 +4,12 @@
 //! builds can bundle the worker as a self-contained executable; development
 //! builds can still run the Python script directly.
 
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::Receiver;
@@ -24,6 +25,33 @@ use crate::types::{TranscriptEvent, Word};
 /// per pass, which helps short Bible references land more consistently.
 const DEFAULT_CHUNK_SAMPLES: usize = 800;
 const CHECK_READY_TIMEOUT: Duration = Duration::from_secs(20);
+const PREFLIGHT_CACHE_TTL: Duration = Duration::from_secs(600);
+
+static PREFLIGHT_CACHE: OnceLock<Mutex<HashMap<(PathBuf, PathBuf), Instant>>> = OnceLock::new();
+
+fn preflight_cache() -> &'static Mutex<HashMap<(PathBuf, PathBuf), Instant>> {
+    PREFLIGHT_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn preflight_cache_hit(model_path: &Path, worker_path: &Path) -> bool {
+    let Ok(cache) = preflight_cache().lock() else {
+        return false;
+    };
+    let Some(validated_at) = cache.get(&(model_path.to_path_buf(), worker_path.to_path_buf())) else {
+        return false;
+    };
+    validated_at.elapsed() < PREFLIGHT_CACHE_TTL
+}
+
+fn record_preflight_success(model_path: &Path, worker_path: &Path) {
+    let Ok(mut cache) = preflight_cache().lock() else {
+        return;
+    };
+    cache.insert(
+        (model_path.to_path_buf(), worker_path.to_path_buf()),
+        Instant::now(),
+    );
+}
 
 #[derive(Debug)]
 pub struct VoskProvider {
@@ -81,6 +109,15 @@ impl VoskProvider {
                 "Vosk worker not found: {}",
                 self.worker_path.display()
             )));
+        }
+
+        if preflight_cache_hit(&self.model_path, &self.worker_path) {
+            log::info!(
+                "Vosk preflight skipped; worker and model validated recently (model={}, worker={})",
+                self.model_path.display(),
+                self.worker_path.display()
+            );
+            return Ok(());
         }
 
         let grammar_json = vosk_grammar_json()?;
@@ -172,6 +209,7 @@ impl VoskProvider {
                 "Vosk worker readiness check passed in {}ms",
                 started_at.elapsed().as_millis()
             );
+            record_preflight_success(&self.model_path, &self.worker_path);
             Ok(())
         } else {
             Err(SttError::ConnectionFailed(

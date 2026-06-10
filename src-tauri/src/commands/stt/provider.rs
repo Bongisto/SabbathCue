@@ -33,7 +33,12 @@ pub(crate) fn build_stt_provider(
                 worker_path.display()
             );
 
-            Ok(Box::new(VoskProvider::new(model_path, worker_path)))
+            let provider = VoskProvider::new(model_path, worker_path);
+            provider
+                .check_ready()
+                .map_err(|e| format!("Vosk startup check failed: {e}"))?;
+
+            Ok(Box::new(provider))
         }
         #[cfg(feature = "whisper")]
         "legacy-whisper" => {
