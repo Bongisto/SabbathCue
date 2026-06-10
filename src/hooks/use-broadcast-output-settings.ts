@@ -58,10 +58,23 @@ function mapNdiFrameRate(fps: number): NdiFrameRate | null {
 
 export async function reconcileBroadcastPreviewState(
   outputId: BroadcastOutputId,
+  options?: { retries?: number; delayMs?: number },
 ): Promise<boolean> {
   const label = getBroadcastWindowLabel(outputId)
-  const windows = await getAllWindows()
-  return windows.some((w) => w.label === label)
+  const retries = options?.retries ?? 8
+  const delayMs = options?.delayMs ?? 125
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const windows = await getAllWindows()
+    if (windows.some((w) => w.label === label)) {
+      return true
+    }
+    if (attempt < retries) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+
+  return false
 }
 
 async function getBroadcastNdiStatus(
@@ -132,6 +145,7 @@ export async function runToggleBroadcastPreview(
         )
         return
       }
+      await deps.invoke("ensure_broadcast_window", { outputId })
       await deps.invoke("open_broadcast_window", {
         ...buildOpenBroadcastWindowArgs(
           outputId,

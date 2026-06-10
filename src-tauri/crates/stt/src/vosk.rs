@@ -4,12 +4,12 @@
 //! builds can bundle the worker as a self-contained executable; development
 //! builds can still run the Python script directly.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::Receiver;
 use serde::Deserialize;
@@ -23,6 +23,7 @@ use crate::types::{TranscriptEvent, Word};
 /// 50ms at 16 kHz. A small latency tradeoff gives Vosk more acoustic context
 /// per pass, which helps short Bible references land more consistently.
 const DEFAULT_CHUNK_SAMPLES: usize = 800;
+const CHECK_READY_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Debug)]
 pub struct VoskProvider {
@@ -87,36 +88,95 @@ impl VoskProvider {
         let mut command = worker_command(&self.worker_path);
         push_worker_args(&mut command, &self.model_path);
         push_grammar_file_args(&mut command, grammar_file.path());
-        let output = command
-            .stdin(Stdio::null())
-            .output()
+        command.stdin(Stdio::null());
+        let started_at = Instant::now();
+        log::info!(
+            "Checking Vosk worker readiness: model={}, worker={}",
+            self.model_path.display(),
+            self.worker_path.display()
+        );
+        let mut child = command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| SttError::ConnectionFailed(format!("failed to start Vosk worker: {e}")))?;
 
-        for line in String::from_utf8_lossy(&output.stdout).lines() {
-            let Ok(event) = serde_json::from_str::<WorkerEvent>(line) else {
-                continue;
-            };
-            match event {
-                WorkerEvent::Ready => return Ok(()),
-                WorkerEvent::Error { message } => {
+        let stdout = child.stdout.take().ok_or_else(|| {
+            terminate_vosk_child(&mut child);
+            SttError::ConnectionFailed("failed to open Vosk preflight stdout".to_string())
+        })?;
+        let (event_tx, event_rx) = std::sync::mpsc::channel::<WorkerEvent>();
+        let reader = std::thread::Builder::new()
+            .name("vosk-preflight-reader".into())
+            .spawn(move || {
+                for line in BufReader::new(stdout).lines() {
+                    let Ok(line) = line else { break };
+                    if let Ok(event) = serde_json::from_str::<WorkerEvent>(&line) {
+                        let _ = event_tx.send(event);
+                    }
+                }
+            })
+            .map_err(|e| {
+                terminate_vosk_child(&mut child);
+                SttError::ConnectionFailed(format!("failed to spawn Vosk preflight reader: {e}"))
+            })?;
+
+        let mut ready = false;
+        let deadline = started_at + CHECK_READY_TIMEOUT;
+        loop {
+            match event_rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(WorkerEvent::Ready) => {
+                    ready = true;
+                    break;
+                }
+                Ok(WorkerEvent::Error { message }) => {
+                    terminate_vosk_child(&mut child);
+                    let _ = reader.join();
                     return Err(SttError::ConnectionFailed(message));
                 }
-                WorkerEvent::Partial { .. } | WorkerEvent::Final { .. } => {}
+                Ok(WorkerEvent::Partial { .. } | WorkerEvent::Final { .. }) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+
+            if let Ok(Some(status)) = child.try_wait() {
+                let stderr = child
+                    .stderr
+                    .take()
+                    .map_or_else(String::new, |stderr| {
+                        let mut bytes = Vec::new();
+                        let _ = BufReader::new(stderr).read_to_end(&mut bytes);
+                        first_nonempty_lines(&bytes, 6)
+                    });
+                let _ = reader.join();
+                return Err(SttError::ConnectionFailed(format!(
+                    "Vosk worker preflight exited before ready with status {status}.{}",
+                    stderr_suffix(&stderr)
+                )));
+            }
+
+            if Instant::now() >= deadline {
+                terminate_vosk_child(&mut child);
+                let _ = reader.join();
+                return Err(SttError::ConnectionFailed(format!(
+                    "Vosk worker did not report ready within {} seconds",
+                    CHECK_READY_TIMEOUT.as_secs()
+                )));
             }
         }
 
-        let stderr = first_nonempty_lines(&output.stderr, 6);
-        if output.status.success() {
-            Err(SttError::ConnectionFailed(format!(
-                "Vosk worker exited without reporting ready.{}",
-                stderr_suffix(&stderr)
-            )))
+        terminate_vosk_child(&mut child);
+        let _ = reader.join();
+        if ready {
+            log::info!(
+                "Vosk worker readiness check passed in {}ms",
+                started_at.elapsed().as_millis()
+            );
+            Ok(())
         } else {
-            Err(SttError::ConnectionFailed(format!(
-                "Vosk worker preflight failed with status {}.{}",
-                output.status,
-                stderr_suffix(&stderr)
-            )))
+            Err(SttError::ConnectionFailed(
+                "Vosk worker exited without reporting ready".to_string(),
+            ))
         }
     }
 
@@ -342,7 +402,7 @@ fn spawn_vosk_stderr_logger(stderr: ChildStderr) -> Result<std::thread::JoinHand
             for line in BufReader::new(stderr).lines() {
                 match line {
                     Ok(line) if !line.trim().is_empty() => {
-                        log::debug!("[VOSK] {line}");
+                        log::info!("[VOSK] {line}");
                     }
                     Ok(_) => {}
                     Err(error) => {

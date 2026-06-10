@@ -1,4 +1,11 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react"
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type KeyboardEvent,
+} from "react"
 import {
   Select,
   SelectContent,
@@ -43,6 +50,8 @@ export function EgwBrowser() {
   const [view, setView] = useState<EgwView>("browse")
   const [searchInput, setSearchInput] = useState("")
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const selectedParagraphRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     egwActions
@@ -94,9 +103,87 @@ export function EgwBrowser() {
     previewEgwParagraph(p)
   }, [])
 
+  const goToChapter = useCallback(
+    (chapter: number) => {
+      if (chapter < 1 || (chapterCount > 0 && chapter > chapterCount)) return
+      useEgwStore.getState().setSelectedChapter(chapter)
+    },
+    [chapterCount],
+  )
+
+  const moveParagraphSelection = useCallback(
+    (direction: -1 | 1) => {
+      const paragraphs = view === "browse" ? currentParagraphs : searchResults
+      if (paragraphs.length === 0) return
+
+      const currentIndex = paragraphs.findIndex((p) => p.id === selectedParagraphId)
+      const nextIndex =
+        currentIndex === -1
+          ? direction > 0
+            ? 0
+            : paragraphs.length - 1
+          : Math.min(Math.max(currentIndex + direction, 0), paragraphs.length - 1)
+      const next = paragraphs[nextIndex]
+      if (next) handleParagraphClick(next)
+    },
+    [currentParagraphs, handleParagraphClick, searchResults, selectedParagraphId, view],
+  )
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement | null
+      if (
+        target?.closest("input, textarea, select, button, [role='combobox'], [contenteditable='true']")
+      ) {
+        return
+      }
+
+      const isChapterKey =
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight" ||
+        event.key === "PageUp" ||
+        event.key === "PageDown"
+
+      if (isChapterKey && view === "browse") {
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.key === "ArrowLeft" || event.key === "PageUp") {
+          goToChapter(selectedChapter - 1)
+        } else {
+          goToChapter(selectedChapter + 1)
+        }
+        return
+      }
+
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault()
+        event.stopPropagation()
+        moveParagraphSelection(event.key === "ArrowUp" ? -1 : 1)
+      }
+    },
+    [goToChapter, moveParagraphSelection, selectedChapter, view],
+  )
+
+  useEffect(() => {
+    if (view !== "browse") return
+    panelRef.current?.focus({ preventScroll: true })
+  }, [view, selectedBookNumber, selectedChapter])
+
+  const focusPanel = useCallback(() => {
+    panelRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  useEffect(() => {
+    selectedParagraphRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    })
+  }, [selectedParagraphId])
+
   const renderRow = (p: EgwParagraph, showRef: boolean) => (
     <div
       key={p.id}
+      ref={p.id === selectedParagraphId ? selectedParagraphRef : undefined}
       onClick={() => handleParagraphClick(p)}
       className={cn(
         "group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors",
@@ -144,7 +231,12 @@ export function EgwBrowser() {
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      ref={panelRef}
+      className="flex min-h-0 flex-1 flex-col outline-none"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       <div className="flex shrink-0 flex-col gap-2 border-b border-white/5 p-2">
         <div className="flex items-center gap-1">
           <Button
@@ -187,11 +279,7 @@ export function EgwBrowser() {
                 variant="ghost"
                 size="icon-xs"
                 disabled={selectedChapter <= 1}
-                onClick={() =>
-                  useEgwStore
-                    .getState()
-                    .setSelectedChapter(Math.max(1, selectedChapter - 1))
-                }
+                onClick={() => goToChapter(selectedChapter - 1)}
               >
                 <ArrowLeftIcon className="size-3" />
               </Button>
@@ -202,9 +290,7 @@ export function EgwBrowser() {
                 variant="ghost"
                 size="icon-xs"
                 disabled={chapterCount === 0 || selectedChapter >= chapterCount}
-                onClick={() =>
-                  useEgwStore.getState().setSelectedChapter(selectedChapter + 1)
-                }
+                onClick={() => goToChapter(selectedChapter + 1)}
               >
                 <ArrowRightIcon className="size-3" />
               </Button>
@@ -220,7 +306,7 @@ export function EgwBrowser() {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto" onMouseDown={focusPanel}>
         {view === "browse" ? (
           books.length === 0 ? (
             <div className="flex h-full items-center justify-center">

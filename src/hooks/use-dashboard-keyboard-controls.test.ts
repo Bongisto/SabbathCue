@@ -3,9 +3,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { handleDashboardKeyboardEvent } from "./use-dashboard-keyboard-controls"
 import { useBroadcastStore } from "@/stores/broadcast-store"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
-import type { HymnPresentationItemData } from "@/types"
+import type { EgwPresentationItemData, HymnPresentationItemData } from "@/types"
 import type { SlideDeckPresentationItemData } from "@/types"
 import { useApiKeyPromptStore } from "@/lib/api-key-prompt"
 import { useTranscriptStore } from "@/stores/transcript-store"
@@ -33,6 +34,26 @@ function makeSlide(index: number): HymnPresentationItemData {
     slideCount: 3,
     reference: `Joyful - Slide ${index + 1} of 3`,
     segments: [{ text: `Line ${index + 1}` }],
+  }
+}
+
+function makeEgwSlide(index: number): EgwPresentationItemData {
+  return {
+    kind: "egw",
+    paragraph: {
+      id: 1,
+      book_number: 1,
+      book_title: "Test Book",
+      chapter: 1,
+      chapter_title: "Chapter",
+      paragraph: 1,
+      text: "Sample paragraph text.",
+    },
+    reference: `Test Book 1:1 (${index + 1}/2)`,
+    slideId: `egw-1-${index}`,
+    slideIndex: index,
+    slideCount: 2,
+    segments: [{ text: "Sample paragraph text." }],
   }
 }
 
@@ -72,6 +93,7 @@ describe("handleDashboardKeyboardEvent", () => {
       0,
       "item-1",
     )
+    useEgwSlideStore.getState().setDeck([makeEgwSlide(0), makeEgwSlide(1)], 0)
     useBroadcastStore.setState({
       isLive: false,
       previewItem: null,
@@ -120,6 +142,25 @@ describe("handleDashboardKeyboardEvent", () => {
     expect(useBroadcastStore.getState().previewItem?.reference).toBe(
       "Series - Slide 2 of 3",
     )
+  })
+
+  it("advances a staged EGW slide preview with arrow keys", () => {
+    const deck = useEgwSlideStore.getState().deck
+    useBroadcastStore.getState().setPreviewItem({
+      kind: "egw",
+      reference: deck[0].reference,
+      segments: deck[0].segments,
+      hymnSlide: {
+        screenId: deck[0].slideId,
+        slideIndex: deck[0].slideIndex,
+        slideCount: deck[0].slideCount,
+      },
+    })
+
+    handleDashboardKeyboardEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }))
+
+    expect(useEgwSlideStore.getState().activeIndex).toBe(1)
+    expect(useBroadcastStore.getState().previewItem?.hymnSlide?.screenId).toBe("egw-1-1")
   })
 
   it("advances a live sermon slide with arrow keys", () => {

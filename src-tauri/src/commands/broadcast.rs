@@ -4,6 +4,7 @@
 )]
 
 use std::sync::Mutex;
+use std::time::Instant;
 
 use base64::Engine;
 use rhema_broadcast::ndi::{NdiRuntime, NdiSessionInfo, NdiStartRequest};
@@ -96,6 +97,7 @@ pub struct NdiFrameRequest {
 
 #[tauri::command]
 pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> {
+    let started_at = Instant::now();
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
     let mut result: Vec<MonitorInfo> = monitors
         .iter()
@@ -115,6 +117,9 @@ pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> 
         .collect();
 
     if result.is_empty() {
+        log::warn!(
+            "[BROADCAST] available_monitors returned no displays; falling back to synthetic primary display"
+        );
         result.push(MonitorInfo {
             key: build_monitor_key("Primary Display", 1920, 1080, 0, 0),
             name: "Primary Display".to_string(),
@@ -124,6 +129,20 @@ pub fn list_monitors(app: tauri::AppHandle) -> Result<Vec<MonitorInfo>, String> 
             y: 0,
         });
     }
+
+    log::info!(
+        "[BROADCAST] list_monitors count={} elapsed_ms={} monitors={}",
+        result.len(),
+        started_at.elapsed().as_millis(),
+        result
+            .iter()
+            .map(|monitor| format!(
+                "{} {}x{} @ {},{} key={}",
+                monitor.name, monitor.width, monitor.height, monitor.x, monitor.y, monitor.key
+            ))
+            .collect::<Vec<_>>()
+            .join("; ")
+    );
 
     Ok(result)
 }
@@ -158,6 +177,7 @@ pub fn open_broadcast_window(
     monitor_key: Option<String>,
     fullscreen: Option<bool>,
 ) -> Result<(), String> {
+    let started_at = Instant::now();
     let label = window_label(&output_id);
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
     let monitor_keys = monitors
@@ -182,6 +202,20 @@ pub fn open_broadcast_window(
     let pos = monitor.position();
     let size = monitor.size();
     let fullscreen_enabled = fullscreen.unwrap_or(false);
+    log::info!(
+        "[BROADCAST] open_window output={} requested_index={} requested_key={:?} resolved_index={} target={} {}x{} @ {},{} fullscreen={} monitor_count={}",
+        output_id,
+        monitor_index,
+        monitor_key,
+        resolved_monitor_index,
+        monitor.name().cloned().unwrap_or_else(|| "Unknown".to_string()),
+        size.width,
+        size.height,
+        pos.x,
+        pos.y,
+        fullscreen_enabled,
+        monitors.len()
+    );
 
     // If window already exists (e.g. hidden for NDI), reuse it
     if let Some(window) = app.get_webview_window(label) {
@@ -189,7 +223,14 @@ pub fn open_broadcast_window(
             .set_title(projector_window_title(&output_id))
             .map_err(|e| e.to_string())?;
         window.set_skip_taskbar(false).map_err(|e| e.to_string())?;
-        return apply_projector_geometry(&window, *pos, *size, fullscreen_enabled);
+        apply_projector_geometry(&window, *pos, *size, fullscreen_enabled)?;
+        log::info!(
+            "[BROADCAST] reused_window output={} label={} elapsed_ms={}",
+            output_id,
+            label,
+            started_at.elapsed().as_millis()
+        );
+        return Ok(());
     }
 
     let window =
@@ -206,7 +247,14 @@ pub fn open_broadcast_window(
             .build()
             .map_err(|e| e.to_string())?;
 
-    apply_projector_geometry(&window, *pos, *size, fullscreen_enabled)
+    apply_projector_geometry(&window, *pos, *size, fullscreen_enabled)?;
+    log::info!(
+        "[BROADCAST] created_window output={} label={} elapsed_ms={}",
+        output_id,
+        label,
+        started_at.elapsed().as_millis()
+    );
+    Ok(())
 }
 
 #[tauri::command]
@@ -215,6 +263,7 @@ pub fn close_broadcast_window(
     output_id: String,
     runtime: State<'_, Mutex<NdiRuntime>>,
 ) -> Result<(), String> {
+    let started_at = Instant::now();
     let label = window_label(&output_id);
     if let Some(window) = app.get_webview_window(label) {
         let ndi_active = runtime
@@ -223,9 +272,28 @@ pub fn close_broadcast_window(
             .is_active(&output_id);
         if ndi_active {
             window.hide().map_err(|e| e.to_string())?;
+            log::info!(
+                "[BROADCAST] hid_window output={} label={} ndi_active=true elapsed_ms={}",
+                output_id,
+                label,
+                started_at.elapsed().as_millis()
+            );
         } else {
             window.close().map_err(|e| e.to_string())?;
+            log::info!(
+                "[BROADCAST] closed_window output={} label={} elapsed_ms={}",
+                output_id,
+                label,
+                started_at.elapsed().as_millis()
+            );
         }
+    } else {
+        log::info!(
+            "[BROADCAST] close_window_noop output={} label={} elapsed_ms={}",
+            output_id,
+            label,
+            started_at.elapsed().as_millis()
+        );
     }
     Ok(())
 }

@@ -87,7 +87,19 @@ export function BroadcastSettings({
   useEffect(() => {
     if (!open) return
 
+    const warmOutputs = async () => {
+      try {
+        await Promise.all([
+          invokeTauri("ensure_broadcast_window", { outputId: "main" }),
+          invokeTauri("ensure_broadcast_window", { outputId: "alt" }),
+        ])
+      } catch (error) {
+        console.warn("[broadcast-settings] prewarm broadcast windows failed", error)
+      }
+    }
+
     const timeoutId = setTimeout(() => {
+      void warmOutputs()
       void fetchMonitors()
     }, 0)
 

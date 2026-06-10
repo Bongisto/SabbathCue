@@ -9,12 +9,14 @@ import { useQueueStore } from "@/stores/queue-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import {
   clampDeckIndex,
+  egwDeckSlides,
   findDeckIndex,
   hymnDeckSlides,
   presentationDeckKind,
   presentationDeckSlideId,
   sermonDeckSlides,
 } from "@/lib/presentation-deck-navigation"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
@@ -117,6 +119,24 @@ function advancePresentationDeck(delta: number): boolean {
     const next = hymnSlides.deck[nextIndex]
     if (!next || nextIndex === currentIndex) return true
     hymnSlides.setDeck(hymnSlides.deck, nextIndex)
+    if (isLive) presentItem(next)
+    else selectPreviewItem(next)
+    return true
+  }
+
+  if (deckKind === "egw") {
+    const egwSlides = useEgwSlideStore.getState()
+    if (egwSlides.deck.length === 0) return false
+    const deck = egwDeckSlides(egwSlides.deck)
+    const currentIndex = findDeckIndex(
+      deck,
+      presentationDeckSlideId(targetItem),
+      egwSlides.activeIndex,
+    )
+    const nextIndex = clampDeckIndex(deck.length, currentIndex, delta)
+    const next = egwSlides.deck[nextIndex]
+    if (!next || nextIndex === currentIndex) return true
+    egwSlides.setDeck(egwSlides.deck, nextIndex)
     if (isLive) presentItem(next)
     else selectPreviewItem(next)
     return true
