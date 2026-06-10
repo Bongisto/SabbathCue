@@ -294,10 +294,25 @@ fn suppress_console_window(command: &mut Command) {
 #[cfg(not(windows))]
 fn suppress_console_window(_command: &mut Command) {}
 
+/// The Vosk C library appends `/conf/model.conf` etc. with forward slashes.
+/// Under the Windows extended-length prefix (`\\?\`) path normalization is
+/// disabled, so such joins fail and model loading reports "Failed to create
+/// a model". Strip the prefix before handing the path to the worker.
+fn simplify_model_path(model_path: &Path) -> PathBuf {
+    let text = model_path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest.to_string());
+    }
+    model_path.to_path_buf()
+}
+
 fn push_worker_args(command: &mut Command, model_path: &Path) {
     command
         .arg("--model")
-        .arg(model_path)
+        .arg(simplify_model_path(model_path))
         .arg("--sample-rate")
         .arg("16000");
 }
@@ -833,6 +848,40 @@ mod tests {
         assert!(
             args.iter().any(|arg| arg.ends_with("vosk_worker.py")),
             "python invocation must pass the script path"
+        );
+    }
+
+    #[test]
+    fn worker_args_strip_windows_extended_length_prefix() {
+        // Regression: passing `\\?\C:\...` to the worker made the Vosk C
+        // library fail with "Failed to create a model" because its internal
+        // forward-slash path joins are not normalized under the prefix.
+        let mut command = Command::new("worker");
+        push_worker_args(&mut command, Path::new(r"\\?\C:\models\vosk\model"));
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(
+            args.windows(2)
+                .any(|w| w[0] == "--model" && w[1] == r"C:\models\vosk\model"),
+            "model arg must not carry the \\\\?\\ prefix, got: {args:?}"
+        );
+    }
+
+    #[test]
+    fn simplify_model_path_handles_unc_and_plain_paths() {
+        assert_eq!(
+            simplify_model_path(Path::new(r"\\?\UNC\server\share\model")),
+            PathBuf::from(r"\\server\share\model")
+        );
+        assert_eq!(
+            simplify_model_path(Path::new(r"C:\models\vosk")),
+            PathBuf::from(r"C:\models\vosk")
+        );
+        assert_eq!(
+            simplify_model_path(Path::new("/opt/models/vosk")),
+            PathBuf::from("/opt/models/vosk")
         );
     }
 

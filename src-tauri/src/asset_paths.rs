@@ -16,6 +16,24 @@ fn dev_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
+/// Strip the Windows extended-length prefix (`\\?\`) from a path.
+///
+/// Tauri's `resource_dir()` returns canonicalized paths carrying this prefix.
+/// With the prefix, Windows disables path normalization, so consumers that
+/// join path segments with forward slashes (the Vosk/Kaldi C library does:
+/// `<model>/conf/model.conf`) fail to open files — the worker reports
+/// "Failed to create a model" even though the model directory exists.
+pub fn simplify_windows_path(path: PathBuf) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{rest}"));
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        return PathBuf::from(rest.to_string());
+    }
+    path
+}
+
 fn first_existing(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
     paths.into_iter().find(|p| p.exists())
 }
@@ -88,36 +106,42 @@ pub fn vosk_model_path(app: &AppHandle) -> PathBuf {
         }
     }
 
-    candidates
-        .into_iter()
-        .find_map(resolve_vosk_model_dir)
-        .unwrap_or_else(|| {
-            app_data_dir(app)
-                .unwrap_or_else(|_| dev_root())
-                .join("models")
-                .join("vosk")
-                .join(VOSK_MODEL_DIRNAME)
-        })
+    // The Vosk C library joins this path with forward slashes, which Windows
+    // rejects under the `\\?\` prefix — always hand it a simplified path.
+    simplify_windows_path(
+        candidates
+            .into_iter()
+            .find_map(resolve_vosk_model_dir)
+            .unwrap_or_else(|| {
+                app_data_dir(app)
+                    .unwrap_or_else(|_| dev_root())
+                    .join("models")
+                    .join("vosk")
+                    .join(VOSK_MODEL_DIRNAME)
+            }),
+    )
 }
 
 pub fn vosk_worker_path(app: &AppHandle) -> PathBuf {
-    first_existing(
-        [
-            app.path()
-                .resource_dir()
-                .ok()
-                .map(|p| p.join("scripts").join("vosk_worker.exe")),
-            app.path()
-                .resource_dir()
-                .ok()
-                .map(|p| p.join("scripts").join("vosk_worker.py")),
-            Some(dev_root().join("sidecars").join("vosk_worker.exe")),
-            Some(dev_root().join("scripts").join("vosk_worker.py")),
-        ]
-        .into_iter()
-        .flatten(),
+    simplify_windows_path(
+        first_existing(
+            [
+                app.path()
+                    .resource_dir()
+                    .ok()
+                    .map(|p| p.join("scripts").join("vosk_worker.exe")),
+                app.path()
+                    .resource_dir()
+                    .ok()
+                    .map(|p| p.join("scripts").join("vosk_worker.py")),
+                Some(dev_root().join("sidecars").join("vosk_worker.exe")),
+                Some(dev_root().join("scripts").join("vosk_worker.py")),
+            ]
+            .into_iter()
+            .flatten(),
+        )
+        .unwrap_or_else(|| dev_root().join("scripts").join("vosk_worker.py")),
     )
-    .unwrap_or_else(|| dev_root().join("scripts").join("vosk_worker.py"))
 }
 
 pub fn onnx_model_path(app: &AppHandle) -> PathBuf {
@@ -312,6 +336,26 @@ mod tests {
         std::fs::create_dir_all(temp.path().join("random")).expect("random dir");
 
         assert_eq!(resolve_vosk_model_dir(temp.path().to_path_buf()), None);
+    }
+
+    #[test]
+    fn simplify_windows_path_strips_extended_length_prefix() {
+        // Regression: Tauri's resource_dir() returns `\\?\C:\...` paths; the
+        // Vosk worker cannot load a model from them (forward-slash joins are
+        // not normalized under the prefix), failing with
+        // "Failed to create a model".
+        assert_eq!(
+            simplify_windows_path(PathBuf::from(r"\\?\C:\app\models\vosk")),
+            PathBuf::from(r"C:\app\models\vosk")
+        );
+        assert_eq!(
+            simplify_windows_path(PathBuf::from(r"\\?\UNC\server\share\models")),
+            PathBuf::from(r"\\server\share\models")
+        );
+        assert_eq!(
+            simplify_windows_path(PathBuf::from(r"C:\app\models\vosk")),
+            PathBuf::from(r"C:\app\models\vosk")
+        );
     }
 
     #[test]
