@@ -12,10 +12,14 @@ import {
 } from "@/lib/presentation-workflow"
 import { useBibleStore } from "@/stores/bible-store"
 import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { PresentationDeckControls } from "@/components/panels/presentation-deck-controls"
-import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
+import {
+  presentationDeckKind,
+  type PresentationDeckKind,
+} from "@/lib/presentation-deck-navigation"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -51,12 +55,20 @@ export function PreviewPanel({ className }: { className?: string }) {
     useBibleStore.getState().selectVerse(null)
   }
 
-  const navigatePreviewDeck = (kind: "hymn" | "slideDeck", index: number) => {
+  const navigatePreviewDeck = (kind: PresentationDeckKind, index: number) => {
     if (kind === "hymn") {
       const hymnSlides = useHymnSlideStore.getState()
       const next = hymnSlides.deck[index]
       if (!next) return
       hymnSlides.setDeck(hymnSlides.deck, index)
+      selectPreviewItem(next)
+      return
+    }
+    if (kind === "egw") {
+      const egwSlides = useEgwSlideStore.getState()
+      const next = egwSlides.deck[index]
+      if (!next) return
+      egwSlides.setDeck(egwSlides.deck, index)
       selectPreviewItem(next)
       return
     }
