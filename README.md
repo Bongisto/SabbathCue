@@ -179,6 +179,23 @@ DEEPGRAM_API_KEY=your_key_here
 
 Get your API key at [deepgram.com](https://deepgram.com/)
 
+#### Account verification (Supabase)
+
+SabbathCue gates the desktop app behind Supabase email/password auth. Each account may register up to **two devices**. Launch requires an active network connection — offline grace entry is not supported.
+
+Add these variables to your local `.env` file (values from your Supabase project dashboard → Settings → API):
+
+```text
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key_here
+```
+
+Apply the SQL migration in `supabase/migrations/` to your Supabase project before testing sign-in. The `register_device` RPC enforces the two-device limit server-side.
+
+**Email confirmation:** If enabled under Authentication → Providers → Email in the Supabase dashboard, sign-up creates the user but returns no session until the confirmation link is clicked. The app shows a “check your email” message in that case.
+
+**E2E / automation bypass:** URLs that include the `e2e` query parameter (for example `/?e2e=1`) skip the verification gate so Playwright specs can reach the dashboard without Supabase credentials.
+
 ### NDI SDK (optional)
 
 For broadcast output via NDI:

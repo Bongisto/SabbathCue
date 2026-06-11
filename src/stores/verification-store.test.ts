@@ -1,36 +1,52 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const mockGet = vi.fn()
-const mockSet = vi.fn()
-const mockDelete = vi.fn()
-const mockSave = vi.fn()
-const mockInvoke = vi.fn()
+const mockLoadCachedVerification = vi.fn()
+const mockSignIn = vi.fn()
+const mockSignUp = vi.fn()
+const mockSignOut = vi.fn()
+const mockRefreshVerification = vi.fn()
+const mockClearVerification = vi.fn()
+const mockHeartbeatDeviceRegistration = vi.fn()
 
-vi.mock("@tauri-apps/plugin-store", () => ({
-  load: vi.fn(async () => ({
-    get: mockGet,
-    set: mockSet,
-    delete: mockDelete,
-    save: mockSave,
-  })),
-}))
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: mockInvoke,
+vi.mock("@/lib/verification/verification-provider", () => ({
+  loadCachedVerification: (...args: unknown[]) => mockLoadCachedVerification(...args),
+  signIn: (...args: unknown[]) => mockSignIn(...args),
+  signUp: (...args: unknown[]) => mockSignUp(...args),
+  signOut: (...args: unknown[]) => mockSignOut(...args),
+  refreshVerification: (...args: unknown[]) => mockRefreshVerification(...args),
+  clearVerification: (...args: unknown[]) => mockClearVerification(...args),
+  heartbeatDeviceRegistration: (...args: unknown[]) => mockHeartbeatDeviceRegistration(...args),
 }))
 
 describe("verification-store", () => {
   beforeEach(() => {
     vi.resetModules()
-    mockGet.mockReset()
-    mockSet.mockReset()
-    mockDelete.mockReset()
-    mockSave.mockReset()
-    mockInvoke.mockReset()
+    vi.useFakeTimers()
+    mockLoadCachedVerification.mockReset()
+    mockSignIn.mockReset()
+    mockSignUp.mockReset()
+    mockSignOut.mockReset()
+    mockRefreshVerification.mockReset()
+    mockClearVerification.mockReset()
+    mockHeartbeatDeviceRegistration.mockReset()
   })
 
-  it("fails closed when no keychain token exists", async () => {
-    mockInvoke.mockResolvedValue(false)
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("hydrate fails closed when no session can be restored", async () => {
+    mockLoadCachedVerification.mockResolvedValue({
+      status: "required",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      error: null,
+      errorCode: null,
+    })
+
     const { hydrateVerification, useVerificationStore, isAppVerified } = await import(
       "./verification-store"
     )
@@ -41,37 +57,110 @@ describe("verification-store", () => {
     expect(isAppVerified()).toBe(false)
   })
 
-  it("verifies a local mock device and stores only metadata in app store", async () => {
-    mockInvoke.mockResolvedValueOnce("token")
+  it("signIn applies a verified snapshot and starts a single heartbeat interval", async () => {
+    mockSignIn.mockResolvedValue({
+      status: "verified",
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() + 60_000,
+      lastVerifiedAt: Date.now(),
+      offlineGraceExpiresAt: 0,
+      error: null,
+      errorCode: null,
+    })
+
     const { useVerificationStore, isAppVerified } = await import("./verification-store")
 
-    await useVerificationStore.getState().verifyDevice()
+    await useVerificationStore.getState().signIn("user@example.com", "secret")
 
-    expect(mockInvoke).toHaveBeenCalledWith("rotate_verification_token", undefined)
-    expect(mockSet).toHaveBeenCalledWith("metadata", expect.objectContaining({
-      verifiedUserId: "creator-local",
-    }))
+    expect(mockSignIn).toHaveBeenCalledWith("user@example.com", "secret")
     expect(useVerificationStore.getState().status).toBe("verified")
     expect(isAppVerified()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000)
+    expect(mockHeartbeatDeviceRegistration).toHaveBeenCalledTimes(1)
+
+    mockSignOut.mockResolvedValue({
+      status: "required",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      error: null,
+      errorCode: null,
+    })
+    await useVerificationStore.getState().signOut()
+    mockHeartbeatDeviceRegistration.mockClear()
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000)
+    expect(mockHeartbeatDeviceRegistration).not.toHaveBeenCalled()
   })
 
-  it("treats expired cached token within grace as verified enough for app entry", async () => {
-    const now = Date.now()
-    mockInvoke.mockResolvedValue(true)
-    mockGet.mockResolvedValue({
-      verifiedUserId: "user",
-      verifiedDeviceId: "device",
-      accessTokenExpiresAt: now - 1000,
-      lastVerifiedAt: now - 5000,
-      offlineGraceExpiresAt: now + 1000,
+  it("signIn surfaces provider errors", async () => {
+    mockSignIn.mockResolvedValue({
+      status: "error",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      error: "Invalid login credentials",
+      errorCode: "invalid_credentials",
     })
-    const { hydrateVerification, useVerificationStore, isAppVerified } = await import(
-      "./verification-store"
-    )
+
+    const { useVerificationStore, isAppVerified } = await import("./verification-store")
+
+    await useVerificationStore.getState().signIn("user@example.com", "wrong")
+
+    expect(useVerificationStore.getState().status).toBe("error")
+    expect(useVerificationStore.getState().errorCode).toBe("invalid_credentials")
+    expect(isAppVerified()).toBe(false)
+  })
+
+  it("signOut clears verified state", async () => {
+    mockSignOut.mockResolvedValue({
+      status: "required",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      error: null,
+      errorCode: null,
+    })
+
+    const { useVerificationStore, isAppVerified } = await import("./verification-store")
+
+    useVerificationStore.setState({
+      status: "verified",
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      isHydrated: true,
+    })
+
+    await useVerificationStore.getState().signOut()
+
+    expect(mockSignOut).toHaveBeenCalled()
+    expect(useVerificationStore.getState().status).toBe("required")
+    expect(isAppVerified()).toBe(false)
+  })
+
+  it("isAppVerified rejects grace status", async () => {
+    mockLoadCachedVerification.mockResolvedValue({
+      status: "grace",
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() - 1000,
+      lastVerifiedAt: Date.now() - 5000,
+      offlineGraceExpiresAt: Date.now() + 1000,
+      error: null,
+      errorCode: null,
+    })
+
+    const { hydrateVerification, isAppVerified } = await import("./verification-store")
 
     await hydrateVerification()
 
-    expect(useVerificationStore.getState().status).toBe("grace")
-    expect(isAppVerified()).toBe(true)
+    expect(isAppVerified()).toBe(false)
   })
 })

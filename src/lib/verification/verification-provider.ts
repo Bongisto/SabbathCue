@@ -1,40 +1,54 @@
-import { load, type Store } from "@tauri-apps/plugin-store"
-import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
-import type { VerificationSession, VerificationStateSnapshot } from "@/types/verification"
+import packageJson from "../../../package.json"
+import {
+  restoreSession,
+  signInWithEmail,
+  signOut as supabaseSignOut,
+  signUpWithEmail,
+} from "@/lib/supabase/auth"
+import { registerDevice } from "@/lib/supabase/devices"
+import { getOrCreateDeviceId } from "@/lib/verification/device-id"
+import {
+  clearSessionMetadata,
+  getRefreshToken,
+  setSessionMetadata,
+} from "@/lib/verification/session-storage"
+import { isTauriRuntime } from "@/lib/tauri-runtime"
+import type {
+  VerificationErrorCode,
+  VerificationSession,
+  VerificationStateSnapshot,
+} from "@/types/verification"
 
-const STORE_FILE = "verification.json"
-const METADATA_KEY = "metadata"
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000
-const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000
-
-let storePromise: Promise<Store> | null = null
+const APP_VERSION = packageJson.version
 
 function now(): number {
   return Date.now()
 }
 
-function getStore(): Promise<Store> {
-  storePromise ??= load(STORE_FILE, { autoSave: false, defaults: {} })
-  return storePromise
+function getRuntimeOs(): string {
+  if (typeof navigator === "undefined") return "unknown"
+  const ua = navigator.userAgent.toLowerCase()
+  if (ua.includes("win")) return "windows"
+  if (ua.includes("mac")) return "macos"
+  if (ua.includes("linux")) return "linux"
+  return "unknown"
 }
 
-function createMockSession(): VerificationSession {
-  const timestamp = now()
-  const deviceSeed =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : String(timestamp)
-
-  return {
-    verifiedUserId: "creator-local",
-    verifiedDeviceId: `device-${deviceSeed}`,
-    accessTokenExpiresAt: timestamp + SESSION_DURATION_MS,
-    lastVerifiedAt: timestamp,
-    offlineGraceExpiresAt: timestamp + SESSION_DURATION_MS + OFFLINE_GRACE_MS,
-  }
+function isNetworkMessage(message: string): boolean {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes("network") ||
+    lower.includes("fetch") ||
+    lower.includes("reach") ||
+    lower.includes("connect")
+  )
 }
 
-function emptySnapshot(status: VerificationStateSnapshot["status"]): VerificationStateSnapshot {
+function emptySnapshot(
+  status: VerificationStateSnapshot["status"],
+  error: string | null = null,
+  errorCode: VerificationErrorCode | null = null,
+): VerificationStateSnapshot {
   return {
     status,
     verifiedUserId: null,
@@ -42,90 +56,152 @@ function emptySnapshot(status: VerificationStateSnapshot["status"]): Verificatio
     accessTokenExpiresAt: null,
     lastVerifiedAt: null,
     offlineGraceExpiresAt: null,
-    error: null,
+    error,
+    errorCode,
+    verifiedEmail: null,
+  }
+}
+
+function sessionFromAuth(
+  userId: string,
+  deviceId: string,
+  accessTokenExpiresAt: number,
+  email: string | null,
+): VerificationSession {
+  const timestamp = now()
+  return {
+    verifiedUserId: userId,
+    verifiedDeviceId: deviceId,
+    accessTokenExpiresAt,
+    lastVerifiedAt: timestamp,
+    offlineGraceExpiresAt: 0,
+    verifiedEmail: email,
   }
 }
 
 function snapshotFromSession(session: VerificationSession): VerificationStateSnapshot {
-  const timestamp = now()
-  const status =
-    session.accessTokenExpiresAt > timestamp
-      ? "verified"
-      : session.offlineGraceExpiresAt > timestamp
-        ? "grace"
-        : "expired"
-
   return {
-    status,
+    status: "verified",
     verifiedUserId: session.verifiedUserId,
     verifiedDeviceId: session.verifiedDeviceId,
     accessTokenExpiresAt: session.accessTokenExpiresAt,
     lastVerifiedAt: session.lastVerifiedAt,
     offlineGraceExpiresAt: session.offlineGraceExpiresAt,
     error: null,
+    errorCode: null,
+    verifiedEmail: session.verifiedEmail ?? null,
   }
 }
 
-function isSession(value: unknown): value is VerificationSession {
-  if (!value || typeof value !== "object") return false
-  const candidate = value as Record<string, unknown>
-  return (
-    typeof candidate.verifiedUserId === "string" &&
-    typeof candidate.verifiedDeviceId === "string" &&
-    typeof candidate.accessTokenExpiresAt === "number" &&
-    typeof candidate.lastVerifiedAt === "number" &&
-    typeof candidate.offlineGraceExpiresAt === "number"
-  )
-}
+async function completeVerification(
+  userId: string,
+  accessTokenExpiresAt: number,
+  email: string | null,
+): Promise<VerificationStateSnapshot> {
+  const deviceId = await getOrCreateDeviceId()
+  const registration = await registerDevice(deviceId, getRuntimeOs(), APP_VERSION)
 
-async function hasKeychainToken(): Promise<boolean> {
-  if (!isTauriRuntime()) return false
-  return invokeTauri<boolean>("has_verification_token").catch(() => false)
-}
+  if (!registration.ok) {
+    if (registration.code === "device_limit_reached") {
+      return emptySnapshot(
+        "error",
+        "This account is already registered on the maximum number of devices (2). Remove a device or contact support.",
+        "device_limit_reached",
+      )
+    }
 
-async function saveMetadata(session: VerificationSession): Promise<void> {
-  if (!isTauriRuntime()) return
-  const store = await getStore()
-  await store.set(METADATA_KEY, session)
-  await store.save()
+    if (registration.code === "suspended") {
+      return emptySnapshot(
+        "error",
+        "This account has been suspended. Contact support for assistance.",
+        "suspended",
+      )
+    }
+
+    const message = registration.message ?? "Device registration failed."
+    return emptySnapshot(
+      "error",
+      message,
+      isNetworkMessage(message) ? "network" : "unknown",
+    )
+  }
+
+  const session = sessionFromAuth(userId, deviceId, accessTokenExpiresAt, email)
+  await setSessionMetadata(session)
+  return snapshotFromSession(session)
 }
 
 export async function loadCachedVerification(): Promise<VerificationStateSnapshot> {
   if (!isTauriRuntime()) return emptySnapshot("required")
 
-  const [store, hasToken] = await Promise.all([getStore(), hasKeychainToken()])
-  if (!hasToken) return emptySnapshot("required")
+  const refreshToken = await getRefreshToken()
+  if (!refreshToken) return emptySnapshot("required")
 
-  const metadata = await store.get<VerificationSession>(METADATA_KEY)
-  if (!isSession(metadata)) return emptySnapshot("required")
-  return snapshotFromSession(metadata)
-}
-
-export async function verifyDevice(): Promise<VerificationStateSnapshot> {
-  const session = createMockSession()
-
-  if (isTauriRuntime()) {
-    await invokeTauri<string>("rotate_verification_token")
-    await saveMetadata(session)
+  const restored = await restoreSession()
+  if (!restored.ok) {
+    if (restored.code === "expired") {
+      return emptySnapshot("expired", restored.message)
+    }
+    if (restored.code === "network") {
+      return emptySnapshot("error", restored.message, "network")
+    }
+    return emptySnapshot("error", restored.message, "unknown")
   }
 
-  return snapshotFromSession(session)
+  return completeVerification(restored.userId, restored.accessTokenExpiresAt, restored.email)
+}
+
+export async function signIn(email: string, password: string): Promise<VerificationStateSnapshot> {
+  const result = await signInWithEmail(email, password)
+  if (!result.ok) {
+    return emptySnapshot("error", result.message, result.code)
+  }
+
+  return completeVerification(result.userId, result.accessTokenExpiresAt, result.email)
+}
+
+export async function signUp(email: string, password: string): Promise<VerificationStateSnapshot> {
+  const result = await signUpWithEmail(email, password)
+  if (!result.ok) {
+    return emptySnapshot("error", result.message, result.code)
+  }
+
+  if (result.needsEmailConfirmation) {
+    return emptySnapshot(
+      "error",
+      "Account created. Check your email to confirm your address, then sign in.",
+      "unknown",
+    )
+  }
+
+  const restored = await restoreSession()
+  if (!restored.ok) {
+    if (restored.code === "network") {
+      return emptySnapshot("error", restored.message, "network")
+    }
+    return emptySnapshot("error", restored.message, "unknown")
+  }
+
+  return completeVerification(restored.userId, restored.accessTokenExpiresAt, restored.email)
+}
+
+export async function signOut(): Promise<VerificationStateSnapshot> {
+  await supabaseSignOut()
+  await clearSessionMetadata()
+  return emptySnapshot("required")
 }
 
 export async function refreshVerification(): Promise<VerificationStateSnapshot> {
-  const cached = await loadCachedVerification()
-  if (cached.status === "verified" || cached.status === "grace") return cached
-  return verifyDevice()
+  return loadCachedVerification()
 }
 
 export async function clearVerification(): Promise<VerificationStateSnapshot> {
-  if (isTauriRuntime()) {
-    await invokeTauri("clear_verification_token").catch((error) => {
-      console.warn("[verification] clear verification token failed", error)
-    })
-    const store = await getStore()
-    await store.delete(METADATA_KEY)
-    await store.save()
-  }
-  return emptySnapshot("required")
+  return signOut()
+}
+
+export async function heartbeatDeviceRegistration(): Promise<void> {
+  if (!isTauriRuntime()) return
+
+  const deviceId = await getOrCreateDeviceId()
+  await registerDevice(deviceId, getRuntimeOs(), APP_VERSION)
 }

@@ -3,9 +3,11 @@ import { createRoot } from "react-dom/client"
 
 import "./index.css"
 import App from "./App.tsx"
+import { VerificationGate } from "@/components/verification/VerificationGate"
 import { ErrorBoundary } from "@/components/error-boundary.tsx"
 import { TooltipProvider } from "@/components/ui/tooltip.tsx"
 import { hydrateSettings } from "@/stores/settings-store"
+import { hydrateVerification } from "@/stores/verification-store"
 import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
 import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
 import { hydrateServicePlans } from "@/stores/service-plan-store"
@@ -50,6 +52,7 @@ resetTranscription
       hydrateBibleStore(),
       hydrateBroadcastThemes(),
       hydrateServicePlans(),
+      hydrateVerification(),
     ]).then(() => {
       useAccentThemeStore.getState().hydrate()
     }),
@@ -60,7 +63,9 @@ resetTranscription
       <StrictMode>
         <TooltipProvider>
           <ErrorBoundary>
-            <App />
+            <VerificationGate>
+              <App />
+            </VerificationGate>
           </ErrorBoundary>
         </TooltipProvider>
       </StrictMode>
