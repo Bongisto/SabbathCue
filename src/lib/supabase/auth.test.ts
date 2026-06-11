@@ -103,6 +103,7 @@ describe("supabase auth", () => {
       userId: "user-1",
       email: null,
       refreshToken: "signup-refresh",
+      accessTokenExpiresAt: 1_700_000_000_000,
     })
     expect(mockSetRefreshToken).toHaveBeenCalledWith("signup-refresh")
   })

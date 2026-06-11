@@ -9,12 +9,9 @@ import {
 } from "@/stores/tutorial-store"
 import { TUTORIAL_STEPS } from "./tutorial-steps"
 import { TutorialTooltip } from "./tutorial-tooltip"
-import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { getTutorialArrowColor } from "./tutorial-arrow-color"
 
 export function TutorialOverlay() {
-  if (!isTauriRuntime()) return null
-
   return <DesktopTutorialOverlay />
 }
 
@@ -25,12 +22,13 @@ function DesktopTutorialOverlay() {
   const [arrowColor, setArrowColor] = useState<string | undefined>()
 
   useEffect(() => {
-    requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
       const cardEl = document.querySelector(".glass-panel")
       if (cardEl) {
         setArrowColor(getTutorialArrowColor(getComputedStyle(cardEl)))
       }
     })
+    return () => cancelAnimationFrame(frame)
   }, [])
 
   const steps = useMemo(

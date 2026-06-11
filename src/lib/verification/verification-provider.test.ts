@@ -30,7 +30,8 @@ vi.mock("@/lib/verification/session-storage", () => ({
   getRefreshToken: (...args: unknown[]) => mockGetRefreshToken(...args),
   getSessionMetadata: (...args: unknown[]) => mockGetSessionMetadata(...args),
   setSessionMetadata: (...args: unknown[]) => mockSetSessionMetadata(...args),
-  clearSessionMetadata: (...args: unknown[]) => mockClearSessionMetadata(...args),
+  clearSessionMetadata: (...args: unknown[]) =>
+    mockClearSessionMetadata(...args),
 }))
 
 describe("verification-provider", () => {
@@ -55,7 +56,8 @@ describe("verification-provider", () => {
   it("loadCachedVerification returns required when no keychain token exists", async () => {
     mockGetRefreshToken.mockResolvedValue(null)
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result.status).toBe("required")
@@ -70,7 +72,8 @@ describe("verification-provider", () => {
       message: "Stored session is no longer valid.",
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result.status).toBe("expired")
@@ -85,14 +88,15 @@ describe("verification-provider", () => {
       message: "Unable to reach the authentication service.",
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result).toEqual(
       expect.objectContaining({
         status: "error",
         errorCode: "network",
-      }),
+      })
     )
   })
 
@@ -111,7 +115,8 @@ describe("verification-provider", () => {
       offlineGraceExpiresAt: Date.now() + 60_000,
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result).toEqual(
@@ -119,7 +124,7 @@ describe("verification-provider", () => {
         status: "verified",
         verifiedUserId: "user-1",
         verifiedDeviceId: "device-1",
-      }),
+      })
     )
   })
 
@@ -138,7 +143,8 @@ describe("verification-provider", () => {
       offlineGraceExpiresAt: 0,
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result.status).toBe("verified")
@@ -159,11 +165,12 @@ describe("verification-provider", () => {
       offlineGraceExpiresAt: Date.now() - 60_000,
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result).toEqual(
-      expect.objectContaining({ status: "error", errorCode: "network" }),
+      expect.objectContaining({ status: "error", errorCode: "network" })
     )
   })
 
@@ -188,7 +195,8 @@ describe("verification-provider", () => {
       offlineGraceExpiresAt: Date.now() + 60_000,
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result.status).toBe("verified")
@@ -202,16 +210,20 @@ describe("verification-provider", () => {
       refreshToken: "rotated-token",
       accessTokenExpiresAt: 1_700_000_000_000,
     })
-    mockRegisterDevice.mockResolvedValue({ ok: false, code: "device_limit_reached" })
+    mockRegisterDevice.mockResolvedValue({
+      ok: false,
+      code: "device_limit_reached",
+    })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result).toEqual(
       expect.objectContaining({
         status: "error",
         errorCode: "device_limit_reached",
-      }),
+      })
     )
     expect(mockSetSessionMetadata).not.toHaveBeenCalled()
   })
@@ -225,7 +237,8 @@ describe("verification-provider", () => {
       accessTokenExpiresAt: 1_700_000_000_000,
     })
 
-    const { loadCachedVerification } = await import("@/lib/verification/verification-provider")
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
     expect(result).toEqual(
@@ -235,13 +248,13 @@ describe("verification-provider", () => {
         verifiedDeviceId: "device-1",
         error: null,
         errorCode: null,
-      }),
+      })
     )
     expect(mockSetSessionMetadata).toHaveBeenCalledWith(
       expect.objectContaining({
         verifiedUserId: "user-1",
         verifiedDeviceId: "device-1",
-      }),
+      })
     )
   })
 
@@ -257,35 +270,66 @@ describe("verification-provider", () => {
     const result = await signIn("user@example.com", "secret")
 
     expect(result.status).toBe("verified")
-    expect(mockSignInWithEmail).toHaveBeenCalledWith("user@example.com", "secret")
+    expect(mockSignInWithEmail).toHaveBeenCalledWith(
+      "user@example.com",
+      "secret"
+    )
     expect(mockRegisterDevice).toHaveBeenCalled()
   })
 
-  it("signUp returns error when email confirmation is required", async () => {
-    mockSignUpWithEmail.mockResolvedValue({ ok: true, needsEmailConfirmation: true })
+  it("signUp returns required with a notice when email confirmation is required", async () => {
+    mockSignUpWithEmail.mockResolvedValue({
+      ok: true,
+      needsEmailConfirmation: true,
+    })
 
     const { signUp } = await import("@/lib/verification/verification-provider")
     const result = await signUp("user@example.com", "secret")
 
     expect(result).toEqual(
       expect.objectContaining({
-        status: "error",
+        status: "required",
         error: expect.stringContaining("Check your email"),
-      }),
+        errorCode: null,
+      })
     )
     expect(mockRegisterDevice).not.toHaveBeenCalled()
+  })
+
+  it("signUp verifies the immediate auth session without restoring it", async () => {
+    mockSignUpWithEmail.mockResolvedValue({
+      ok: true,
+      needsEmailConfirmation: false,
+      userId: "user-3",
+      email: "user@example.com",
+      refreshToken: "signup-refresh",
+      accessTokenExpiresAt: 1_700_000_000_000,
+    })
+
+    const { signUp } = await import("@/lib/verification/verification-provider")
+    const result = await signUp("user@example.com", "secret")
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "verified",
+        verifiedUserId: "user-3",
+        verifiedDeviceId: "device-1",
+        verifiedEmail: "user@example.com",
+      })
+    )
+    expect(mockRestoreSession).not.toHaveBeenCalled()
+    expect(mockRegisterDevice).toHaveBeenCalled()
   })
 
   it("heartbeat returns a suspended snapshot and clears metadata when blocked", async () => {
     mockRegisterDevice.mockResolvedValue({ ok: false, code: "suspended" })
 
-    const { heartbeatDeviceRegistration } = await import(
-      "@/lib/verification/verification-provider"
-    )
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
     const result = await heartbeatDeviceRegistration()
 
     expect(result).toEqual(
-      expect.objectContaining({ status: "error", errorCode: "suspended" }),
+      expect.objectContaining({ status: "error", errorCode: "suspended" })
     )
     expect(mockClearSessionMetadata).toHaveBeenCalled()
   })
@@ -297,9 +341,8 @@ describe("verification-provider", () => {
       message: "Unable to reach the device registration service.",
     })
 
-    const { heartbeatDeviceRegistration } = await import(
-      "@/lib/verification/verification-provider"
-    )
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
     const result = await heartbeatDeviceRegistration()
 
     expect(result).toBeNull()

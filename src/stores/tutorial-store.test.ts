@@ -1,9 +1,15 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockGet = vi.fn()
 const mockSet = vi.fn()
 const mockSave = vi.fn()
 const mockLoad = vi.fn()
+const mockIsTauriRuntime = vi.fn(() => true)
+
+vi.mock("@/lib/tauri-runtime", () => ({
+  isTauriRuntime: () => mockIsTauriRuntime(),
+}))
 
 vi.mock("@tauri-apps/plugin-store", () => ({
   load: (...args: unknown[]) => mockLoad(...args),
@@ -11,10 +17,14 @@ vi.mock("@tauri-apps/plugin-store", () => ({
 
 describe("tutorial store", () => {
   beforeEach(async () => {
+    vi.restoreAllMocks()
     mockGet.mockReset()
     mockSet.mockReset()
     mockSave.mockReset()
     mockLoad.mockReset()
+    mockIsTauriRuntime.mockReset()
+    mockIsTauriRuntime.mockReturnValue(true)
+    window.localStorage?.clear()
     mockLoad.mockResolvedValue({
       get: mockGet,
       set: mockSet,
@@ -97,5 +107,30 @@ describe("tutorial store", () => {
       "[tutorial] Failed to persist onboarding state"
     )
     warnSpy.mockRestore()
+  })
+
+  it("hydrates onboarding state from browser storage outside Tauri", async () => {
+    mockIsTauriRuntime.mockReturnValue(false)
+    window.localStorage.setItem("sabbathcue.onboardingComplete", "true")
+
+    const { hydrateOnboardingState } = await import("./tutorial-store")
+    const { useSettingsStore } = await import("./settings-store")
+
+    await hydrateOnboardingState()
+
+    expect(useSettingsStore.getState().onboardingComplete).toBe(true)
+    expect(mockLoad).not.toHaveBeenCalled()
+  })
+
+  it("persists onboarding state to browser storage outside Tauri", async () => {
+    mockIsTauriRuntime.mockReturnValue(false)
+
+    const { persistOnboardingComplete } = await import("./tutorial-store")
+    await persistOnboardingComplete()
+
+    expect(window.localStorage.getItem("sabbathcue.onboardingComplete")).toBe(
+      "true"
+    )
+    expect(mockLoad).not.toHaveBeenCalled()
   })
 })

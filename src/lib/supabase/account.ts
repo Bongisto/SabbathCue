@@ -13,7 +13,10 @@ export interface AdminAccountRow {
 
 export type AccountActionResult = { ok: true } | { ok: false; message: string }
 
-function failureMessage(error: { message?: string } | null, fallback: string): string {
+function failureMessage(
+  error: { message?: string } | null,
+  fallback: string
+): string {
   return error?.message?.trim() ? error.message : fallback
 }
 
@@ -35,7 +38,10 @@ export async function deleteOwnAccount(): Promise<AccountActionResult> {
     const supabase = getSupabaseClient()
     const { error } = await supabase.rpc("delete_own_account")
     if (error) {
-      return { ok: false, message: failureMessage(error, "Account deletion failed.") }
+      return {
+        ok: false,
+        message: failureMessage(error, "Account deletion failed."),
+      }
     }
     return { ok: true }
   } catch {
@@ -50,7 +56,10 @@ export async function adminListAccounts(): Promise<
     const supabase = getSupabaseClient()
     const { data, error } = await supabase.rpc("admin_list_accounts")
     if (error) {
-      return { ok: false, message: failureMessage(error, "Could not load accounts.") }
+      return {
+        ok: false,
+        message: failureMessage(error, "Could not load accounts."),
+      }
     }
     return { ok: true, accounts: (data ?? []) as AdminAccountRow[] }
   } catch {
@@ -61,7 +70,7 @@ export async function adminListAccounts(): Promise<
 export async function adminSetSuspended(
   userId: string,
   suspended: boolean,
-  reason?: string,
+  reason?: string
 ): Promise<AccountActionResult> {
   try {
     const supabase = getSupabaseClient()
@@ -71,7 +80,10 @@ export async function adminSetSuspended(
       p_reason: reason ?? null,
     })
     if (error) {
-      return { ok: false, message: failureMessage(error, "Suspension update failed.") }
+      return {
+        ok: false,
+        message: failureMessage(error, "Suspension update failed."),
+      }
     }
     return { ok: true }
   } catch {
@@ -79,12 +91,19 @@ export async function adminSetSuspended(
   }
 }
 
-export async function adminDeleteAccount(userId: string): Promise<AccountActionResult> {
+export async function adminDeleteAccount(
+  userId: string
+): Promise<AccountActionResult> {
   try {
     const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("admin_delete_account", { p_user_id: userId })
+    const { error } = await supabase.rpc("admin_delete_account", {
+      p_user_id: userId,
+    })
     if (error) {
-      return { ok: false, message: failureMessage(error, "Account deletion failed.") }
+      return {
+        ok: false,
+        message: failureMessage(error, "Account deletion failed."),
+      }
     }
     return { ok: true }
   } catch {

@@ -28,7 +28,8 @@ export function HelpSection() {
 
     if (result.available) {
       toast.info(`Update ${result.update?.version ?? ""} is available.`, {
-        description: "Restart the app from the update prompt when you are ready.",
+        description:
+          "Restart the app from the update prompt when you are ready.",
       })
       return
     }
@@ -87,7 +88,9 @@ export function HelpSection() {
             <div>
               <p className="text-sm font-medium">App version</p>
               <p className="text-xs text-muted-foreground">
-                {state.currentVersion ? `v${state.currentVersion}` : "Loading version…"}
+                {state.currentVersion
+                  ? `v${state.currentVersion}`
+                  : "Loading version..."}
               </p>
             </div>
             <Button

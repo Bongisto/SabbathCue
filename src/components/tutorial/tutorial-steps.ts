@@ -10,8 +10,7 @@ export const TUTORIAL_STEPS: Step[] = [
     ...STEP_DEFAULTS,
     target: "body",
     title: `Welcome to ${APP_DISPLAY_NAME}`,
-    content:
-      `${APP_DISPLAY_NAME} listens to your sermon, detects Bible verses as they are spoken, and presents them on screen for your congregation. This quick tour shows you around — it takes about a minute. You can skip it and restart it later from Settings → Help.`,
+    content: `${APP_DISPLAY_NAME} listens to your sermon, detects Bible verses as they are spoken, and presents them on screen for your congregation. This quick tour shows you around - it takes about a minute. You can skip it and restart it later from Settings > Help.`,
     placement: "center",
   },
   {
@@ -43,8 +42,7 @@ export const TUTORIAL_STEPS: Step[] = [
     ...STEP_DEFAULTS,
     target: '[data-tour="context-search"]',
     title: "Context Search",
-    content:
-      `Search by phrase or topic. ${APP_DISPLAY_NAME} uses AI to find matching verses.`,
+    content: `Search by phrase or topic. ${APP_DISPLAY_NAME} uses AI to find matching verses.`,
     placement: "bottom",
     spotlightPadding: 2,
   },
@@ -53,7 +51,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="quick-nav"]',
     title: "Quick Navigation",
     content:
-      "Type to instantly navigate: 'J' → 'Joshua' or '1 J' → '1 John', press Tab to advance stages, then type chapter and verse.",
+      "Type to instantly navigate: 'J' -> 'Joshua' or '1 J' -> '1 John', press Tab to advance stages, then type chapter and verse.",
     placement: "bottom",
     spotlightPadding: 2,
   },
@@ -110,7 +108,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="settings"]',
     title: "Your Account",
     content:
-      "Settings → Account shows the email you signed in with. From there you can sign out, manage your account, and your sign-in works on up to 2 machines.",
+      "Settings > Account shows the email you signed in with. From there you can sign out, manage your account, and your sign-in works on up to 2 machines.",
     placement: "left",
   },
   {
@@ -118,7 +116,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: "body",
     title: "You're all set",
     content:
-      "A good first run: start transcribing, speak a verse reference out loud, and press Present when it appears. Revisit this tour anytime from Settings → Help → Restart.",
+      "A good first run: start transcribing, speak a verse reference out loud, and press Present when it appears. Revisit this tour anytime from Settings > Help > Restart.",
     placement: "center",
   },
 ]

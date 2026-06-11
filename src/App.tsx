@@ -7,7 +7,10 @@ import { useAnnouncements } from "@/hooks/use-announcements"
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { Toaster, toast } from "sonner"
 import { useVerificationStore } from "@/stores/verification-store"
-import type { BroadcastOutputErrorEvent, BroadcastOutputIssueKind } from "@/types"
+import type {
+  BroadcastOutputErrorEvent,
+  BroadcastOutputIssueKind,
+} from "@/types"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useApiKeyPromptStore } from "@/lib/api-key-prompt"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
@@ -17,13 +20,13 @@ import { useTutorialStore } from "@/stores/tutorial-store"
 const LazyTutorialOverlay = lazy(() =>
   import("@/components/tutorial/tutorial-overlay").then((mod) => ({
     default: mod.TutorialOverlay,
-  })),
+  }))
 )
 
 const LazyApiKeyPrompt = lazy(() =>
   import("@/components/ui/api-key-prompt").then((mod) => ({
     default: mod.ApiKeyPrompt,
-  })),
+  }))
 )
 
 const VALID_OUTPUT_ERROR_KINDS = new Set<BroadcastOutputIssueKind>([
@@ -39,7 +42,7 @@ const VALID_OUTPUT_ERROR_KINDS = new Set<BroadcastOutputIssueKind>([
 ])
 
 function isValidOutputErrorPayload(
-  payload: unknown,
+  payload: unknown
 ): payload is BroadcastOutputErrorEvent {
   if (!payload || typeof payload !== "object") return false
   const event = payload as BroadcastOutputErrorEvent
@@ -57,15 +60,18 @@ function useBroadcastOutputErrorListener() {
 
     let unlisten: (() => void) | undefined
 
-    void listen<BroadcastOutputErrorEvent>("broadcast:output-error", (event) => {
-      if (!isValidOutputErrorPayload(event.payload)) return
-      useBroadcastStore.getState().reportOutputIssue({
-        outputId: event.payload.outputId,
-        kind: event.payload.kind,
-        title: event.payload.title,
-        description: event.payload.description,
-      })
-    })
+    void listen<BroadcastOutputErrorEvent>(
+      "broadcast:output-error",
+      (event) => {
+        if (!isValidOutputErrorPayload(event.payload)) return
+        useBroadcastStore.getState().reportOutputIssue({
+          outputId: event.payload.outputId,
+          kind: event.payload.kind,
+          title: event.payload.title,
+          description: event.payload.description,
+        })
+      }
+    )
       .then((dispose) => {
         unlisten = dispose
       })
@@ -105,27 +111,32 @@ function useAppUpdateLauncher() {
   }, [loadVersion])
 
   useEffect(() => {
-    if (status !== "verified" || autoCheckedRef.current || !isTauriRuntime()) return
+    if (status !== "verified" || autoCheckedRef.current || !isTauriRuntime())
+      return
     autoCheckedRef.current = true
 
     void autoCheckOnce().then((result) => {
       if (!result?.available || !result.update) return
 
-      updateToastIdRef.current = toast(`Update ${result.update.version} available`, {
-        description: "A new version is ready to install.",
-        duration: Infinity,
-        action: {
-          label: "Install & restart",
-          onClick: () => {
-            void install()
+      updateToastIdRef.current = toast(
+        `Update ${result.update.version} available`,
+        {
+          description: "A new version is ready to install.",
+          duration: Infinity,
+          action: {
+            label: "Install & restart",
+            onClick: () => {
+              void install()
+            },
           },
-        },
-      })
+        }
+      )
     })
   }, [status, autoCheckOnce, install])
 
   useEffect(() => {
-    if (state.phase !== "downloading" || updateToastIdRef.current === null) return
+    if (state.phase !== "downloading" || updateToastIdRef.current === null)
+      return
 
     const label =
       state.downloadPercent !== null
@@ -137,7 +148,9 @@ function useAppUpdateLauncher() {
 
   useEffect(() => {
     if (state.phase === "installed" && updateToastIdRef.current !== null) {
-      toast.success("Update installed. Restarting…", { id: updateToastIdRef.current })
+      toast.success("Update installed. Restarting…", {
+        id: updateToastIdRef.current,
+      })
       updateToastIdRef.current = null
     }
   }, [state.phase])
@@ -154,8 +167,7 @@ export function App() {
   const setApiKeyPromptOpen = useApiKeyPromptStore((s) => s.setOpen)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)
   const tutorialRunning = useTutorialStore((s) => s.isRunning)
-  const shouldMountTutorial =
-    isTauriRuntime() && (!onboardingComplete || tutorialRunning)
+  const shouldMountTutorial = !onboardingComplete || tutorialRunning
 
   return (
     <>

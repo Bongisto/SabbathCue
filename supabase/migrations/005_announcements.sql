@@ -167,7 +167,9 @@ BEGIN
     END,
     expires_at = CASE
       WHEN p_status = 'expired' THEN COALESCE(p_expires_at, now())
-      ELSE p_expires_at
+      WHEN p_status IN ('draft', 'published') THEN p_expires_at
+      WHEN p_expires_at IS NOT NULL THEN p_expires_at
+      ELSE expires_at
     END,
     updated_at = now()
   WHERE id = p_id;

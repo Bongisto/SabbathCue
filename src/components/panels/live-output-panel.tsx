@@ -5,7 +5,10 @@ import { CanvasPresentation } from "@/components/ui/canvas-verse"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { Switch } from "@/components/ui/switch"
-import { applyPanelFullscreen, tauriWindowFullscreen } from "@/components/panels/live-output-panel-fullscreen"
+import {
+  applyPanelFullscreen,
+  tauriWindowFullscreen,
+} from "@/components/panels/live-output-panel-fullscreen"
 import { commitPreviewToLive, presentItem } from "@/lib/presentation-workflow"
 import { cn } from "@/lib/utils"
 import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
@@ -14,7 +17,14 @@ import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { PresentationDeckControls } from "@/components/panels/presentation-deck-controls"
 import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
-import { EyeIcon, EyeOffIcon, RadioIcon, SendIcon, Maximize2Icon, Minimize2Icon } from "lucide-react"
+import {
+  EyeIcon,
+  EyeOffIcon,
+  RadioIcon,
+  SendIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 export function LiveOutputPanel({ className }: { className?: string }) {
@@ -29,10 +39,13 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
   const visibleItem = useMemo(
     () => (isLive ? liveItem : null),
-    [isLive, liveItem],
+    [isLive, liveItem]
   )
   const canCommitPreview = Boolean(previewItem)
-  const navigateLiveDeck = (kind: "hymn" | "slideDeck" | "egw", index: number) => {
+  const navigateLiveDeck = (
+    kind: "hymn" | "slideDeck" | "egw",
+    index: number
+  ) => {
     if (kind === "hymn") {
       const hymnSlides = useHymnSlideStore.getState()
       const next = hymnSlides.deck[index]
@@ -64,7 +77,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         (next) => {
           setIsFullscreen(next)
           setIsFullscreenLayout(next)
-        },
+        }
       )
     } catch (error) {
       toast.error("Fullscreen failed", {
@@ -90,7 +103,6 @@ export function LiveOutputPanel({ className }: { className?: string }) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFullscreenLayout])
 
   return (
@@ -102,7 +114,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         "glass-panel relative flex min-h-0 flex-col overflow-hidden",
         isFullscreenLayout &&
           "!fixed !inset-0 !z-[80] !h-screen !w-screen !rounded-none !border-0",
-        className,
+        className
       )}
     >
       <PanelHeader
@@ -111,33 +123,38 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         step={3}
         className={cn(isFullscreenLayout && "hidden")}
       >
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="xs"
-              className="h-6 gap-1 px-2"
-              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              onClick={toggleFullscreen}
-            >
-              {isFullscreen ? (
-                <Minimize2Icon className="size-3.5" />
-              ) : (
-                <Maximize2Icon className="size-3.5" />
-              )}
-            </Button>
-            <Badge
-              variant={isLive ? "default" : "outline"}
-              className={cn(
-                "h-5 text-[0.5625rem] uppercase",
-                isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
-              )}
-            >
-              {isLive ? "On air" : "Hidden"}
-            </Badge>
-          </div>
-        </PanelHeader>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="xs"
+            className="h-6 gap-1 px-2"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? (
+              <Minimize2Icon className="size-3.5" />
+            ) : (
+              <Maximize2Icon className="size-3.5" />
+            )}
+          </Button>
+          <Badge
+            variant={isLive ? "default" : "outline"}
+            className={cn(
+              "h-5 text-[0.5625rem] uppercase",
+              isLive && "bg-emerald-500 text-white hover:bg-emerald-500"
+            )}
+          >
+            {isLive ? "On air" : "Hidden"}
+          </Badge>
+        </div>
+      </PanelHeader>
 
-      <div className={cn("flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2", isFullscreenLayout && "hidden")}>
+      <div
+        className={cn(
+          "flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2",
+          isFullscreenLayout && "hidden"
+        )}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
@@ -180,7 +197,12 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         </label>
       </div>
 
-      <div className={cn("flex min-h-10 items-center justify-between gap-3 border-b border-white/5 px-4 py-2", isFullscreenLayout && "hidden")}>
+      <div
+        className={cn(
+          "flex min-h-10 items-center justify-between gap-3 border-b border-white/5 px-4 py-2",
+          isFullscreenLayout && "hidden"
+        )}
+      >
         <span className="truncate text-xs text-muted-foreground">
           Auto-live reading mode
         </span>
@@ -198,7 +220,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         className={cn(
           "flex min-h-0 flex-1 bg-slate-950/50 p-2",
           isFullscreenLayout && "bg-black p-0",
-          !isFullscreenLayout && !isLive && "opacity-45 transition-opacity",
+          !isFullscreenLayout && !isLive && "opacity-45 transition-opacity"
         )}
       >
         <div
@@ -206,14 +228,16 @@ export function LiveOutputPanel({ className }: { className?: string }) {
           className={cn(
             "flex h-full w-full items-center justify-center rounded-md border border-white/5 p-2 text-center",
             isLive && !isFullscreenLayout && "live-glowing-active",
-            isFullscreenLayout && "rounded-none border-0 p-0",
+            isFullscreenLayout && "rounded-none border-0 p-0"
           )}
         >
           {visibleItem && activeTheme ? (
             <CanvasPresentation
               theme={activeTheme}
               item={visibleItem}
-              className={isFullscreenLayout ? "[&_canvas]:rounded-none" : undefined}
+              className={
+                isFullscreenLayout ? "[&_canvas]:rounded-none" : undefined
+              }
             />
           ) : (
             <PanelEmptyState
@@ -225,7 +249,12 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className={cn("truncate border-t border-white/5 px-4 py-2 text-xs text-muted-foreground", isFullscreenLayout && "hidden")}>
+      <div
+        className={cn(
+          "truncate border-t border-white/5 px-4 py-2 text-xs text-muted-foreground",
+          isFullscreenLayout && "hidden"
+        )}
+      >
         {liveItem
           ? liveItem.reference
           : "Nothing has been sent to the live output yet."}

@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { useAnnouncementsStore } from "@/stores/announcements-store"
 import { useVerificationStore } from "@/stores/verification-store"
-import { isTauriRuntime } from "@/lib/tauri-runtime"
 
 export function useAnnouncements() {
   const status = useVerificationStore((s) => s.status)
@@ -15,7 +14,6 @@ export function useAnnouncements() {
   const surfacedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    if (!isTauriRuntime()) return
     void hydrateSeenIds()
   }, [hydrateSeenIds])
 
@@ -28,7 +26,11 @@ export function useAnnouncements() {
     if (status !== "verified" || !isHydrated) return
 
     for (const announcement of announcements) {
-      if (seenIds.has(announcement.id) || surfacedRef.current.has(announcement.id)) continue
+      if (
+        seenIds.has(announcement.id) ||
+        surfacedRef.current.has(announcement.id)
+      )
+        continue
       surfacedRef.current.add(announcement.id)
 
       toast.info(announcement.title, {

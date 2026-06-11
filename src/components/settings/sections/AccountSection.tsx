@@ -66,7 +66,7 @@ function AdminAccountsPanel() {
       toast.success(
         account.suspended
           ? `Reinstated ${account.email ?? account.user_id}`
-          : `Suspended ${account.email ?? account.user_id}`,
+          : `Suspended ${account.email ?? account.user_id}`
       )
       await refresh()
     } else {
@@ -92,9 +92,14 @@ function AdminAccountsPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShieldIcon className="size-4 text-primary" />
-          <p className="text-sm font-medium">Admin · Accounts</p>
+          <p className="text-sm font-medium">Admin - Accounts</p>
         </div>
-        <Button variant="outline" size="sm" disabled={loading} onClick={() => void refresh()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => void refresh()}
+        >
           <RefreshCwIcon className="mr-1.5 size-3.5" />
           Refresh
         </Button>
@@ -119,19 +124,20 @@ function AdminAccountsPanel() {
                     <p className="truncate text-sm font-medium">
                       {account.email ?? account.user_id}
                       {account.is_admin ? (
-                        <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary">
+                        <span className="ml-2 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] tracking-wide text-primary uppercase">
                           Admin
                         </span>
                       ) : null}
                       {account.suspended ? (
-                        <span className="ml-2 rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-destructive">
+                        <span className="ml-2 rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] tracking-wide text-destructive uppercase">
                           Suspended
                         </span>
                       ) : null}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {account.device_count} device{account.device_count === 1 ? "" : "s"} ·
-                      last seen {formatTimestamp(account.last_seen_at)}
+                      {account.device_count} device
+                      {account.device_count === 1 ? "" : "s"} - last seen{" "}
+                      {formatTimestamp(account.last_seen_at)}
                     </p>
                   </div>
                   {account.is_admin ? null : confirmingDelete ? (
@@ -167,6 +173,8 @@ function AdminAccountsPanel() {
                         variant="ghost"
                         size="sm"
                         disabled={isBusy || isSelf}
+                        title={`Delete ${account.email ?? "account"}`}
+                        aria-label={`Delete ${account.email ?? "account"}`}
                         onClick={() => setPendingDeleteId(account.user_id)}
                       >
                         <Trash2Icon className="size-3.5 text-destructive" />
@@ -187,13 +195,16 @@ export function AccountSection() {
   const verifiedEmail = useVerificationStore((s) => s.verifiedEmail)
   const signOut = useVerificationStore((s) => s.signOut)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingAdmin, setCheckingAdmin] = useState(true)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     void fetchIsAdmin().then((result) => {
-      if (!cancelled) setIsAdmin(result)
+      if (cancelled) return
+      setIsAdmin(result)
+      setCheckingAdmin(false)
     })
     return () => {
       cancelled = true
@@ -221,11 +232,18 @@ export function AccountSection() {
             <UserIcon className="size-4 text-primary" />
           </div>
           <div>
-            <p className="text-sm font-medium">{verifiedEmail ?? "Signed in"}</p>
+            <p className="text-sm font-medium">
+              {verifiedEmail ?? "Signed in"}
+            </p>
             <p className="text-xs text-muted-foreground">SabbathCue account</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" disabled={deleting} onClick={() => void signOut()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={deleting}
+          onClick={() => void signOut()}
+        >
           <LogOutIcon className="mr-1.5 size-3.5" />
           Sign out
         </Button>
@@ -235,10 +253,16 @@ export function AccountSection() {
         <div>
           <p className="text-sm font-medium">Delete account</p>
           <p className="text-xs text-muted-foreground">
-            Permanently removes your account and all registered devices. This cannot be undone.
+            Permanently removes your account and all registered devices. This
+            cannot be undone.
           </p>
         </div>
-        {confirmingDelete ? (
+        {isAdmin ? (
+          <p className="text-xs text-muted-foreground">
+            Admin accounts are protected from self-delete. Remove the admin row
+            in Supabase first if this account must be deleted.
+          </p>
+        ) : confirmingDelete ? (
           <div className="flex items-center gap-2">
             <Button
               variant="destructive"
@@ -258,9 +282,14 @@ export function AccountSection() {
             </Button>
           </div>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setConfirmingDelete(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checkingAdmin}
+            onClick={() => setConfirmingDelete(true)}
+          >
             <Trash2Icon className="mr-1.5 size-3.5 text-destructive" />
-            Delete account
+            {checkingAdmin ? "Checking account..." : "Delete account"}
           </Button>
         )}
       </div>

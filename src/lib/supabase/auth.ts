@@ -19,6 +19,7 @@ export type SignUpResult =
       userId: string
       email: string | null
       refreshToken: string
+      accessTokenExpiresAt: number
     }
   | { ok: true; needsEmailConfirmation: true }
   | { ok: false; code: AuthErrorCode; message: string }
@@ -105,6 +106,7 @@ export async function signUpWithEmail(email: string, password: string): Promise<
       userId: data.user.id,
       email: data.user.email ?? null,
       refreshToken: data.session.refresh_token,
+      accessTokenExpiresAt: accessTokenExpiresAt(data.session.expires_at),
     }
   } catch (error) {
     if (isNetworkError(error)) {

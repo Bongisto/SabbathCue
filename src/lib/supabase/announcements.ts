@@ -19,14 +19,20 @@ export interface AdminAnnouncementRow {
   updated_at: string
 }
 
-export type AnnouncementActionResult = { ok: true } | { ok: false; message: string }
+export type AnnouncementActionResult =
+  | { ok: true }
+  | { ok: false; message: string }
 
-function failureMessage(error: { message?: string } | null, fallback: string): string {
+function failureMessage(
+  error: { message?: string } | null,
+  fallback: string
+): string {
   return error?.message?.trim() ? error.message : fallback
 }
 
 export async function fetchActiveAnnouncements(): Promise<
-  { ok: true; announcements: ActiveAnnouncement[] } | { ok: false; message: string }
+  | { ok: true; announcements: ActiveAnnouncement[] }
+  | { ok: false; message: string }
 > {
   try {
     const supabase = getSupabaseClient()
@@ -44,7 +50,8 @@ export async function fetchActiveAnnouncements(): Promise<
 }
 
 export async function adminListAnnouncements(): Promise<
-  { ok: true; announcements: AdminAnnouncementRow[] } | { ok: false; message: string }
+  | { ok: true; announcements: AdminAnnouncementRow[] }
+  | { ok: false; message: string }
 > {
   try {
     const supabase = getSupabaseClient()
@@ -63,7 +70,7 @@ export async function adminListAnnouncements(): Promise<
 
 export async function adminCreateAnnouncement(
   title: string,
-  body: string,
+  body: string
 ): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
   try {
     const supabase = getSupabaseClient()
@@ -95,13 +102,20 @@ export async function adminUpdateAnnouncement(input: {
 }): Promise<AnnouncementActionResult> {
   try {
     const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("admin_update_announcement", {
-      p_id: input.id,
-      p_title: input.title ?? null,
-      p_body: input.body ?? null,
-      p_status: input.status ?? null,
-      p_expires_at: input.expiresAt ?? null,
-    })
+    const params: {
+      p_id: string
+      p_title?: string | null
+      p_body?: string | null
+      p_status?: AdminAnnouncementRow["status"] | null
+      p_expires_at?: string | null
+    } = { p_id: input.id }
+
+    if ("title" in input) params.p_title = input.title ?? null
+    if ("body" in input) params.p_body = input.body ?? null
+    if ("status" in input) params.p_status = input.status ?? null
+    if ("expiresAt" in input) params.p_expires_at = input.expiresAt ?? null
+
+    const { error } = await supabase.rpc("admin_update_announcement", params)
     if (error) {
       return {
         ok: false,
@@ -114,10 +128,14 @@ export async function adminUpdateAnnouncement(input: {
   }
 }
 
-export async function adminDeleteAnnouncement(id: string): Promise<AnnouncementActionResult> {
+export async function adminDeleteAnnouncement(
+  id: string
+): Promise<AnnouncementActionResult> {
   try {
     const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("admin_delete_announcement", { p_id: id })
+    const { error } = await supabase.rpc("admin_delete_announcement", {
+      p_id: id,
+    })
     if (error) {
       return {
         ok: false,

@@ -51,7 +51,7 @@ function isNetworkMessage(message: string): boolean {
 function emptySnapshot(
   status: VerificationStateSnapshot["status"],
   error: string | null = null,
-  errorCode: VerificationErrorCode | null = null,
+  errorCode: VerificationErrorCode | null = null
 ): VerificationStateSnapshot {
   return {
     status,
@@ -70,7 +70,7 @@ function sessionFromAuth(
   userId: string,
   deviceId: string,
   accessTokenExpiresAt: number,
-  email: string | null,
+  email: string | null
 ): VerificationSession {
   const timestamp = now()
   return {
@@ -83,7 +83,9 @@ function sessionFromAuth(
   }
 }
 
-function snapshotFromSession(session: VerificationSession): VerificationStateSnapshot {
+function snapshotFromSession(
+  session: VerificationSession
+): VerificationStateSnapshot {
   return {
     status: "verified",
     verifiedUserId: session.verifiedUserId,
@@ -100,17 +102,21 @@ function snapshotFromSession(session: VerificationSession): VerificationStateSna
 async function completeVerification(
   userId: string,
   accessTokenExpiresAt: number,
-  email: string | null,
+  email: string | null
 ): Promise<VerificationStateSnapshot> {
   const deviceId = await getOrCreateDeviceId()
-  const registration = await registerDevice(deviceId, getRuntimeOs(), APP_VERSION)
+  const registration = await registerDevice(
+    deviceId,
+    getRuntimeOs(),
+    APP_VERSION
+  )
 
   if (!registration.ok) {
     if (registration.code === "device_limit_reached") {
       return emptySnapshot(
         "error",
         "This account is already registered on the maximum number of devices (2). Remove a device or contact support.",
-        "device_limit_reached",
+        "device_limit_reached"
       )
     }
 
@@ -118,7 +124,7 @@ async function completeVerification(
       return emptySnapshot(
         "error",
         "This account has been suspended. Contact support for assistance.",
-        "suspended",
+        "suspended"
       )
     }
 
@@ -126,7 +132,7 @@ async function completeVerification(
     return emptySnapshot(
       "error",
       message,
-      isNetworkMessage(message) ? "network" : "unknown",
+      isNetworkMessage(message) ? "network" : "unknown"
     )
   }
 
@@ -175,7 +181,7 @@ export async function loadCachedVerification(): Promise<VerificationStateSnapsho
   const snapshot = await completeVerification(
     restored.userId,
     restored.accessTokenExpiresAt,
-    restored.email,
+    restored.email
   )
   if (snapshot.status === "error" && snapshot.errorCode === "network") {
     const grace = await offlineGraceSnapshot()
@@ -184,16 +190,26 @@ export async function loadCachedVerification(): Promise<VerificationStateSnapsho
   return snapshot
 }
 
-export async function signIn(email: string, password: string): Promise<VerificationStateSnapshot> {
+export async function signIn(
+  email: string,
+  password: string
+): Promise<VerificationStateSnapshot> {
   const result = await signInWithEmail(email, password)
   if (!result.ok) {
     return emptySnapshot("error", result.message, result.code)
   }
 
-  return completeVerification(result.userId, result.accessTokenExpiresAt, result.email)
+  return completeVerification(
+    result.userId,
+    result.accessTokenExpiresAt,
+    result.email
+  )
 }
 
-export async function signUp(email: string, password: string): Promise<VerificationStateSnapshot> {
+export async function signUp(
+  email: string,
+  password: string
+): Promise<VerificationStateSnapshot> {
   const result = await signUpWithEmail(email, password)
   if (!result.ok) {
     return emptySnapshot("error", result.message, result.code)
@@ -201,21 +217,16 @@ export async function signUp(email: string, password: string): Promise<Verificat
 
   if (result.needsEmailConfirmation) {
     return emptySnapshot(
-      "error",
-      "Account created. Check your email to confirm your address, then sign in.",
-      "unknown",
+      "required",
+      "Account created. Check your email to confirm your address, then sign in."
     )
   }
 
-  const restored = await restoreSession()
-  if (!restored.ok) {
-    if (restored.code === "network") {
-      return emptySnapshot("error", restored.message, "network")
-    }
-    return emptySnapshot("error", restored.message, "unknown")
-  }
-
-  return completeVerification(restored.userId, restored.accessTokenExpiresAt, restored.email)
+  return completeVerification(
+    result.userId,
+    result.accessTokenExpiresAt,
+    result.email
+  )
 }
 
 export async function signOut(): Promise<VerificationStateSnapshot> {
@@ -241,14 +252,18 @@ export async function heartbeatDeviceRegistration(): Promise<VerificationStateSn
   if (!isTauriRuntime()) return null
 
   const deviceId = await getOrCreateDeviceId()
-  const registration = await registerDevice(deviceId, getRuntimeOs(), APP_VERSION)
+  const registration = await registerDevice(
+    deviceId,
+    getRuntimeOs(),
+    APP_VERSION
+  )
 
   if (!registration.ok && registration.code === "suspended") {
     await clearSessionMetadata()
     return emptySnapshot(
       "error",
       "This account has been suspended. Contact support for assistance.",
-      "suspended",
+      "suspended"
     )
   }
 

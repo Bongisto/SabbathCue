@@ -11,7 +11,7 @@ import {
 } from "@/lib/supabase/announcements"
 
 function formatTimestamp(value: string | null): string {
-  if (!value) return "—"
+  if (!value) return "-"
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? "unknown" : parsed.toLocaleString()
 }
@@ -132,9 +132,14 @@ export function AnnouncementsAdminPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MegaphoneIcon className="size-4 text-primary" />
-          <p className="text-sm font-medium">Admin · Announcements</p>
+          <p className="text-sm font-medium">Admin - Announcements</p>
         </div>
-        <Button variant="outline" size="sm" disabled={loading} onClick={() => void refresh()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => void refresh()}
+        >
           <RefreshCwIcon className="mr-1.5 size-3.5" />
           Refresh
         </Button>
@@ -142,8 +147,8 @@ export function AnnouncementsAdminPanel() {
 
       <div className="glass-panel space-y-3 p-3">
         <p className="text-xs text-muted-foreground">
-          Drafts are visible here only. Published announcements appear once for signed-in users
-          until dismissed.
+          Drafts are visible here only. Published announcements appear once for
+          signed-in users until dismissed.
         </p>
         <input
           className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm"
@@ -157,13 +162,19 @@ export function AnnouncementsAdminPanel() {
           value={body}
           onChange={(event) => setBody(event.target.value)}
         />
-        <Button size="sm" disabled={creating} onClick={() => void handleCreate()}>
+        <Button
+          size="sm"
+          disabled={creating}
+          onClick={() => void handleCreate()}
+        >
           {creating ? "Creating..." : "Create draft"}
         </Button>
       </div>
 
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading announcements...</p>
+        <p className="text-xs text-muted-foreground">
+          Loading announcements...
+        </p>
       ) : loadError ? (
         <p className="text-xs text-destructive">{loadError}</p>
       ) : announcements.length === 0 ? (
@@ -176,17 +187,19 @@ export function AnnouncementsAdminPanel() {
               <div key={announcement.id} className="glass-panel space-y-2 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{announcement.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">
+                    <p className="truncate text-sm font-medium">
+                      {announcement.title}
+                    </p>
+                    <p className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
                       {announcement.body}
                     </p>
-                    <p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <p className="mt-2 text-[10px] tracking-wide text-muted-foreground uppercase">
                       {statusLabel(announcement.status)}
                       {announcement.published_at
-                        ? ` · published ${formatTimestamp(announcement.published_at)}`
+                        ? ` - published ${formatTimestamp(announcement.published_at)}`
                         : ""}
                       {announcement.expires_at
-                        ? ` · expires ${formatTimestamp(announcement.expires_at)}`
+                        ? ` - expires ${formatTimestamp(announcement.expires_at)}`
                         : ""}
                     </p>
                   </div>
@@ -214,6 +227,8 @@ export function AnnouncementsAdminPanel() {
                       variant="ghost"
                       size="sm"
                       disabled={isBusy}
+                      title={`Delete ${announcement.title}`}
+                      aria-label={`Delete ${announcement.title}`}
                       onClick={() => void handleDelete(announcement)}
                     >
                       <Trash2Icon className="size-3.5 text-destructive" />

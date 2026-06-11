@@ -1,10 +1,14 @@
 import { create } from "zustand"
 import { load, type Store } from "@tauri-apps/plugin-store"
-import { fetchActiveAnnouncements, type ActiveAnnouncement } from "@/lib/supabase/announcements"
+import {
+  fetchActiveAnnouncements,
+  type ActiveAnnouncement,
+} from "@/lib/supabase/announcements"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 
 const STORE_FILE = "announcements.json"
 const SEEN_IDS_KEY = "seenAnnouncementIds"
+const BROWSER_SEEN_IDS_KEY = "sabbathcue.seenAnnouncementIds"
 
 interface AnnouncementsStore {
   announcements: ActiveAnnouncement[]
@@ -25,7 +29,40 @@ async function getStore(): Promise<Store> {
 
 function parseSeenIds(value: unknown): Set<string> {
   if (!Array.isArray(value)) return new Set()
-  return new Set(value.filter((item): item is string => typeof item === "string"))
+  return new Set(
+    value.filter((item): item is string => typeof item === "string")
+  )
+}
+
+function getBrowserStorage(): Storage | null {
+  if (typeof window === "undefined") return null
+
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function readBrowserSeenIds(): Set<string> {
+  try {
+    const raw = getBrowserStorage()?.getItem(BROWSER_SEEN_IDS_KEY)
+    if (!raw) return new Set()
+    return parseSeenIds(JSON.parse(raw))
+  } catch {
+    return new Set()
+  }
+}
+
+function writeBrowserSeenIds(seenIds: Set<string>): void {
+  try {
+    getBrowserStorage()?.setItem(
+      BROWSER_SEEN_IDS_KEY,
+      JSON.stringify([...seenIds])
+    )
+  } catch {
+    console.warn("[announcements] Failed to persist browser seen ids")
+  }
 }
 
 export const useAnnouncementsStore = create<AnnouncementsStore>((set, get) => ({
@@ -35,7 +72,7 @@ export const useAnnouncementsStore = create<AnnouncementsStore>((set, get) => ({
 
   hydrateSeenIds: async () => {
     if (!isTauriRuntime()) {
-      set({ isHydrated: true })
+      set({ seenIds: readBrowserSeenIds(), isHydrated: true })
       return
     }
 
@@ -60,7 +97,10 @@ export const useAnnouncementsStore = create<AnnouncementsStore>((set, get) => ({
     nextSeen.add(id)
     set({ seenIds: nextSeen })
 
-    if (!isTauriRuntime()) return
+    if (!isTauriRuntime()) {
+      writeBrowserSeenIds(nextSeen)
+      return
+    }
 
     try {
       const store = await getStore()
