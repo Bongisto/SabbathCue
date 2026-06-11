@@ -8,6 +8,14 @@ const STEP_DEFAULTS = {
 export const TUTORIAL_STEPS: Step[] = [
   {
     ...STEP_DEFAULTS,
+    target: "body",
+    title: `Welcome to ${APP_DISPLAY_NAME}`,
+    content:
+      `${APP_DISPLAY_NAME} listens to your sermon, detects Bible verses as they are spoken, and presents them on screen for your congregation. This quick tour shows you around — it takes about a minute. You can skip it and restart it later from Settings → Help.`,
+    placement: "center",
+  },
+  {
+    ...STEP_DEFAULTS,
     target: '[data-slot="transcript-panel"]',
     title: "Live Transcript",
     content:
@@ -96,5 +104,21 @@ export const TUTORIAL_STEPS: Step[] = [
     content:
       "Open System Settings in the sidebar to configure audio, Bible translations, display mode, remote control, and API keys.",
     placement: "left",
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-tour="settings"]',
+    title: "Your Account",
+    content:
+      "Settings → Account shows the email you signed in with. From there you can sign out, manage your account, and your sign-in works on up to 2 machines.",
+    placement: "left",
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: "body",
+    title: "You're all set",
+    content:
+      "A good first run: start transcribing, speak a verse reference out loud, and press Present when it appears. Revisit this tour anytime from Settings → Help → Restart.",
+    placement: "center",
   },
 ]

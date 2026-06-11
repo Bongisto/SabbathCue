@@ -120,7 +120,8 @@ describe("controller UI guard — tutorial targets", () => {
           `data-slot="${id}"`,
         )
         expect(TUTORIAL_DATA_SLOTS as readonly string[]).toContain(id)
-      } else {
+      } else if (target !== "body") {
+        // "body" is react-joyride's centered-modal target and always exists.
         throw new Error(`Unrecognized tutorial target: ${target}`)
       }
     }
