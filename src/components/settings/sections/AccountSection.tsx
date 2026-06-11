@@ -17,6 +17,7 @@ import {
   type AdminAccountRow,
 } from "@/lib/supabase/account"
 import { useVerificationStore } from "@/stores/verification-store"
+import { AnnouncementsAdminPanel } from "@/components/settings/sections/AnnouncementsAdminPanel"
 
 function formatTimestamp(value: string | null): string {
   if (!value) return "never"
@@ -264,7 +265,12 @@ export function AccountSection() {
         )}
       </div>
 
-      {isAdmin ? <AdminAccountsPanel /> : null}
+      {isAdmin ? (
+        <>
+          <AdminAccountsPanel />
+          <AnnouncementsAdminPanel />
+        </>
+      ) : null}
     </div>
   )
 }

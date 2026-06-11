@@ -18,7 +18,7 @@ export const SITE = {
     owner: "BongaNdlovu",
     name: "SabbathCue",
     url: "https://github.com/BongaNdlovu/SabbathCue",
-    releasesLatest: "https://github.com/BongaNdlovu/SabbathCue/releases/latest",
+    releasesLatest: "https://github.com/BongaNdlovu/sabbathcue-releases/releases/latest",
     discussions: "https://github.com/BongaNdlovu/SabbathCue/discussions",
     stars: { fallback: 0 },
   },

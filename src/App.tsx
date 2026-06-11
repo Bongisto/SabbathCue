@@ -3,6 +3,8 @@ import { listen } from "@tauri-apps/api/event"
 import { Dashboard } from "@/components/layout/dashboard"
 import { useRemoteControl } from "@/hooks/use-remote-control"
 import { useDetectionSettingsSync } from "@/hooks/use-detection-settings-sync"
+import { useAnnouncements } from "@/hooks/use-announcements"
+import { useAppUpdate } from "@/hooks/use-app-update"
 import { Toaster, toast } from "sonner"
 import { useVerificationStore } from "@/stores/verification-store"
 import type { BroadcastOutputErrorEvent, BroadcastOutputIssueKind } from "@/types"
@@ -91,11 +93,63 @@ function useWelcomeToast() {
   }, [status, email])
 }
 
+function useAppUpdateLauncher() {
+  const status = useVerificationStore((s) => s.status)
+  const { state, loadVersion, install, autoCheckOnce } = useAppUpdate()
+  const updateToastIdRef = useRef<string | number | null>(null)
+  const autoCheckedRef = useRef(false)
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return
+    void loadVersion()
+  }, [loadVersion])
+
+  useEffect(() => {
+    if (status !== "verified" || autoCheckedRef.current || !isTauriRuntime()) return
+    autoCheckedRef.current = true
+
+    void autoCheckOnce().then((result) => {
+      if (!result?.available || !result.update) return
+
+      updateToastIdRef.current = toast(`Update ${result.update.version} available`, {
+        description: "A new version is ready to install.",
+        duration: Infinity,
+        action: {
+          label: "Install & restart",
+          onClick: () => {
+            void install()
+          },
+        },
+      })
+    })
+  }, [status, autoCheckOnce, install])
+
+  useEffect(() => {
+    if (state.phase !== "downloading" || updateToastIdRef.current === null) return
+
+    const label =
+      state.downloadPercent !== null
+        ? `Downloading update… ${state.downloadPercent}%`
+        : "Downloading update…"
+
+    toast.loading(label, { id: updateToastIdRef.current })
+  }, [state.phase, state.downloadPercent])
+
+  useEffect(() => {
+    if (state.phase === "installed" && updateToastIdRef.current !== null) {
+      toast.success("Update installed. Restarting…", { id: updateToastIdRef.current })
+      updateToastIdRef.current = null
+    }
+  }, [state.phase])
+}
+
 export function App() {
   useRemoteControl()
   useDetectionSettingsSync()
   useBroadcastOutputErrorListener()
   useWelcomeToast()
+  useAnnouncements()
+  useAppUpdateLauncher()
   const apiKeyPromptOpen = useApiKeyPromptStore((s) => s.isOpen)
   const setApiKeyPromptOpen = useApiKeyPromptStore((s) => s.setOpen)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)

@@ -101,7 +101,78 @@ jobs:
         run: cargo cyclonedx --all --format json
 
       - name: Build Tauri installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri build
+
+      - name: Generate latest.json for updater
+        shell: pwsh
+        run: |
+          $bundleRoot = "src-tauri/target/release/bundle"
+          $nsisDir = Join-Path $bundleRoot "nsis"
+          if (-not (Test-Path $nsisDir)) {
+            Write-Error "NSIS bundle directory not found at $nsisDir"
+            exit 1
+          }
+
+          $setupExe = Get-ChildItem -Path $nsisDir -Filter "*-setup.exe" | Select-Object -First 1
+          if (-not $setupExe) {
+            Write-Error "NSIS setup.exe not found under $nsisDir"
+            exit 1
+          }
+
+          $sigPath = "$($setupExe.FullName).sig"
+          if (-not (Test-Path $sigPath)) {
+            Write-Error "Signature file missing: $sigPath"
+            exit 1
+          }
+
+          $conf = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+          $version = $conf.version
+          if (-not $version) {
+            Write-Error "Could not read version from tauri.conf.json"
+            exit 1
+          }
+
+          $tag = "v$version"
+          $assetName = $setupExe.Name
+          $downloadUrl = "https://github.com/BongaNdlovu/sabbathcue-releases/releases/download/$tag/$assetName"
+          $signature = (Get-Content $sigPath -Raw).Trim()
+
+          $latest = [ordered]@{
+            version = $version
+            notes = "SabbathCue $version"
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = [ordered]@{
+              "windows-x86_64" = [ordered]@{
+                url = $downloadUrl
+                signature = $signature
+              }
+            }
+          }
+
+          $latestPath = Join-Path $bundleRoot "latest.json"
+          $latest | ConvertTo-Json -Depth 6 | Set-Content -Path $latestPath -Encoding utf8
+          Write-Host "Wrote $latestPath for $assetName"
+
+      - name: Verify updater artifacts
+        shell: pwsh
+        run: |
+          $bundleRoot = "src-tauri/target/release/bundle"
+          $latestPath = Join-Path $bundleRoot "latest.json"
+          if (-not (Test-Path $latestPath)) {
+            Write-Error "latest.json missing"
+            exit 1
+          }
+
+          $sigFiles = Get-ChildItem -Path $bundleRoot -Recurse -Filter "*.sig"
+          if ($sigFiles.Count -eq 0) {
+            Write-Error "No .sig files found under $bundleRoot"
+            exit 1
+          }
+
+          Write-Host "Found $($sigFiles.Count) signature file(s) and latest.json"
 
       - name: Generate checksums
         run: |
@@ -133,3 +204,28 @@ jobs:
           name: sabbathcue-windows-bundle
           path: |
             src-tauri/target/release/bundle/**
+
+      - name: Publish GitHub Release (sabbathcue-releases)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          $bundleRoot = "src-tauri/target/release/bundle"
+          $conf = Get-Content "src-tauri/tauri.conf.json" -Raw | ConvertFrom-Json
+          $version = $conf.version
+          $tag = "v$version"
+
+          $assets = @()
+          $assets += Get-ChildItem -Path (Join-Path $bundleRoot "nsis") -File -ErrorAction SilentlyContinue
+          $assets += Get-ChildItem -Path (Join-Path $bundleRoot "msi") -File -ErrorAction SilentlyContinue
+          $assets += Get-ChildItem -Path $bundleRoot -Recurse -Filter "*.sig" -File
+          $assets += Get-Item (Join-Path $bundleRoot "latest.json")
+          $assets += Get-Item (Join-Path $bundleRoot "SHA256SUMS.txt")
+
+          $assetArgs = $assets | ForEach-Object { $_.FullName }
+
+          gh release create $tag `
+            --repo BongaNdlovu/sabbathcue-releases `
+            --title "SabbathCue $version" `
+            --notes "Windows installers for SabbathCue $version. Auto-update is supported via the NSIS .exe (recommended). MSI is provided as an alternate installer." `
+            $assetArgs

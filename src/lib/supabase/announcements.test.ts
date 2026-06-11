@@ -1,0 +1,61 @@
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { resetSupabaseClientForTests } from "@/lib/supabase/client"
+
+const mockRpc = vi.fn()
+
+vi.mock("@/lib/supabase/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase/client")>()
+  return {
+    ...actual,
+    getSupabaseClient: () => ({
+      rpc: mockRpc,
+    }),
+  }
+})
+
+describe("announcements supabase lib", () => {
+  beforeEach(() => {
+    resetSupabaseClientForTests()
+    mockRpc.mockReset()
+  })
+
+  it("fetchActiveAnnouncements returns published rows", async () => {
+    mockRpc.mockResolvedValue({
+      data: [{ id: "a1", title: "Hello", body: "World", published_at: null, expires_at: null }],
+      error: null,
+    })
+
+    const { fetchActiveAnnouncements } = await import("@/lib/supabase/announcements")
+    const result = await fetchActiveAnnouncements()
+
+    expect(result).toEqual({
+      ok: true,
+      announcements: [
+        { id: "a1", title: "Hello", body: "World", published_at: null, expires_at: null },
+      ],
+    })
+    expect(mockRpc).toHaveBeenCalledWith("fetch_active_announcements")
+  })
+
+  it("adminCreateAnnouncement returns the new id", async () => {
+    mockRpc.mockResolvedValue({ data: "new-id", error: null })
+
+    const { adminCreateAnnouncement } = await import("@/lib/supabase/announcements")
+    const result = await adminCreateAnnouncement("Title", "Body")
+
+    expect(result).toEqual({ ok: true, id: "new-id" })
+    expect(mockRpc).toHaveBeenCalledWith("admin_create_announcement", {
+      p_title: "Title",
+      p_body: "Body",
+    })
+  })
+
+  it("adminUpdateAnnouncement surfaces RPC errors", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "Admin access required" } })
+
+    const { adminUpdateAnnouncement } = await import("@/lib/supabase/announcements")
+    const result = await adminUpdateAnnouncement({ id: "a1", status: "published" })
+
+    expect(result).toEqual({ ok: false, message: "Admin access required" })
+  })
+})
