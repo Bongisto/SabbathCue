@@ -12,6 +12,9 @@ export type AuthErrorCode =
   | "network"
   | "unknown"
 
+const SUPABASE_CONFIGURATION_ERROR_MESSAGE =
+  "This app build is missing Supabase configuration. Rebuild or reinstall a release built with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+
 export type SignUpResult =
   | {
       ok: true
@@ -52,6 +55,13 @@ function isNetworkError(error: unknown): boolean {
     message.includes("network") ||
     message.includes("failed to fetch") ||
     message.includes("networkerror")
+  )
+}
+
+function isSupabaseConfigurationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("missing supabase configuration")
   )
 }
 
@@ -112,6 +122,9 @@ export async function signUpWithEmail(email: string, password: string): Promise<
     if (isNetworkError(error)) {
       return { ok: false, code: "network", message: "Unable to reach the authentication service." }
     }
+    if (isSupabaseConfigurationError(error)) {
+      return { ok: false, code: "unknown", message: SUPABASE_CONFIGURATION_ERROR_MESSAGE }
+    }
     return { ok: false, code: "unknown", message: "Sign up failed." }
   }
 }
@@ -151,6 +164,9 @@ export async function signInWithEmail(email: string, password: string): Promise<
     if (isNetworkError(error)) {
       return { ok: false, code: "network", message: "Unable to reach the authentication service." }
     }
+    if (isSupabaseConfigurationError(error)) {
+      return { ok: false, code: "unknown", message: SUPABASE_CONFIGURATION_ERROR_MESSAGE }
+    }
     return { ok: false, code: "unknown", message: "Sign in failed." }
   }
 }
@@ -182,6 +198,9 @@ export async function requestPasswordReset(email: string): Promise<PasswordReset
   } catch (error) {
     if (isNetworkError(error)) {
       return { ok: false, code: "network", message: "Unable to reach the authentication service." }
+    }
+    if (isSupabaseConfigurationError(error)) {
+      return { ok: false, code: "unknown", message: SUPABASE_CONFIGURATION_ERROR_MESSAGE }
     }
     return { ok: false, code: "unknown", message: "Could not send the reset email." }
   }
@@ -233,6 +252,9 @@ export async function restoreSession(): Promise<RestoreSessionResult> {
   } catch (error) {
     if (isNetworkError(error)) {
       return { ok: false, code: "network", message: "Unable to reach the authentication service." }
+    }
+    if (isSupabaseConfigurationError(error)) {
+      return { ok: false, code: "unknown", message: SUPABASE_CONFIGURATION_ERROR_MESSAGE }
     }
     return { ok: false, code: "unknown", message: "Session restore failed." }
   }

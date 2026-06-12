@@ -8,7 +8,7 @@ function requireSupabaseEnv(): { url: string; anonKey: string } {
 
   if (!url?.trim() || !anonKey?.trim()) {
     throw new Error(
-      "Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your local .env file.",
+      "Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before building the app.",
     )
   }
 

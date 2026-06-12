@@ -6,20 +6,24 @@ const mockSignInWithPassword = vi.fn()
 const mockSignOut = vi.fn()
 const mockRefreshSession = vi.fn()
 const mockResetPasswordForEmail = vi.fn()
+let mockGetSupabaseClientError: unknown = null
 
 vi.mock("@/lib/supabase/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/supabase/client")>()
   return {
     ...actual,
-    getSupabaseClient: () => ({
-      auth: {
-        signUp: mockSignUp,
-        signInWithPassword: mockSignInWithPassword,
-        signOut: mockSignOut,
-        refreshSession: mockRefreshSession,
-        resetPasswordForEmail: mockResetPasswordForEmail,
-      },
-    }),
+    getSupabaseClient: () => {
+      if (mockGetSupabaseClientError) throw mockGetSupabaseClientError
+      return {
+        auth: {
+          signUp: mockSignUp,
+          signInWithPassword: mockSignInWithPassword,
+          signOut: mockSignOut,
+          refreshSession: mockRefreshSession,
+          resetPasswordForEmail: mockResetPasswordForEmail,
+        },
+      }
+    },
   }
 })
 
@@ -41,6 +45,7 @@ describe("supabase auth", () => {
     mockSignOut.mockReset()
     mockRefreshSession.mockReset()
     mockResetPasswordForEmail.mockReset()
+    mockGetSupabaseClientError = null
     mockGetRefreshToken.mockReset()
     mockSetRefreshToken.mockReset()
     mockClearToken.mockReset()
@@ -178,6 +183,21 @@ describe("supabase auth", () => {
     expect(mockSetRefreshToken).not.toHaveBeenCalled()
   })
 
+  it("signInWithEmail surfaces missing build-time Supabase configuration", async () => {
+    mockGetSupabaseClientError = new Error("Missing Supabase configuration.")
+
+    const { signInWithEmail } = await import("@/lib/supabase/auth")
+    const result = await signInWithEmail("user@example.com", "secret")
+
+    expect(result).toEqual({
+      ok: false,
+      code: "unknown",
+      message:
+        "This app build is missing Supabase configuration. Rebuild or reinstall a release built with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
+    })
+    expect(mockSignInWithPassword).not.toHaveBeenCalled()
+  })
+
   it("restoreSession returns network when refresh fails due to connectivity", async () => {
     mockGetRefreshToken.mockResolvedValue("stored-refresh")
     mockRefreshSession.mockRejectedValue(new TypeError("NetworkError when attempting to fetch resource."))
@@ -233,6 +253,21 @@ describe("supabase auth", () => {
       code: "network",
       message: "Unable to reach the authentication service.",
     })
+  })
+
+  it("requestPasswordReset surfaces missing build-time Supabase configuration", async () => {
+    mockGetSupabaseClientError = new Error("Missing Supabase configuration.")
+
+    const { requestPasswordReset } = await import("@/lib/supabase/auth")
+    const result = await requestPasswordReset("user@example.com")
+
+    expect(result).toEqual({
+      ok: false,
+      code: "unknown",
+      message:
+        "This app build is missing Supabase configuration. Rebuild or reinstall a release built with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
+    })
+    expect(mockResetPasswordForEmail).not.toHaveBeenCalled()
   })
 
   it("signOut clears the local refresh token", async () => {
