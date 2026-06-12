@@ -1253,6 +1253,180 @@ const PREMIUM_PEARL_DAWN: BroadcastTheme = {
   transition: { ...MODERN_LIGHT.transition, type: "fade", duration: 520 },
 }
 
+// "Veil" family: a near-full-frame translucent scrim over live video
+// (transparent background + large text box), title-style reference above a
+// centered body with tall line spacing — sized to hold hymn stanzas, single
+// verses, or full paragraphs without reflowing the design.
+const VEIL_LAYOUT: BroadcastTheme["layout"] = {
+  anchor: "center",
+  offsetX: 0,
+  offsetY: 0,
+  padding: { top: 72, right: 110, bottom: 72, left: 110 },
+  textAlign: "center",
+  backgroundWidth: 100,
+  backgroundHeight: 100,
+  textAreaWidth: 92,
+  textAreaHeight: 88,
+  referenceGap: 40,
+}
+
+const VEIL_BODY: BroadcastTheme["verseText"] = {
+  fontFamily: "Geist Variable",
+  fontSize: 64,
+  fontWeight: 500,
+  color: "#1f2937",
+  horizontalAlign: "center",
+  verticalAlign: "middle",
+  textTransform: "none",
+  textDecoration: "none",
+  lineHeight: 1.6,
+  letterSpacing: 0,
+  shadow: null,
+  outline: null,
+}
+
+const VEIL_TITLE: BroadcastTheme["reference"] = {
+  fontFamily: "Geist Variable",
+  fontSize: 54,
+  fontWeight: 700,
+  color: "#111827",
+  horizontalAlign: "center",
+  verticalAlign: "top",
+  textTransform: "none",
+  textDecoration: "none",
+  uppercase: false,
+  letterSpacing: 0,
+  position: "above",
+}
+
+const VEIL_TRANSPARENT_BACKGROUND: BroadcastTheme["background"] = {
+  type: "transparent",
+  color: "transparent",
+  gradient: null,
+  image: null,
+}
+
+const CINEMA_VEIL_MIST: BroadcastTheme = {
+  ...baseTheme,
+  id: "builtin-cinema-veil-mist",
+  name: "Cinema Veil Mist",
+  background: VEIL_TRANSPARENT_BACKGROUND,
+  textBox: {
+    enabled: true,
+    color: "#e3f1ef",
+    opacity: 0.72,
+    borderRadius: 10,
+    padding: 48,
+  },
+  verseText: { ...VEIL_BODY, color: "#1c2b2a" },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#1c2b2a",
+    superscript: true,
+  },
+  reference: { ...VEIL_TITLE, color: "#122220" },
+  layout: VEIL_LAYOUT,
+  transition: {
+    type: "fade",
+    duration: 500,
+    easing: "ease-in-out",
+    direction: "up",
+  },
+}
+
+const CINEMA_VEIL_IVORY: BroadcastTheme = {
+  ...CINEMA_VEIL_MIST,
+  id: "builtin-cinema-veil-ivory",
+  name: "Cinema Veil Ivory",
+  textBox: { ...CINEMA_VEIL_MIST.textBox, color: "#f6efe2", opacity: 0.74 },
+  verseText: {
+    ...VEIL_BODY,
+    fontFamily: "Source Serif 4 Variable",
+    color: "#2b1d12",
+  },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#2b1d12",
+    superscript: true,
+  },
+  reference: {
+    ...VEIL_TITLE,
+    fontFamily: "Source Serif 4 Variable",
+    color: "#7c4a12",
+  },
+}
+
+const CINEMA_VEIL_DAWN: BroadcastTheme = {
+  ...CINEMA_VEIL_MIST,
+  id: "builtin-cinema-veil-dawn",
+  name: "Cinema Veil Dawn",
+  textBox: { ...CINEMA_VEIL_MIST.textBox, color: "#f5e4e8", opacity: 0.72 },
+  verseText: { ...VEIL_BODY, color: "#3b1026" },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#3b1026",
+    superscript: true,
+  },
+  reference: { ...VEIL_TITLE, color: "#6d1338" },
+}
+
+const CINEMA_VEIL_OLIVE: BroadcastTheme = {
+  ...CINEMA_VEIL_MIST,
+  id: "builtin-cinema-veil-olive",
+  name: "Cinema Veil Olive",
+  textBox: { ...CINEMA_VEIL_MIST.textBox, color: "#e9eedd", opacity: 0.74 },
+  verseText: { ...VEIL_BODY, color: "#1f2b16" },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#1f2b16",
+    superscript: true,
+  },
+  reference: { ...VEIL_TITLE, color: "#3f5220" },
+}
+
+const CINEMA_VEIL_SMOKE: BroadcastTheme = {
+  ...CINEMA_VEIL_MIST,
+  id: "builtin-cinema-veil-smoke",
+  name: "Cinema Veil Smoke",
+  textBox: { ...CINEMA_VEIL_MIST.textBox, color: "#0b1014", opacity: 0.62 },
+  verseText: {
+    ...VEIL_BODY,
+    fontFamily: "Source Serif 4 Variable",
+    color: "#f8f5ee",
+    shadow: { color: "rgba(0,0,0,0.6)", blur: 10, x: 0, y: 2 },
+  },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#f8f5ee",
+    superscript: true,
+  },
+  reference: { ...VEIL_TITLE, color: "#f0c75e" },
+}
+
+const CINEMA_VEIL_DUSK: BroadcastTheme = {
+  ...CINEMA_VEIL_MIST,
+  id: "builtin-cinema-veil-dusk",
+  name: "Cinema Veil Dusk",
+  textBox: { ...CINEMA_VEIL_MIST.textBox, color: "#10142b", opacity: 0.6 },
+  verseText: {
+    ...VEIL_BODY,
+    color: "#eef2ff",
+    shadow: { color: "rgba(0,0,0,0.55)", blur: 10, x: 0, y: 2 },
+  },
+  verseNumbers: {
+    visible: false,
+    fontSize: 16,
+    color: "#eef2ff",
+    superscript: true,
+  },
+  reference: { ...VEIL_TITLE, color: "#a5b4fc" },
+}
+
 export const BUILTIN_THEMES: BroadcastTheme[] = [
   CLASSIC_DARK,
   MODERN_LIGHT,
@@ -1276,6 +1450,12 @@ export const BUILTIN_THEMES: BroadcastTheme[] = [
   CINEMA_CRIMSON_VEIL,
   CINEMA_ALPINE_MIST,
   CINEMA_LANTERN_LOWER,
+  CINEMA_VEIL_MIST,
+  CINEMA_VEIL_IVORY,
+  CINEMA_VEIL_DAWN,
+  CINEMA_VEIL_OLIVE,
+  CINEMA_VEIL_SMOKE,
+  CINEMA_VEIL_DUSK,
   PREMIUM_SUNRISE_GLORY,
   PREMIUM_MIDNIGHT_OCEAN,
   PREMIUM_CELESTIAL_VELVET,
