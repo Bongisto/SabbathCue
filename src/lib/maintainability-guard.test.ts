@@ -103,3 +103,13 @@ describe("maintainability guard — extracted module presence", () => {
     }
   })
 })
+
+describe("maintainability guard — Tauri capabilities", () => {
+  it("allows the live output panel to toggle Tauri window fullscreen", () => {
+    const capability = JSON.parse(
+      readFileSync(join(REPO_ROOT, "src-tauri/capabilities/default.json"), "utf8"),
+    ) as { permissions?: string[] }
+
+    expect(capability.permissions).toContain("core:window:allow-set-fullscreen")
+  })
+})

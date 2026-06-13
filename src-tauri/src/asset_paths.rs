@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
 pub const VOSK_ACCURATE_MODEL_DIRNAME: &str = "vosk-model-en-us-0.22-lgraph";
-pub const VOSK_SMALL_MODEL_DIRNAME: &str = "vosk-model-small-en-us";
 pub const VOSK_MODEL_DIRNAME: &str = VOSK_ACCURATE_MODEL_DIRNAME;
+#[cfg(test)]
+const VOSK_SMALL_MODEL_DIRNAME: &str = "vosk-model-small-en-us";
 const VOSK_MODEL_DIRNAMES: &[&str] = &[
     "vosk-model-en-us-0.22-lgraph",
     "vosk-model-small-en-us",
