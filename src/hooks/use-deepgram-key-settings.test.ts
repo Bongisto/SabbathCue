@@ -19,10 +19,13 @@ async function loadModules() {
   vi.resetModules()
   const transcriptMod = await import("@/stores/transcript-store")
   const mod = await import("./use-deepgram-key-settings")
+  const gladiaMod = await import("./use-gladia-key-settings")
   return {
     useTranscriptStore: transcriptMod.useTranscriptStore,
     saveDeepgramApiKey: mod.saveDeepgramApiKey,
     clearDeepgramApiKey: mod.clearDeepgramApiKey,
+    saveGladiaApiKey: gladiaMod.saveGladiaApiKey,
+    clearGladiaApiKey: gladiaMod.clearGladiaApiKey,
     restartActiveTranscriptionIfNeeded: mod.restartActiveTranscriptionIfNeeded,
   }
 }
@@ -38,9 +41,7 @@ describe("use-deepgram-key-settings", () => {
 
   describe("saveDeepgramApiKey", () => {
     it("persists the key and reports success when has_deepgram_api_key is true", async () => {
-      mockInvoke
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(true)
+      mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(true)
 
       const { saveDeepgramApiKey } = await loadModules()
       await expect(saveDeepgramApiKey("secret-key")).resolves.toEqual({
@@ -53,9 +54,7 @@ describe("use-deepgram-key-settings", () => {
     })
 
     it("returns an error when the key is not stored", async () => {
-      mockInvoke
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(false)
+      mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(false)
 
       const { saveDeepgramApiKey } = await loadModules()
       await expect(saveDeepgramApiKey("bad-key")).resolves.toEqual({
@@ -91,6 +90,41 @@ describe("use-deepgram-key-settings", () => {
       await expect(clearDeepgramApiKey()).resolves.toEqual({
         error: "Error: clear failed",
       })
+    })
+  })
+
+  describe("saveGladiaApiKey", () => {
+    it("persists the key and reports success when has_gladia_api_key is true", async () => {
+      mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(true)
+
+      const { saveGladiaApiKey } = await loadModules()
+      await expect(saveGladiaApiKey("secret-key")).resolves.toEqual({
+        hasKey: true,
+      })
+      expect(mockInvoke).toHaveBeenNthCalledWith(1, "set_gladia_api_key", {
+        apiKey: "secret-key",
+      })
+      expect(mockInvoke).toHaveBeenNthCalledWith(2, "has_gladia_api_key")
+    })
+
+    it("returns an error when the key is not stored", async () => {
+      mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(false)
+
+      const { saveGladiaApiKey } = await loadModules()
+      await expect(saveGladiaApiKey("bad-key")).resolves.toEqual({
+        hasKey: false,
+        error: "Gladia API key was not saved",
+      })
+    })
+  })
+
+  describe("clearGladiaApiKey", () => {
+    it("clears the stored key on success", async () => {
+      mockInvoke.mockResolvedValue(undefined)
+
+      const { clearGladiaApiKey } = await loadModules()
+      await expect(clearGladiaApiKey()).resolves.toEqual({})
+      expect(mockInvoke).toHaveBeenCalledWith("clear_gladia_api_key")
     })
   })
 

@@ -1,14 +1,15 @@
 import { useCallback, useState } from "react"
 import { invokeTauri } from "@/lib/tauri-runtime"
 import { transcriptionActions } from "@/hooks/use-transcription"
-import { useSettingsStore } from "@/stores/settings-store"
+import { useSettingsStore, type SttProvider } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 
 const SAVED_KEY_DISPLAY = "Saved in secure keychain"
 const STT_RESTART_DELAY_MS = 350
+export type ProviderChangeHandler = (provider: SttProvider) => void
 
 export async function saveDeepgramApiKey(
-  apiKey: string,
+  apiKey: string
 ): Promise<{ hasKey: boolean; error?: string }> {
   try {
     await invokeTauri("set_deepgram_api_key", { apiKey })
@@ -105,12 +106,12 @@ export function useDeepgramKeySettings() {
   }, [])
 
   const handleProviderChange = useCallback(
-    (provider: "deepgram" | "vosk") => {
+    (provider: SttProvider) => {
       if (provider === sttProvider || switchingStt) return
       setSttProvider(provider)
       void restartActiveTranscription()
     },
-    [restartActiveTranscription, setSttProvider, sttProvider, switchingStt],
+    [restartActiveTranscription, setSttProvider, sttProvider, switchingStt]
   )
 
   return {

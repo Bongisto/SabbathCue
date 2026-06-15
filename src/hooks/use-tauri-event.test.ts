@@ -3,15 +3,22 @@ import { renderHook, act } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 let resolveListen: ((unlisten: () => void) => void) | undefined
-const listenMock = vi.fn(
-  () =>
-    new Promise<() => void>((resolve) => {
-      resolveListen = resolve
-    })
-)
+const listenMock = vi.fn<
+  (
+    event: string,
+    handler: (event: { payload: unknown }) => void
+  ) => Promise<() => void>
+>((event, handler) => {
+  void event
+  void handler
+  return new Promise<() => void>((resolve) => {
+    resolveListen = resolve
+  })
+})
 
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: (...args: unknown[]) => listenMock(...args),
+  listen: (event: string, handler: (event: { payload: unknown }) => void) =>
+    listenMock(event, handler),
 }))
 
 vi.mock("@/lib/tauri-runtime", () => ({

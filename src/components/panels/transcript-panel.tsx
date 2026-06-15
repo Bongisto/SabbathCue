@@ -16,6 +16,7 @@ import { profileDetectionEvent } from "@/lib/detection-profiler"
 import { cn } from "@/lib/utils"
 import { useAudioStore } from "@/stores/audio-store"
 import { useBibleStore } from "@/stores/bible-store"
+import type { SttProvider } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
@@ -28,7 +29,7 @@ import type { DetectionResult, ReadingAdvance } from "@/types"
 const LazyApiKeyPrompt = lazy(() =>
   import("@/components/ui/api-key-prompt").then((mod) => ({
     default: mod.ApiKeyPrompt,
-  })),
+  }))
 )
 
 /**
@@ -44,7 +45,11 @@ function AudioLevelMeter() {
 /**
  * Leaf component that subscribes to `currentPartial`. Partials update per audio tick.
  */
-function LivePartialLine({ scrollRef }: { scrollRef: RefObject<HTMLDivElement | null> }) {
+function LivePartialLine({
+  scrollRef,
+}: {
+  scrollRef: RefObject<HTMLDivElement | null>
+}) {
   const currentPartial = useTranscriptStore((s) => s.currentPartial)
 
   useEffect(() => {
@@ -65,7 +70,12 @@ function LivePartialLine({ scrollRef }: { scrollRef: RefObject<HTMLDivElement | 
 
 export function TranscriptPanel({ className }: { className?: string }) {
   const [showKeyPrompt, setShowKeyPrompt] = useState(false)
-  const onMissingApiKey = useCallback(() => setShowKeyPrompt(true), [])
+  const [missingKeyProvider, setMissingKeyProvider] =
+    useState<SttProvider>("deepgram")
+  const onMissingApiKey = useCallback((provider: SttProvider) => {
+    setMissingKeyProvider(provider)
+    setShowKeyPrompt(true)
+  }, [])
   const {
     segments,
     isTranscribing,
@@ -121,7 +131,7 @@ export function TranscriptPanel({ className }: { className?: string }) {
       data-slot="transcript-panel"
       className={cn(
         "relative flex min-h-0 flex-1 flex-col overflow-hidden",
-        className,
+        className
       )}
     >
       <PanelHeader
@@ -214,7 +224,7 @@ export function TranscriptPanel({ className }: { className?: string }) {
           </Button>
         ) : (
           <Button variant="ghost" size="sm" onClick={startTranscription}>
-              <MicIcon className="size-3" />
+            <MicIcon className="size-3" />
             Start transcribing
           </Button>
         )}
@@ -225,8 +235,10 @@ export function TranscriptPanel({ className }: { className?: string }) {
           <LazyApiKeyPrompt
             open={showKeyPrompt}
             onOpenChange={setShowKeyPrompt}
-            service="Deepgram"
-            description="Live transcription needs a Deepgram API key. Add it in settings so the app can start listening."
+            service={missingKeyProvider === "gladia" ? "Gladia" : "Deepgram"}
+            description={`Live transcription needs a ${
+              missingKeyProvider === "gladia" ? "Gladia" : "Deepgram"
+            } API key. Add it in settings so the app can start listening.`}
           />
         </Suspense>
       ) : null}

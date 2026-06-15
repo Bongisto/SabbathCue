@@ -79,7 +79,7 @@ describe("use-transcription", () => {
 
       expect(mockInvoke).toHaveBeenCalledWith(
         "start_transcription",
-        expect.objectContaining({ lowPower: true }),
+        expect.objectContaining({ lowPower: true })
       )
     })
 
@@ -99,6 +99,28 @@ describe("use-transcription", () => {
         "start_transcription",
         expect.objectContaining({
           provider: "deepgram",
+          deviceId: null,
+          gain: 1.0,
+        })
+      )
+    })
+
+    it("invokes gladia provider without forwarding secrets", async () => {
+      mockInvoke.mockResolvedValue(undefined)
+      const { useSettingsStore, transcriptionActions } = await loadModules()
+
+      useSettingsStore.setState({
+        sttProvider: "gladia",
+        audioDeviceId: null,
+        gain: 1.0,
+      })
+
+      await transcriptionActions.start()
+
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "start_transcription",
+        expect.objectContaining({
+          provider: "gladia",
           deviceId: null,
           gain: 1.0,
         })
@@ -131,15 +153,33 @@ describe("use-transcription", () => {
       mockInvoke.mockRejectedValue(
         "No Deepgram API key configured. Set it in Settings or via DEEPGRAM_API_KEY env var."
       )
-      const { useTranscriptStore, transcriptionActions } = await loadModules()
+      const { useSettingsStore, useTranscriptStore, transcriptionActions } =
+        await loadModules()
       const onMissingApiKey = vi.fn()
 
+      useSettingsStore.setState({ sttProvider: "deepgram" })
       await transcriptionActions.start(onMissingApiKey)
 
-      expect(onMissingApiKey).toHaveBeenCalledTimes(1)
+      expect(onMissingApiKey).toHaveBeenCalledWith("deepgram")
       expect(mockToastError).not.toHaveBeenCalled()
       expect(useTranscriptStore.getState().connectionStatus).toBe("error")
       expect(useTranscriptStore.getState().isTranscribing).toBe(false)
+    })
+
+    it("routes a missing-Gladia-key error to onMissingApiKey (no toast)", async () => {
+      mockInvoke.mockRejectedValue(
+        "No Gladia API key configured. Set it in Settings."
+      )
+      const { useSettingsStore, useTranscriptStore, transcriptionActions } =
+        await loadModules()
+      const onMissingApiKey = vi.fn()
+
+      useSettingsStore.setState({ sttProvider: "gladia" })
+      await transcriptionActions.start(onMissingApiKey)
+
+      expect(onMissingApiKey).toHaveBeenCalledWith("gladia")
+      expect(mockToastError).not.toHaveBeenCalled()
+      expect(useTranscriptStore.getState().connectionStatus).toBe("error")
     })
 
     it("falls back to toast when missing-key error fires but no callback is provided", async () => {

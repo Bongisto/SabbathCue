@@ -3,10 +3,11 @@ import { load, type Store } from "@tauri-apps/plugin-store"
 import { isTauriRuntime, invokeTauri } from "@/lib/tauri-runtime"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 
-type SttProvider = "deepgram" | "vosk"
+export type SttProvider = "deepgram" | "gladia" | "vosk"
 
 interface SettingsState {
   hasDeepgramApiKey: boolean
+  hasGladiaApiKey: boolean
   audioDeviceId: string | null
   gain: number
   autoMode: boolean
@@ -19,6 +20,7 @@ interface SettingsState {
   lowPowerMode: boolean
 
   setHasDeepgramApiKey: (has: boolean) => void
+  setHasGladiaApiKey: (has: boolean) => void
   setAudioDeviceId: (id: string | null) => void
   setGain: (gain: number) => void
   setAutoMode: (auto: boolean) => void
@@ -31,6 +33,7 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   hasDeepgramApiKey: false,
+  hasGladiaApiKey: false,
   audioDeviceId: null,
   gain: 1.0,
   autoMode: false,
@@ -41,6 +44,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   lowPowerMode: false,
 
   setHasDeepgramApiKey: (hasDeepgramApiKey) => set({ hasDeepgramApiKey }),
+  setHasGladiaApiKey: (hasGladiaApiKey) => set({ hasGladiaApiKey }),
   setAudioDeviceId: (audioDeviceId) => set({ audioDeviceId }),
   setGain: (gain) => set({ gain }),
   setAutoMode: (autoMode) => set({ autoMode }),
@@ -62,6 +66,11 @@ const PERSISTED_KEYS = [
   "lowPowerMode",
 ] as const satisfies readonly (keyof SettingsState)[]
 
+function parseSttProvider(value: unknown): SttProvider {
+  if (value === "deepgram" || value === "gladia") return value
+  return "vosk"
+}
+
 let tauriStore: Store | null = null
 let hydrationPromise: Promise<void> | null = null
 let settingsUnsubscribe: (() => void) | null = null
@@ -81,7 +90,9 @@ function ensureSettingsPersistenceSubscription() {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
-      pendingSave = pendingSave.then(() => persistAll(useSettingsStore.getState()))
+      pendingSave = pendingSave.then(() =>
+        persistAll(useSettingsStore.getState())
+      )
     }, SAVE_DEBOUNCE_MS)
   })
 }
@@ -101,7 +112,7 @@ export function hydrateSettings(): Promise<void> {
         const value = await store.get(key)
         if (value !== undefined && value !== null) {
           if (key === "sttProvider") {
-            patch.sttProvider = value === "deepgram" ? "deepgram" : "vosk"
+            patch.sttProvider = parseSttProvider(value)
           } else {
             ;(patch as Record<string, unknown>)[key] = value
           }
@@ -113,6 +124,12 @@ export function hydrateSettings(): Promise<void> {
       try {
         const has = await invokeTauri<boolean>("has_deepgram_api_key")
         patch.hasDeepgramApiKey = has
+      } catch {
+        // ignore
+      }
+      try {
+        const has = await invokeTauri<boolean>("has_gladia_api_key")
+        patch.hasGladiaApiKey = has
       } catch {
         // ignore
       }

@@ -4,7 +4,7 @@ use tauri::AppHandle;
 
 use crate::asset_paths;
 use crate::commands::secrets;
-use rhema_stt::{DeepgramClient, SttConfig, SttProvider, VoskProvider};
+use rhema_stt::{DeepgramClient, GladiaClient, SttConfig, SttProvider, VoskProvider};
 
 pub(crate) fn missing_vosk_model_error(model_path: &Path) -> String {
     format!(
@@ -73,7 +73,28 @@ pub(crate) async fn build_stt_provider(
             ))
         }
         "faster-whisper" => Err("faster-whisper has been removed. Choose Vosk or Deepgram.".into()),
-        _ => {
+        "gladia" => {
+            let resolved_api_key = secrets::get_gladia_api_key_or_empty()?;
+
+            if resolved_api_key.is_empty() {
+                return Err("No Gladia API key configured. Set it in Settings.".into());
+            }
+
+            log::info!(
+                "Starting Gladia transcription: api_key_configured=true, device_id={device_id:?}, gain={gain:?}"
+            );
+
+            let stt_config = SttConfig {
+                api_key: resolved_api_key,
+                model: "solaria-1".to_string(),
+                sample_rate: 16_000,
+                encoding: "wav/pcm".to_string(),
+                language: Some("en".to_string()),
+            };
+
+            Ok(Box::new(GladiaClient::new(stt_config)))
+        }
+        "deepgram" => {
             let resolved_api_key = secrets::get_deepgram_api_key_or_empty()?;
 
             if resolved_api_key.is_empty() {
@@ -94,6 +115,9 @@ pub(crate) async fn build_stt_provider(
 
             Ok(Box::new(DeepgramClient::new(stt_config)))
         }
+        _ => Err(format!(
+            "Unknown speech-to-text provider \"{provider_name}\". Choose Vosk, Deepgram, or Gladia."
+        )),
     }
 }
 
@@ -127,8 +151,7 @@ mod tests {
 
     #[test]
     fn missing_worker_error_mentions_path() {
-        let error =
-            missing_vosk_worker_error(&PathBuf::from("C:\\app\\scripts\\vosk_worker.exe"));
+        let error = missing_vosk_worker_error(&PathBuf::from("C:\\app\\scripts\\vosk_worker.exe"));
         assert!(error.contains("vosk_worker.exe"));
     }
 }

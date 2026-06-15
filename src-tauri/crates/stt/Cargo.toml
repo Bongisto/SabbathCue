@@ -32,7 +32,8 @@ whisper-rs = { version = "0.16", features = ["metal"], optional = true }
 whisper-rs = { version = "0.16", optional = true }
 
 [features]
-default = ["rest-fallback"]
+default = ["rest-fallback", "gladia"]
+gladia = ["reqwest"]
 rest-fallback = ["reqwest"]
 whisper = ["dep:whisper-rs", "rhema-audio"]
 faster-whisper = ["dep:base64", "rhema-audio"]

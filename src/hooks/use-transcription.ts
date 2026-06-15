@@ -2,7 +2,7 @@ import { useCallback } from "react"
 import { invokeTauri } from "@/lib/tauri-runtime"
 import { toast } from "sonner"
 import { useAudioStore } from "@/stores/audio-store"
-import { useSettingsStore } from "@/stores/settings-store"
+import { useSettingsStore, type SttProvider } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { handleSermonSlideVoiceControl } from "@/services/slides/sermon-slide-voice-control"
 import { useTauriEvent } from "./use-tauri-event"
@@ -22,21 +22,22 @@ interface TranscriptPartialPayload {
 
 interface UseTranscriptionOptions {
   /**
-   * Called when `start_transcription` fails because the user picked the
-   * Deepgram provider but hasn't set an API key. Panels typically react by
+   * Called when `start_transcription` fails because the user picked a cloud
+   * provider but hasn't set an API key. Panels typically react by
    * opening a key-prompt dialog instead of showing the default toast.
    */
-  onMissingApiKey?: () => void
+  onMissingApiKey?: (provider: SttProvider) => void
 }
 
 const MISSING_DEEPGRAM_KEY_MARKER = "No Deepgram API key"
+const MISSING_GLADIA_KEY_MARKER = "No Gladia API key"
 const NOT_RUNNING_ERROR = "Transcription is not running"
 const MAYBE_HYMN_CUE_PATTERN =
   /\b(?:sda\s+(?:hymn|song)|(?:hymn|song))(?:\s+number)?\s+[a-z0-9]/i
 
-let hymnVoiceControlPromise:
-  | Promise<typeof import("@/services/hymnal/hymn-voice-control")>
-  | null = null
+let hymnVoiceControlPromise: Promise<
+  typeof import("@/services/hymnal/hymn-voice-control")
+> | null = null
 
 function loadHymnVoiceControl() {
   hymnVoiceControlPromise ??= import("@/services/hymnal/hymn-voice-control")
@@ -44,7 +45,9 @@ function loadHymnVoiceControl() {
 }
 
 export const transcriptionActions = {
-  async start(onMissingApiKey?: () => void): Promise<void> {
+  async start(
+    onMissingApiKey?: (provider: SttProvider) => void
+  ): Promise<void> {
     const transcript = useTranscriptStore.getState()
     transcript.setConnectionStatus("connecting")
 
@@ -60,8 +63,12 @@ export const transcriptionActions = {
     } catch (e) {
       const msg = String(e)
       transcript.setConnectionStatus("error")
-      if (msg.includes(MISSING_DEEPGRAM_KEY_MARKER) && onMissingApiKey) {
-        onMissingApiKey()
+      if (
+        (msg.includes(MISSING_DEEPGRAM_KEY_MARKER) ||
+          msg.includes(MISSING_GLADIA_KEY_MARKER)) &&
+        onMissingApiKey
+      ) {
+        onMissingApiKey(settings.sttProvider)
       } else {
         toast.error("Could not start transcription", { description: msg })
       }
@@ -82,7 +89,9 @@ export const transcriptionActions = {
     transcript.setConnectionStatus("disconnected")
   },
 
-  async dumpMemory(onMissingApiKey?: () => void): Promise<void> {
+  async dumpMemory(
+    onMissingApiKey?: (provider: SttProvider) => void
+  ): Promise<void> {
     const transcript = useTranscriptStore.getState()
     const wasTranscribing = transcript.isTranscribing
 
@@ -164,12 +173,9 @@ export function useTranscription(options?: UseTranscriptionOptions) {
     useTranscriptStore.getState().setPartial(payload.text)
   })
 
-  useTauriEvent<TranscriptPartialPayload>(
-    "transcript_final",
-    (payload) => {
-      void handleTranscriptFinalPayload(payload)
-    }
-  )
+  useTauriEvent<TranscriptPartialPayload>("transcript_final", (payload) => {
+    void handleTranscriptFinalPayload(payload)
+  })
 
   const onMissingApiKey = options?.onMissingApiKey
 

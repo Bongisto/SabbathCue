@@ -100,6 +100,31 @@ describe("settings store", () => {
     expect(mockGet).not.toHaveBeenCalledWith("hasDeepgramApiKey")
   })
 
+  it("does not trust persisted Gladia key status when keychain status is unavailable", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "hasGladiaApiKey") return true
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    await hydrateSettings()
+
+    expect(useSettingsStore.getState().hasGladiaApiKey).toBe(false)
+    expect(mockGet).not.toHaveBeenCalledWith("hasGladiaApiKey")
+  })
+
+  it("hydrates persisted Gladia provider", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "sttProvider") return "gladia"
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } = await import("./settings-store")
+    await hydrateSettings()
+
+    expect(useSettingsStore.getState().sttProvider).toBe("gladia")
+  })
+
   it("hydrate maps removed faster-whisper provider to local vosk", async () => {
     mockGet.mockImplementation(async (key: string) => {
       if (key === "sttProvider") return "faster-whisper"

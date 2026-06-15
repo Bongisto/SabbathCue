@@ -5,7 +5,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { useAssets } from "@/hooks/use-assets"
 import { useDeepgramKeySettings } from "@/hooks/use-deepgram-key-settings"
-import { useSettingsStore } from "@/stores/settings-store"
+import { useGladiaKeySettings } from "@/hooks/use-gladia-key-settings"
+import { useSettingsStore, type SttProvider } from "@/stores/settings-store"
 import { CheckIcon, DownloadIcon, HardDriveIcon, ZapIcon } from "lucide-react"
 
 export function SpeechSection() {
@@ -26,6 +27,7 @@ export function SpeechSection() {
     handleClearKey,
     handleProviderChange,
   } = useDeepgramKeySettings()
+  const gladiaKeySettings = useGladiaKeySettings(handleProviderChange)
 
   const {
     status: assetStatus,
@@ -35,8 +37,8 @@ export function SpeechSection() {
 
   const voskReady = Boolean(
     assetStatus?.vosk_model &&
-      assetStatus?.vosk_worker &&
-      assetStatus?.vosk_runtime,
+    assetStatus?.vosk_worker &&
+    assetStatus?.vosk_runtime
   )
   const voskModelName = assetStatus?.vosk_model_name ?? null
   const voskModelQuality = assetStatus?.vosk_model_quality ?? null
@@ -58,7 +60,7 @@ export function SpeechSection() {
 
         <RadioGroup
           value={sttProvider}
-          onValueChange={(v) => handleProviderChange(v as "deepgram" | "vosk")}
+          onValueChange={(v) => handleProviderChange(v as SttProvider)}
           disabled={switchingStt}
           className="gap-3"
         >
@@ -78,6 +80,24 @@ export function SpeechSection() {
                 Uses Deepgram Nova-3 for real-time streaming transcription.
                 Requires an API key and internet connection. Best accuracy with
                 keyword boosting for Bible terms.
+              </p>
+            </div>
+          </label>
+
+          <label
+            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary/20 ${
+              sttProvider !== "gladia" ? "hover:border-muted-foreground/25" : ""
+            }`}
+          >
+            <RadioGroupItem value="gladia" className="mt-0.5" />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-foreground">
+                Cloud (Gladia)
+              </span>
+              <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
+                Uses Gladia Solaria-1 for real-time streaming transcription.
+                Requires an API key and internet connection. Runs English-only
+                live captions through the same verse detection pipeline.
               </p>
             </div>
           </label>
@@ -221,6 +241,75 @@ export function SpeechSection() {
         </div>
       )}
 
+      {sttProvider === "gladia" && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Gladia API Key
+            </label>
+            {gladiaKeySettings.hasGladiaApiKey && (
+              <Badge variant="outline" className="text-[0.5rem]">
+                Key configured
+              </Badge>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type={
+                gladiaKeySettings.hasGladiaApiKey &&
+                !gladiaKeySettings.editingSavedKey &&
+                !gladiaKeySettings.keyValue
+                  ? "text"
+                  : "password"
+              }
+              placeholder="Enter your Gladia API key..."
+              value={gladiaKeySettings.displayedKeyValue}
+              readOnly={
+                gladiaKeySettings.hasGladiaApiKey &&
+                !gladiaKeySettings.editingSavedKey &&
+                !gladiaKeySettings.keyValue
+              }
+              onChange={(e) => {
+                gladiaKeySettings.setEditingSavedKey(true)
+                gladiaKeySettings.setKeyValue(e.target.value)
+              }}
+              className="flex-1 text-xs"
+            />
+            <Button
+              size="sm"
+              onClick={() => void gladiaKeySettings.handleKeyAction()}
+            >
+              {gladiaKeySettings.saved ? (
+                <>
+                  <CheckIcon className="size-3" />
+                  Saved
+                </>
+              ) : (
+                gladiaKeySettings.keyActionLabel
+              )}
+            </Button>
+            {gladiaKeySettings.hasGladiaApiKey && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void gladiaKeySettings.handleClearKey()}
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+          {gladiaKeySettings.keyError && (
+            <p className="text-[0.625rem] text-red-500">
+              {gladiaKeySettings.keyError}
+            </p>
+          )}
+          <p className="text-[0.625rem] text-muted-foreground">
+            Required for live transcription. Get a key at{" "}
+            <span className="text-primary">gladia.io</span>
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
           Performance
@@ -238,8 +327,8 @@ export function SpeechSection() {
               <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
                 Reduces CPU and memory use on weaker machines. Paraphrase
                 detection runs only on finished sentences instead of live
-                partial speech; spoken references like &quot;John 3:16&quot;
-                are still detected instantly. Takes effect the next time
+                partial speech; spoken references like &quot;John 3:16&quot; are
+                still detected instantly. Takes effect the next time
                 transcription starts.
               </p>
             </div>
