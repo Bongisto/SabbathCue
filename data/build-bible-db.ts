@@ -73,12 +73,12 @@ const TRANSLATIONS_META: Array<{
   includeInPublicRelease: boolean
 }> = [
   { file: "KJV.json", abbreviation: "KJV", title: "King James Version", language: "en", license: "Public Domain", isCopyrighted: false, includeInPublicRelease: true },
-  { file: "NIV.json", abbreviation: "NIV", title: "New International Version", language: "en", license: "Biblica", isCopyrighted: true, includeInPublicRelease: false },
-  { file: "ESV.json", abbreviation: "ESV", title: "English Standard Version", language: "en", license: "Crossway", isCopyrighted: true, includeInPublicRelease: false },
-  { file: "NASB.json", abbreviation: "NASB", title: "New American Standard Bible", language: "en", license: "Lockman Foundation", isCopyrighted: true, includeInPublicRelease: false },
-  { file: "NKJV.json", abbreviation: "NKJV", title: "New King James Version", language: "en", license: "Thomas Nelson", isCopyrighted: true, includeInPublicRelease: false },
-  { file: "NLT.json", abbreviation: "NLT", title: "New Living Translation", language: "en", license: "Tyndale House", isCopyrighted: true, includeInPublicRelease: false },
-  { file: "AMP.json", abbreviation: "AMP", title: "Amplified Bible", language: "en", license: "Lockman Foundation", isCopyrighted: true, includeInPublicRelease: false },
+  { file: "NIV.json", abbreviation: "NIV", title: "New International Version", language: "en", license: "Biblica", isCopyrighted: true, includeInPublicRelease: true },
+  { file: "ESV.json", abbreviation: "ESV", title: "English Standard Version", language: "en", license: "Crossway", isCopyrighted: true, includeInPublicRelease: true },
+  { file: "NASB.json", abbreviation: "NASB", title: "New American Standard Bible", language: "en", license: "Lockman Foundation", isCopyrighted: true, includeInPublicRelease: true },
+  { file: "NKJV.json", abbreviation: "NKJV", title: "New King James Version", language: "en", license: "Thomas Nelson", isCopyrighted: true, includeInPublicRelease: true },
+  { file: "NLT.json", abbreviation: "NLT", title: "New Living Translation", language: "en", license: "Tyndale House", isCopyrighted: true, includeInPublicRelease: true },
+  { file: "AMP.json", abbreviation: "AMP", title: "Amplified Bible", language: "en", license: "Lockman Foundation", isCopyrighted: true, includeInPublicRelease: true },
   { file: "SpaRV.json", abbreviation: "SpaRV", title: "Reina-Valera 1909", language: "es", license: "Public Domain", isCopyrighted: false, includeInPublicRelease: true },
   { file: "FreJND.json", abbreviation: "FreJND", title: "J.N. Darby French 1885", language: "fr", license: "Public Domain", isCopyrighted: false, includeInPublicRelease: true },
   { file: "PorBLivre.json", abbreviation: "PorBLivre", title: "Biblia Livre", language: "pt", license: "Public Domain", isCopyrighted: false, includeInPublicRelease: true },
