@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -18,6 +20,7 @@ use crate::types::{TranscriptEvent, Word};
 pub(crate) const DEFAULT_CHUNK_SAMPLES: usize = 800;
 
 const CHECK_READY_TIMEOUT: Duration = Duration::from_secs(20);
+const WORKER_MONITOR_INTERVAL: Duration = Duration::from_millis(50);
 #[expect(
     clippy::duration_suboptimal_units,
     reason = "Keep Duration::from_secs for compatibility with the project Rust MSRV"
@@ -106,6 +109,82 @@ impl WorkerTempFile {
 impl Drop for WorkerTempFile {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.path);
+    }
+}
+
+pub(crate) struct CancellationGuard {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl CancellationGuard {
+    pub(crate) fn new(cancelled: Arc<AtomicBool>) -> Self {
+        Self { cancelled }
+    }
+
+    pub(crate) fn cancel(&self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+    }
+}
+
+impl Drop for CancellationGuard {
+    fn drop(&mut self) {
+        self.cancel();
+    }
+}
+
+pub(crate) struct WorkerProcess {
+    label: &'static str,
+    child: Option<Child>,
+    reader: Option<std::thread::JoinHandle<()>>,
+    stderr_reader: Option<std::thread::JoinHandle<()>>,
+}
+
+impl WorkerProcess {
+    pub(crate) fn new(
+        label: &'static str,
+        child: Child,
+        reader: std::thread::JoinHandle<()>,
+        stderr_reader: std::thread::JoinHandle<()>,
+    ) -> Self {
+        Self {
+            label,
+            child: Some(child),
+            reader: Some(reader),
+            stderr_reader: Some(stderr_reader),
+        }
+    }
+
+    fn child_mut(&mut self) -> Option<&mut Child> {
+        self.child.as_mut()
+    }
+
+    pub(crate) fn stop(mut self) {
+        self.stop_inner(true);
+    }
+
+    fn stop_inner(&mut self, join_threads: bool) {
+        if let Some(mut child) = self.child.take() {
+            terminate_child(self.label, &mut child);
+        }
+
+        if join_threads {
+            if let Some(reader) = self.reader.take() {
+                if reader.join().is_err() {
+                    log::warn!("{} reader thread panicked", self.label);
+                }
+            }
+            if let Some(stderr_reader) = self.stderr_reader.take() {
+                if stderr_reader.join().is_err() {
+                    log::warn!("{} stderr reader thread panicked", self.label);
+                }
+            }
+        }
+    }
+}
+
+impl Drop for WorkerProcess {
+    fn drop(&mut self) {
+        self.stop_inner(false);
     }
 }
 
@@ -421,18 +500,36 @@ pub(crate) async fn stop_writer(
     }
 }
 
-pub(crate) fn stop_worker(
+pub(crate) async fn wait_for_worker_shutdown(
     label: &'static str,
-    mut child: Child,
-    reader: std::thread::JoinHandle<()>,
-    stderr_reader: std::thread::JoinHandle<()>,
-) {
-    terminate_child(label, &mut child);
-    if reader.join().is_err() {
-        log::warn!("{label} reader thread panicked");
-    }
-    if stderr_reader.join().is_err() {
-        log::warn!("{label} stderr reader thread panicked");
+    cancelled: &AtomicBool,
+    process: &mut WorkerProcess,
+    writer: &tokio::task::JoinHandle<Result<(), SttError>>,
+) -> Result<(), SttError> {
+    loop {
+        if cancelled.load(Ordering::SeqCst) || writer.is_finished() {
+            return Ok(());
+        }
+
+        let Some(child) = process.child_mut() else {
+            return Ok(());
+        };
+
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return Err(SttError::ConnectionFailed(format!(
+                    "{label} worker exited unexpectedly with status {status}"
+                )));
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return Err(SttError::ConnectionFailed(format!(
+                    "failed to inspect {label} worker process: {e}"
+                )));
+            }
+        }
+
+        tokio::time::sleep(WORKER_MONITOR_INTERVAL).await;
     }
 }
 

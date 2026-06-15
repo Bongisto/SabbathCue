@@ -101,6 +101,8 @@ impl SttProvider for VoskProvider {
         audio_rx: Receiver<Vec<i16>>,
         event_tx: mpsc::Sender<TranscriptEvent>,
     ) -> Result<(), SttError> {
+        self.cancelled.store(false, Ordering::SeqCst);
+        let cancel_on_drop = worker::CancellationGuard::new(self.cancelled.clone());
         let grammar_json = vosk_grammar_json()?;
         let grammar_file = write_grammar_temp_file(&grammar_json)?;
         let mut child = self.spawn_worker(&grammar_file)?;
@@ -168,10 +170,19 @@ impl SttProvider for VoskProvider {
             Ok::<(), SttError>(())
         });
 
+        let mut process = worker::WorkerProcess::new(VOSK_LABEL, child, reader, stderr_reader);
+        let run_result = worker::wait_for_worker_shutdown(
+            VOSK_LABEL,
+            self.cancelled.as_ref(),
+            &mut process,
+            &writer,
+        )
+        .await;
+        cancel_on_drop.cancel();
         worker::stop_writer(VOSK_LABEL, writer).await;
-        worker::stop_worker(VOSK_LABEL, child, reader, stderr_reader);
+        process.stop();
         let _ = event_tx.send(TranscriptEvent::Disconnected).await;
-        Ok(())
+        run_result
     }
 
     fn stop(&self) {

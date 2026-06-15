@@ -110,6 +110,8 @@ impl SttProvider for SherpaProvider {
         audio_rx: Receiver<Vec<i16>>,
         event_tx: mpsc::Sender<TranscriptEvent>,
     ) -> Result<(), SttError> {
+        self.cancelled.store(false, Ordering::SeqCst);
+        let cancel_on_drop = worker::CancellationGuard::new(self.cancelled.clone());
         let hotwords = sherpa_hotwords_text();
         let hotwords_file = write_hotwords_temp_file(&hotwords)?;
         let mut child = self.spawn_worker(&hotwords_file)?;
@@ -177,10 +179,19 @@ impl SttProvider for SherpaProvider {
             Ok::<(), SttError>(())
         });
 
+        let mut process = worker::WorkerProcess::new(SHERPA_LABEL, child, reader, stderr_reader);
+        let run_result = worker::wait_for_worker_shutdown(
+            SHERPA_LABEL,
+            self.cancelled.as_ref(),
+            &mut process,
+            &writer,
+        )
+        .await;
+        cancel_on_drop.cancel();
         worker::stop_writer(SHERPA_LABEL, writer).await;
-        worker::stop_worker(SHERPA_LABEL, child, reader, stderr_reader);
+        process.stop();
         let _ = event_tx.send(TranscriptEvent::Disconnected).await;
-        Ok(())
+        run_result
     }
 
     fn stop(&self) {
@@ -220,6 +231,72 @@ mod tests {
             std::fs::read_to_string(temp.path()).expect("hotwords temp file should exist");
 
         assert!(contents.lines().any(|term| term == "revelation"));
+    }
+
+    #[tokio::test]
+    async fn bundled_worker_start_keeps_provider_alive_until_audio_disconnect() {
+        let model_path = project_root()
+            .join("models")
+            .join("sherpa")
+            .join("sherpa-onnx-streaming-zipformer-en-2023-06-26");
+        let worker_path = project_root().join("sidecars").join("sherpa_worker.exe");
+
+        if !model_path.exists() || !worker_path.exists() {
+            eprintln!(
+                "Skipping bundled Sherpa lifecycle test: model={} worker={}",
+                model_path.display(),
+                worker_path.display()
+            );
+            return;
+        }
+
+        let provider = SherpaProvider::new(model_path, worker_path);
+        let (audio_tx, audio_rx) = crossbeam_channel::bounded::<Vec<i16>>(2);
+        let (event_tx, mut event_rx) = mpsc::channel::<TranscriptEvent>(8);
+        let handle = tokio::spawn(async move { provider.start(audio_rx, event_tx).await });
+
+        let connected = tokio::time::timeout(Duration::from_secs(30), async {
+            while let Some(event) = event_rx.recv().await {
+                match event {
+                    TranscriptEvent::Connected => return true,
+                    TranscriptEvent::Error(error) => panic!("Sherpa worker error: {error}"),
+                    TranscriptEvent::Partial { .. }
+                    | TranscriptEvent::Final { .. }
+                    | TranscriptEvent::UtteranceEnd
+                    | TranscriptEvent::SpeechStarted
+                    | TranscriptEvent::Disconnected => {}
+                }
+            }
+            false
+        })
+        .await
+        .expect("Sherpa worker should report ready within the startup timeout");
+
+        assert!(connected, "Sherpa worker event stream ended before ready");
+
+        tokio::time::sleep(Duration::from_millis(2_500)).await;
+        assert!(
+            !handle.is_finished(),
+            "Sherpa provider must stay alive while audio is still connected"
+        );
+
+        drop(audio_tx);
+        let result = tokio::time::timeout(Duration::from_secs(5), handle)
+            .await
+            .expect("Sherpa provider should stop after audio disconnect")
+            .expect("Sherpa provider task should not panic");
+
+        assert!(
+            result.is_ok(),
+            "Sherpa provider should stop cleanly after audio disconnect: {result:?}"
+        );
+    }
+
+    fn project_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("..")
     }
 
     #[test]
