@@ -15,10 +15,6 @@ use tokio::sync::mpsc;
 use crate::error::SttError;
 use crate::types::{TranscriptEvent, Word};
 
-/// 50ms at 16 kHz. A small latency tradeoff gives local workers more acoustic
-/// context per pass without making partial transcripts feel sluggish.
-pub(crate) const DEFAULT_CHUNK_SAMPLES: usize = 800;
-
 const CHECK_READY_TIMEOUT: Duration = Duration::from_secs(20);
 const WORKER_MONITOR_INTERVAL: Duration = Duration::from_millis(50);
 #[expect(

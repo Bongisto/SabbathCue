@@ -24,6 +24,7 @@ import {
   SearchIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { scrollIntoPanelView } from "@/lib/scroll-into-panel-view"
 import { useEgw, egwActions } from "@/hooks/use-egw"
 import { useEgwStore } from "@/stores/egw-store"
 import {
@@ -174,10 +175,7 @@ export function EgwBrowser() {
   }, [])
 
   useEffect(() => {
-    selectedParagraphRef.current?.scrollIntoView({
-      block: "nearest",
-      behavior: "smooth",
-    })
+    scrollIntoPanelView(selectedParagraphRef.current)
   }, [selectedParagraphId])
 
   const renderRow = (p: EgwParagraph, showRef: boolean) => (
@@ -233,6 +231,7 @@ export function EgwBrowser() {
   return (
     <div
       ref={panelRef}
+      data-slot="egw-browser"
       className="flex min-h-0 flex-1 flex-col outline-none"
       tabIndex={0}
       onKeyDown={handleKeyDown}

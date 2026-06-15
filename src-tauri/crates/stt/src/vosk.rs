@@ -17,9 +17,10 @@ use crate::error::SttError;
 use crate::keyterms::verse_only_keyterms;
 use crate::provider::SttProvider;
 use crate::types::TranscriptEvent;
-use crate::worker::{self, WorkerTempFile, DEFAULT_CHUNK_SAMPLES};
+use crate::worker::{self, WorkerTempFile};
 
 const VOSK_LABEL: &str = "Vosk";
+const VOSK_CHUNK_SAMPLES: usize = 1_280;
 
 #[derive(Debug)]
 pub struct VoskProvider {
@@ -142,7 +143,7 @@ impl SttProvider for VoskProvider {
 
         let writer_cancelled = self.cancelled.clone();
         let writer = tokio::task::spawn_blocking(move || {
-            let mut pending: Vec<i16> = Vec::with_capacity(DEFAULT_CHUNK_SAMPLES);
+            let mut pending: Vec<i16> = Vec::with_capacity(VOSK_CHUNK_SAMPLES);
             loop {
                 if writer_cancelled.load(Ordering::SeqCst) {
                     break;
@@ -150,8 +151,8 @@ impl SttProvider for VoskProvider {
                 match audio_rx.recv_timeout(Duration::from_millis(25)) {
                     Ok(samples) => {
                         pending.extend(samples);
-                        while pending.len() >= DEFAULT_CHUNK_SAMPLES {
-                            let chunk: Vec<i16> = pending.drain(..DEFAULT_CHUNK_SAMPLES).collect();
+                        while pending.len() >= VOSK_CHUNK_SAMPLES {
+                            let chunk: Vec<i16> = pending.drain(..VOSK_CHUNK_SAMPLES).collect();
                             worker::write_samples(VOSK_LABEL, &mut stdin, &chunk)?;
                         }
                     }
@@ -222,11 +223,22 @@ mod tests {
     }
 
     #[test]
-    fn grammar_json_excludes_worship_and_unk_terms() {
+    fn grammar_json_includes_open_dictation_fallback() {
         let json = vosk_grammar_json().expect("grammar JSON should be valid");
         let parsed: Vec<String> =
             serde_json::from_str(&json).expect("grammar JSON must parse as string array");
-        for excluded in ["[unk]", "sabbath", "holy spirit", "scripture reading"] {
+        assert!(
+            parsed.iter().any(|p| p == "[unk]"),
+            "grammar must include [unk] so Vosk can recognize speech outside the phrase list"
+        );
+    }
+
+    #[test]
+    fn grammar_json_excludes_worship_terms() {
+        let json = vosk_grammar_json().expect("grammar JSON should be valid");
+        let parsed: Vec<String> =
+            serde_json::from_str(&json).expect("grammar JSON must parse as string array");
+        for excluded in ["sabbath", "holy spirit", "scripture reading"] {
             assert!(
                 !parsed.iter().any(|p| p == excluded),
                 "grammar must not include '{excluded}'"

@@ -1,4 +1,5 @@
 import { invokeTauri } from "@/lib/tauri-runtime"
+import { scrollIntoPanelView } from "@/lib/scroll-into-panel-view"
 import { useBibleStore } from "@/stores/bible-store"
 import { getVerseFromItem, type Book, type QueueItem, type Verse } from "@/types"
 
@@ -81,9 +82,7 @@ export function handleBookChapterKeyDown(
     if (next) {
       setSelectedVerseId(next.id)
       onSelectVerse(next)
-      document
-        .getElementById(`verse-${next.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      scrollIntoPanelView(document.getElementById(`verse-${next.id}`))
     }
   } else if (e.key === "ArrowUp") {
     e.preventDefault()
@@ -96,9 +95,7 @@ export function handleBookChapterKeyDown(
     if (prev) {
       setSelectedVerseId(prev.id)
       onSelectVerse(prev)
-      document
-        .getElementById(`verse-${prev.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      scrollIntoPanelView(document.getElementById(`verse-${prev.id}`))
     }
   }
 }

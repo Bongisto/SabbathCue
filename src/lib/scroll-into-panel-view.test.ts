@@ -57,6 +57,26 @@ describe("scrollIntoPanelView", () => {
     expect(() => scrollIntoPanelView(element)).not.toThrow()
   })
 
+  it("does not scroll the dashboard workspace when no panel scroller exists", () => {
+    const workspace = document.createElement("div")
+    workspace.dataset.slot = "workspace-scroll"
+    makeScrollable(workspace, 5000, 800)
+    const panel = document.createElement("div")
+    panel.dataset.slot = "search-panel"
+    const verse = document.createElement("div")
+
+    workspace.appendChild(panel)
+    panel.appendChild(verse)
+    document.body.appendChild(workspace)
+
+    workspace.scrollTo = vi.fn() as unknown as typeof workspace.scrollTo
+
+    expect(findScrollContainer(verse)).toBeNull()
+    scrollIntoPanelView(verse)
+
+    expect(workspace.scrollTo).not.toHaveBeenCalled()
+  })
+
   it("ignores null elements", () => {
     expect(() => scrollIntoPanelView(null)).not.toThrow()
   })

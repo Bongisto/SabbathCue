@@ -3,7 +3,6 @@
 //! Provides real-time transcription via multiple providers:
 //! - **Deepgram** (cloud): WebSocket streaming with keyword boosting
 //! - **Gladia** (cloud): WebSocket streaming via the Gladia live API
-//! - **Sherpa** (local): offline streaming via a sherpa-onnx Zipformer worker
 //! - **Vosk** (local): offline low-latency streaming via a worker process
 //!
 //! # Key types
@@ -11,7 +10,6 @@
 //! - [`SttProvider`]: trait for swappable STT backends
 //! - [`DeepgramClient`]: Deepgram WebSocket/REST provider
 //! - [`GladiaClient`]: Gladia live WebSocket provider
-//! - [`SherpaProvider`]: local sherpa-onnx worker provider
 //! - [`TranscriptEvent`]: streaming transcript events
 //! - [`SttConfig`]: API configuration
 //! - [`SttError`]: error type for STT operations
@@ -30,7 +28,6 @@ pub mod gladia;
 pub mod keyterms;
 pub mod provider;
 pub mod rest;
-pub mod sherpa;
 pub mod types;
 pub mod vosk;
 pub mod worker;
@@ -46,7 +43,6 @@ pub use error::SttError;
 pub use gladia::GladiaClient;
 pub use keyterms::bible_keyterms;
 pub use provider::SttProvider;
-pub use sherpa::SherpaProvider;
 pub use types::{SttConfig, TranscriptEvent, Word};
 pub use vosk::VoskProvider;
 

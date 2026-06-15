@@ -190,6 +190,7 @@ export function Dashboard() {
 
             <div
               ref={workspaceScrollRef}
+              data-slot="workspace-scroll"
               className="scrollbar-thin flex-1 overflow-y-auto p-5"
             >
               {workspaceContent}

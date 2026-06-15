@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { createScriptureQueueItem, selectPreviewVerse } from "@/lib/presentation-workflow"
+import { scrollIntoPanelView } from "@/lib/scroll-into-panel-view"
 import { useQueueStore } from "@/stores/queue-store"
 import type { SemanticSearchResult, Verse } from "@/types"
 import { CheckIcon, PlusIcon, SparklesIcon } from "lucide-react"
@@ -120,9 +121,11 @@ export function ContextSearchTab({
                         )
                         if (idx !== -1) {
                           store.flashItem(store.items[idx].id)
-                          document
-                            .querySelector(`[data-slot="queue-panel"] [data-queue-idx="${idx}"]`)
-                            ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+                          scrollIntoPanelView(
+                            document.querySelector(
+                              `[data-slot="queue-panel"] [data-queue-idx="${idx}"]`,
+                            ),
+                          )
                         }
                       }}
                     >

@@ -11,16 +11,21 @@ function isScrollable(element: HTMLElement): boolean {
   return overflowY === "auto" || overflowY === "scroll"
 }
 
-export function findScrollContainer(element: HTMLElement): HTMLElement | null {
+function isWorkspaceScroller(element: HTMLElement): boolean {
+  return element.dataset.slot === "workspace-scroll"
+}
+
+export function findScrollContainer(element: Element): HTMLElement | null {
   let parent = element.parentElement
   while (parent) {
+    if (isWorkspaceScroller(parent)) return null
     if (isScrollable(parent)) return parent
     parent = parent.parentElement
   }
   return null
 }
 
-export function scrollIntoPanelView(element: HTMLElement | null): void {
+export function scrollIntoPanelView(element: Element | null): void {
   if (!element) return
   const container = findScrollContainer(element)
   if (!container) return

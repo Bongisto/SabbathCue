@@ -34,11 +34,11 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   const verse = detectionToVerse(detection)
 
   const handlePreview = () => {
-    selectPreviewVerse(verse, { navigate: true })
+    selectPreviewVerse(verse)
   }
 
   const handlePresent = () => {
-    presentVerse(verse, { navigate: true })
+    presentVerse(verse)
   }
 
   return (

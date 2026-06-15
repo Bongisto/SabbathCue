@@ -83,10 +83,10 @@ def main() -> int:
         recognizer.SetPartialWords(True)
         emit({"type": "ready"})
 
-        # 35 ms of 16 kHz 16-bit mono PCM. This keeps live preview latency low
-        # while giving Vosk a little more context per pass. The Rust side writes
-        # the same chunk size; this worker emits partials as soon as Vosk has useful text.
-        chunk_bytes = 1120
+        # 80 ms of 16 kHz 16-bit mono PCM. This gives Vosk a little more
+        # acoustic context than the earlier tiny chunks without making live
+        # partials feel sluggish.
+        chunk_bytes = 2560
 
         while True:
             chunk = sys.stdin.buffer.read(chunk_bytes)

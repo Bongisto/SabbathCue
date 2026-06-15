@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { createScriptureQueueItem } from "@/lib/presentation-workflow"
+import { scrollIntoPanelView } from "@/lib/scroll-into-panel-view"
 import { useQueueStore } from "@/stores/queue-store"
 import type { Book, Verse } from "@/types"
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, PlusIcon } from "lucide-react"
@@ -94,9 +95,11 @@ export function BookChapterBrowser({
                           )
                           if (idx !== -1) {
                             store.flashItem(store.items[idx].id)
-                            document
-                              .querySelector(`[data-slot="queue-panel"] [data-queue-idx="${idx}"]`)
-                              ?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+                            scrollIntoPanelView(
+                              document.querySelector(
+                                `[data-slot="queue-panel"] [data-queue-idx="${idx}"]`,
+                              ),
+                            )
                           }
                         }}
                       >

@@ -66,12 +66,12 @@ describe("use-transcription", () => {
       })
     })
 
-    it("invokes start_transcription with settings-derived params for sherpa", async () => {
+    it("keeps local transcription on Vosk for settings-derived params", async () => {
       mockInvoke.mockResolvedValue(undefined)
       const { useSettingsStore, transcriptionActions } = await loadModules()
 
       useSettingsStore.setState({
-        sttProvider: "sherpa",
+        sttProvider: "vosk",
         audioDeviceId: "dev-43",
         gain: 1.25,
       })
@@ -81,7 +81,7 @@ describe("use-transcription", () => {
       expect(mockInvoke).toHaveBeenCalledWith("start_transcription", {
         deviceId: "dev-43",
         gain: 1.25,
-        provider: "sherpa",
+        provider: "vosk",
         lowPower: false,
       })
     })

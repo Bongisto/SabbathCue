@@ -11,9 +11,9 @@ SabbathCue listens to a live sermon audio feed, transcribes speech in real time,
 ## Free Desktop Distribution
 
 SabbathCue's public desktop installer is local-first and free to operate. It ships
-with redistributable Bible content only, defaults to local Sherpa speech-to-text,
-does not require Deepgram, and does not bundle NDI SDK binaries. Deepgram, Vosk,
-and NDI remain optional integrations that users configure separately.
+with redistributable Bible content only, defaults to local Vosk speech-to-text,
+does not require Deepgram, and does not bundle NDI SDK binaries. Deepgram,
+Gladia, and NDI remain optional integrations that users configure separately.
 
 ### Building for Public Release
 
@@ -21,8 +21,6 @@ To build the public release version with only redistributable content:
 
 ```bash
 bun run build:bible:public
-bun run download:sherpa
-bun run build:sherpa-sidecar
 bun run download:vosk
 bun run build:vosk-sidecar
 bun run download:model
@@ -33,14 +31,14 @@ bun run tauri build
 
 This creates an installer that includes only public-domain Bible translations
 (KJV, Reina-Valera 1909, J.N. Darby French 1885, Biblia Livre) and defaults
-to local Sherpa speech recognition with the model and self-contained worker bundled.
+to local Vosk speech recognition with the model and self-contained worker bundled.
 Local builds create an unsigned NSIS installer; official release CI uses
 `bun run tauri:build:release` with updater signing secrets.
 
 ## Features
 
-- **Real-time speech-to-text** via local Sherpa/Vosk or cloud Deepgram/Gladia
-  - Sherpa and Vosk run locally with no API costs; cloud providers stream through their live APIs
+- **Real-time speech-to-text** via local Vosk or cloud Deepgram/Gladia
+  - Vosk runs locally with no API costs; cloud providers stream through their live APIs
 - **Voice-controlled translation switching** — say "read in NIV" or "switch to ESV" to change translations instantly during a sermon
 - **Multi-strategy verse detection**
   - Direct reference parsing (Aho-Corasick automaton + fuzzy matching)
@@ -73,14 +71,14 @@ Local builds create an unsigned NSIS installer; official release CI uses
 | **AI/ML**     | ONNX Runtime (MiniLM-L6-v2 embeddings), Aho-Corasick, Fuse.js      |
 | **Database**  | SQLite via rusqlite (bundled) with FTS5                            |
 | **Broadcast** | NDI 6 SDK via dynamic loading (libloading FFI)                     |
-| **STT**       | Local Sherpa/Vosk workers; Deepgram/Gladia streaming APIs          |
+| **STT**       | Local Vosk worker; Deepgram/Gladia streaming APIs                  |
 
 ### Rust Crates
 
 | Crate             | Purpose                                                                                                               |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `rhema-audio`     | Audio device enumeration, capture, VAD (cpal)                                                                         |
-| `rhema-stt`       | Local Sherpa/Vosk STT, legacy Whisper behind the `whisper` Cargo feature, and cloud STT streaming                     |
+| `rhema-stt`       | Local Vosk STT, legacy Whisper behind the `whisper` Cargo feature, and cloud STT streaming                            |
 | `rhema-bible`     | SQLite Bible DB, FTS5 search, cross-references                                                                        |
 | `rhema-detection` | Verse detection pipeline: direct, semantic, quotation, ensemble merger, sentence buffer, sermon context, reading mode |
 | `rhema-broadcast` | NDI video frame output via FFI                                                                                        |
@@ -96,7 +94,7 @@ Local builds create an unsigned NSIS installer; official release CI uses
 
 ### Platform-specific setup
 
-Legacy local Whisper builds compile `whisper.cpp` from source, which requires CMake and `libclang` (via `bindgen`). Current public builds use bundled Sherpa/Vosk workers, so this setup is only needed when working on the legacy Whisper feature.
+Legacy local Whisper builds compile `whisper.cpp` from source, which requires CMake and `libclang` (via `bindgen`). Current public builds use the bundled Vosk worker, so this setup is only needed when working on the legacy Whisper feature.
 
 #### macOS
 
@@ -165,23 +163,16 @@ This runs 7 idempotent phases in sequence, skipping any whose output artifacts a
 
 #### Speech-to-Text Options
 
-SabbathCue supports four speech-to-text engines:
+SabbathCue supports three speech-to-text engines:
 
-**Option 1: Sherpa (Local, Free, Default)**
-Sherpa runs locally through a streaming sherpa-onnx Zipformer worker with no API costs or per-minute billing.
-
-- Development builds can use Python plus `pip install sherpa-onnx numpy`.
-- Public release builds run `bun run build:sherpa-sidecar` so the installed app has a self-contained `sherpa_worker.exe`.
-- The model is fetched with `bun run download:sherpa`.
-
-**Option 2: Vosk (Local, Free, Fallback)**
+**Option 1: Vosk (Local, Free, Default)**
 Vosk runs locally on your machine with no API costs or per-minute billing.
 
 - Development builds can use Python plus `pip install vosk`.
 - Public release builds run `bun run build:vosk-sidecar` so the installed app has a self-contained `vosk_worker.exe`.
 - The model is fetched with `bun run download:vosk`.
 
-**Option 3: Deepgram (Cloud, Paid)**
+**Option 2: Deepgram (Cloud, Paid)**
 Create a `.env` file in the project root:
 
 ```text
@@ -190,7 +181,7 @@ DEEPGRAM_API_KEY=your_key_here
 
 Get your API key at [deepgram.com](https://deepgram.com/)
 
-**Option 4: Gladia (Cloud, Paid)**
+**Option 3: Gladia (Cloud, Paid)**
 Configure the Gladia API key in app settings or through the secure keyring flow.
 
 #### Account verification (Supabase)
@@ -230,8 +221,6 @@ bun run build:egw                    # Import EGW JSON into data/rhema.db (run a
 bun run download:model               # Download & export ONNX model
 bun run export:verses                # Export verses to JSON
 bun run precompute:embeddings        # Rust ONNX (recommended); see also -onnx and -py variants
-bun run download:sherpa              # Sherpa streaming Zipformer STT model
-bun run build:sherpa-sidecar         # Self-contained Sherpa worker for release builds
 bun run download:vosk                # Vosk STT model
 bun run build:vosk-sidecar           # Self-contained Vosk worker for release builds
 ```
@@ -330,9 +319,7 @@ sabbathcue/
 | `precompute:embeddings-onnx`                    | Precompute embeddings via Python ONNX Runtime                                                       |
 | `precompute:embeddings-py`                      | Precompute embeddings via Python sentence-transformers (GPU path)                                   |
 | `quantize:model`                                | Quantize ONNX model to INT8 for ARM64                                                               |
-| `download:sherpa`                               | Download the Sherpa streaming Zipformer English model for local STT                                 |
-| `build:sherpa-sidecar`                          | Build the self-contained Sherpa worker executable bundled in public installers                      |
-| `download:vosk`                                 | Download the English Vosk model for fallback local STT                                              |
+| `download:vosk`                                 | Download the English Vosk model for local STT                                                       |
 | `build:vosk-sidecar`                            | Build the self-contained Vosk worker executable bundled in public installers                        |
 | `download:whisper`                              | Download `ggml-tiny.en.bin` for legacy Whisper STT development                                      |
 | `download:ndi-sdk`                              | Download NDI 6 SDK headers and platform libraries                                                   |

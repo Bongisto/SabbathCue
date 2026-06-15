@@ -83,7 +83,7 @@ describe("settings store", () => {
     const after = useSettingsStore.getState()
 
     expect(after.gain).toBe(1.0)
-    expect(after.sttProvider).toBe("sherpa")
+    expect(after.sttProvider).toBe("vosk")
     expect(after.autoMode).toBe(false)
   })
 
@@ -125,7 +125,7 @@ describe("settings store", () => {
     expect(useSettingsStore.getState().sttProvider).toBe("gladia")
   })
 
-  it("hydrates persisted Sherpa provider", async () => {
+  it("hydrate maps removed Sherpa provider to local Vosk", async () => {
     mockGet.mockImplementation(async (key: string) => {
       if (key === "sttProvider") return "sherpa"
       return null
@@ -134,10 +134,10 @@ describe("settings store", () => {
     const { hydrateSettings, useSettingsStore } = await import("./settings-store")
     await hydrateSettings()
 
-    expect(useSettingsStore.getState().sttProvider).toBe("sherpa")
+    expect(useSettingsStore.getState().sttProvider).toBe("vosk")
   })
 
-  it("hydrate maps removed faster-whisper provider to local sherpa", async () => {
+  it("hydrate maps removed faster-whisper provider to local Vosk", async () => {
     mockGet.mockImplementation(async (key: string) => {
       if (key === "sttProvider") return "faster-whisper"
       return null
@@ -146,7 +146,7 @@ describe("settings store", () => {
     const { hydrateSettings, useSettingsStore } = await import("./settings-store")
     await hydrateSettings()
 
-    expect(useSettingsStore.getState().sttProvider).toBe("sherpa")
+    expect(useSettingsStore.getState().sttProvider).toBe("vosk")
   })
 
   it("a setter call after hydration writes the full snapshot to disk", async () => {
@@ -265,7 +265,7 @@ describe("settings store", () => {
     expect(state.confidenceThreshold).toBe(0)
     expect(state.cooldownMs).toBe(0)
     // Non-zero-keyed fields stay at defaults
-    expect(state.sttProvider).toBe("sherpa")
+    expect(state.sttProvider).toBe("vosk")
   })
 
   it("persist handles save rejection gracefully", async () => {

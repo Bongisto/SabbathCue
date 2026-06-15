@@ -156,12 +156,17 @@ pub fn bible_keyterms() -> Vec<String> {
 /// Keeps a narrow set of explicit voice-control and translation terms
 /// that the app already supports so local Vosk does not silently lose
 /// those workflows.
-/// Excludes `[unk]`, theological/worship terms, and general dictation
-/// vocabulary so that Vosk narrows transcript coverage to Bible-
-/// reference language.
+/// Includes `[unk]` so Vosk can fall back to open dictation instead of
+/// forcing every utterance into the Bible/control phrase list.
+/// Excludes theological/worship terms and broad dictation vocabulary so
+/// the explicit phrase bias still favors Bible-reference language.
 #[allow(clippy::too_many_lines)]
 pub fn verse_only_keyterms() -> Vec<String> {
     let mut terms: Vec<String> = Vec::new();
+
+    // Keep Vosk usable for sermon language outside the phrase list while still
+    // biasing heavily toward Bible references and app voice controls.
+    terms.push("[unk]".to_string());
 
     // 66 Bible book names (lowercased for grammar matching)
     let books = [
