@@ -47,6 +47,9 @@ models/sherpa/*
 !models/sherpa/.gitkeep
 sidecars/*
 !sidecars/.gitkeep
+!sidecars/sherpa_worker/
+sidecars/sherpa_worker/*
+!sidecars/sherpa_worker/.gitkeep
 .env
 .venv/
 .superpowers/
