@@ -89,7 +89,7 @@ function sourceDefinesDataTour(sources: string, id: string): boolean {
 describe("controller UI guard — tutorial targets", () => {
   it("maps every TUTORIAL_STEPS target to a data-tour or data-slot anchor in source", () => {
     const layoutAndPanelSources = [
-      "src/components/layout/workspace-sidebar.tsx",
+      "src/components/layout/workspace-top-nav.tsx",
       "src/components/layout/app-controller-header.tsx",
       "src/components/panels/transcript-panel.tsx",
       "src/components/panels/detections-panel.tsx",

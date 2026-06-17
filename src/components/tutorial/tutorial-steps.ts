@@ -153,7 +153,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="settings"]',
     title: "Settings",
     content:
-      "Open System Settings in the sidebar to configure audio, Bible translations, display mode, remote control, and API keys.",
+      "Open System Settings in the top navigation to configure audio, Bible translations, display mode, remote control, and API keys.",
     placement: "left",
   },
   {
