@@ -7,8 +7,8 @@ import {
   useAccentThemeStore,
   type AccentTheme,
 } from "@/stores/accent-theme-store"
-import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { blackoutOutput } from "@/lib/operator-actions"
+import { WorkspaceTopNav } from "@/components/layout/workspace-top-nav"
 import packageJson from "../../../package.json"
 
 const ACCENT_SWATCHES: { id: AccentTheme; className: string; title: string }[] =
@@ -65,19 +65,14 @@ export function AppControllerHeader() {
         </div>
       </div>
 
-      <div className="hidden items-center gap-6 font-mono text-sm text-slate-400 md:flex">
-        <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-slate-900/50 px-3 py-1 text-xs">
-          <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
-          <span>
-            {isTauriRuntime() ? "DESKTOP CORE: ACTIVE" : "WEB PREVIEW: ACTIVE"}
-          </span>
-        </div>
-        <div className="rounded-lg border border-white/5 bg-slate-950/60 px-3 py-1 text-xs font-semibold tracking-wider text-slate-100">
-          {clock}
-        </div>
+      <div className="flex flex-1 justify-center">
+        <WorkspaceTopNav />
       </div>
 
       <div className="flex items-center gap-3">
+        <div className="hidden rounded-lg border border-white/5 bg-slate-950/60 px-3 py-1 font-mono text-xs font-semibold tracking-wider text-slate-100 lg:block">
+          {clock}
+        </div>
         <div
           className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 p-1"
           data-tour="theme"

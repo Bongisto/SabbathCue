@@ -53,10 +53,10 @@ describe("service plan shell integration", () => {
     expect(servicePlanShell).toContain("RunServicePage")
   })
 
-  it("opens the planner from the workspace sidebar", () => {
-    const sidebar = readSource("src/components/layout/workspace-sidebar.tsx")
-    expect(sidebar).toContain("openPlanner")
-    expect(sidebar).toContain("service-plans")
+  it("opens the planner from the workspace top navigation", () => {
+    const topNav = readSource("src/components/layout/workspace-top-nav.tsx")
+    expect(topNav).toContain("openPlanner")
+    expect(topNav).toContain("service-plans")
   })
 
   it("validates service plan attachments through the backend command", () => {

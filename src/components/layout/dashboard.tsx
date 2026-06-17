@@ -1,7 +1,6 @@
 import { useEffect, lazy, Suspense, useLayoutEffect, useRef } from "react"
 import { AppControllerHeader } from "@/components/layout/app-controller-header"
 import { OperatorStatusStrip } from "@/components/layout/operator-status-strip"
-import { WorkspaceSidebar } from "@/components/layout/workspace-sidebar"
 import { TranscriptPanel } from "@/components/panels/transcript-panel"
 import { PreviewPanel } from "@/components/panels/preview-panel"
 import { LiveOutputPanel } from "@/components/panels/live-output-panel"
@@ -163,8 +162,6 @@ export function Dashboard() {
         <AppControllerHeader />
 
         <div className="flex flex-1 overflow-hidden">
-          <WorkspaceSidebar />
-
           <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
             <OperatorStatusStrip />
 

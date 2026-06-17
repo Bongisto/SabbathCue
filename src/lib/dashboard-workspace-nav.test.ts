@@ -20,9 +20,22 @@ describe("dashboard-workspace-nav", () => {
     expect(DASHBOARD_WORKSPACE_NAV.map((item) => item.id)).toEqual(EXPECTED_IDS)
   })
 
-  it("uses flat nav with dividers before media and settings", () => {
+  it("uses top navigation with dividers before media and settings", () => {
     const withDivider = DASHBOARD_WORKSPACE_NAV.filter((i) => i.dividerBefore)
     expect(withDivider.map((i) => i.id)).toEqual(["hymns", "settings"])
+  })
+
+  it("exposes shortcut metadata for the workspaces that have keyboard shortcuts", () => {
+    const shortcuts = Object.fromEntries(
+      DASHBOARD_WORKSPACE_NAV.map((item) => [item.id, item.shortcut]),
+    )
+    expect(shortcuts.live).toBe("Ctrl/Cmd + 1")
+    expect(shortcuts["service-plans"]).toBe("Ctrl/Cmd + 2")
+    expect(shortcuts["run-service"]).toBe("Ctrl/Cmd + 3")
+    expect(shortcuts.hymns).toBe("Ctrl/Cmd + 4")
+    expect(shortcuts["live-service"]).toBeUndefined()
+    expect(shortcuts.settings).toBeUndefined()
+    expect(shortcuts["help-legal"]).toBeUndefined()
   })
 
   it("opens planner only for service schedules", () => {

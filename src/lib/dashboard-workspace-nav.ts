@@ -14,23 +14,37 @@ export type DashboardWorkspaceNavItem = {
   id: DashboardWorkspace
   label: string
   icon: LucideIcon
-  /** Insert a divider before this item (reference flat nav). */
+  /** Insert a divider before this item in the workspace navigation. */
   dividerBefore?: boolean
   opensPlanner?: boolean
+  /** Keyboard shortcut shown in the top-navigation icon tooltip, when one exists. */
+  shortcut?: string
 }
 
-/** Flat sidebar order matching reference HTML. */
+/** Workspace navigation order, rendered as icon-first buttons in the top navigation. */
 export const DASHBOARD_WORKSPACE_NAV: DashboardWorkspaceNavItem[] = [
-  { id: "live", label: "Live Desk", icon: LayoutGridIcon },
-  { id: "run-service", label: "Run Service Flow", icon: PlayCircleIcon },
+  { id: "live", label: "Live Desk", icon: LayoutGridIcon, shortcut: "Ctrl/Cmd + 1" },
+  {
+    id: "run-service",
+    label: "Run Service Flow",
+    icon: PlayCircleIcon,
+    shortcut: "Ctrl/Cmd + 3",
+  },
   {
     id: "service-plans",
     label: "Service Schedules",
     icon: ClipboardListIcon,
     opensPlanner: true,
+    shortcut: "Ctrl/Cmd + 2",
   },
   { id: "live-service", label: "Broadcast Control", icon: RadioIcon },
-  { id: "hymns", label: "SDA Hymns Search", icon: BookOpenIcon, dividerBefore: true },
+  {
+    id: "hymns",
+    label: "SDA Hymns Search",
+    icon: BookOpenIcon,
+    dividerBefore: true,
+    shortcut: "Ctrl/Cmd + 4",
+  },
   {
     id: "settings",
     label: "System Settings",
