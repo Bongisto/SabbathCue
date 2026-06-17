@@ -6,8 +6,6 @@ export type DashboardWorkspace =
   | "service-plans"
   | "hymns"
   | "live-service"
-  | "live-hymns"
-  | "sermon-slides"
   | "settings"
   | "help-legal"
 

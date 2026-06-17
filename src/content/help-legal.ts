@@ -27,9 +27,9 @@ export const HELP_GUIDE_SECTIONS = [
       "Live Desk — transcript, preview, live output, detection queue, and manual search.",
       "Run Service Flow — step through a prepared service plan during worship.",
       "Service Schedules — build and organise items before Sunday.",
-      "Broadcast Overlays — configure NDI and on-screen presentation.",
-      "SDA Hymns Search & Lyric Presenter — find and display hymnal lyrics.",
-      "Sermon Slide Studio — attach slides and media to your service plan.",
+      "Broadcast Control — configure NDI and on-screen presentation.",
+      "SDA Hymns Search — find hymns, build lyric slides, and send them live.",
+      "Service Schedules — attach sermon slides and media to service-plan items.",
     ],
   },
   {
@@ -43,8 +43,10 @@ export const HELP_GUIDE_SECTIONS = [
   {
     title: "Broadcast & presentation",
     items: [
-      "Configure outputs in Broadcast Overlays and System Settings → Broadcast Settings.",
+      "Configure outputs in Broadcast Control and System Settings → Broadcast Settings.",
       "Use themes and display modes to match your church's visual style.",
+      "Find hymnal lyrics and custom song slides in SDA Hymns Search, then present them from the hymn deck in Run Service Flow.",
+      "Attach sermon slides in Service Schedules, then present them from Run Service Flow.",
       "Test your output on a secondary monitor or NDI receiver before going live.",
     ],
   },

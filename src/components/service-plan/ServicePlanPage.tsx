@@ -7,8 +7,6 @@ export { ServicePlanLibraryPanel } from "./ServicePlanLibraryPanel"
 export { ServicePlanDialog } from "./ServicePlanDialog"
 export { RunServicePage } from "./RunServicePage"
 export { LiveServicePlanPage } from "./LiveServicePlanPage"
-export { LiveHymnPage } from "./LiveHymnPage"
-export { SermonSlidesPage } from "./SermonSlidesPage"
 export { LiveProductionGrid } from "./LiveProductionGrid"
 
 const LazyServicePlanWorkspace = lazy(() =>

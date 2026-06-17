@@ -136,7 +136,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="broadcast"]',
     title: "Broadcast",
     content:
-      "Open Broadcast Overlays to configure NDI output, display windows, and resolution for your production setup.",
+      "Open Broadcast Control to configure NDI output, display windows, and resolution for your production setup.",
     placement: "right",
   },
   {
@@ -145,7 +145,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="theme"]',
     title: "Themes",
     content:
-      "Pick an accent from the header swatches, or open Theme designer from Broadcast Overlays for full slide styling.",
+      "Pick an accent from the header swatches, or open Theme designer from Broadcast Control for full slide styling.",
     placement: "bottom",
   },
   {
