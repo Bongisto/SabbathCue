@@ -11,8 +11,6 @@ const EXPECTED_IDS: DashboardWorkspace[] = [
   "service-plans",
   "live-service",
   "hymns",
-  "live-hymns",
-  "sermon-slides",
   "settings",
   "help-legal",
 ]
@@ -40,6 +38,7 @@ describe("dashboard-workspace-nav", () => {
       expect(workspaceNavLabel(id)).toBeTruthy()
     }
     expect(workspaceNavLabel("live")).toBe("Live Desk")
+    expect(workspaceNavLabel("live-service")).toBe("Broadcast Control")
     expect(workspaceNavLabel("settings")).toBe("System Settings")
     expect(workspaceNavLabel("help-legal")).toBe("Help & Legal")
   })

@@ -40,6 +40,44 @@ const EXPECTED = [
   },
 ] as const
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function titlePattern(title: string): string {
+  return title
+    .replace(/["']/g, "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(escapeRegExp)
+    .join("\\s+")
+}
+
+function looksLikePageNumberArtifact(
+  text: string,
+  bookTitle: string,
+  chapterTitle: string,
+): boolean {
+  const trimmed = text.trim()
+  const pageNumber = "\\d{1,4}"
+  const chapterPattern = titlePattern(chapterTitle)
+  const bookPattern = titlePattern(bookTitle)
+  const titleHeaderPatterns = [chapterPattern, bookPattern]
+    .filter(Boolean)
+    .map((pattern) => new RegExp(`\\b${pattern}\\s+${pageNumber}\\b`, "i"))
+
+  return (
+    /^\d{2,4}\s+/.test(trimmed) ||
+    /\s+\d{1,4}$/.test(trimmed) ||
+    titleHeaderPatterns.some((pattern) => pattern.test(trimmed))
+  )
+}
+
+function startsLikeContinuation(text: string): boolean {
+  return /^[a-z]/.test(text.trim())
+}
+
 function main() {
   for (const book of EXPECTED) {
     const path = join(import.meta.dir, "sources", "egw", book.file)
@@ -74,6 +112,22 @@ function main() {
         if (!paragraph.text.trim()) {
           throw new Error(
             `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} is empty`,
+          )
+        }
+        if (
+          looksLikePageNumberArtifact(
+            paragraph.text,
+            source.title,
+            chapter.title,
+          )
+        ) {
+          throw new Error(
+            `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} appears to contain a PDF page number artifact`,
+          )
+        }
+        if (startsLikeContinuation(paragraph.text)) {
+          throw new Error(
+            `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} starts like a page-break continuation`,
           )
         }
         for (const forbidden of FORBIDDEN_TEXT) {

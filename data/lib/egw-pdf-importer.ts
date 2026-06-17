@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
+import { cleanEgwParagraphs } from "./egw-text-cleanup"
 
 export interface EgwChapterConfig {
   chapter: number
@@ -96,7 +97,6 @@ function stripChapterFurniture(
   return raw
     .replace(new RegExp(`\\b${escBook}\\b`, "gi"), "")
     .replace(new RegExp(`${escTitle}\\s+\\d+`, "gi"), "")
-    .replace(new RegExp(escTitle, "gi"), "")
     .replace(/^\s*\d+\s*$/gm, "")
     .replace(/^\s*Contents\s*$/gim, "")
     .replace(/^\s*Appendix\s*$/gim, "")
@@ -242,10 +242,16 @@ export async function importEgwPdf(config: EgwBookConfig): Promise<void> {
     chapters.push({
       chapter: current.chapter,
       title: current.title,
-      paragraphs: paragraphTexts.map((text, index) => ({
-        paragraph: index + 1,
-        text,
-      })),
+      paragraphs: cleanEgwParagraphs(
+        paragraphTexts.map((text, index) => ({
+          paragraph: index + 1,
+          text,
+        })),
+        {
+          bookTitle: config.title,
+          chapterTitle: current.title,
+        },
+      ),
     })
   }
 

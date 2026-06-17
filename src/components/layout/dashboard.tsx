@@ -42,18 +42,6 @@ const LazyLiveServicePlanPage = lazy(() =>
   })),
 )
 
-const LazyLiveHymnPage = lazy(() =>
-  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
-    default: mod.LiveHymnPage,
-  })),
-)
-
-const LazySermonSlidesPage = lazy(() =>
-  import("@/components/service-plan/ServicePlanPage").then((mod) => ({
-    default: mod.SermonSlidesPage,
-  })),
-)
-
 const LazySettingsPage = lazy(() =>
   import("@/components/settings/SettingsPage").then((mod) => ({
     default: mod.SettingsPage,
@@ -152,14 +140,6 @@ export function Dashboard() {
     ) : workspace === "live-service" ? (
       <Suspense fallback={<WorkspaceFallback />}>
         <LazyLiveServicePlanPage />
-      </Suspense>
-    ) : workspace === "live-hymns" ? (
-      <Suspense fallback={<WorkspaceFallback />}>
-        <LazyLiveHymnPage />
-      </Suspense>
-    ) : workspace === "sermon-slides" ? (
-      <Suspense fallback={<WorkspaceFallback />}>
-        <LazySermonSlidesPage />
       </Suspense>
     ) : workspace === "settings" ? (
       <Suspense fallback={<WorkspaceFallback />}>

@@ -1,11 +1,23 @@
-import { lazy, Suspense, useMemo, useState } from "react"
+import { lazy, Suspense, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PanelHeader } from "@/components/ui/panel-header"
-import { useBroadcastStore } from "@/stores/broadcast-store"
+import { LiveOutputPanel } from "@/components/panels/live-output-panel"
+import { PreviewPanel } from "@/components/panels/preview-panel"
+import {
+  selectActiveTheme,
+  selectLatestOutputIssue,
+  useBroadcastStore,
+} from "@/stores/broadcast-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
-import { CastIcon, ClipboardListIcon, FileTextIcon, PaletteIcon } from "lucide-react"
-import { LiveProductionGrid } from "./LiveProductionGrid"
+import {
+  AlertTriangleIcon,
+  CastIcon,
+  FileTextIcon,
+  MonitorIcon,
+  PaletteIcon,
+  RadioIcon,
+} from "lucide-react"
 
 const LazyBroadcastSettings = lazy(() =>
   import("@/components/broadcast/broadcast-settings").then((mod) => ({
@@ -23,19 +35,24 @@ export function LiveServicePlanPage() {
   const [broadcastOpen, setBroadcastOpen] = useState(false)
   const [broadcastSettingsMounted, setBroadcastSettingsMounted] = useState(false)
   const [themeDesignerMounted, setThemeDesignerMounted] = useState(false)
-  const activePlan = useServicePlanStore((s) => s.activePlan)
   const serviceContext = useServicePlanStore((s) => s.serviceContext)
-  const orderedItems = useMemo(
-    () => [...(activePlan?.items ?? [])].sort((a, b) => a.order - b.order),
-    [activePlan?.items],
-  )
+  const isLive = useBroadcastStore((s) => s.isLive)
+  const liveItem = useBroadcastStore((s) => s.liveItem)
+  const previewItem = useBroadcastStore((s) => s.previewItem)
+  const activeTheme = useBroadcastStore(selectActiveTheme)
+  const latestOutputIssue = useBroadcastStore(selectLatestOutputIssue)
 
   return (
     <div className="view-pane flex min-h-full flex-col gap-5">
-      <div className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          Downstream broadcast
-        </p>
+      <section className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Broadcast control
+          </p>
+          <h1 className="mt-1 text-xl font-semibold text-slate-100">
+            Production Output
+          </h1>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="chrome"
@@ -62,7 +79,8 @@ export function LiveServicePlanPage() {
             Theme designer
           </Button>
         </div>
-      </div>
+      </section>
+
       {broadcastSettingsMounted && (
         <Suspense fallback={null}>
           <LazyBroadcastSettings
@@ -77,111 +95,122 @@ export function LiveServicePlanPage() {
         </Suspense>
       )}
 
-      <LiveProductionGrid />
+      <div className="grid min-h-[620px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="grid min-h-[560px] grid-cols-1 gap-5 lg:grid-cols-2">
+          <PreviewPanel />
+          <LiveOutputPanel />
+        </section>
 
-      <div className="grid min-h-[380px] grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="glass-panel relative flex min-h-[360px] flex-col overflow-hidden">
-          <PanelHeader
-            title="Live Service Plan"
-            icon={<ClipboardListIcon className="size-4" />}
-          >
-            <Badge
-              variant={serviceContext.performanceMode ? "default" : "outline"}
+        <aside className="flex min-h-[560px] flex-col gap-5">
+          <section className="glass-panel relative flex flex-col overflow-hidden">
+            <PanelHeader
+              title="Output Status"
+              icon={<RadioIcon className="size-4" />}
             >
-              {serviceContext.planStatus}
-            </Badge>
-          </PanelHeader>
-          <div className="grid gap-3 p-3 md:grid-cols-2">
-            <div className="rounded-md border border-white/10 bg-white/[0.03] p-4 shadow-inner shadow-black/20">
-              <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
-                Active item
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {serviceContext.activeItem?.title ?? "Nothing active"}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground capitalize">
-                {serviceContext.activeItem?.kind ??
-                  "Start a service plan to populate this view"}
-              </div>
-            </div>
-            <div className="rounded-md border border-white/10 bg-white/[0.03] p-4 shadow-inner shadow-black/20">
-              <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
-                Up next
-              </div>
-              <div className="mt-1 text-lg font-semibold">
-                {serviceContext.nextItem?.title ?? "No next item"}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground capitalize">
-                {serviceContext.nextItem?.kind ?? "End of plan"}
-              </div>
-            </div>
-          </div>
-          <div className="flex min-h-0 flex-1 px-3 pb-3">
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-white/10 bg-black/20">
-              {orderedItems.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">
-                  No service plan is loaded.
+              <Badge variant={isLive ? "default" : "outline"}>
+                {isLive ? "On air" : "Hidden"}
+              </Badge>
+            </PanelHeader>
+            <div className="space-y-3 p-3">
+              <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                <div className="flex items-center gap-2 text-[0.625rem] font-medium uppercase text-muted-foreground">
+                  <MonitorIcon className="size-3.5" />
+                  Active theme
                 </div>
-              ) : (
-                orderedItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between gap-3 border-b border-white/5 px-3 py-2 last:border-b-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
-                        {item.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground capitalize">
-                        {item.kind}
-                      </div>
-                    </div>
-                    <Badge
-                      variant={item.status === "active" ? "default" : "outline"}
-                    >
-                      {item.status}
-                    </Badge>
+                <p className="mt-1 truncate text-sm font-medium">
+                  {activeTheme?.name ?? "No theme selected"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                  <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
+                    Preview
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-        <section className="glass-panel relative flex min-h-[360px] flex-col overflow-hidden">
-          <PanelHeader
-            title="Live Context"
-            icon={<FileTextIcon className="size-4" />}
-          />
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 text-sm">
-            <div>
-              <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
-                Expected references
+                  <p className="mt-1 truncate text-sm font-medium">
+                    {previewItem?.reference ?? "Empty"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                  <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
+                    Live
+                  </div>
+                  <p className="mt-1 truncate text-sm font-medium">
+                    {liveItem?.reference ?? "Nothing live"}
+                  </p>
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {serviceContext.expectedReferences.length > 0 ? (
-                  serviceContext.expectedReferences.map((ref) => (
-                    <Badge key={ref} variant="secondary">
-                      {ref}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    None for the active item.
-                  </span>
-                )}
+              {latestOutputIssue ? (
+                <div className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3">
+                  <div className="flex items-center gap-2 text-[0.625rem] font-medium uppercase text-amber-100/90">
+                    <AlertTriangleIcon className="size-3.5" />
+                    {latestOutputIssue.title}
+                  </div>
+                  <p className="mt-1 line-clamp-3 text-xs text-amber-100/75">
+                    {latestOutputIssue.description}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-hidden">
+            <PanelHeader
+              title="Service Signal"
+              icon={<FileTextIcon className="size-4" />}
+            >
+              <Badge
+                variant={serviceContext.performanceMode ? "default" : "outline"}
+              >
+                {serviceContext.planStatus}
+              </Badge>
+            </PanelHeader>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+              <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
+                  Active item
+                </div>
+                <p className="mt-1 truncate text-sm font-medium">
+                  {serviceContext.activeItem?.title ?? "Nothing active"}
+                </p>
+                <p className="mt-1 text-xs capitalize text-muted-foreground">
+                  {serviceContext.activeItem?.kind ??
+                    "Start a service plan to populate this view"}
+                </p>
+              </div>
+
+              <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
+                  Up next
+                </div>
+                <p className="mt-1 truncate text-sm font-medium">
+                  {serviceContext.nextItem?.title ?? "No next item"}
+                </p>
+                <p className="mt-1 text-xs capitalize text-muted-foreground">
+                  {serviceContext.nextItem?.kind ?? "End of plan"}
+                </p>
+              </div>
+
+              <div>
+                <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
+                  Expected references
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {serviceContext.expectedReferences.length > 0 ? (
+                    serviceContext.expectedReferences.map((ref) => (
+                      <Badge key={ref} variant="secondary">
+                        {ref}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      None for the active item.
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
-                Operator notes
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
-                {serviceContext.operatorNotes ||
-                  "No notes for the active item."}
-              </p>
-            </div>
-          </div>
-        </section>
+          </section>
+        </aside>
       </div>
     </div>
   )
