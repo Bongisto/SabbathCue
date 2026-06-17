@@ -6,25 +6,15 @@ use crate::asset_paths;
 use crate::commands::secrets;
 #[cfg(feature = "whisper")]
 use rhema_stt::WhisperProvider;
-use rhema_stt::{
-    DeepgramClient, GladiaClient, SherpaProvider, SttConfig, SttProvider, VoskProvider,
-};
+use rhema_stt::{DeepgramClient, GladiaClient, SttConfig, SttProvider, VoskProvider};
 
-pub(crate) fn missing_sherpa_model_error(model_path: &Path) -> String {
-    format!(
-        "Sherpa model not found at {}. Reinstall the app, run `bun run download:sherpa`, place the model in <app data>\\models\\sherpa\\{} (or set SABBATHCUE_SHERPA_MODEL_DIR).",
-        model_path.display(),
-        asset_paths::SHERPA_MODEL_DIRNAME
+#[cfg_attr(
+    not(feature = "whisper"),
+    expect(
+        dead_code,
+        reason = "The helper is used when the optional Whisper provider is compiled"
     )
-}
-
-pub(crate) fn missing_sherpa_worker_error(worker_path: &Path) -> String {
-    format!(
-        "Sherpa worker not found at {}. Reinstall the app to restore scripts\\sherpa_worker\\sherpa_worker.exe.",
-        worker_path.display()
-    )
-}
-
+)]
 pub(crate) fn missing_whisper_model_error(model_path: &Path) -> String {
     format!(
         "Whisper model not found at {}. Run `bun run download:whisper` to fetch {}, or set SABBATHCUE_WHISPER_MODEL to an existing model file.",
@@ -46,32 +36,6 @@ pub(crate) fn missing_vosk_worker_error(worker_path: &Path) -> String {
         "Vosk worker not found at {}. Reinstall the app to restore scripts\\vosk_worker.exe.",
         worker_path.display()
     )
-}
-
-async fn build_sherpa_provider(
-    app: &AppHandle,
-    device_id: Option<&str>,
-) -> Result<Box<dyn SttProvider>, String> {
-    let model_path = asset_paths::sherpa_model_path(app);
-    if !model_path.exists() {
-        let error = missing_sherpa_model_error(&model_path);
-        log::error!("[STT-sherpa] {error}");
-        return Err(error);
-    }
-    let worker_path = asset_paths::sherpa_worker_path(app);
-    if !worker_path.exists() {
-        let error = missing_sherpa_worker_error(&worker_path);
-        log::error!("[STT-sherpa] {error}");
-        return Err(error);
-    }
-
-    log::info!(
-        "Starting Sherpa transcription: model={}, worker={}, device_id={device_id:?}",
-        model_path.display(),
-        worker_path.display()
-    );
-
-    Ok(Box::new(SherpaProvider::new(model_path, worker_path)))
 }
 
 async fn build_vosk_provider(
@@ -171,12 +135,11 @@ pub(crate) async fn build_stt_provider(
     whisper_profile: Option<&str>,
 ) -> Result<Box<dyn SttProvider>, String> {
     match provider_name {
-        "sherpa" => build_sherpa_provider(app, device_id).await,
         "vosk" => build_vosk_provider(app, device_id).await,
         "whisper" | "legacy-whisper" => build_whisper_provider(app, whisper_profile).await,
-        "faster-whisper" => Err(
-            "faster-whisper has been removed. Choose Sherpa, Vosk, Deepgram, or Gladia.".into(),
-        ),
+        "faster-whisper" => {
+            Err("faster-whisper has been removed. Choose Vosk, Deepgram, or Gladia.".into())
+        }
         "gladia" => {
             let resolved_api_key = secrets::get_gladia_api_key_or_empty()?;
 
@@ -220,7 +183,7 @@ pub(crate) async fn build_stt_provider(
             Ok(Box::new(DeepgramClient::new(stt_config)))
         }
         _ => Err(format!(
-            "Unknown speech-to-text provider \"{provider_name}\". Choose Sherpa, Vosk, Deepgram, or Gladia."
+            "Unknown speech-to-text provider \"{provider_name}\". Choose Vosk, Deepgram, or Gladia."
         )),
     }
 }
@@ -229,21 +192,6 @@ pub(crate) async fn build_stt_provider(
 mod tests {
     use super::*;
     use std::path::PathBuf;
-
-    #[test]
-    fn missing_sherpa_model_error_mentions_recovery_steps() {
-        let error = missing_sherpa_model_error(&PathBuf::from("C:\\app\\models\\sherpa\\missing"));
-        assert!(error.contains("SABBATHCUE_SHERPA_MODEL_DIR"));
-        assert!(error.contains(asset_paths::SHERPA_MODEL_DIRNAME));
-        assert!(error.contains("download:sherpa"));
-    }
-
-    #[test]
-    fn missing_sherpa_worker_error_mentions_worker_name() {
-        let error =
-            missing_sherpa_worker_error(&PathBuf::from("C:\\app\\scripts\\sherpa_worker.exe"));
-        assert!(error.contains("sherpa_worker.exe"));
-    }
 
     #[test]
     fn missing_whisper_model_error_mentions_path_and_download_step() {

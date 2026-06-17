@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { handleReadingAdvance, handleVerseDetections } from "./verse-detection-workflow"
+import {
+  handleReadingAdvance,
+  handleVerseDetections,
+} from "./verse-detection-workflow"
 import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useDetectionStore } from "@/stores/detection-store"
+import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useQueueStore } from "@/stores/queue-store"
 import type { DetectionResult, QueueItem, ReadingAdvance } from "@/types"
 
@@ -113,6 +117,10 @@ describe("verse detection workflow", () => {
       activeIndex: null,
       highlightedId: null,
       highlightedIds: [],
+    })
+    useEgwSlideStore.setState({
+      deck: [],
+      activeIndex: 0,
     })
     useBroadcastStore.setState({
       isLive: false,
@@ -251,7 +259,9 @@ describe("verse detection workflow", () => {
       isLive: true,
       liveItem: {
         reference: "Romans 8:1 (KJV)",
-        segments: [{ verseNumber: 1, text: "There is therefore now no condemnation." }],
+        segments: [
+          { verseNumber: 1, text: "There is therefore now no condemnation." },
+        ],
       },
     })
 
@@ -262,7 +272,9 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 16,
     })
-    expect(useBroadcastStore.getState().liveItem?.reference).toBe("Romans 8:1 (KJV)")
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe(
+      "Romans 8:1 (KJV)"
+    )
   })
 
   it("auto-updates live output for reading mode when already live", () => {
@@ -280,7 +292,8 @@ describe("verse detection workflow", () => {
       book_name: "John",
       chapter: 3,
       verse: 17,
-      verse_text: "For God sent not his Son into the world to condemn the world.",
+      verse_text:
+        "For God sent not his Son into the world to condemn the world.",
       reference: "John 3:17",
       confidence: 0.9,
     })
@@ -290,11 +303,15 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 17,
     })
-    expect(useBroadcastStore.getState().liveItem?.reference).toBe("John 3:17 (KJV)")
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe(
+      "John 3:17 (KJV)"
+    )
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:verse-update",
-      expect.objectContaining({ item: expect.objectContaining({ reference: "John 3:17 (KJV)" }) }),
+      expect.objectContaining({
+        item: expect.objectContaining({ reference: "John 3:17 (KJV)" }),
+      })
     )
   })
 
@@ -313,7 +330,8 @@ describe("verse detection workflow", () => {
       book_name: "John",
       chapter: 3,
       verse: 17,
-      verse_text: "For God sent not his Son into the world to condemn the world.",
+      verse_text:
+        "For God sent not his Son into the world to condemn the world.",
       reference: "John 3:17",
       confidence: 0.9,
     })
@@ -323,7 +341,9 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 17,
     })
-    expect(useBroadcastStore.getState().liveItem?.reference).toBe("John 3:16 (KJV)")
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe(
+      "John 3:16 (KJV)"
+    )
   })
 
   it("does not turn live output on for reading mode when hidden", () => {
@@ -337,7 +357,8 @@ describe("verse detection workflow", () => {
       book_name: "John",
       chapter: 3,
       verse: 17,
-      verse_text: "For God sent not his Son into the world to condemn the world.",
+      verse_text:
+        "For God sent not his Son into the world to condemn the world.",
       reference: "John 3:17",
       confidence: 0.9,
     })
@@ -352,7 +373,12 @@ describe("verse detection workflow", () => {
   })
 
   it("previews from incoming direct detection event", async () => {
-    const detection = makeDetection({ verse_ref: "Romans 5:8", book_number: 45, chapter: 5, verse: 8 })
+    const detection = makeDetection({
+      verse_ref: "Romans 5:8",
+      book_number: 45,
+      chapter: 5,
+      verse: 8,
+    })
     await handleVerseDetections([detection])
 
     expect(useBibleStore.getState().selectedVerse).toMatchObject({
@@ -383,6 +409,40 @@ describe("verse detection workflow", () => {
       book_number: 45,
       chapter: 8,
       verse: 1,
+    })
+  })
+
+  it("previews EGW direct detections without selecting a Bible verse", async () => {
+    await handleVerseDetections([
+      makeDetection({
+        content_type: "egw",
+        verse_ref: "Patriarchs and Prophets 1:2",
+        verse_text: "The history of the great conflict.",
+        book_name: "Patriarchs and Prophets",
+        book_number: 1,
+        chapter: 1,
+        verse: 2,
+        auto_queued: false,
+        egw_paragraph: {
+          id: 12,
+          book_number: 1,
+          book_title: "Patriarchs and Prophets",
+          chapter: 1,
+          chapter_title: "Why Was Sin Permitted?",
+          paragraph: 2,
+          text: "The history of the great conflict.",
+        },
+      }),
+    ])
+
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useEgwSlideStore.getState().deck[0]).toMatchObject({
+      kind: "egw",
+      reference: "Patriarchs and Prophets 1:2",
+    })
+    expect(useBroadcastStore.getState().previewItem).toMatchObject({
+      kind: "egw",
+      reference: "Patriarchs and Prophets 1:2",
     })
   })
 
@@ -421,7 +481,13 @@ describe("verse detection workflow", () => {
       makeDetection({ verse_ref: "John 3:16", auto_queued: true }),
     ])
     const second = handleVerseDetections([
-      makeDetection({ verse_ref: "Romans 8:1", book_number: 45, chapter: 8, verse: 1, auto_queued: true }),
+      makeDetection({
+        verse_ref: "Romans 8:1",
+        book_number: 45,
+        chapter: 8,
+        verse: 1,
+        auto_queued: true,
+      }),
     ])
 
     await Promise.all([first, second])
@@ -433,7 +499,9 @@ describe("verse detection workflow", () => {
     useBroadcastStore.setState({ outputIssues: [] })
     invokeMock.mockRejectedValueOnce(new Error("network down"))
 
-    await handleVerseDetections([makeDetection({ verse_text: "Fallback verse text" })])
+    await handleVerseDetections([
+      makeDetection({ verse_text: "Fallback verse text" }),
+    ])
 
     expect(useBroadcastStore.getState().outputIssues).toEqual(
       expect.arrayContaining([
@@ -441,7 +509,7 @@ describe("verse detection workflow", () => {
           kind: "verse-lookup",
           outputId: "global",
         }),
-      ]),
+      ])
     )
   })
 
@@ -463,7 +531,7 @@ describe("verse detection workflow", () => {
           kind: "auto-detection",
           title: "Detection batch failed",
         }),
-      ]),
+      ])
     )
 
     useDetectionStore.setState({ addDetections: originalAddDetections })
@@ -487,7 +555,7 @@ describe("verse detection workflow", () => {
 
     const presentation = useQueueStore.getState().items[0].presentation
     expect(
-      presentation.kind === "scripture" ? presentation.verse.text : null,
+      presentation.kind === "scripture" ? presentation.verse.text : null
     ).toBe("Current translation text")
   })
 
@@ -513,7 +581,7 @@ describe("verse detection workflow", () => {
 
     const presentation = useQueueStore.getState().items[0].presentation
     expect(
-      presentation.kind === "scripture" ? presentation.verse.text : null,
+      presentation.kind === "scripture" ? presentation.verse.text : null
     ).toBe("Loaded current chapter text")
   })
 })

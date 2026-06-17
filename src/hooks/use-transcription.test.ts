@@ -46,12 +46,12 @@ describe("use-transcription", () => {
   })
 
   describe("transcriptionActions.start", () => {
-    it("invokes start_transcription with settings-derived params for sherpa", async () => {
+    it("invokes start_transcription with settings-derived params for vosk", async () => {
       mockInvoke.mockResolvedValue(undefined)
       const { useSettingsStore, transcriptionActions } = await loadModules()
 
       useSettingsStore.setState({
-        sttProvider: "sherpa",
+        sttProvider: "vosk",
         audioDeviceId: "dev-42",
         gain: 1.5,
       })
@@ -61,18 +61,18 @@ describe("use-transcription", () => {
       expect(mockInvoke).toHaveBeenCalledWith("start_transcription", {
         deviceId: "dev-42",
         gain: 1.5,
-        provider: "sherpa",
+        provider: "vosk",
         lowPower: false,
         whisperProfile: "balanced",
       })
     })
 
-    it("keeps local transcription on Sherpa for settings-derived params", async () => {
+    it("keeps local transcription on Vosk for settings-derived params", async () => {
       mockInvoke.mockResolvedValue(undefined)
       const { useSettingsStore, transcriptionActions } = await loadModules()
 
       useSettingsStore.setState({
-        sttProvider: "sherpa",
+        sttProvider: "vosk",
         audioDeviceId: "dev-43",
         gain: 1.25,
       })
@@ -82,7 +82,7 @@ describe("use-transcription", () => {
       expect(mockInvoke).toHaveBeenCalledWith("start_transcription", {
         deviceId: "dev-43",
         gain: 1.25,
-        provider: "sherpa",
+        provider: "vosk",
         lowPower: false,
         whisperProfile: "balanced",
       })
@@ -93,7 +93,7 @@ describe("use-transcription", () => {
       const { useSettingsStore, transcriptionActions } = await loadModules()
 
       useSettingsStore.setState({
-        sttProvider: "sherpa",
+        sttProvider: "vosk",
         lowPowerMode: true,
       })
 
@@ -372,10 +372,12 @@ describe("use-transcription", () => {
       expect(mockInvoke).toHaveBeenNthCalledWith(
         2,
         "start_transcription",
-        expect.any(Object),
+        expect.any(Object)
       )
       expect(useTranscriptStore.getState().segments).toEqual(existingSegments)
-      expect(useTranscriptStore.getState().currentPartial).toBe("unfinished thought")
+      expect(useTranscriptStore.getState().currentPartial).toBe(
+        "unfinished thought"
+      )
       expect(useTranscriptStore.getState().connectionStatus).toBe("error")
     })
   })
