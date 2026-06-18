@@ -1,12 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react"
-import {
-  CircleDotIcon,
-  MoonIcon,
-  RadioTowerIcon,
-  SunIcon,
-  Trash2Icon,
-  WavesIcon,
-} from "lucide-react"
+import { CircleDotIcon, MoonIcon, SunIcon, Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 import { AppLogo } from "@/components/ui/app-logo"
@@ -16,7 +9,6 @@ import {
 } from "@/stores/accent-theme-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useColorModeStore } from "@/stores/color-mode-store"
-import { useSettingsStore, type SttProvider } from "@/stores/settings-store"
 import { blackoutOutput } from "@/lib/operator-actions"
 import { WorkspaceTopNav } from "@/components/layout/workspace-top-nav"
 import packageJson from "../../../package.json"
@@ -40,12 +32,6 @@ function formatClock(date: Date): string {
     minute: "2-digit",
     second: "2-digit",
   })
-}
-
-function sttProviderLabel(provider: SttProvider) {
-  if (provider === "vosk") return "Local STT"
-  if (provider === "gladia") return "Gladia"
-  return "Deepgram"
 }
 
 function HeaderStatusChip({
@@ -82,12 +68,7 @@ export function AppControllerHeader() {
   const colorMode = useColorModeStore((s) => s.mode)
   const toggleColorMode = useColorModeStore((s) => s.toggle)
   const isLive = useBroadcastStore((s) => s.isLive)
-  const outputIssues = useBroadcastStore((s) => s.outputIssues)
-  const sttProvider = useSettingsStore((s) => s.sttProvider)
   const [clock, setClock] = useState(() => formatClock(new Date()))
-  const hasNdiIssue = outputIssues.some(
-    (issue) => issue.kind === "ndi-config" || issue.kind === "ndi-frame"
-  )
 
   useEffect(() => {
     const id = window.setInterval(() => setClock(formatClock(new Date())), 1000)
@@ -128,16 +109,6 @@ export function AppControllerHeader() {
             icon={<CircleDotIcon className="size-3" />}
             label={isLive ? "On Air" : "Standby"}
             tone={isLive ? "live" : "neutral"}
-          />
-          <HeaderStatusChip
-            icon={<RadioTowerIcon className="size-3" />}
-            label={hasNdiIssue ? "NDI Issue" : "NDI Ready"}
-            tone={hasNdiIssue ? "warn" : "ready"}
-          />
-          <HeaderStatusChip
-            icon={<WavesIcon className="size-3" />}
-            label={sttProviderLabel(sttProvider)}
-            tone={sttProvider === "vosk" ? "ready" : "neutral"}
           />
         </div>
         <div className="hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] px-3 py-1 font-mono text-xs font-semibold tracking-wider text-foreground lg:block">
