@@ -260,6 +260,8 @@ export function DesignCanvas() {
     setZoomLevel(Math.round(newZoom * 100))
   }, [resyncLatestTheme])
 
+  const draftBackgroundColor = draftTheme?.background.color ?? "#000000"
+
   const handleLibraryImageDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       const raw = event.dataTransfer.getData(
@@ -274,7 +276,7 @@ export function DesignCanvas() {
         broadcast.updateDraft({
           background: {
             type: "image",
-            color: draftTheme?.background.color ?? "#000000",
+            color: draftBackgroundColor,
             gradient: null,
             image: {
               url: image.thumbnail,
@@ -289,7 +291,7 @@ export function DesignCanvas() {
         console.warn("[theme-designer] invalid library image drop", error)
       }
     },
-    [draftTheme?.background.color],
+    [draftBackgroundColor],
   )
 
   const elementLabel =
