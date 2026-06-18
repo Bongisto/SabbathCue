@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { presentItem, selectPreviewItem } from "@/lib/presentation-workflow"
 import { useQueueStore } from "@/stores/queue-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
+import { useLibraryStore } from "@/stores/library-store"
 import {
   defaultSelectedSectionIds,
   createHymnPresentationItem,
@@ -193,6 +194,35 @@ export function HymnalPanel() {
     const queueItems = createGroupedHymnQueueItems(screens)
     queue.addItems(queueItems)
     useHymnSlideStore.getState().setDeck(presentationDeck, clampedActiveScreenIndex)
+  }
+
+  const saveHymnToLibrary = () => {
+    if (!selectedHymn || selectedSectionIds.length === 0) return
+    const sectionsById = new Map(
+      selectedHymn.sections.map((section) => [section.id, section]),
+    )
+    useLibraryStore.getState().addAsset({
+      id: crypto.randomUUID(),
+      name: `#${selectedHymn.number} ${selectedHymn.title}`,
+      type: "song",
+      collectionIds: [],
+      song: {
+        title: selectedHymn.title,
+        sections: selectedSectionIds.flatMap((sectionId, index) => {
+          const section = sectionsById.get(sectionId)
+          if (!section) return []
+          return [
+            {
+              kind: section.kind === "refrain" ? "chorus" : "verse",
+              index: index + 1,
+              lines: section.lines,
+            } as const,
+          ]
+        }),
+      },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
   }
 
   const selectedHymnIsFavorite = selectedHymn ? favoriteHymnIds.includes(selectedHymn.id) : false
@@ -445,6 +475,9 @@ export function HymnalPanel() {
                 <Button size="xs" variant="outline" disabled={screens.length === 0} onClick={queueScreens}>
                   <PlusIcon className="mr-1 size-3" />
                   Queue
+                </Button>
+                <Button size="xs" variant="outline" disabled={screens.length === 0} onClick={saveHymnToLibrary}>
+                  Save
                 </Button>
                 <Button size="xs" disabled={!activeScreen} onClick={presentActiveScreen}>
                   <PlayIcon className="mr-1 size-3" />

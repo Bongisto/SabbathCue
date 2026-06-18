@@ -11,6 +11,7 @@ const EXPECTED_IDS: DashboardWorkspace[] = [
   "service-plans",
   "live-service",
   "hymns",
+  "library",
   "settings",
   "help-legal",
 ]
@@ -33,6 +34,7 @@ describe("dashboard-workspace-nav", () => {
     expect(shortcuts["service-plans"]).toBe("Ctrl/Cmd + 2")
     expect(shortcuts["run-service"]).toBe("Ctrl/Cmd + 3")
     expect(shortcuts.hymns).toBe("Ctrl/Cmd + 4")
+    expect(shortcuts.library).toBe("Ctrl/Cmd + 5")
     expect(shortcuts["live-service"]).toBeUndefined()
     expect(shortcuts.settings).toBeUndefined()
     expect(shortcuts["help-legal"]).toBeUndefined()

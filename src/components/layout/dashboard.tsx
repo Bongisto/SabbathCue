@@ -53,6 +53,12 @@ const LazyHelpLegalPage = lazy(() =>
   })),
 )
 
+const LazyLibraryWorkspace = lazy(() =>
+  import("@/components/library/LibraryWorkspace").then((mod) => ({
+    default: mod.LibraryWorkspace,
+  })),
+)
+
 function WorkspaceFallback() {
   return <div className="glass-panel min-h-[200px] animate-pulse" />
 }
@@ -131,6 +137,10 @@ export function Dashboard() {
     ) : workspace === "hymns" ? (
       <Suspense fallback={<WorkspaceFallback />}>
         <LazyHymnWorkspace />
+      </Suspense>
+    ) : workspace === "library" ? (
+      <Suspense fallback={<WorkspaceFallback />}>
+        <LazyLibraryWorkspace />
       </Suspense>
     ) : workspace === "run-service" ? (
       <Suspense fallback={<WorkspaceFallback />}>

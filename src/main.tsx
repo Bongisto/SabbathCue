@@ -11,6 +11,7 @@ import { hydrateVerification } from "@/stores/verification-store"
 import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
 import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
 import { hydrateServicePlans } from "@/stores/service-plan-store"
+import { hydrateLibraryStore } from "@/stores/library-store"
 import { useAccentThemeStore } from "@/stores/accent-theme-store"
 import { useColorModeStore } from "@/stores/color-mode-store"
 import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
@@ -56,6 +57,7 @@ resetTranscription
       hydrateBibleStore(),
       hydrateBroadcastThemes(),
       hydrateServicePlans(),
+      hydrateLibraryStore(),
     ]).then(() => {
       useAccentThemeStore.getState().hydrate()
       useColorModeStore.getState().hydrate()

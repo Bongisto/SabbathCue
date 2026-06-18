@@ -210,6 +210,13 @@ export function handleDashboardKeyboardEvent(event: KeyboardEvent): void {
     return
   }
 
+  if (workspaceMod && !event.shiftKey && key === "5") {
+    event.preventDefault()
+    useDashboardWorkspaceStore.getState().setWorkspace("library")
+    useServicePlanStore.getState().closePlanner()
+    return
+  }
+
   if (!mod && !event.altKey && !event.shiftKey && event.key === "ArrowRight") {
     if (advancePresentationDeck(1)) event.preventDefault()
     return

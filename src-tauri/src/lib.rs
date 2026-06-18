@@ -114,6 +114,8 @@ pub fn run() {
             commands::theme_files::import_theme_from_path,
             commands::theme_files::export_theme_to_path,
             commands::theme_files::read_image_as_data_url,
+            commands::library::save_library_image,
+            commands::library::delete_library_image,
             commands::powerpoint::convert_powerpoint_to_pdf,
         ])
         .setup(|app| {
