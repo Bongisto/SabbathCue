@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | `2026-06-18 16:00` |
+| **Last updated** | `2026-06-18 16:40` |
 | **Updated by** | `Claude (Opus 4.8) — automated assessment` |
 | **Commit / build** | `d43f1de` (branch `main`, clean tree) |
 | **Test environment** | `local` — Windows 11, Node/Vite build, no app runtime profiling |
@@ -45,8 +45,9 @@
 | Error rate under load | ➖ | — | ➖ N/A | — | — |
 | Peak memory | < 600 MB idle (target) | not profiled | 🧪 | — | — |
 | Peak CPU | < 25% idle, no runaway | not profiled | 🧪 | — | — |
-| **Initial JS (gzipped)** | **< 350 KB** | **~324 KB** (main 71 + vendor 253) | ⚠️ | — | 2026-06-18 |
-| **Total JS bundle (raw)** | < 3 MB | **3.9 MB** across 47 chunks | ❌ | — | 2026-06-18 |
+| **Initial JS (gzipped)** | **< 350 KB** | **~313 KB** (main 69 + vendor 134 + react 54 + supabase 50 + tauri 6) | ✅ | 🔺 | 2026-06-18 |
+| **Largest single chunk (raw)** | < 500 KB (rolldown warn) | **460 KB** (`vendor`, was 877) | ✅ | 🔺 | 2026-06-18 |
+| **Total JS bundle (raw)** | < 3 MB | **3.9 MB** across 51 chunks | ❌ | — | 2026-06-18 |
 | **Production build time** | < 20 s | **9.2 s** (16 s wall) | ✅ | — | 2026-06-18 |
 | **Unit test suite runtime** | < 30 s | **~13 s** (603 tests) | ✅ | — | 2026-06-18 |
 | Cold start / boot time | < 2.5 s | not profiled | 🧪 | — | — |
@@ -66,11 +67,11 @@
 
 ### 2.2 Asset & Bundle Analysis
 
-- **Status:** ⚠️ Near limit (measured)
+- **Status:** ✅ Meets target (was ⚠️ Near limit) — 🔺 improved 2026-06-18 by R1
 - **Checked:** bundle size per route/chunk, code splitting, manual chunking, lazy loading. Tool: `vite build` (rolldown) reporter, 2026-06-18.
 - **Notes / findings:**
   - ✅ **Good code-splitting hygiene.** The 7 SDA hymnal data chunks (~90–137 KB each raw) are split out and lazy-loaded, not in the initial bundle. `theme-designer` (53 KB), `SettingsPage` (49 KB), `tour` (78 KB / 26 KB gz), and the `pdf.worker` (1.14 MB) are all separate, lazily-fetched chunks. Manual `manualChunks` config in [vite.config.ts](vite.config.ts) deliberately isolates `canvas` (fabric), `search` (fuse.js), `tour`, `icons`, `dialog`, and `ui`.
-  - ❌ **`vendor` chunk is 877 KB raw / 253 KB gz** — over half the gzipped initial payload and the top bundle bottleneck (PERF-001). It is a catch-all for everything not matched by a named `manualChunks` rule.
+  - 🔺 **PERF-001 addressed (R1, 2026-06-18):** the monolithic `vendor` chunk was split. **Before:** `vendor` 877 KB raw / 253 KB gz (tripped rolldown's 500 KB warning). **After:** `vendor` 460 KB / 134 KB gz + `react` 174 KB / 54 KB gz + `supabase` 196 KB / 50 KB gz + `tauri` 25 KB / 5.6 KB gz + `state` 0.7 KB. Total initial payload is roughly unchanged (same dependencies, ~313 KB gz) — the win is **caching granularity** (React/Supabase/Tauri are stable across app releases, so app-code updates no longer invalidate them) and clearing the >500 KB chunk warning. See [CODE_REFACTORING_PLAN.md](CODE_REFACTORING_PLAN.md) R1.
   - ⚠️ **`canvas` (fabric.js) is 280 KB / 87 KB gz.** Fabric is only needed by the theme designer / design canvas, not at first paint — confirm it is lazy and not in the initial graph (PERF-002).
   - ⚠️ **`pdf.worker.min` is 1.14 MB raw** (PowerPoint/PDF import). It is a worker (lazy), so it does not hit first paint, but it is the largest single asset — confirm it loads only on import.
   - ⚠️ **`verse-renderer.css` is 167 KB / 26 KB gz.** Large for a single stylesheet; likely Tailwind output. Verify Tailwind content globbing is pruning unused utilities.
@@ -123,7 +124,7 @@
 
 | ID | Area | Description | Impact | Suggested fix | Status | Owner |
 |---|---|---|---|---|---|---|
-| PERF-001 | Bundle | `vendor` chunk 877 KB / 253 KB gz dominates initial payload | High | Split `vendor` further in `manualChunks` (separate React, zustand, supabase, tauri APIs); audit with a bundle visualizer | Open | |
+| PERF-001 | Bundle | `vendor` chunk 877 KB / 253 KB gz dominated initial payload | High | Split `vendor` in `manualChunks` (react / supabase / tauri / state separated) | **Fixed (R1, 2026-06-18)** — vendor now 460 KB / 134 KB gz | |
 | PERF-002 | Bundle | `canvas`/fabric 280 KB (87 KB gz) — confirm not in first-paint graph | Med | Ensure design-canvas/theme-designer are `React.lazy`-loaded; verify fabric isn't imported by an eagerly-loaded module | Open | |
 | PERF-003 | Runtime | No live-service runtime profiling (FPS, memory growth, detection latency) | High | Add `performance.mark` harness + run a 90-min service profile; record memory at start/30/60/90 min | Open | |
 | PERF-004 | CSS | `verse-renderer.css` 167 KB / 26 KB gz | Low | Confirm Tailwind content globbing prunes unused utilities for the build | Open | |
@@ -137,6 +138,8 @@
 
 | Date | Commit | Key metric | Value | vs previous |
 |---|---|---|---|---|
+| `2026-06-18` | `8424fdb`+R1 | Largest single chunk (raw) | 460 KB (`vendor`) | 🔺 from 877 KB |
+| `2026-06-18` | `8424fdb`+R1 | `vendor` gzipped | 134 KB | 🔺 from 253 KB |
 | `2026-06-18` | `d43f1de` | Production build time | 9.2 s | ➖ (baseline) |
 | `2026-06-18` | `d43f1de` | Unit test suite (603 tests) | ~13 s | ➖ (baseline) |
 | `2026-06-18` | `d43f1de` | Total JS bundle (raw) | 3.9 MB / 47 chunks | ➖ (baseline) |
@@ -161,6 +164,7 @@
 
 | Date | By | Summary of change | Metrics affected |
 |---|---|---|---|
+| `2026-06-18` | Claude (Opus 4.8) | **R1: split monolithic `vendor` chunk** (877→460 KB raw / 253→134 KB gz) into react/supabase/tauri/state. Overall status → 🟡 Mixed still (total raw bundle + runtime unprofiled). | Bundle composition, caching |
 | `2026-06-18` | Claude (Opus 4.8) | Initial measured baseline: build, bundle, tests, lint, typecheck. Runtime/web-vitals flagged as not-yet-measured. | Bundle, build time, test runtime |
 
 ---

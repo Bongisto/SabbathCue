@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| **Last updated** | `2026-06-18 16:10` |
+| **Last updated** | `2026-06-18 16:40` |
 | **Updated by** | `Claude (Opus 4.8) — automated assessment` |
 | **Commit / build** | `d43f1de` (branch `main`, clean tree) |
 | **Overall status** | 🟢 Secure (with verify/monitor items) |
@@ -40,7 +40,7 @@
 | Cross-site scripting (XSS) | ✅ | 2026-06-18 | 0 `dangerouslySetInnerHTML`, 0 `eval`/`new Function`; React auto-escaping; strict CSP |
 | CSRF protection | 🔵 | 2026-06-18 | N/A — no cookie-session web surface; Supabase uses bearer tokens |
 | Secrets & credential management | ✅ | 2026-06-18 | API keys in **OS keychain** via `keyring`; `.env` gitignored & untracked |
-| Dependency / supply-chain | ✅ | 2026-06-18 | `npm audit`: **0 vulnerabilities**; lockfiles committed |
+| Dependency / supply-chain | ✅ | 2026-06-18 | `npm audit` **0 vulns** + `cargo audit` **0 vulns** (696 crates); 21 advisory warnings (unmaintained/unsound transitive) |
 | Data protection & encryption | ✅ | 2026-06-18 | TLS to Supabase; keychain at rest; updates minisign-signed |
 | Session management | ⚠️ | 2026-06-18 | `persistSession:false`, custom verification token store; verify token-at-rest handling |
 | API / endpoint security | ⚠️ | 2026-06-18 | Supabase RPCs (`register_device`) + RLS; verify least-privilege on RPCs |
@@ -108,8 +108,8 @@
 - **Checked:** `npm audit`, lockfiles, CVEs.
 - **Findings:**
   - `npm audit`: **0 vulnerabilities** (info/low/moderate/high/critical all 0) as of 2026-06-18.
+  - **`cargo audit` (R8, 2026-06-18): 0 vulnerabilities** across **696 crate dependencies** (1,134 advisories loaded). It reported **21 advisory *warnings*** — all "unmaintained" or "unsound" transitive crates, e.g. `glib 0.18.5` (RUSTSEC-2024-0429, unsound, transitive via Tauri/GTK on Linux), `rand` (RUSTSEC-2026-0097, unsound only with a custom logger calling `rand::rng()`), `unic-ucd-version` (unmaintained). **None are exploitable vulnerabilities**; they are upstream maintenance signals to monitor on dependency bumps.
   - Lockfiles committed (`package-lock.json`, `bun.lock`); Rust pins via `Cargo.lock` + `rust-toolchain.toml`.
-  - **Verify (👤):** Rust crate CVEs were **not** scanned here — run `cargo audit` to complete supply-chain coverage (SEC-002).
 
 ### 2.8 Data Protection & Encryption
 
@@ -145,7 +145,7 @@
 | ID | Severity | Area | Description | Status | Owner | Opened | Target |
 |---|---|---|---|---|---|---|---|
 | SEC-001 | Medium | AuthZ | Verify RLS enabled + explicit policies on **every** Supabase table and least-privilege on RPCs | Open | 👤 | 2026-06-18 | next release |
-| SEC-002 | Low | Supply chain | Run `cargo audit` for Rust crate CVEs (only `npm audit` run so far) | Open | 🤖 | 2026-06-18 | next release |
+| SEC-002 | Low | Supply chain | Run `cargo audit` for Rust crate CVEs | **Fixed (R8, 2026-06-18)** — 0 vulns / 696 crates; 21 maintenance warnings to monitor | 🤖 | 2026-06-18 | done |
 | SEC-003 | Low | File handling | Add/confirm `starts_with(app_dir)` containment after `canonicalize()` for imported asset paths | Open | 🤖 | 2026-06-18 | next release |
 | SEC-004 | Low | Session | Confirm verification/device token storage location + logout invalidation | Open | 🤖+👤 | 2026-06-18 | next release |
 | SEC-005 | Info | Auth | Confirm Supabase brute-force/rate-limit + lockout enabled in dashboard | Open | 👤 | 2026-06-18 | next release |
@@ -160,7 +160,7 @@
 | Manual source review | — | CSP, capabilities, secrets, injection sinks, XSS sinks | 2026-06-18 |
 | `git ls-files` | git | Secret/`.env` tracking check | 2026-06-18 |
 | Migration review | — | Supabase RLS / RPC posture | 2026-06-18 |
-| `cargo audit` | — | Rust crate CVEs | 🧪 not yet run (SEC-002) |
+| `cargo audit` | 0.21+ | Rust crate CVEs (0 vulns / 696 crates; 21 warnings) | 2026-06-18 |
 | DAST / pen test | — | Runtime attack surface | 🧪 not run |
 
 ---
@@ -171,6 +171,7 @@
 
 | Date | By | Summary of change | Items affected |
 |---|---|---|---|
+| `2026-06-18` | Claude (Opus 4.8) | **R8: ran `cargo audit`** — 0 vulnerabilities / 696 crates; 21 maintenance warnings recorded. SEC-002 closed. | §2.7 Dependencies |
 | `2026-06-18` | Claude (Opus 4.8) | Initial assessment. Strong posture: keychain secrets, strict CSP, least-privilege Tauri capabilities, signed updates, 0 npm vulns, RLS present. 5 verify/low items opened (SEC-001…005). | All sections |
 
 ---

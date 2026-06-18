@@ -40,14 +40,14 @@
 
 | # | Item | Source | Technique | Files affected | Risk | Status |
 |---|---|---|---|---|:---:|:---:|
-| R1 | Split monolithic `vendor` chunk (877 KB / 253 KB gz) into react / state / supabase / tauri sub-chunks | PERF-001 | edit `manualChunks` | [vite.config.ts](vite.config.ts) | 🟢 | `[ ]` |
+| R1 | Split monolithic `vendor` chunk (877 KB / 253 KB gz) into react / state / supabase / tauri sub-chunks | PERF-001 | edit `manualChunks` | [vite.config.ts](vite.config.ts) | 🟢 | `[x]` **done 2026-06-18** — vendor → 460 KB / 134 KB gz + react/supabase/tauri/state |
 | R2 | Confirm `fabric`/`canvas` (280 KB) and `pdf.worker` (1.14 MB) are lazy, not in first-paint graph | PERF-002, PERF-005 | `React.lazy` audit | design-canvas, theme-designer, ppt-import | 🟢 | `[ ]` |
 | R3 | Verify Tailwind content-globbing prunes unused CSS (`verse-renderer.css` 167 KB) | PERF-004 | build config check | tailwind/vite config | 🟢 | `[ ]` |
 | R4 | Extract `wrapText` / layout-math / draw from `verse-renderer.ts` (1,197 LOC, hot path) | DBG #2 | extract module | [src/lib/verse-renderer.ts](src/lib/verse-renderer.ts) | 🟡 | `[ ]` |
 | R5 | Data-drive or split builtin themes (1,467 LOC) | DBG #1 | extract data | [src/lib/builtin-themes.ts](src/lib/builtin-themes.ts) | 🟢 | `[ ]` |
 | R6 | Introduce leveled logger; replace 67 stray `console.*` | DBG #6 / SEC §2.12 | wrap + replace | `src/**` (67 sites) | 🟢 | `[ ]` |
 | R7 | **Verify RLS enabled + explicit policies on every Supabase table; least-privilege RPCs** | SEC-001 | DB review | `supabase/migrations/**` | 🟡 | `[ ]` |
-| R8 | Run `cargo audit` for Rust crate CVEs | SEC-002 | tooling | `src-tauri/Cargo.lock` | 🟢 | `[ ]` |
+| R8 | Run `cargo audit` for Rust crate CVEs | SEC-002 | tooling | `src-tauri/Cargo.lock` | 🟢 | `[x]` **done 2026-06-18** — 0 vulns / 696 crates; 21 maintenance warnings |
 | R9 | Add `vitest --coverage`, `eslint complexity`, `jscpd`, `cargo audit` to CI | DBG B3 / SEC-002 | CI tooling | [.github/workflows/desktop-ci.yml](.github/workflows/desktop-ci.yml) | 🟢 | `[ ]` |
 | R10 | Live-service runtime profiling (FPS, memory growth, detection latency over 90 min) | PERF-003 | instrument + soak | `main.tsx`, broadcast path | 🟡 | `[ ]` |
 | R11 | Add `starts_with(app_dir)` containment after `canonicalize()` for imported assets | SEC-003 | guard clause | [src-tauri/src/commands/assets.rs](src-tauri/src/commands/assets.rs) | 🟢 | `[ ]` |
@@ -86,13 +86,14 @@
 
 | Metric | Before (2026-06-18) | After | Δ |
 |---|---|---|---|
-| Largest initial gz chunk | 253 KB (`vendor`) | | |
-| Total JS bundle (raw) | 3.9 MB | | |
-| Max non-data file (LOC) | 1,467 (`builtin-themes.ts`) | | |
-| Test coverage | not instrumented | | |
-| Lint warnings | 0 | | |
-| npm + cargo vulnerabilities | 0 npm / cargo not run | | |
-| Open security verify-items | 5 (SEC-001…005) | | |
+| Largest single raw chunk | 877 KB (`vendor`) | 460 KB (`vendor`) | **−417 KB** (R1) |
+| `vendor` gzipped | 253 KB | 134 KB | **−119 KB** (R1) |
+| Total JS bundle (raw) | 3.9 MB | 3.9 MB | ~0 (split, not removed) |
+| Max non-data file (LOC) | 1,467 (`builtin-themes.ts`) | 1,467 | pending (R5) |
+| Test coverage | not instrumented | not instrumented | pending (R9) |
+| Lint warnings | 0 | 0 | ➖ |
+| npm + cargo vulnerabilities | 0 npm / cargo not run | **0 npm / 0 cargo** | ✅ (R8) |
+| Open security verify-items | 5 (SEC-001…005) | 4 (SEC-002 closed) | **−1** (R8) |
 
 ## 7. Open Questions & Follow-ups
 
