@@ -154,7 +154,7 @@
 | Vite build (rolldown) reporter | per `package.json` | Bundle size / chunking | 2026-06-18 |
 | Vitest | v4.1.6 | Unit test runtime | 2026-06-18 |
 | `tsc --noEmit` | per `tsconfig` | Typecheck (passed) | 2026-06-18 |
-| ESLint flat config | per `eslint.config.js` | Lint (passed, 0 warnings) | 2026-06-18 |
+| ESLint flat config | per `eslint.config.js` | Lint (passed, 0 errors) | 2026-06-18 |
 | Lighthouse / runtime profiler | — | Web Vitals, memory | 🧪 not yet run |
 | Live-service soak profile | — | Memory growth, detection latency | 🧪 not yet run |
 

@@ -26,11 +26,14 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Unit tests
-        run: bun run test -- --run
+      - name: Unit tests + coverage
+        run: bun run test:coverage
 
       - name: Lint
         run: bun run lint
+
+      - name: Duplication check
+        run: bunx jscpd
 
       - name: Build frontend
         run: bun run build

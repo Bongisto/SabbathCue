@@ -18,7 +18,7 @@
 | Goal | Reduce bundle weight + oversized hot-path files; close security verify-items; add measurement to CI — **no feature changes** |
 | Test safety net | **Yes** — 603 unit tests / 89 files green (~13 s); typecheck + lint clean; e2e configured |
 
-**Verdict:** The codebase is **healthy and well-disciplined** (0 lint warnings, 0 `any`, 0 debt markers, 0 npm vulns, secrets in OS keychain, strict CSP). There is **no correctness crisis and no rewrite case.** The work is incremental hardening: trim the bundle, split a handful of god-files, verify a few security items, and bolt measurement onto CI so this stays true.
+**Verdict:** The codebase is **healthy and well-disciplined** (0 lint errors, 0 `any`, 0 debt markers, 0 npm vulns, secrets in OS keychain, strict CSP). There is **no correctness crisis and no rewrite case.** The work is incremental hardening: trim the bundle, split a handful of god-files, verify a few security items, and bolt measurement onto CI so this stays true.
 
 ---
 
@@ -48,7 +48,7 @@
 | R6 | Introduce leveled logger; replace 67 stray `console.*` | DBG #6 / SEC §2.12 | wrap + replace | `src/**` (67 sites) | 🟢 | `[ ]` |
 | R7 | **Verify RLS enabled + explicit policies on every Supabase table; least-privilege RPCs** | SEC-001 | DB review | `supabase/migrations/**` | 🟡 | `[ ]` |
 | R8 | Gate Rust crate advisories in CI | SEC-002 | tooling | [src-tauri/deny.toml](src-tauri/deny.toml) | 🟢 | `[x]` **done 2026-06-18** — `cargo deny check` already in CI (0 issues / 696 crates); hardened `workspace → all` + 8 documented ignores |
-| R9 | Add `vitest --coverage`, `eslint complexity`, `jscpd` to CI (Rust advisories already gated via `cargo deny`, hardened in R8) | DBG B3 | CI tooling | [.github/workflows/desktop-ci.yml](.github/workflows/desktop-ci.yml) | 🟢 | `[~]` cargo-deny portion done (R8); coverage/complexity/jscpd pending |
+| R9 | Add `vitest --coverage` (gated), `eslint complexity` (warn), `jscpd` to CI | DBG B3 | CI tooling | [.github/workflows/desktop-ci.yml](.github/workflows/desktop-ci.yml), `vitest.config.ts`, `eslint.config.js`, `.jscpd.json` | 🟢 | `[x]` **done 2026-06-18** — coverage floor ~40%, complexity warn@20, jscpd<3%; Rust advisories via `cargo deny` (R8) |
 | R10 | Live-service runtime profiling (FPS, memory growth, detection latency over 90 min) | PERF-003 | instrument + soak | `main.tsx`, broadcast path | 🟡 | `[ ]` |
 | R11 | Add `starts_with(app_dir)` containment after `canonicalize()` for imported assets | SEC-003 | guard clause | [src-tauri/src/commands/assets.rs](src-tauri/src/commands/assets.rs) | 🟢 | `[ ]` |
 | R12 | Confirm verification/device token storage location + logout invalidation | SEC-004 | review | [src/lib/verification/session-storage.ts](src/lib/verification/session-storage.ts) | 🟢 | `[ ]` |
@@ -90,8 +90,10 @@
 | `vendor` gzipped | 253 KB | 134 KB | **−119 KB** (R1) |
 | Total JS bundle (raw) | 3.9 MB | 3.9 MB | ~0 (split, not removed) |
 | Max non-data file (LOC) | 1,467 (`builtin-themes.ts`) | 1,467 | pending (R5) |
-| Test coverage | not instrumented | not instrumented | pending (R9) |
-| Lint warnings | 0 | 0 | ➖ |
+| Test coverage (all `src/**`) | not instrumented | **39.6% / gated** | ✅ measured + gated (R9) |
+| Max cyclomatic complexity | not measured | **58 / warn-gated @20** | ✅ measured (R9) |
+| Duplication % | not measured | **0.71% / gated <3%** | ✅ measured + gated (R9) |
+| Lint errors | 0 | 0 | ➖ |
 | npm + cargo vulnerabilities | 0 npm / cargo not run | **0 npm / 0 cargo** | ✅ (R8) |
 | Open security verify-items | 5 (SEC-001…005) | 4 (SEC-002 closed) | **−1** (R8) |
 
@@ -107,7 +109,7 @@
 
 ```bash
 npx tsc --noEmit              # typecheck — clean
-npx eslint .                  # lint — 0 warnings
+npx eslint .                  # lint — 0 errors
 npx vitest --run              # 603 tests / 89 files pass (~13 s)
 npx vite build                # production build (9.2 s) + bundle report
 npm audit --json              # 0 vulnerabilities

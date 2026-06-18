@@ -26,7 +26,7 @@
 
 ### Phase 1 — Gather signals
 
-- [x] Linters / formatters — **ESLint: 0 warnings/errors** (exit 0); Prettier configured
+- [x] Linters / formatters — **ESLint: 0 errors** (exit 0); after R9 a `complexity` warn-rule surfaces 13 hotspots; Prettier configured
 - [x] Static analysis (size/dup proxy via LOC + manual read) — no dedicated complexity tool run yet
 - [x] Test suite — **603 tests / 89 files pass**, ~13 s; `tsc --noEmit` clean
 - [x] Churn data — top hotspots: `settings-dialog.tsx` (41), `live-output-panel.tsx` (29), `dashboard.tsx` (28), `search-panel.tsx` (24), `preview-panel.tsx` (24), `use-transcription.ts` (22)
@@ -62,9 +62,9 @@
 | **Duplication** | 4/5 | No obvious copy-paste; hymnal data is generated chunks (acceptable) |
 | **Coupling / cohesion** | 4/5 | Zustand stores keep state cohesive; `broadcast-store` reaches into video/queue/store plugins (watch coupling) |
 | **Error handling** | 4/5 | `toast`-based user feedback; no swallowed-error markers found. Confirm Rust `Result` paths surface to UI |
-| **Testing** | 5/5 | 603 passing tests, hooks + lib + components covered; e2e configured |
+| **Testing** | 4/5 | 603 passing tests, hooks + lib + components covered; e2e configured. Coverage now measured & gated at ~40% all-`src` (R9) — solid for core logic, room to grow |
 | **Documentation** | 4/5 | Strong README + multiple review docs; inline "why" comments sparse but code is self-describing |
-| **Consistency** | 5/5 | One style throughout; 0 lint warnings, 0 `eslint-disable` |
+| **Consistency** | 5/5 | One style throughout; **0 lint errors**, 0 `eslint-disable` in `src/` (3 unused-disable elsewhere) |
 | **Dependencies** | 4/5 | 32 prod deps, current majors (React 19, Tauri 2.10); fabric/pdf-worker are heavy but justified |
 | **Security** | 4/5 | Dedicated `secrets.rs` (733 LOC) + `api-key-prompt`; verify secret storage uses OS keychain, not plaintext store |
 | **Performance** | 3/5 | Build/tests fast; bundle `vendor` oversized; runtime not yet profiled (see perf report) |
@@ -105,11 +105,11 @@
 
 | Metric | Before | Target | Tool |
 |---|---|---|---|
-| Test coverage | not instrumented (603 tests green) | report `--coverage` | Vitest |
-| Lint warnings | **0** | 0 | ESLint |
+| Test coverage (all `src/**`) | **39.6% stmts / 33.5% branch / 37.3% funcs / 40.8% lines** (gated, R9) | ratchet ↑ | Vitest + v8 |
+| Lint errors / warnings | **0 errors** / 16 warnings (13 complexity + 3 pre-existing unused-disable) | 0 errors | ESLint |
 | Typecheck errors | **0** | 0 | `tsc --noEmit` |
-| Cyclomatic complexity (max / avg) | not measured | add `eslint complexity` rule | — |
-| Duplication % | not measured | < 3% | jscpd |
+| Cyclomatic complexity (max) | **58** (11 funcs > 20); now `warn`-gated at 20 (R9) | ratchet ↓ | `eslint complexity` |
+| Duplication % | **0.71%** (61 clones / 696 lines); gated < 3% (R9) | < 3% | jscpd |
 | Largest file (LOC, non-data) | **1,467** (`builtin-themes.ts`) | < 500 | `wc -l` |
 | Unit test runtime | **~13 s** (603 tests) | < 30 s | Vitest |
 | Production build time | **9.2 s** | < 20 s | Vite |
