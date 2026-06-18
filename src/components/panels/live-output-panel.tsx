@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CanvasPresentation } from "@/components/ui/canvas-verse"
+import { VideoControlBar } from "@/components/broadcast/VideoControlBar"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { Switch } from "@/components/ui/switch"
@@ -214,6 +215,10 @@ export function LiveOutputPanel({ className }: { className?: string }) {
           className="data-[state=checked]:bg-emerald-500"
         />
       </div>
+
+      {isLive && liveItem?.kind === "video" ? (
+        <VideoControlBar item={liveItem} />
+      ) : null}
 
       <div
         data-slot="live-output-stage"

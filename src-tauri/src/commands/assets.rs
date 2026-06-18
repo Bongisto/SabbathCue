@@ -16,7 +16,7 @@ use crate::commands::path_guard::{
 
 const MAX_SLIDE_SIZE_BYTES: u64 = 10_000_000;
 const MAX_DOCUMENT_SIZE_BYTES: u64 = 100 * 1024 * 1024;
-const MAX_MEDIA_SIZE_BYTES: u64 = 750 * 1024 * 1024;
+pub(crate) const MAX_MEDIA_SIZE_BYTES: u64 = 750 * 1024 * 1024;
 
 const SUPPORTED_ATTACHMENT_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "gif", "pdf"];
 

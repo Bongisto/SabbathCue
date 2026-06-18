@@ -117,6 +117,7 @@ pub fn run() {
             commands::library::save_library_image,
             commands::library::delete_library_image,
             commands::powerpoint::convert_powerpoint_to_pdf,
+            commands::video::validate_video_path,
         ])
         .setup(|app| {
             use tauri::Manager;

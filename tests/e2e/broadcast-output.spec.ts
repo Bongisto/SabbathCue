@@ -79,6 +79,18 @@ const verse = {
   segments: [{ verseNumber: 16, text: "For God so loved the world." }],
 }
 
+const videoItem = {
+  kind: "video",
+  reference: "Welcome Video",
+  segments: [{ text: "Welcome Video" }],
+  video: {
+    source: "url",
+    videoId: "video-e2e",
+    title: "Welcome Video",
+    url: "https://cdn.example.com/welcome.mp4",
+  },
+}
+
 test("broadcast output paints the same payload committed from preview", async ({ page }) => {
   await page.goto("/broadcast-output.html?output=main&e2e=1", {
     waitUntil: "domcontentloaded",
@@ -148,4 +160,43 @@ test("broadcast output paints the same payload committed from preview", async ({
   )
   expect(metrics?.brightPixels).toBeGreaterThan(5)
   expect(metrics?.goldPixels).toBeGreaterThan(1)
+})
+
+test("broadcast output switches to the native video overlay for video payloads", async ({
+  page,
+}) => {
+  await page.goto("/broadcast-output.html?output=main&e2e=1", {
+    waitUntil: "domcontentloaded",
+  })
+
+  await page.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__))
+  await page.evaluate(
+    ({ theme, item }) => {
+      window.__SABBATHCUE_BROADCAST_TEST__?.render({ theme, item })
+    },
+    { theme, item: videoItem },
+  )
+
+  const video = page.locator("video")
+  await expect(video).toBeVisible()
+  await expect(video).toHaveJSProperty("src", videoItem.video.url)
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const canvas = document.querySelector("canvas")
+        const ctx = canvas?.getContext("2d")
+        if (!canvas || !ctx) return null
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        let blackPixels = 0
+        for (let i = 0; i < data.length; i += 4 * 100) {
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          if (r === 0 && g === 0 && b === 0) blackPixels += 1
+        }
+        return blackPixels
+      }),
+    )
+    .toBeGreaterThan(9000)
 })

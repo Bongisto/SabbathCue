@@ -10,7 +10,15 @@ import type {
   PresentationRenderData,
 } from "@/types"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import {
+  buildVideoCommand,
+  emitVideoCommand,
+  type VideoTimeUpdatePayload,
+  type VideoTransportCommand,
+} from "@/lib/broadcast-video-control"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
+import { getPresentationRenderData } from "@/types"
+import { useQueueStore } from "@/stores/queue-store"
 
 type SelectedElement = "verse" | "reference" | null
 
@@ -23,6 +31,12 @@ interface BroadcastState {
   liveItem: PresentationRenderData | null
   readingModeAutoLive: boolean
   opacity: number
+  videoTransport: VideoTimeUpdatePayload | null
+  videoLoop: boolean
+  videoMuted: boolean
+  videoVolume: number
+  autoAdvanceVideoOnEnd: boolean
+  preferredAudioOutputDeviceId: string
 
   // Projector display settings
   mainDisplayMonitorIndex: number
@@ -57,6 +71,14 @@ interface BroadcastState {
   commitLiveItem: (item: PresentationRenderData, options?: { makeLive?: boolean }) => void
   setReadingModeAutoLive: (enabled: boolean) => void
   setOpacity: (opacity: number) => void
+  sendVideoCommand: (command: VideoTransportCommand) => void
+  setVideoTransport: (payload: VideoTimeUpdatePayload) => void
+  setVideoLoop: (loop: boolean) => void
+  setVideoMuted: (muted: boolean) => void
+  setVideoVolume: (volume: number) => void
+  setPreferredAudioOutputDeviceId: (deviceId: string) => void
+  setAutoAdvanceVideoOnEnd: (enabled: boolean) => void
+  handleVideoEnded: () => VideoEndDecision
   syncBroadcastOutput: () => void
   syncBroadcastOutputFor: (outputId: string) => void
   reportOutputIssue: (input: {
@@ -116,9 +138,38 @@ function findThemeById(themes: BroadcastTheme[], id: string): BroadcastTheme | n
   return themes.find((theme) => theme.id === id) ?? themes[0] ?? null
 }
 
+export type VideoEndDecision = "loop" | "advance" | "hold"
+
 const OUTPUT_ISSUE_LIMIT = 20
 const OUTPUT_ISSUE_TTL_MS = 10 * 60 * 1000
+const PREFERRED_AUDIO_DEVICE_STORAGE_KEY = "sabbathcue:video:preferred-audio-output-device"
 const reportedLoadFailureIds = new Set<string>()
+
+export function decideVideoEndAction(input: {
+  loop: boolean
+  autoAdvance: boolean
+  hasNextItem: boolean
+}): VideoEndDecision {
+  if (input.loop) return "loop"
+  if (input.autoAdvance && input.hasNextItem) return "advance"
+  return "hold"
+}
+
+function readPreferredAudioOutputDeviceId(): string {
+  try {
+    return globalThis.localStorage.getItem(PREFERRED_AUDIO_DEVICE_STORAGE_KEY) ?? ""
+  } catch {
+    return ""
+  }
+}
+
+function savePreferredAudioOutputDeviceId(deviceId: string): void {
+  try {
+    globalThis.localStorage.setItem(PREFERRED_AUDIO_DEVICE_STORAGE_KEY, deviceId)
+  } catch {
+    // localStorage is optional in test and non-browser runtimes.
+  }
+}
 
 export function buildBroadcastHydrationPatch({
   customThemes,
@@ -300,6 +351,12 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   liveItem: null,
   readingModeAutoLive: true,
   opacity: 1,
+  videoTransport: null,
+  videoLoop: false,
+  videoMuted: false,
+  videoVolume: 1,
+  autoAdvanceVideoOnEnd: true,
+  preferredAudioOutputDeviceId: readPreferredAudioOutputDeviceId(),
   mainDisplayMonitorIndex: 0,
   altDisplayMonitorIndex: 0,
   mainDisplayMonitorKey: "",
@@ -484,8 +541,10 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
     get().syncBroadcastOutputFor("alt")
   },
   setLive: (isLive) => {
+    const shouldStopVideo = !isLive && get().liveItem?.kind === "video"
     set({ isLive })
     get().syncBroadcastOutput()
+    if (shouldStopVideo) get().sendVideoCommand({ type: "stop" })
   },
   setPreviewItem: (previewItem) => {
     set({ previewItem })
@@ -496,8 +555,14 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
   },
   commitLiveItem: (liveItem, options) => {
     const makeLive = options?.makeLive ?? true
+    const previousWasVideo = get().liveItem?.kind === "video"
     set(makeLive ? { liveItem, isLive: true } : { liveItem })
     get().syncBroadcastOutput()
+    if (liveItem.kind === "video") {
+      get().sendVideoCommand({ type: "load", item: liveItem })
+    } else if (previousWasVideo) {
+      get().sendVideoCommand({ type: "stop" })
+    }
   },
   setReadingModeAutoLive: (readingModeAutoLive) => {
     set({ readingModeAutoLive })
@@ -508,6 +573,76 @@ export const useBroadcastStore = create<BroadcastState>((set, get) => ({
       : 1
     set({ opacity: nextOpacity })
     get().syncBroadcastOutput()
+  },
+  sendVideoCommand: (command) => {
+    const payload = buildVideoCommand(command)
+    if (payload.type === "setLoop") set({ videoLoop: payload.loop })
+    if (payload.type === "setMuted") set({ videoMuted: payload.muted })
+    if (payload.type === "setVolume") set({ videoVolume: payload.volume })
+    if (payload.type === "setSinkId") {
+      savePreferredAudioOutputDeviceId(payload.sinkId)
+      set({ preferredAudioOutputDeviceId: payload.sinkId })
+    }
+    void emitVideoCommand(payload).catch((error) => {
+      console.warn("[broadcast-store] video command emit failed", error)
+      get().reportOutputIssue({
+        outputId: "global",
+        kind: "broadcast-sync",
+        title: "Video control failed",
+        description: `Could not send video control: ${String(error)}`,
+      })
+    })
+  },
+  setVideoTransport: (payload) => {
+    set({
+      videoTransport: payload,
+      videoLoop: payload.loop,
+      videoMuted: payload.muted,
+      videoVolume: payload.volume,
+    })
+  },
+  setVideoLoop: (loop) => {
+    set({ videoLoop: loop })
+    get().sendVideoCommand({ type: "setLoop", loop })
+  },
+  setVideoMuted: (muted) => {
+    set({ videoMuted: muted })
+    get().sendVideoCommand({ type: "setMuted", muted })
+  },
+  setVideoVolume: (volume) => {
+    const nextVolume = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 1))
+    set({ videoVolume: nextVolume })
+    get().sendVideoCommand({ type: "setVolume", volume: nextVolume })
+  },
+  setPreferredAudioOutputDeviceId: (deviceId) => {
+    savePreferredAudioOutputDeviceId(deviceId)
+    set({ preferredAudioOutputDeviceId: deviceId })
+    get().sendVideoCommand({ type: "setSinkId", sinkId: deviceId })
+  },
+  setAutoAdvanceVideoOnEnd: (enabled) => {
+    set({ autoAdvanceVideoOnEnd: enabled })
+  },
+  handleVideoEnded: () => {
+    const queue = useQueueStore.getState()
+    const nextIndex =
+      queue.activeIndex === null ? -1 : Math.min(queue.activeIndex + 1, queue.items.length - 1)
+    const nextItem = nextIndex >= 0 ? queue.items[nextIndex] : null
+    const decision = decideVideoEndAction({
+      loop: get().videoLoop,
+      autoAdvance: get().autoAdvanceVideoOnEnd,
+      hasNextItem: Boolean(nextItem),
+    })
+
+    if (decision === "loop") {
+      get().sendVideoCommand({ type: "restart" })
+      return decision
+    }
+    if (decision === "advance" && nextItem) {
+      queue.setActive(nextIndex)
+      const renderData = getPresentationRenderData(nextItem.presentation)
+      get().commitLiveItem(renderData)
+    }
+    return decision
   },
   setMainDisplayMonitorIndex: (mainDisplayMonitorIndex) => {
     set({ mainDisplayMonitorIndex })

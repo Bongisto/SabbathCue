@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core"
+import { convertFileSrc, invoke } from "@tauri-apps/api/core"
 
 declare global {
   interface Window {
@@ -22,4 +22,9 @@ export async function invokeTauri<T>(command: string, args?: Record<string, unkn
   }
 
   return invoke<T>(command, args)
+}
+
+export function convertTauriFileSrc(filePath: string): string {
+  if (!isTauriRuntime()) return filePath
+  return convertFileSrc(filePath)
 }

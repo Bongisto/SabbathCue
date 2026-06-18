@@ -1,12 +1,18 @@
 import { createRoot } from "react-dom/client"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import "@/index.css"
+import { useBroadcastVideo } from "@/hooks/use-broadcast-video"
+import {
+  useBroadcastYoutube,
+  useYoutubeEmbedUrl,
+} from "@/hooks/use-broadcast-youtube"
 import { useBroadcastOutputRuntime } from "@/hooks/use-broadcast-output-runtime"
 import {
   ACCENT_THEME_STORAGE_KEY,
   accentThemeClassName,
   type AccentTheme,
 } from "@/stores/accent-theme-store"
+import type { PresentationRenderData } from "@/types"
 
 function readAccentTheme(): AccentTheme {
   try {
@@ -41,7 +47,24 @@ const outputId =
 
 function BroadcastCanvas() {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
-  useBroadcastOutputRuntime({ canvas, outputId })
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
+  const [youtubeFrame, setYoutubeFrame] = useState<HTMLIFrameElement | null>(null)
+  const [item, setItem] = useState<PresentationRenderData | null>(null)
+  const videoItem = item?.kind === "video" ? item : null
+  const youtubeSrc = useYoutubeEmbedUrl(videoItem?.video?.youtubeId)
+  const isYoutube = videoItem?.video?.source === "youtube"
+  const handlePayloadChange = useCallback(
+    (payload: { item: PresentationRenderData | null }) => setItem(payload.item),
+    [],
+  )
+
+  useBroadcastOutputRuntime({
+    canvas,
+    outputId,
+    onPayloadChange: handlePayloadChange,
+  })
+  useBroadcastVideo({ video: videoElement, item: videoItem, outputId })
+  useBroadcastYoutube(youtubeFrame, isYoutube)
 
   useEffect(() => {
     applyAccentThemeToDocument()
@@ -55,18 +78,51 @@ function BroadcastCanvas() {
   }, [])
 
   return (
-    <canvas
-      ref={setCanvas}
-      style={{
-        position: "fixed",
-        inset: 0,
-        width: "100vw",
-        height: "100vh",
-        display: "block",
-        background: "#000",
-        objectFit: "contain",
-      }}
-    />
+    <>
+      <canvas
+        ref={setCanvas}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100vw",
+          height: "100vh",
+          display: "block",
+          background: "#000",
+          objectFit: "contain",
+        }}
+      />
+      <video
+        ref={setVideoElement}
+        playsInline
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100vw",
+          height: "100vh",
+          display: videoItem && !isYoutube ? "block" : "none",
+          background: "#000",
+          objectFit: "contain",
+          zIndex: 2,
+        }}
+      />
+      <iframe
+        ref={setYoutubeFrame}
+        title={videoItem?.reference ?? "YouTube video"}
+        src={isYoutube && youtubeSrc ? youtubeSrc : undefined}
+        allow="autoplay; encrypted-media; picture-in-picture"
+        allowFullScreen
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100vw",
+          height: "100vh",
+          display: isYoutube ? "block" : "none",
+          background: "#000",
+          border: 0,
+          zIndex: 2,
+        }}
+      />
+    </>
   )
 }
 

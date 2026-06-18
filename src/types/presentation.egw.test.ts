@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { getPresentationRenderData } from "./presentation"
-import type { EgwPresentationItemData } from "./presentation"
+import type { EgwPresentationItemData, VideoPresentationItemData } from "./presentation"
 
 describe("EGW presentation render data", () => {
   it("maps an EGW item to reference + segments", () => {
@@ -25,5 +25,25 @@ describe("EGW presentation render data", () => {
     expect(render.kind).toBe("egw")
     expect(render.reference).toBe("Patriarchs and Prophets 1:3")
     expect(render.segments).toEqual([{ text: "God is love." }])
+  })
+
+  it("maps a video item to reference + source carrier", () => {
+    const item: VideoPresentationItemData = {
+      kind: "video",
+      videoId: "video-1",
+      title: "Welcome",
+      source: "local",
+      videoPath: "C:\\Videos\\welcome.mp4",
+      reference: "Welcome",
+      segments: [{ text: "Welcome" }],
+    }
+    const render = getPresentationRenderData(item)
+    expect(render.kind).toBe("video")
+    expect(render.reference).toBe("Welcome")
+    expect(render.video).toMatchObject({
+      source: "local",
+      videoId: "video-1",
+      videoPath: "C:\\Videos\\welcome.mp4",
+    })
   })
 })

@@ -1,6 +1,7 @@
 import { FolderPlusIcon, PlayIcon, PlusIcon, SendIcon, Trash2Icon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { libraryAssetToServiceItem } from "@/lib/library/asset-to-service-item"
+import { videoAssetToPresentation } from "@/lib/library/library-video"
 import { songDocToDeck } from "@/lib/library/song-doc"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
@@ -28,6 +29,11 @@ export function AssetCard({ asset }: AssetCardProps) {
     broadcast.saveTheme({ ...asset.theme, builtin: false })
     broadcast.setActiveTheme(asset.theme.id)
   }
+  const videoMissing =
+    asset.type === "video" &&
+    ((asset.source === "local" && !asset.filePath) ||
+      (asset.source === "url" && !asset.url) ||
+      (asset.source === "youtube" && !asset.youtubeId))
 
   const unlinkedCollection = collections.find(
     (collection) => !asset.collectionIds.includes(collection.id),
@@ -59,8 +65,8 @@ export function AssetCard({ asset }: AssetCardProps) {
             loading="lazy"
           />
         ) : (
-          <span className="text-xs font-semibold uppercase text-muted-foreground">
-            {asset.type}
+          <span className="text-center text-xs font-semibold uppercase text-muted-foreground">
+            {videoMissing ? "Missing source" : asset.type}
           </span>
         )}
       </div>
@@ -81,11 +87,23 @@ export function AssetCard({ asset }: AssetCardProps) {
             </Button>
           ) : (
             <>
-              <Button type="button" size="xs" variant="outline" onClick={preview}>
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                onClick={preview}
+                disabled={videoMissing}
+              >
                 <SendIcon className="size-3" />
                 Preview
               </Button>
-              <Button type="button" size="xs" variant="outline" onClick={queue}>
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                onClick={queue}
+                disabled={videoMissing}
+              >
                 <PlusIcon className="size-3" />
                 Queue
               </Button>
@@ -210,6 +228,31 @@ function firstPresentation(asset: LibraryAsset): {
           screenId: first.slideId,
           slideIndex: first.slideIndex,
           slideCount: first.slideCount,
+        },
+      },
+    }
+  }
+
+  if (asset.type === "video") {
+    const presentation = videoAssetToPresentation(asset)
+    return {
+      presentation,
+      renderData: {
+        kind: "video",
+        reference: asset.name,
+        segments: [{ text: asset.name }],
+        video: {
+          source: asset.source,
+          videoId: asset.id,
+          title: asset.name,
+          videoPath: asset.filePath,
+          url: asset.url,
+          youtubeId: asset.youtubeId,
+          poster: asset.thumbnail,
+          durationMs: asset.durationMs,
+          width: asset.width,
+          height: asset.height,
+          mimeType: asset.mimeType,
         },
       },
     }

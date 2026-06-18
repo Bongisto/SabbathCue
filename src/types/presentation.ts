@@ -1,7 +1,15 @@
 import type { Verse } from "./bible"
 import type { EgwParagraph } from "./egw"
 
-export type PresentationItemKind = "scripture" | "hymn" | "media" | "slideDeck" | "egw"
+export type VideoSourceKind = "local" | "url" | "youtube"
+
+export type PresentationItemKind =
+  | "scripture"
+  | "hymn"
+  | "media"
+  | "slideDeck"
+  | "egw"
+  | "video"
 
 export interface PresentationSegment {
   verseNumber?: number
@@ -13,11 +21,27 @@ export interface PresentationRenderData {
   segments: PresentationSegment[]
   kind?: PresentationItemKind
   slideImageUrl?: string
+  video?: VideoPresentationSource
   hymnSlide?: {
     screenId: string
     slideIndex: number
     slideCount: number
   }
+}
+
+export interface VideoPresentationSource {
+  source: VideoSourceKind
+  videoId: string
+  title: string
+  videoPath?: string
+  url?: string
+  youtubeId?: string
+  poster?: string
+  loop?: boolean
+  durationMs?: number
+  width?: number
+  height?: number
+  mimeType?: string
 }
 
 export interface ScripturePresentationItemData {
@@ -53,6 +77,24 @@ export interface MediaPresentationItemData {
   mediaId: string
   title: string
   mediaKind: "media" | "slide" | "document" | "deck"
+  reference: string
+  segments: PresentationSegment[]
+}
+
+export interface VideoPresentationItemData {
+  kind: "video"
+  videoId: string
+  title: string
+  source: VideoSourceKind
+  videoPath?: string
+  url?: string
+  youtubeId?: string
+  poster?: string
+  loop?: boolean
+  durationMs?: number
+  width?: number
+  height?: number
+  mimeType?: string
   reference: string
   segments: PresentationSegment[]
 }
@@ -108,6 +150,7 @@ export type PresentationItem =
   | MediaPresentationItemData
   | SlideDeckPresentationItemData
   | EgwPresentationItemData
+  | VideoPresentationItemData
 
 export function getPresentationReference(item: PresentationItem): string {
   return item.reference
@@ -158,6 +201,28 @@ export function getPresentationRenderData(item: PresentationItem): PresentationR
         screenId: item.slideId,
         slideIndex: item.slideIndex,
         slideCount: item.slideCount,
+      },
+    }
+  }
+
+  if (item.kind === "video") {
+    return {
+      kind: "video",
+      reference: item.reference,
+      segments: item.segments,
+      video: {
+        source: item.source,
+        videoId: item.videoId,
+        title: item.title,
+        videoPath: item.videoPath,
+        url: item.url,
+        youtubeId: item.youtubeId,
+        poster: item.poster,
+        loop: item.loop,
+        durationMs: item.durationMs,
+        width: item.width,
+        height: item.height,
+        mimeType: item.mimeType,
       },
     }
   }

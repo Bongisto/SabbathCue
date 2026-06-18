@@ -414,4 +414,65 @@ describe("broadcast store sync", () => {
       expect.objectContaining({ opacity: 1 }),
     )
   })
+
+  it("decides video end behavior in loop advance hold order", async () => {
+    const { decideVideoEndAction } = await import("./broadcast-store")
+
+    expect(
+      decideVideoEndAction({
+        loop: true,
+        autoAdvance: true,
+        hasNextItem: true,
+      }),
+    ).toBe("loop")
+    expect(
+      decideVideoEndAction({
+        loop: false,
+        autoAdvance: true,
+        hasNextItem: true,
+      }),
+    ).toBe("advance")
+    expect(
+      decideVideoEndAction({
+        loop: false,
+        autoAdvance: true,
+        hasNextItem: false,
+      }),
+    ).toBe("hold")
+  })
+
+  it("emits video load commands when a video item goes live", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const item = {
+      kind: "video" as const,
+      reference: "Welcome Video",
+      segments: [{ text: "Welcome Video" }],
+      video: {
+        source: "url" as const,
+        videoId: "video-1",
+        title: "Welcome Video",
+        url: "https://cdn.example.com/welcome.mp4",
+      },
+    }
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().commitLiveItem(item)
+
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:video-control",
+      {
+        type: "load",
+        item,
+      },
+    )
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast-alt",
+      "broadcast:video-control",
+      {
+        type: "load",
+        item,
+      },
+    )
+  })
 })

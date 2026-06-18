@@ -20,8 +20,21 @@ import {
   presentationDeckKind,
   type PresentationDeckKind,
 } from "@/lib/presentation-deck-navigation"
+import type { PresentationRenderData } from "@/types"
 import { MonitorIcon, SendIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { convertTauriFileSrc } from "@/lib/tauri-runtime"
+
+function previewVideoSrc(item: PresentationRenderData): string | null {
+  const video = item.video
+  if (!video) return null
+  if (video.source === "local" && video.videoPath) return convertTauriFileSrc(video.videoPath)
+  if (video.source === "url" && video.url) return video.url
+  if (video.source === "youtube" && video.youtubeId) {
+    return `https://www.youtube-nocookie.com/embed/${video.youtubeId}?controls=1`
+  }
+  return null
+}
 
 export function PreviewPanel({ className }: { className?: string }) {
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
@@ -138,7 +151,24 @@ export function PreviewPanel({ className }: { className?: string }) {
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center p-4">
-        {previewItem && activeTheme ? (
+        {previewItem?.kind === "video" && previewVideoSrc(previewItem) ? (
+          previewItem.video?.source === "youtube" ? (
+            <iframe
+              title={previewItem.reference}
+              src={previewVideoSrc(previewItem) ?? undefined}
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              className="aspect-video max-h-full w-full rounded-md border border-[var(--border-subtle)] bg-black"
+            />
+          ) : (
+            <video
+              src={previewVideoSrc(previewItem) ?? undefined}
+              poster={previewItem.video?.poster}
+              controls
+              className="aspect-video max-h-full w-full rounded-md border border-[var(--border-subtle)] bg-black object-contain"
+            />
+          )
+        ) : previewItem && activeTheme ? (
           <CanvasPresentation theme={activeTheme} item={previewItem} />
         ) : (
           <PanelEmptyState

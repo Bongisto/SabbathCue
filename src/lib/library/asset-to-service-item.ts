@@ -56,6 +56,32 @@ export function libraryAssetToServiceItem(
     }
   }
 
+  if (asset.type === "video") {
+    return {
+      ...base,
+      kind: "media",
+      mediaRefs: [
+        {
+          attachmentId: asset.id,
+          label: asset.name,
+          path: asset.filePath ?? asset.url ?? asset.youtubeId ?? "",
+        },
+      ],
+      attachments: [
+        {
+          id: asset.id,
+          kind: "media",
+          label: asset.name,
+          path: asset.filePath ?? asset.url ?? asset.youtubeId ?? "",
+          status:
+            asset.filePath || asset.url || asset.youtubeId ? "ready" : "failed",
+          thumbnailUrl: asset.thumbnail,
+          mimeType: asset.mimeType,
+        },
+      ],
+    }
+  }
+
   return {
     ...base,
     kind: "general",

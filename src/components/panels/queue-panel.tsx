@@ -11,6 +11,7 @@ import {
   GripVerticalIcon,
   ListOrderedIcon,
   Rows3Icon,
+  VideoIcon,
 } from "lucide-react"
 import { useQueueStore } from "@/stores/queue-store"
 import {
@@ -118,6 +119,9 @@ function QueueItemRow({
       />
 
       <span className="flex-1 truncate text-sm font-medium text-foreground">
+        {item.presentation.kind === "video" ? (
+          <VideoIcon className="mr-1 inline size-3 text-muted-foreground" />
+        ) : null}
         {getReferenceFromItem(item)}
       </span>
 

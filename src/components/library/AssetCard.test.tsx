@@ -12,6 +12,11 @@ vi.mock("@tauri-apps/api/event", () => ({
   emitTo: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock("@/lib/library/library-persistence", () => ({
+  loadLibrarySnapshot: vi.fn().mockResolvedValue({ assets: [], collections: [] }),
+  saveLibrarySnapshot: vi.fn().mockResolvedValue(undefined),
+}))
+
 function imageAsset(): LibraryAsset {
   return {
     id: "image-1",
@@ -23,6 +28,21 @@ function imageAsset(): LibraryAsset {
     height: 1080,
     mimeType: "image/png",
     thumbnail: "data:image/png;base64,abc",
+    createdAt: 1,
+    updatedAt: 1,
+  }
+}
+
+function videoAsset(): LibraryAsset {
+  return {
+    id: "video-1",
+    name: "Welcome Video",
+    type: "video",
+    source: "url",
+    collectionIds: [],
+    url: "https://cdn.example.com/welcome.mp4",
+    mimeType: "video/mp4",
+    thumbnail: "data:image/jpeg;base64,abc",
     createdAt: 1,
     updatedAt: 1,
   }
@@ -68,6 +88,27 @@ describe("AssetCard", () => {
     expect(useQueueStore.getState().items[0].presentation).toMatchObject({
       kind: "slideDeck",
       reference: "Welcome Background",
+    })
+  })
+
+  it("previews and queues video assets as video items", () => {
+    render(<AssetCard asset={videoAsset()} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /preview/i }))
+    expect(useBroadcastStore.getState().previewItem).toMatchObject({
+      kind: "video",
+      reference: "Welcome Video",
+      video: {
+        source: "url",
+        url: "https://cdn.example.com/welcome.mp4",
+      },
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /queue/i }))
+    expect(useQueueStore.getState().items[0].presentation).toMatchObject({
+      kind: "video",
+      reference: "Welcome Video",
+      url: "https://cdn.example.com/welcome.mp4",
     })
   })
 

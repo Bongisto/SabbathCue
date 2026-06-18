@@ -48,11 +48,13 @@ function fillBlack(canvas: HTMLCanvasElement): void {
 interface UseBroadcastOutputRuntimeOptions {
   canvas: HTMLCanvasElement | null
   outputId: string
+  onPayloadChange?: (payload: BroadcastPayload) => void
 }
 
 export function useBroadcastOutputRuntime({
   canvas,
   outputId,
+  onPayloadChange,
 }: UseBroadcastOutputRuntimeOptions): void {
   const latestData = useRef<BroadcastPayload | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -98,6 +100,10 @@ export function useBroadcastOutputRuntime({
     const { theme, item } = data
     canvas.width = theme.resolution.width
     canvas.height = theme.resolution.height
+    if (item?.kind === "video") {
+      fillBlack(canvas)
+      return
+    }
     const result = renderPresentation(ctx, theme, item, {
       scale: 1,
       opacity: data.opacity,
@@ -246,6 +252,7 @@ export function useBroadcastOutputRuntime({
 
       lastRenderKeyRef.current = renderKey
       latestData.current = payload
+      onPayloadChange?.(payload)
       preloadBackgroundImage(payload.theme)
       logDebug("Received broadcast payload", {
         hasItem: Boolean(payload.item),
@@ -319,7 +326,7 @@ export function useBroadcastOutputRuntime({
       unlisten?.then((fn) => fn())
       unlistenNdiConfig?.then((fn) => fn())
     }
-  }, [canvas, draw, logDebug, outputId, preloadBackgroundImage, pushNdiBurst])
+  }, [canvas, draw, logDebug, onPayloadChange, outputId, preloadBackgroundImage, pushNdiBurst])
 
   useEffect(() => {
     const timer = setInterval(() => {

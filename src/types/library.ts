@@ -1,6 +1,7 @@
 import type { BroadcastTheme, HymnPresentationItemData, SlideDeckPresentationItemData } from "@/types"
+import type { VideoSourceKind } from "./presentation"
 
-export type LibraryAssetType = "theme" | "image" | "song" | "slide-template"
+export type LibraryAssetType = "theme" | "image" | "song" | "slide-template" | "video"
 
 export type SongSectionKind = "verse" | "chorus" | "bridge"
 
@@ -56,16 +57,30 @@ export interface LibrarySlideTemplateAsset extends LibraryAssetBase {
   deck: SlideDeckPresentationItemData[]
 }
 
+export interface LibraryVideoAsset extends LibraryAssetBase {
+  type: "video"
+  source: VideoSourceKind
+  filePath?: string
+  url?: string
+  youtubeId?: string
+  durationMs?: number
+  width?: number
+  height?: number
+  mimeType?: string
+}
+
 export type LibraryAsset =
   | LibraryThemeAsset
   | LibraryImageAsset
   | LibrarySongAsset
   | LibrarySlideTemplateAsset
+  | LibraryVideoAsset
 
 export type LibraryPreviewAsset =
   | LibraryImageAsset
   | LibrarySongAsset
   | LibrarySlideTemplateAsset
   | LibraryThemeAsset
+  | LibraryVideoAsset
 
 export type SongDeck = HymnPresentationItemData[]
