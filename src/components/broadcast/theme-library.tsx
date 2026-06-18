@@ -76,7 +76,7 @@ function ThemeCard({
 
         {/* Active badge */}
         {isActive && (
-          <Badge className="absolute top-1.5 left-1.5 bg-emerald-600 text-[0.5rem] text-white hover:bg-emerald-600">
+          <Badge className="absolute top-1.5 left-1.5 bg-emerald-600 text-[0.5rem] text-foreground hover:bg-emerald-600">
             Active
           </Badge>
         )}
@@ -242,7 +242,7 @@ export function ThemeLibrary() {
   }
 
   return (
-    <div className="controller-sidebar flex h-full min-h-0 flex-col overflow-hidden border-r border-white/[0.06] bg-card/80">
+    <div className="controller-sidebar flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]">
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-border px-3">
         <span className="text-lg font-semibold text-foreground">Themes</span>

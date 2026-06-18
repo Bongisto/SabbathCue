@@ -136,11 +136,11 @@ function Field({
   help?: string
 }) {
   return (
-    <label className="flex flex-col gap-1.5 text-left text-xs font-medium text-slate-300">
+    <label className="flex flex-col gap-1.5 text-left text-xs font-medium text-foreground">
       <span>{label}</span>
       <Input {...props} />
       {help ? (
-        <span className="text-[11px] leading-relaxed font-normal text-slate-500">
+        <span className="text-[11px] leading-relaxed font-normal text-muted-foreground">
           {help}
         </span>
       ) : null}
@@ -200,7 +200,7 @@ function PasswordResetForm({
     >
       <button
         type="button"
-        className="inline-flex w-fit items-center gap-1 text-xs font-medium text-slate-400 transition-colors hover:text-white"
+        className="inline-flex w-fit items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         disabled={busy}
         onClick={() =>
           onBack(
@@ -215,11 +215,11 @@ function PasswordResetForm({
       </button>
 
       <div className="space-y-1 text-left">
-        <div className="flex items-center gap-2 text-lg font-semibold text-white">
+        <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <KeyRoundIcon className="size-5 text-[var(--brand-accent)]" />
           Reset password
         </div>
-        <p className="text-sm leading-relaxed text-slate-400">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           Send a recovery link to the email on your SabbathCue account.
         </p>
       </div>
@@ -357,20 +357,20 @@ export function VerificationScreen() {
   return (
     <div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-[var(--bg-deep)] p-4 text-foreground">
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(135deg,rgba(250,204,21,0.12),transparent_35%,rgba(16,185,129,0.08)_70%,rgba(14,165,233,0.1))]" />
-      <main className="relative grid w-full max-w-4xl overflow-hidden rounded-[8px] border border-white/10 bg-[rgba(3,5,10,0.92)] shadow-[0_28px_90px_rgba(0,0,0,0.65)] md:grid-cols-[0.9fr_1.1fr]">
+      <main className="relative grid w-full max-w-4xl overflow-hidden rounded-[8px] border border-[var(--border-dim)] bg-[rgba(3,5,10,0.92)] shadow-[0_28px_90px_rgba(0,0,0,0.65)] md:grid-cols-[0.9fr_1.1fr]">
         <section
           aria-label="SabbathCue account"
-          className="hidden border-r border-white/10 bg-black/20 p-8 md:flex md:flex-col md:justify-between"
+          className="hidden border-r border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] p-8 md:flex md:flex-col md:justify-between"
         >
           <div className="space-y-8">
             <AppLogo size="lg" />
-            <p className="max-w-xs text-2xl leading-tight font-semibold text-white">
+            <p className="max-w-xs text-2xl leading-tight font-semibold text-foreground">
               SabbathCue account
             </p>
           </div>
           <div
             aria-hidden="true"
-            className="h-44 rounded-[8px] border border-white/10 bg-[linear-gradient(135deg,rgba(250,204,21,0.2),rgba(16,185,129,0.08),rgba(14,165,233,0.14))]"
+            className="h-44 rounded-[8px] border border-[var(--border-dim)] bg-[linear-gradient(135deg,rgba(250,204,21,0.2),rgba(16,185,129,0.08),rgba(14,165,233,0.14))]"
           >
             <div className="h-full bg-[linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:28px_28px] opacity-35" />
           </div>
@@ -410,10 +410,10 @@ export function VerificationScreen() {
                   />
 
                   <div className="space-y-1 text-left">
-                    <h1 className="text-xl font-semibold text-white">
+                    <h1 className="text-xl font-semibold text-foreground">
                       {modeTitle(mode, status)}
                     </h1>
-                    <p className="text-sm leading-relaxed text-slate-400">
+                    <p className="text-sm leading-relaxed text-muted-foreground">
                       {modeDescription(mode, status)}
                     </p>
                   </div>
@@ -482,7 +482,7 @@ export function VerificationScreen() {
                   </Button>
                 </form>
 
-                <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 pt-4">
+                <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[var(--border-dim)] pt-4">
                   <Button
                     disabled={isBusy}
                     size="sm"

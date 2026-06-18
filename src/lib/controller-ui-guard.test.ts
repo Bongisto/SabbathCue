@@ -40,6 +40,34 @@ describe("controller UI guard — Proof A (mixed outer shell)", () => {
   })
 })
 
+describe("controller UI guard - light mode regression", () => {
+  it("has no hard-coded dark-mode utility colors in controller components", () => {
+    const bannedUtility =
+      /bg-white\/[0-9]|text-white|bg-black\/[0-9]|bg-\[#|text-\[#|border-\[rgba|border-white|ring-white|hover:bg-white|bg-slate-9|text-slate-[1-5]/
+    const violations: string[] = []
+
+    for (const file of listControllerWorkspaceFiles(REPO_ROOT)) {
+      const content = readFileSync(join(REPO_ROOT, file), "utf8")
+      if (bannedUtility.test(content)) violations.push(file)
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  it("keeps broadcast output on a dark shell independent of controller mode", () => {
+    const broadcastOutput = readFileSync(
+      join(REPO_ROOT, "src/broadcast-output.tsx"),
+      "utf8",
+    )
+
+    expect(broadcastOutput).toMatch(
+      /root\.className = `dark \$\{accentThemeClassName\(theme\)\}`/,
+    )
+    expect(broadcastOutput).toMatch(/background: "#000"/)
+    expect(broadcastOutput).not.toMatch(/useColorModeStore/)
+  })
+})
+
 describe("controller UI guard — Proof B (banned surface tokens)", () => {
   it("has no banned shadcn surface tokens outside primitive-owned lines", () => {
     const violations = scanBannedSurfaceTokens(REPO_ROOT)
@@ -57,13 +85,13 @@ describe("controller UI guard — Proof B (banned surface tokens)", () => {
   it("does not allowlist native textarea/select shadcn classes", () => {
     expect(
       isPrimitiveOwnedLine(
-        'className="min-h-0 flex-1 border border-input bg-background p-3"',
-      ),
+        'className="min-h-0 flex-1 border border-input bg-background p-3"'
+      )
     ).toBe(false)
     expect(
       isPrimitiveOwnedLine(
-        'className="h-9 w-full border border-input bg-background px-3 text-sm"',
-      ),
+        'className="h-9 w-full border border-input bg-background px-3 text-sm"'
+      )
     ).toBe(false)
     expect(scanNativeFormSurfaceTokens(REPO_ROOT)).toEqual([])
   })
@@ -99,7 +127,12 @@ describe("controller UI guard — tutorial targets", () => {
       "src/components/panels/search-panel.tsx",
       "src/components/settings-dialog.tsx",
     ]
-    const sources = [...new Set([...listControllerWorkspaceFiles(REPO_ROOT), ...layoutAndPanelSources])]
+    const sources = [
+      ...new Set([
+        ...listControllerWorkspaceFiles(REPO_ROOT),
+        ...layoutAndPanelSources,
+      ]),
+    ]
       .map((file) => readFileSync(join(REPO_ROOT, file), "utf8"))
       .join("\n")
 
@@ -112,14 +145,15 @@ describe("controller UI guard — tutorial targets", () => {
         const id = tourMatch[1]
         expect(
           sourceDefinesDataTour(sources, id),
-          `missing data-tour anchor for "${id}" (step "${step.title}")`,
+          `missing data-tour anchor for "${id}" (step "${step.title}")`
         ).toBe(true)
         expect(TUTORIAL_DATA_TOUR_IDS as readonly string[]).toContain(id)
       } else if (slotMatch) {
         const id = slotMatch[1]
-        expect(sources, `missing data-slot="${id}" for step "${step.title}"`).toContain(
-          `data-slot="${id}"`,
-        )
+        expect(
+          sources,
+          `missing data-slot="${id}" for step "${step.title}"`
+        ).toContain(`data-slot="${id}"`)
         expect(TUTORIAL_DATA_SLOTS as readonly string[]).toContain(id)
       } else if (target !== "body") {
         // "body" is react-joyride's centered-modal target and always exists.
@@ -133,9 +167,10 @@ describe("controller UI guard — dark shell boot", () => {
   it("does not wrap the app in ThemeProvider and forces dark shell before render", () => {
     const main = readFileSync(join(REPO_ROOT, "src/main.tsx"), "utf8")
     expect(main).not.toMatch(/ThemeProvider/)
-    expect(main).toMatch(/ensureControllerDarkShell/)
-    expect(main).toMatch(/classList\.remove\("light"\)/)
-    expect(main).toMatch(/classList\.add\("dark"\)/)
+    expect(main).toMatch(/hydrateControllerColorMode/)
+    expect(main).toMatch(/useColorModeStore\.getState\(\)\.hydrate\(\)/)
+    expect(main).not.toMatch(/classList\.remove\("light"\)/)
+    expect(main).not.toMatch(/classList\.add\("dark"\)/)
   })
 
   it("has no controller component imports of useTheme", () => {
@@ -158,11 +193,17 @@ describe("controller UI guard — legacy classes and dialog CSS", () => {
   })
 
   it("styles dialog and toaster with reference glass in components", () => {
-    const dialog = readFileSync(join(REPO_ROOT, "src/components/ui/dialog.tsx"), "utf8")
+    const dialog = readFileSync(
+      join(REPO_ROOT, "src/components/ui/dialog.tsx"),
+      "utf8"
+    )
     const app = readFileSync(join(REPO_ROOT, "src/App.tsx"), "utf8")
-    expect(dialog).toMatch(/border-white\/\[0\.08\]/)
-    expect(dialog).toMatch(/linear-gradient\(145deg/)
+    expect(dialog).toMatch(/border-\[var\(--border-subtle\)\]/)
+    expect(dialog).toMatch(
+      /linear-gradient\(145deg,var\(--bg-surface\),var\(--bg-elevated\)\)/
+    )
     expect(app).toMatch(/<Toaster/)
     expect(app).toMatch(/glass-panel/)
+    expect(app).toMatch(/theme=\{colorMode\}/)
   })
 })

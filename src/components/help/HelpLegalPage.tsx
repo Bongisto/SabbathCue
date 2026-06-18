@@ -31,10 +31,10 @@ function SectionBlock({
 }) {
   return (
     <section className="glass-panel space-y-3 p-5">
-      <h3 className="text-sm font-semibold tracking-wide text-white uppercase">
+      <h3 className="text-sm font-semibold tracking-wide text-foreground uppercase">
         {title}
       </h3>
-      <div className="space-y-3 text-sm leading-relaxed text-slate-300">
+      <div className="space-y-3 text-sm leading-relaxed text-foreground">
         {children}
       </div>
     </section>
@@ -61,19 +61,19 @@ export function HelpLegalPage() {
             <p className="font-mono text-[11px] tracking-widest text-[var(--accent)] uppercase">
               User guide & legal
             </p>
-            <h2 className="text-2xl font-bold text-white">
+            <h2 className="text-2xl font-bold text-foreground">
               Help, Terms & Copyright
             </h2>
-            <p className="max-w-2xl text-sm text-slate-400">
+            <p className="max-w-2xl text-sm text-muted-foreground">
               Everything you need to use {APP_DISPLAY_NAME} confidently — plus
               the terms you agree to when you download and run the app.
             </p>
           </div>
-          <div className="rounded-lg border border-white/10 bg-slate-950/50 px-4 py-3 text-right">
-            <p className="text-[10px] tracking-wide text-slate-500 uppercase">
+          <div className="rounded-lg border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] px-4 py-3 text-right">
+            <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
               Version
             </p>
-            <p className="font-mono text-sm text-slate-200">
+            <p className="font-mono text-sm text-foreground">
               v{HELP_LEGAL_APP_VERSION}
             </p>
           </div>
@@ -89,7 +89,7 @@ export function HelpLegalPage() {
       </div>
 
       <Tabs defaultValue="guide" className="gap-4">
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-slate-950/60 p-1.5">
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-[var(--shell-bg-sunken)] p-1.5">
           <TabsTrigger value="guide" className="gap-1.5 px-3 py-2 text-xs">
             <BookOpenIcon className="size-3.5" />
             User guide
@@ -138,7 +138,7 @@ export function HelpLegalPage() {
 
         <TabsContent value="terms" className="space-y-4">
           <SectionBlock title="Terms and conditions">
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               Effective for version {HELP_LEGAL_APP_VERSION}. Last updated{" "}
               {HELP_LEGAL_TERMS_LAST_UPDATED}.
             </p>
@@ -150,8 +150,8 @@ export function HelpLegalPage() {
             </SectionBlock>
           ))}
 
-          <div className="glass-panel border border-white/5 p-5 text-xs text-slate-500">
-            <ScrollTextIcon className="mb-2 size-4 text-slate-400" />
+          <div className="glass-panel border border-[var(--border-subtle)] p-5 text-xs text-muted-foreground">
+            <ScrollTextIcon className="mb-2 size-4 text-muted-foreground" />
             This document is provided for in-app notice and user agreement. It
             does not constitute legal advice. For formal legal questions,
             consult a qualified attorney in your jurisdiction.
@@ -177,9 +177,9 @@ export function HelpLegalPage() {
 
         <TabsContent value="about" className="space-y-4">
           <SectionBlock title="Created with care">
-            <p className="text-base text-slate-200">
+            <p className="text-base text-foreground">
               {APP_DISPLAY_NAME} is created by{" "}
-              <span className="font-semibold text-white">
+              <span className="font-semibold text-foreground">
                 {HELP_LEGAL_CREATOR}
               </span>
               .
@@ -189,7 +189,7 @@ export function HelpLegalPage() {
           </SectionBlock>
 
           <blockquote className="glass-panel space-y-3 border-l-4 border-[var(--accent)] p-5 not-italic">
-            <p className="font-serif text-lg leading-relaxed text-slate-100">
+            <p className="font-serif text-lg leading-relaxed text-foreground">
               &ldquo;{HELP_LEGAL_CLOSING_MESSAGE.verse.text}&rdquo;
             </p>
             <footer className="text-sm font-medium text-[var(--accent)]">
@@ -198,7 +198,7 @@ export function HelpLegalPage() {
           </blockquote>
 
           <div className="glass-panel p-5">
-            <p className="whitespace-pre-line text-sm leading-relaxed text-slate-300">
+            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
               {HELP_LEGAL_CLOSING_MESSAGE.signOff}
             </p>
           </div>

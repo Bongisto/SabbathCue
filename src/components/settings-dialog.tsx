@@ -98,10 +98,10 @@ export function SettingsPage() {
   return (
     <div className="view-pane flex flex-col gap-5" data-tour="settings">
       <div className="glass-panel p-5">
-        <h2 className="mb-2 text-2xl font-bold text-white">
+        <h2 className="mb-2 text-2xl font-bold text-foreground">
           Configuration and Hardware Setup
         </h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           Manage audio capture feeds, interface endpoints, downstream
           configurations, and keyboard shortcuts.
         </p>
@@ -122,7 +122,7 @@ export function SettingsPage() {
                 activeSection === item.id && "active",
                 activeSection === item.id
                   ? "text-[var(--accent)]"
-                  : "text-slate-400 hover:bg-white/5 hover:text-slate-200",
+                  : "text-muted-foreground hover:bg-[var(--shell-bg-sunken)] hover:text-foreground",
               )}
             >
               {item.icon}
@@ -136,7 +136,7 @@ export function SettingsPage() {
           data-tour={activeSection === "account" ? "settings-section-account" : undefined}
           className="glass-panel min-h-0 overflow-y-auto p-5 scrollbar-thin"
         >
-          <h3 className="mb-4 border-b border-white/5 pb-2 font-mono text-xs font-bold uppercase tracking-wider text-slate-200">
+          <h3 className="mb-4 border-b border-[var(--border-subtle)] pb-2 font-mono text-xs font-bold uppercase tracking-wider text-foreground">
             {sectionTitles[activeSection]}
           </h3>
           <ActiveContent />

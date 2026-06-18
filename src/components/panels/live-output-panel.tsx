@@ -141,7 +141,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
             variant={isLive ? "default" : "outline"}
             className={cn(
               "h-5 text-[0.5625rem] uppercase",
-              isLive && "bg-emerald-500 text-white hover:bg-emerald-500"
+              isLive && "bg-emerald-500 text-foreground hover:bg-emerald-500"
             )}
           >
             {isLive ? "On air" : "Hidden"}
@@ -151,7 +151,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
       <div
         className={cn(
-          "flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-white/5 px-4 py-2",
+          "flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-2",
           isFullscreenLayout && "hidden"
         )}
       >
@@ -199,7 +199,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
       <div
         className={cn(
-          "flex min-h-10 items-center justify-between gap-3 border-b border-white/5 px-4 py-2",
+          "flex min-h-10 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-2",
           isFullscreenLayout && "hidden"
         )}
       >
@@ -218,7 +218,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
       <div
         data-slot="live-output-stage"
         className={cn(
-          "flex min-h-0 flex-1 bg-slate-950/50 p-2",
+          "flex min-h-0 flex-1 bg-[var(--shell-bg-sunken)] p-2",
           isFullscreenLayout && "bg-black p-0",
           !isFullscreenLayout && !isLive && "opacity-45 transition-opacity"
         )}
@@ -226,7 +226,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         <div
           data-slot="live-output-frame"
           className={cn(
-            "flex h-full w-full items-center justify-center rounded-md border border-white/5 p-2 text-center",
+            "flex h-full w-full items-center justify-center rounded-md border border-[var(--border-subtle)] p-2 text-center",
             isLive && !isFullscreenLayout && "live-glowing-active",
             isFullscreenLayout && "rounded-none border-0 p-0"
           )}
@@ -251,7 +251,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
       <div
         className={cn(
-          "truncate border-t border-white/5 px-4 py-2 text-xs text-muted-foreground",
+          "truncate border-t border-[var(--border-subtle)] px-4 py-2 text-xs text-muted-foreground",
           isFullscreenLayout && "hidden"
         )}
       >

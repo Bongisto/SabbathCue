@@ -46,10 +46,10 @@ export function LiveServicePlanPage() {
     <div className="view-pane flex min-h-full flex-col gap-5">
       <section className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Broadcast control
           </p>
-          <h1 className="mt-1 text-xl font-semibold text-slate-100">
+          <h1 className="mt-1 text-xl font-semibold text-foreground">
             Production Output
           </h1>
         </div>
@@ -112,7 +112,7 @@ export function LiveServicePlanPage() {
               </Badge>
             </PanelHeader>
             <div className="space-y-3 p-3">
-              <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] p-3">
                 <div className="flex items-center gap-2 text-[0.625rem] font-medium uppercase text-muted-foreground">
                   <MonitorIcon className="size-3.5" />
                   Active theme
@@ -122,7 +122,7 @@ export function LiveServicePlanPage() {
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] p-3">
                   <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
                     Preview
                   </div>
@@ -130,7 +130,7 @@ export function LiveServicePlanPage() {
                     {previewItem?.reference ?? "Empty"}
                   </p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+                <div className="rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] p-3">
                   <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
                     Live
                   </div>
@@ -165,7 +165,7 @@ export function LiveServicePlanPage() {
               </Badge>
             </PanelHeader>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-              <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] p-3">
                 <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
                   Active item
                 </div>
@@ -178,7 +178,7 @@ export function LiveServicePlanPage() {
                 </p>
               </div>
 
-              <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
+              <div className="rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] p-3">
                 <div className="text-[0.625rem] font-medium uppercase text-muted-foreground">
                   Up next
                 </div>

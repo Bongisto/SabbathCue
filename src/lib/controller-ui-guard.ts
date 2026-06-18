@@ -12,8 +12,7 @@ export const BANNED_SURFACE_TOKEN =
 export const LEGACY_CONTROLLER_CLASSES =
   /\b(btn-tactile|interactive-row|scrollbar-controller)\b/
 
-export const LEGACY_DIALOG_CSS_PATTERN =
-  /\.dark\s+\[data-slot="dialog/
+export const LEGACY_DIALOG_CSS_PATTERN = /\.dark\s+\[data-slot="dialog/
 
 export const CONTROLLER_WORKSPACE_ROOTS = [
   "src/components/layout",
@@ -23,6 +22,7 @@ export const CONTROLLER_WORKSPACE_ROOTS = [
   "src/components/tutorial",
   "src/components/settings-dialog.tsx",
   "src/components/broadcast/broadcast-settings.tsx",
+  "src/components/verification/VerificationScreen.tsx",
   "src/App.tsx",
 ] as const
 
@@ -54,7 +54,7 @@ export function isPrimitiveOwnedLine(line: string): boolean {
 
 export function scanNativeFormSurfaceTokens(
   repoRoot: string,
-  files = listControllerWorkspaceFiles(repoRoot),
+  files = listControllerWorkspaceFiles(repoRoot)
 ): ScanViolation[] {
   const violations: ScanViolation[] = []
   for (const file of files) {
@@ -112,7 +112,7 @@ export function listControllerWorkspaceFiles(repoRoot: string): string[] {
 
 export function scanMixedOuterShell(
   repoRoot: string,
-  files = listControllerWorkspaceFiles(repoRoot),
+  files = listControllerWorkspaceFiles(repoRoot)
 ): ScanViolation[] {
   const violations: ScanViolation[] = []
   for (const file of files) {
@@ -131,7 +131,7 @@ export function scanMixedOuterShell(
 
 export function scanBannedSurfaceTokens(
   repoRoot: string,
-  files = listControllerWorkspaceFiles(repoRoot),
+  files = listControllerWorkspaceFiles(repoRoot)
 ): ScanViolation[] {
   const violations: ScanViolation[] = []
   for (const file of files) {
@@ -152,7 +152,7 @@ export function scanBannedSurfaceTokens(
 
 export function scanLegacyControllerClasses(
   repoRoot: string,
-  files = listControllerWorkspaceFiles(repoRoot),
+  files = listControllerWorkspaceFiles(repoRoot)
 ): ScanViolation[] {
   const violations: ScanViolation[] = []
   for (const file of files) {

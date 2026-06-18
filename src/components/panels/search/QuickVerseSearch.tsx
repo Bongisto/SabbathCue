@@ -42,7 +42,7 @@ export function QuickVerseSearch({
         onKeyDown={onQuickKeyDown}
         placeholder="Type: J → John 3:16"
         className={cn(
-          "relative h-7 bg-black/40 text-xs",
+          "relative h-7 bg-[var(--shell-code-bg)] text-xs",
           quickSuggestion && quickSuggestion !== quickInput ? "text-transparent" : "",
         )}
         style={
@@ -53,7 +53,7 @@ export function QuickVerseSearch({
       />
 
       {shouldShowVerseDropdown && quickVersesList.length > 0 ? (
-        <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-white/5 bg-[rgba(2,3,7,0.95)] shadow-lg backdrop-blur-md">
+        <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-64 overflow-y-auto rounded-md border border-[var(--border-subtle)] bg-[rgba(2,3,7,0.95)] shadow-lg backdrop-blur-md">
           <div className="p-1">
             {quickVersesList.map((verse) => (
               <button

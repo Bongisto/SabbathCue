@@ -77,7 +77,7 @@ export function HelpSection() {
 
         <div className="glass-panel flex items-center justify-between p-4">
           <div className="flex items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--shell-bg-sunken)]">
               <KeyIcon className="size-4 text-muted-foreground" />
             </div>
             <div className="min-w-0 flex-1">
@@ -104,7 +104,7 @@ export function HelpSection() {
                                   key={`${shortcut.keys}-${part}-${index}`}
                                   className="flex items-center gap-1"
                                 >
-                                  <kbd className="rounded border border-white/10 bg-black/25 px-1.5 py-0.5 font-mono text-[10px] text-slate-200">
+                                  <kbd className="rounded border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] px-1.5 py-0.5 font-mono text-[10px] text-foreground">
                                     {part}
                                   </kbd>
                                   {index < parts.length - 1 ? (

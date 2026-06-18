@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-export type AccentTheme = "gold" | "emerald" | "purple" | "aurora"
+export type AccentTheme = "teal" | "gold" | "emerald" | "purple" | "aurora"
 
 export const ACCENT_THEME_STORAGE_KEY = "sabbathcue-accent-theme"
 
@@ -8,6 +8,7 @@ function readStoredTheme(): AccentTheme {
   try {
     const raw = localStorage.getItem(ACCENT_THEME_STORAGE_KEY)
     if (
+      raw === "teal" ||
       raw === "gold" ||
       raw === "emerald" ||
       raw === "purple" ||
@@ -18,7 +19,7 @@ function readStoredTheme(): AccentTheme {
   } catch {
     /* private browsing / disabled storage */
   }
-  return "gold"
+  return "teal"
 }
 
 interface AccentThemeState {
@@ -28,7 +29,7 @@ interface AccentThemeState {
 }
 
 export const useAccentThemeStore = create<AccentThemeState>((set) => ({
-  theme: "gold",
+  theme: "teal",
   setTheme: (theme) => {
     try {
       localStorage.setItem(ACCENT_THEME_STORAGE_KEY, theme)

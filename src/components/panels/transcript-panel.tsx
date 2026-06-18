@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { useAudioStore } from "@/stores/audio-store"
 import { useBibleStore } from "@/stores/bible-store"
 import type { SttProvider } from "@/stores/settings-store"
+import { useDetectionStore } from "@/stores/detection-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { useTauriEvent } from "@/hooks/use-tauri-event"
 import { useTranscription } from "@/hooks/use-transcription"
@@ -126,6 +127,13 @@ export function TranscriptPanel({ className }: { className?: string }) {
     }
   }, [segments])
 
+  useEffect(() => {
+    const id = setInterval(() => {
+      useDetectionStore.getState().evictStale()
+    }, 2_000)
+    return () => clearInterval(id)
+  }, [])
+
   return (
     <div
       data-slot="transcript-panel"
@@ -211,7 +219,7 @@ export function TranscriptPanel({ className }: { className?: string }) {
       </div>
 
       {/* Bottom control */}
-      <div className="flex gap-2 border-t border-white/5 px-3 py-2">
+      <div className="flex gap-2 border-t border-[var(--border-subtle)] px-3 py-2">
         {isTranscribing ? (
           <Button
             variant="ghost"

@@ -140,7 +140,7 @@ export function RemoteControlSection() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-white/5 bg-white/5 p-3">
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-3">
         <p className="mb-1 text-[0.625rem] font-medium text-muted-foreground">
           Firewall Note
         </p>
@@ -166,7 +166,7 @@ export function RemoteControlSection() {
             </Button>
           )}
         </div>
-        <div className="h-32 overflow-y-auto rounded-lg border border-white/5 bg-black/40 p-2">
+        <div className="h-32 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-code-bg)] p-2">
           {commandLog.length === 0 ? (
             <p className="mt-8 text-center text-[0.625rem] text-muted-foreground">
               No commands received yet

@@ -16,7 +16,7 @@ function EditorSection({
   children: React.ReactNode
 }) {
   return (
-    <section className="space-y-3 rounded-lg border border-white/[0.08] bg-black/25 p-4">
+    <section className="space-y-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-4">
       <div className="text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase">
         {title}
       </div>
@@ -120,7 +120,7 @@ export function ServiceItemDetailsPanel({
         />
       </EditorSection>
 
-      <div className="mt-auto flex flex-wrap gap-3 border-t border-white/5 pt-4">
+      <div className="mt-auto flex flex-wrap gap-3 border-t border-[var(--border-subtle)] pt-4">
         <Button size="sm" variant="outline" onClick={onEnqueuePrepared}>
           Queue prepared resources
         </Button>

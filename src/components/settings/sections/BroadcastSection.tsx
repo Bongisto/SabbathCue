@@ -14,7 +14,7 @@ export function BroadcastSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-lg border border-white/5 bg-white/5 p-4">
+      <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <p className="text-sm font-medium text-foreground">

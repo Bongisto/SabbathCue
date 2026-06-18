@@ -187,7 +187,7 @@ export function EgwBrowser() {
         "group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors",
         p.id === selectedParagraphId
           ? "border border-lime-500/50 bg-lime-500/10"
-          : "border border-transparent hover:bg-white/5"
+          : "border border-transparent hover:bg-[var(--shell-bg-sunken)]"
       )}
     >
       <span className="w-8 shrink-0 text-right text-sm font-semibold text-primary">
@@ -236,7 +236,7 @@ export function EgwBrowser() {
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
-      <div className="flex shrink-0 flex-col gap-2 border-b border-white/5 p-2">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-[var(--border-subtle)] p-2">
         <div className="flex items-center gap-1">
           <Button
             size="xs"

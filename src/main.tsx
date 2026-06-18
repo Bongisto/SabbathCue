@@ -12,16 +12,15 @@ import { hydrateBibleStore, initBiblePersistence } from "@/stores/bible-store"
 import { hydrateBroadcastThemes } from "@/stores/broadcast-store"
 import { hydrateServicePlans } from "@/stores/service-plan-store"
 import { useAccentThemeStore } from "@/stores/accent-theme-store"
+import { useColorModeStore } from "@/stores/color-mode-store"
 import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 import { installOperatorFlowHarness } from "@/test/operator-flow-harness"
 
-function ensureControllerDarkShell() {
-  const root = document.documentElement
-  root.classList.remove("light")
-  root.classList.add("dark")
+function hydrateControllerColorMode() {
+  useColorModeStore.getState().hydrate()
 }
 
-ensureControllerDarkShell()
+hydrateControllerColorMode()
 
 if (
   typeof window !== "undefined" &&
@@ -59,7 +58,8 @@ resetTranscription
       hydrateServicePlans(),
     ]).then(() => {
       useAccentThemeStore.getState().hydrate()
-    }),
+      useColorModeStore.getState().hydrate()
+    })
   )
   .then(() => initBiblePersistence())
   .finally(() => {

@@ -132,7 +132,7 @@ export function MediaAttachmentsEditor({
           {attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-center justify-between rounded-md border border-white/5 px-2 py-1"
+              className="flex items-center justify-between rounded-md border border-[var(--border-subtle)] px-2 py-1"
             >
               <span className="truncate">
                 {attachment.label}{" "}

@@ -85,8 +85,8 @@ export function RunServicePage() {
             </Badge>
           </PanelHeader>
 
-          <div className="grid gap-4 border-b border-white/5 p-4 md:grid-cols-2">
-            <div className="rounded-md border border-white/5 p-3">
+          <div className="grid gap-4 border-b border-[var(--border-subtle)] p-4 md:grid-cols-2">
+            <div className="rounded-md border border-[var(--border-subtle)] p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Current item
               </div>
@@ -97,7 +97,7 @@ export function RunServicePage() {
                 {activeItemContentLabel(activeItem ?? serviceContext.activeItem)}
               </p>
             </div>
-            <div className="rounded-md border border-white/5 p-3">
+            <div className="rounded-md border border-[var(--border-subtle)] p-3">
               <div className="text-[0.625rem] font-medium text-muted-foreground uppercase">
                 Up next
               </div>
@@ -111,7 +111,7 @@ export function RunServicePage() {
           </div>
 
           {slideDeck.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
               <span className="text-xs font-medium text-muted-foreground">
                 Sermon slides
               </span>
@@ -145,7 +145,7 @@ export function RunServicePage() {
           )}
 
           {deck.length > 0 && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
               <span className="text-xs font-medium text-muted-foreground">
                 Hymn deck
               </span>
@@ -175,7 +175,7 @@ export function RunServicePage() {
           )}
 
           {(presentationDeckKind(previewItem) || presentationDeckKind(liveItem)) && (
-            <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
               <span className="text-xs text-muted-foreground">Deck navigation</span>
               {previewItem && presentationDeckKind(previewItem) ? (
                 <PresentationDeckControls

@@ -31,7 +31,7 @@ export function WorkspaceTopNav() {
   return (
     <nav
       aria-label="Workspaces"
-      className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-slate-900/50 px-1.5 py-1"
+      className="flex items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] px-1.5 py-1"
     >
       {DASHBOARD_WORKSPACE_NAV.map((item) => {
         const Icon = item.icon
@@ -43,7 +43,7 @@ export function WorkspaceTopNav() {
           <div key={item.id} className="flex items-center">
             {item.dividerBefore ? (
               <div
-                className="mx-1 h-5 w-px bg-white/10"
+                className="mx-1 h-5 w-px bg-[var(--shell-bg-sunken)]"
                 role="separator"
                 aria-orientation="vertical"
               />
@@ -66,7 +66,7 @@ export function WorkspaceTopNav() {
                     "btn-action flex size-9 cursor-pointer items-center justify-center rounded-lg transition-colors",
                     active
                       ? "bg-[var(--accent-glow)] text-[var(--accent)] ring-1 ring-[var(--accent)]/40"
-                      : "text-slate-400 hover:bg-white/5 hover:text-slate-100",
+                      : "text-muted-foreground hover:bg-[var(--shell-bg-sunken)] hover:text-foreground"
                   )}
                 >
                   <Icon className="size-[18px] shrink-0" strokeWidth={2} />

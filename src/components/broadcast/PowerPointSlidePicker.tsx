@@ -38,7 +38,7 @@ export function PowerPointSlidePicker({
             <button
               key={slide.index}
               type="button"
-              className="group flex flex-col overflow-hidden rounded border border-white/10 transition-colors hover:border-primary"
+              className="group flex flex-col overflow-hidden rounded border border-[var(--border-dim)] transition-colors hover:border-primary"
               onClick={() => onSelect(slide)}
             >
               <img

@@ -24,7 +24,7 @@ interface ServiceItemBasicFieldsProps {
 
 export function ServiceItemBasicFields({ item, onPatchItem }: ServiceItemBasicFieldsProps) {
   return (
-    <div className="space-y-4 rounded-lg border border-white/[0.08] bg-black/25 p-4">
+    <div className="space-y-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-4">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <label className="text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground">

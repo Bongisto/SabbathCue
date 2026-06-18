@@ -11,7 +11,7 @@ export function PropertiesPanel() {
 
   if (!draftTheme) {
     return (
-      <div className="glass-panel relative flex h-full flex-col items-center justify-center border-l border-white/[0.06] bg-card/80 p-6">
+      <div className="glass-panel relative flex h-full flex-col items-center justify-center border-l border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6">
         <p className="text-sm text-muted-foreground">Select a theme to edit</p>
       </div>
     )
@@ -25,7 +25,7 @@ export function PropertiesPanel() {
         : "Select an element or use tabs below"
 
   return (
-    <div className="glass-panel relative flex h-full min-h-0 flex-col overflow-hidden border-l border-white/[0.06] bg-card/80">
+    <div className="glass-panel relative flex h-full min-h-0 flex-col overflow-hidden border-l border-[var(--border-subtle)] bg-[var(--bg-surface)]">
       {/* Header */}
       <div className="flex h-14 flex-col gap-0.5 border-b border-border px-4 py-2">
         <h3 className="truncate text-sm font-semibold">{draftTheme.name}</h3>

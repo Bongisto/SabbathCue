@@ -67,7 +67,7 @@ export function ServicePlanEditor() {
         </Badge>
       </PanelHeader>
 
-      <div className="border-b border-white/5 px-4 py-3">
+      <div className="border-b border-[var(--border-subtle)] px-4 py-3">
         <Input
           value={activePlan.title}
           onChange={(event) => updatePlanTitle(event.target.value)}
@@ -76,8 +76,8 @@ export function ServicePlanEditor() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-        <div className="flex min-h-0 flex-col border-r border-white/5">
-          <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+        <div className="flex min-h-0 flex-col border-r border-[var(--border-subtle)]">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
             <span className="text-xs font-medium text-muted-foreground">
               Timeline
             </span>
@@ -129,7 +129,7 @@ export function ServicePlanEditor() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-white/5 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--border-subtle)] px-4 py-3">
         <Button
           size="sm"
           variant="outline"
@@ -179,7 +179,7 @@ export function ServicePlanEditor() {
         )}
       </div>
       {lastReport && (
-        <div className="border-t border-white/5 px-4 py-3 text-xs text-muted-foreground">
+        <div className="border-t border-[var(--border-subtle)] px-4 py-3 text-xs text-muted-foreground">
           <div className="font-medium text-foreground">Post-service report</div>
           <div>
             {lastReport.completedItems}/{lastReport.totalItems} items completed

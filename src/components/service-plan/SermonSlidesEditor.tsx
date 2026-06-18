@@ -252,7 +252,7 @@ export function SermonSlidesEditor({
       ) : null}
 
       {slides.length === 0 ? (
-        <p className="rounded-md border border-dashed border-white/5 px-3 py-4 text-xs text-muted-foreground">
+        <p className="rounded-md border border-dashed border-[var(--border-subtle)] px-3 py-4 text-xs text-muted-foreground">
           Add PNG, JPEG, WebP, or GIF slides for this service item. Each image
           may be up to {slideLimitLabel}. Voice commands control only these
           slides while this item is active.
@@ -262,9 +262,9 @@ export function SermonSlidesEditor({
           {slides.map((slide, index) => (
             <div
               key={slide.id}
-              className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-white/5 p-2"
+              className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-[var(--border-subtle)] p-2"
             >
-              <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-white/10">
+              <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-[var(--shell-bg-sunken)]">
                 {slide.thumbnailUrl ? (
                   <img
                     src={slide.thumbnailUrl}
