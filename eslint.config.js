@@ -28,6 +28,10 @@ export default defineConfig([
     },
     rules: {
       'react-refresh/only-export-components': 'off',
+      // Surface high-cyclomatic-complexity functions as warnings (non-blocking).
+      // 2026-06-18 baseline: max 58, 11 functions > 20. Ratchet the threshold
+      // down as the R4/R13 refactors land. See CODE_REFACTORING_PLAN.md.
+      complexity: ['warn', 20],
     },
   },
 ])

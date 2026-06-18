@@ -47,6 +47,19 @@ export default defineConfig({
           ) {
             return "ui"
           }
+          // Split the previously-monolithic `vendor` chunk (PERF-001 / R1).
+          // Path-anchored matches avoid catching e.g. `react-*` packages already
+          // routed above (tour/icons/ui).
+          if (
+            normalizedId.includes("/node_modules/react/") ||
+            normalizedId.includes("/node_modules/react-dom/") ||
+            normalizedId.includes("/node_modules/scheduler/")
+          ) {
+            return "react"
+          }
+          if (normalizedId.includes("/node_modules/@supabase/")) return "supabase"
+          if (normalizedId.includes("/node_modules/@tauri-apps/")) return "tauri"
+          if (normalizedId.includes("/node_modules/zustand/")) return "state"
           return "vendor"
         },
       },
