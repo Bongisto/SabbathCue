@@ -124,7 +124,7 @@ export function SpeechSection() {
       </div>
 
       {sttProvider === "vosk" && (
-        <div className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/5 p-3">
+        <div className="flex flex-col gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <HardDriveIcon className="size-3.5 text-muted-foreground" />
@@ -156,17 +156,17 @@ export function SpeechSection() {
             <code className="text-[0.5625rem]">SABBATHCUE_VOSK_MODEL_DIR</code>.
           </p>
           {!assetsLoading && voskModelName && (
-            <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
+            <p className="rounded-md bg-[var(--shell-code-bg)] px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
               Active model: {voskModelName}
             </p>
           )}
           {!assetsLoading && voskMissingMessage && (
-            <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
+            <p className="rounded-md bg-[var(--shell-code-bg)] px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
               {voskMissingMessage}
             </p>
           )}
           {!assetsLoading && !assetStatus?.vosk_model && (
-            <p className="rounded-md bg-black/40 px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
+            <p className="rounded-md bg-[var(--shell-code-bg)] px-2 py-1.5 font-mono text-[0.625rem] text-muted-foreground">
               models\vosk\vosk-model-en-us-0.22-lgraph
             </p>
           )}

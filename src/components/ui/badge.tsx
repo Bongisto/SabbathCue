@@ -5,7 +5,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border border-white/10 bg-slate-900/50 px-1.5 py-0 font-mono text-[9px] font-bold uppercase tracking-wider whitespace-nowrap text-slate-300 transition-all [&>svg]:pointer-events-none [&>svg]:size-3",
+  "inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] px-1.5 py-0 font-mono text-[9px] font-bold tracking-wider whitespace-nowrap text-foreground uppercase transition-all [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
@@ -15,7 +15,7 @@ const badgeVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
         outline:
-          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground dark:border-white/10 dark:bg-slate-900/40",
+          "border-border text-foreground dark:border-[var(--border-dim)] dark:bg-[var(--shell-bg-sunken)] [a]:hover:bg-muted [a]:hover:text-muted-foreground",
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",

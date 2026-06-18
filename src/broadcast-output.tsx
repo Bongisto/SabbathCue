@@ -12,6 +12,7 @@ function readAccentTheme(): AccentTheme {
   try {
     const raw = localStorage.getItem(ACCENT_THEME_STORAGE_KEY)
     if (
+      raw === "teal" ||
       raw === "gold" ||
       raw === "emerald" ||
       raw === "purple" ||
@@ -22,14 +23,14 @@ function readAccentTheme(): AccentTheme {
   } catch {
     /* ignore */
   }
-  return "gold"
+  return "teal"
 }
 
 function applyAccentThemeToDocument() {
   const theme = readAccentTheme()
   const root = document.documentElement
   root.id = "bodyThemeContainer"
-  root.className = accentThemeClassName(theme)
+  root.className = `dark ${accentThemeClassName(theme)}`
   document.body.style.margin = "0"
   document.body.style.background = "var(--bg-deep)"
 }

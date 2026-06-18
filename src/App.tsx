@@ -16,6 +16,7 @@ import { useApiKeyPromptStore } from "@/lib/api-key-prompt"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
+import { useColorModeStore } from "@/stores/color-mode-store"
 
 const LazyTutorialOverlay = lazy(() =>
   import("@/components/tutorial/tutorial-overlay").then((mod) => ({
@@ -151,6 +152,7 @@ export function App() {
   const setApiKeyPromptOpen = useApiKeyPromptStore((s) => s.setOpen)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)
   const tutorialRunning = useTutorialStore((s) => s.isRunning)
+  const colorMode = useColorModeStore((s) => s.mode)
   const shouldMountTutorial = !onboardingComplete || tutorialRunning
 
   return (
@@ -173,11 +175,11 @@ export function App() {
       ) : null}
       <Toaster
         position="bottom-right"
-        theme="dark"
+        theme={colorMode}
         toastOptions={{
           classNames: {
             toast:
-              "glass-panel border border-white/[0.08] bg-[linear-gradient(145deg,rgba(13,20,38,0.95),rgba(4,7,16,0.98))] text-foreground shadow-[0_24px_48px_rgba(0,0,0,0.6)]",
+              "glass-panel border border-[var(--border-subtle)] bg-[linear-gradient(145deg,var(--bg-surface),var(--bg-elevated))] text-foreground shadow-[var(--shell-panel-shadow)]",
             title: "text-foreground",
             description: "text-muted-foreground",
             actionButton: "btn-action",

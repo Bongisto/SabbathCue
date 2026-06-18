@@ -151,13 +151,13 @@ export function AnnouncementsAdminPanel() {
           signed-in users until dismissed.
         </p>
         <input
-          className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          className="w-full rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] px-3 py-2 text-sm"
           placeholder="Title"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
         <textarea
-          className="min-h-20 w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm"
+          className="min-h-20 w-full rounded-md border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] px-3 py-2 text-sm"
           placeholder="Message body"
           value={body}
           onChange={(event) => setBody(event.target.value)}

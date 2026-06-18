@@ -36,7 +36,7 @@ export function ApiKeyPrompt({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="border-white/12 bg-linear-to-b from-card to-card/95 sm:max-w-[420px]"
+        className="border-[var(--border-dim)] bg-linear-to-b from-[var(--bg-surface)] to-[var(--bg-elevated)] sm:max-w-[420px]"
         showCloseButton={false}
       >
         <DialogHeader>

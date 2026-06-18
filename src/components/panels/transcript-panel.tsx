@@ -219,7 +219,7 @@ export function TranscriptPanel({ className }: { className?: string }) {
       </div>
 
       {/* Bottom control */}
-      <div className="flex gap-2 border-t border-white/5 px-3 py-2">
+      <div className="flex gap-2 border-t border-[var(--border-subtle)] px-3 py-2">
         {isTranscribing ? (
           <Button
             variant="ghost"

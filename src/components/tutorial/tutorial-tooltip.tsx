@@ -53,7 +53,7 @@ export function TutorialTooltip({
       {...tooltipProps}
       className="glass-panel z-[70] w-[340px] overflow-hidden shadow-2xl shadow-black/25"
     >
-      <div className="flex items-center gap-2.5 border-b border-white/5 px-4 pt-4 pb-3">
+      <div className="flex items-center gap-2.5 border-b border-[var(--border-subtle)] px-4 pt-4 pb-3">
         <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-glow)]">
           <SparklesIcon className="size-3.5 text-[var(--accent)]" />
         </div>
@@ -68,7 +68,7 @@ export function TutorialTooltip({
         </p>
       </div>
 
-      <div className="space-y-2.5 border-t border-white/5 px-4 py-3">
+      <div className="space-y-2.5 border-t border-[var(--border-subtle)] px-4 py-3">
         <div className="flex items-center gap-1">
           {Array.from({ length: size }, (_, i) => (
             <div
@@ -90,14 +90,14 @@ export function TutorialTooltip({
         <div className="flex items-center justify-end gap-1.5">
           <button
             {...skipProps}
-            className="btn-action mr-auto rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            className="btn-action mr-auto rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-[var(--shell-bg-sunken)] hover:text-foreground"
           >
             Skip
           </button>
           {index > 0 ? (
             <button
               {...backProps}
-              className="btn-action inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              className="btn-action inline-flex items-center gap-0.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-[var(--shell-bg-sunken)] hover:text-foreground"
             >
               <ChevronLeftIcon className="size-3" />
               Back

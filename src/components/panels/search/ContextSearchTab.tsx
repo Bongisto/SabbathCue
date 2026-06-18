@@ -92,7 +92,7 @@ export function ContextSearchTab({
                 text: result.verse_text,
               })
             }}
-            className="group relative flex cursor-pointer flex-col gap-1 rounded-lg p-3 transition-colors hover:bg-white/5"
+            className="group relative flex cursor-pointer flex-col gap-1 rounded-lg p-3 transition-colors hover:bg-[var(--shell-bg-sunken)]"
           >
             <div className="flex shrink-0 flex-row items-start gap-2">
               <span className="text-xs font-semibold">

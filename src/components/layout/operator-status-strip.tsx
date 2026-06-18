@@ -14,7 +14,12 @@ import { useServicePlanStore } from "@/stores/service-plan-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 import { detectionActions } from "@/hooks/use-detection"
 import { OperatorStatusActions } from "@/components/layout/operator-status-actions"
-import { AlertTriangleIcon, MicIcon, Rows3Icon, SwatchBookIcon } from "lucide-react"
+import {
+  AlertTriangleIcon,
+  MicIcon,
+  Rows3Icon,
+  SwatchBookIcon,
+} from "lucide-react"
 
 export function OperatorStatusStrip({
   actionsLayout = "responsive",
@@ -66,7 +71,7 @@ export function OperatorStatusStrip({
   return (
     <section
       data-slot="operator-status-strip"
-      className="flex h-11 shrink-0 items-center justify-between gap-4 overflow-x-auto border-b border-[rgba(255,255,255,0.06)] bg-slate-950/80 px-5 text-xs select-none scrollbar-thin"
+      className="flex h-11 shrink-0 scrollbar-thin items-center justify-between gap-4 overflow-x-auto border-b border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] px-5 text-xs select-none"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
         <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
@@ -77,7 +82,7 @@ export function OperatorStatusStrip({
           </span>
         </div>
 
-        <div className="h-3.5 w-px shrink-0 bg-white/10" />
+        <div className="h-3.5 w-px shrink-0 bg-[var(--shell-bg-sunken)]" />
 
         <div className="flex min-w-0 shrink items-center gap-1">
           <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
@@ -88,22 +93,24 @@ export function OperatorStatusStrip({
           </span>
         </div>
 
-        <div className="h-3.5 w-px shrink-0 bg-white/10" />
+        <div className="h-3.5 w-px shrink-0 bg-[var(--shell-bg-sunken)]" />
 
         <div className="flex min-w-0 shrink items-center gap-1">
-          <span className="font-mono text-[10px] text-muted-foreground">Live:</span>
+          <span className="font-mono text-[10px] text-muted-foreground">
+            Live:
+          </span>
           <span className="truncate font-mono text-[10px] font-bold text-[var(--accent)]">
             {liveItem?.reference ?? "—"}
           </span>
         </div>
 
-        <div className="h-3.5 w-px shrink-0 bg-white/10" />
+        <div className="h-3.5 w-px shrink-0 bg-[var(--shell-bg-sunken)]" />
 
         <Badge
           variant={isLive ? "default" : "outline"}
           className={cn(
             "h-5 shrink-0 font-mono text-[0.5rem] uppercase",
-            isLive && "bg-emerald-500 text-white hover:bg-emerald-500",
+            isLive && "bg-emerald-500 text-foreground hover:bg-emerald-500"
           )}
         >
           {isLive ? "On air" : "Hidden"}
@@ -116,12 +123,14 @@ export function OperatorStatusStrip({
 
         {latestOutputIssue ? (
           <>
-            <div className="h-3.5 w-px shrink-0 bg-white/10" />
+            <div className="h-3.5 w-px shrink-0 bg-[var(--shell-bg-sunken)]" />
             <button
               type="button"
               title={latestOutputIssue.description}
               onClick={() =>
-                useBroadcastStore.getState().clearOutputIssue(latestOutputIssue.id)
+                useBroadcastStore
+                  .getState()
+                  .clearOutputIssue(latestOutputIssue.id)
               }
               className="flex max-w-[180px] shrink-0 items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-300"
             >
@@ -135,15 +144,15 @@ export function OperatorStatusStrip({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <div className="flex items-center gap-1 rounded-md border border-white/5 bg-slate-900/60 px-2 py-0.5 font-mono text-[10px]">
+        <div className="flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] px-2 py-0.5 font-mono text-[10px]">
           <span
             className={cn(
               "size-1.5 rounded-full",
-              isLive ? "bg-emerald-500 animate-pulse" : "bg-red-500/80",
+              isLive ? "animate-pulse bg-emerald-500" : "bg-red-500/80"
             )}
           />
           <span className="text-muted-foreground">Broadcast</span>
-          <span className="font-semibold uppercase text-foreground">
+          <span className="font-semibold text-foreground uppercase">
             {isLive ? "On air" : "Standby"}
           </span>
         </div>

@@ -11,12 +11,13 @@ const buttonVariants = cva(
       variant: {
         default: "bg-yellow-400 text-slate-950 hover:bg-yellow-500",
         outline:
-          "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10",
+          "border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] text-foreground hover:bg-[var(--shell-bg-sunken)]",
         secondary:
-          "border border-white/10 bg-slate-900/50 text-slate-300 hover:bg-white/15",
-        ghost: "text-slate-400 hover:bg-white/5 hover:text-white",
+          "border border-[var(--border-dim)] bg-[var(--shell-bg-sunken)] text-foreground hover:bg-[var(--shell-bg-sunken)]",
+        ghost:
+          "text-muted-foreground hover:bg-[var(--shell-bg-sunken)] hover:text-foreground",
         chrome:
-          "border border-white/5 bg-slate-900/60 text-slate-400 hover:border-[var(--accent-border)] hover:bg-[var(--accent-glow)] hover:text-[var(--accent)]",
+          "border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] text-muted-foreground hover:border-[var(--accent-border)] hover:bg-[var(--accent-glow)] hover:text-[var(--accent)]",
         destructive:
           "border border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/25",
         link: "text-[var(--accent)] underline-offset-4 hover:underline",
@@ -36,7 +37,7 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  },
+  }
 )
 
 function Button({

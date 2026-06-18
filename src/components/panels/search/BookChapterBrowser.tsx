@@ -33,7 +33,7 @@ export function BookChapterBrowser({
 }) {
   return (
     <>
-      <div className="flex min-h-9 shrink-0 items-center justify-between border-b border-white/5 px-3 py-2">
+      <div className="flex min-h-9 shrink-0 items-center justify-between border-b border-[var(--border-subtle)] px-3 py-2">
         {selectedBook ? (
           <h3 className="text-sm font-semibold text-foreground">
             {selectedBook.name} {chapter}
@@ -72,7 +72,7 @@ export function BookChapterBrowser({
                 "group flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors",
                 verse.id === effectiveSelectedVerseId
                   ? "border border-lime-500/50 bg-lime-500/10"
-                  : "border border-transparent hover:bg-white/5",
+                  : "border border-transparent hover:bg-[var(--shell-bg-sunken)]",
               )}
             >
               <span className="w-6 shrink-0 text-right text-sm font-semibold text-primary">

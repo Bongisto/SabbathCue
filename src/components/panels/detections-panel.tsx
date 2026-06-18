@@ -39,7 +39,7 @@ const SOURCE_COLORS: Record<
 
 function SourceBadge({ source }: { source: string }) {
   const style = SOURCE_COLORS[source] ?? {
-    bg: "bg-white/10",
+    bg: "bg-[var(--shell-bg-sunken)]",
     text: "text-muted-foreground",
     label: source,
   }
@@ -188,7 +188,7 @@ export function DetectionsPanel({ className }: { className?: string }) {
       >
         <div className="flex items-center gap-2">
           <span
-            className="inline-flex items-center gap-1 rounded border border-white/5 px-1.5 py-0.5 text-[0.5625rem] text-muted-foreground uppercase"
+            className="inline-flex items-center gap-1 rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[0.5625rem] text-muted-foreground uppercase"
             title="Semantic detections remain visible from 42%; the threshold controls automatic output only."
           >
             <BrainCircuitIcon className="size-2.5" />

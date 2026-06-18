@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Trash2Icon } from "lucide-react"
+import { MoonIcon, SunIcon, Trash2Icon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 import { AppLogo } from "@/components/ui/app-logo"
@@ -7,6 +7,7 @@ import {
   useAccentThemeStore,
   type AccentTheme,
 } from "@/stores/accent-theme-store"
+import { useColorModeStore } from "@/stores/color-mode-store"
 import { blackoutOutput } from "@/lib/operator-actions"
 import { WorkspaceTopNav } from "@/components/layout/workspace-top-nav"
 import packageJson from "../../../package.json"
@@ -14,6 +15,7 @@ import packageJson from "../../../package.json"
 const ACCENT_SWATCHES: { id: AccentTheme; className: string; title: string }[] =
   [
     { id: "gold", className: "bg-yellow-400", title: "Sunrise Gold" },
+    { id: "teal", className: "bg-teal-500", title: "Soft Teal" },
     { id: "emerald", className: "bg-emerald-500", title: "Emerald Sanctuary" },
     {
       id: "purple",
@@ -34,6 +36,8 @@ function formatClock(date: Date): string {
 export function AppControllerHeader() {
   const theme = useAccentThemeStore((s) => s.theme)
   const setTheme = useAccentThemeStore((s) => s.setTheme)
+  const colorMode = useColorModeStore((s) => s.mode)
+  const toggleColorMode = useColorModeStore((s) => s.toggle)
   const [clock, setClock] = useState(() => formatClock(new Date()))
 
   useEffect(() => {
@@ -44,7 +48,7 @@ export function AppControllerHeader() {
   const versionLabel = `v${packageJson.version}`
 
   return (
-    <header className="z-50 flex h-[56px] shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[#02040a]/90 px-6 backdrop-blur-xl">
+    <header className="z-50 flex h-[56px] shrink-0 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] px-6 backdrop-blur-xl">
       <div className="flex items-center gap-5">
         <div className="flex items-center gap-3">
           <AppLogo
@@ -52,10 +56,10 @@ export function AppControllerHeader() {
             className="transition-transform duration-300 hover:rotate-3"
           />
           <div className="flex flex-col leading-none">
-            <span className="font-display text-xl tracking-wide text-white">
+            <span className="font-display text-xl tracking-wide text-foreground">
               {APP_DISPLAY_NAME}
             </span>
-            <span className="mt-0.5 font-mono text-[9px] tracking-wider text-slate-500 uppercase">
+            <span className="mt-0.5 font-mono text-[9px] tracking-wider text-muted-foreground uppercase">
               Automated Presentation Space
             </span>
           </div>
@@ -70,32 +74,55 @@ export function AppControllerHeader() {
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden rounded-lg border border-white/5 bg-slate-950/60 px-3 py-1 font-mono text-xs font-semibold tracking-wider text-slate-100 lg:block">
+        <div className="hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] px-3 py-1 font-mono text-xs font-semibold tracking-wider text-foreground lg:block">
           {clock}
         </div>
-        <div
-          className="flex items-center gap-1.5 rounded-lg border border-white/5 bg-slate-900/60 p-1"
-          data-tour="theme"
+        <button
+          type="button"
+          title={
+            colorMode === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          aria-label={
+            colorMode === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          onClick={toggleColorMode}
+          className="btn-action flex size-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] text-muted-foreground hover:text-foreground"
         >
-          <span className="hidden px-2 font-mono text-[10px] font-bold text-slate-400 uppercase sm:inline">
-            Theme:
-          </span>
-          {ACCENT_SWATCHES.map((swatch) => (
-            <button
-              key={swatch.id}
-              type="button"
-              title={swatch.title}
-              aria-label={swatch.title}
-              aria-pressed={theme === swatch.id}
-              onClick={() => setTheme(swatch.id)}
-              className={cn(
-                "btn-action size-[18px] rounded-md border border-white/10 transition-all hover:scale-125",
-                swatch.className,
-                theme === swatch.id && "ring-2 ring-white/40"
-              )}
-            />
-          ))}
-        </div>
+          {colorMode === "dark" ? (
+            <SunIcon className="size-4" />
+          ) : (
+            <MoonIcon className="size-4" />
+          )}
+        </button>
+        {colorMode === "dark" ? (
+          <div
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-1"
+            data-tour="theme"
+          >
+            <span className="hidden px-2 font-mono text-[10px] font-bold text-muted-foreground uppercase sm:inline">
+              Theme:
+            </span>
+            {ACCENT_SWATCHES.map((swatch) => (
+              <button
+                key={swatch.id}
+                type="button"
+                title={swatch.title}
+                aria-label={swatch.title}
+                aria-pressed={theme === swatch.id}
+                onClick={() => setTheme(swatch.id)}
+                className={cn(
+                  "btn-action size-[18px] rounded-md border border-[var(--border-subtle)] transition-all hover:scale-125",
+                  swatch.className,
+                  theme === swatch.id && "ring-2 ring-[var(--accent-border)]"
+                )}
+              />
+            ))}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={blackoutOutput}

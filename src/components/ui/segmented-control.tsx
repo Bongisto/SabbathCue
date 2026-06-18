@@ -26,7 +26,7 @@ function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       data-slot="segmented-control"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-lg border border-white/5 bg-slate-900/60 p-0.5",
+        "inline-flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-0.5",
         className
       )}
     >
@@ -42,7 +42,7 @@ function SegmentedControl<T extends string>({
               "rounded-md px-3 py-1 text-xs font-semibold capitalize transition-all",
               active
                 ? "border border-[var(--brand-border)] bg-[var(--brand-accent-glow)] text-[var(--brand-accent)] shadow-sm"
-                : "border border-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                : "border border-transparent text-muted-foreground hover:bg-[var(--shell-bg-sunken)] hover:text-foreground"
             )}
           >
             {option.label}

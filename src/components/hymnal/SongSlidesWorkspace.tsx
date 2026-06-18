@@ -154,7 +154,7 @@ export function SongSlidesWorkspace() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,0.8fr)_minmax(320px,1fr)]">
         <div className="flex min-h-0 flex-col border-r border-[var(--border-subtle)]">
-          <div className="space-y-2 border-b border-white/5 p-3">
+          <div className="space-y-2 border-b border-[var(--border-subtle)] p-3">
             <label className="text-[0.625rem] font-medium uppercase text-muted-foreground">
               Song title
             </label>
@@ -198,7 +198,7 @@ export function SongSlidesWorkspace() {
         </div>
 
         <div className="flex min-h-0 flex-col">
-          <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-white/5 px-3 py-1.5">
+          <div className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-1.5">
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{title || "Custom Song"}</p>
               <p className="truncate text-xs text-muted-foreground">
@@ -224,11 +224,11 @@ export function SongSlidesWorkspace() {
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
             {activeSlide ? (
               <div className="flex min-h-full flex-col gap-3">
-                <div className="relative flex aspect-video items-center justify-center rounded-md border border-white/5 bg-black p-8 text-center">
-                  <span className="absolute right-3 top-3 rounded bg-white/10 px-2 py-0.5 text-[0.625rem] font-semibold text-white/80">
+                <div className="relative flex aspect-video items-center justify-center rounded-md border border-[var(--border-subtle)] bg-black p-8 text-center">
+                  <span className="absolute right-3 top-3 rounded bg-[var(--shell-bg-sunken)] px-2 py-0.5 text-[0.625rem] font-semibold text-foreground">
                     {activeSlide.slideIndex + 1} of {activeSlide.slideCount}
                   </span>
-                  <div className="max-w-[80%] space-y-3 text-balance text-2xl font-semibold leading-snug text-white">
+                  <div className="max-w-[80%] space-y-3 text-balance text-2xl font-semibold leading-snug text-foreground">
                     {activeSlide.segments.map((segment) => (
                       <p key={segment.text}>{segment.text}</p>
                     ))}
@@ -245,7 +245,7 @@ export function SongSlidesWorkspace() {
                         "rounded-md border px-2 py-1.5 text-left text-xs transition-colors",
                         index === activeIndex
                           ? "border-lime-500/50 bg-lime-500/15"
-                          : "border-white/5 hover:bg-white/5",
+                          : "border-[var(--border-subtle)] hover:bg-[var(--shell-bg-sunken)]",
                       )}
                     >
                       <span className="block truncate font-medium">

@@ -8,7 +8,7 @@ export function ServicePlanSummaryWidget() {
 
   if (summaries.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-white/5 px-3 py-4 text-xs text-muted-foreground">
+      <div className="rounded-md border border-dashed border-[var(--border-subtle)] px-3 py-4 text-xs text-muted-foreground">
         No service plans yet.
       </div>
     )
@@ -20,7 +20,7 @@ export function ServicePlanSummaryWidget() {
         <button
           key={summary.id}
           type="button"
-          className="flex w-full items-center justify-between rounded-md border border-white/5 px-3 py-2 text-left text-xs hover:bg-white/5"
+          className="flex w-full items-center justify-between rounded-md border border-[var(--border-subtle)] px-3 py-2 text-left text-xs hover:bg-[var(--shell-bg-sunken)]"
           onClick={() => void loadPlan(summary.id)}
         >
           <span className="font-medium">{summary.title}</span>

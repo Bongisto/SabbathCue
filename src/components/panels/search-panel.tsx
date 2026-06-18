@@ -207,7 +207,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
     >
       <PanelHeader title="Search" icon={<SearchIcon className="size-3" />} step={5} />
 
-      <div className="flex min-h-11 shrink-0 items-center gap-0 border-b border-white/5">
+      <div className="flex min-h-11 shrink-0 items-center gap-0 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-1 px-3 py-1.5">
           <button
             data-tour="book-search"
@@ -216,7 +216,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
               activeTab === "book"
                 ? "border-lime-500/50 bg-lime-500/15"
-                : "border-white/5 text-muted-foreground hover:text-foreground",
+                : "border-[var(--border-subtle)] text-muted-foreground hover:text-foreground",
             )}
           >
             <BookOpenIcon
@@ -237,7 +237,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
               activeTab === "context"
                 ? "border-lime-500/50 bg-lime-500/15"
-                : "border-white/5 bg-black/40 text-muted-foreground hover:text-foreground",
+                : "border-[var(--border-subtle)] bg-[var(--shell-code-bg)] text-muted-foreground hover:text-foreground",
             )}
           >
             <SparklesIcon
@@ -254,7 +254,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
               "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
               activeTab === "egw"
                 ? "border-lime-500/50 bg-lime-500/15"
-                : "border-white/5 text-muted-foreground hover:text-foreground",
+                : "border-[var(--border-subtle)] text-muted-foreground hover:text-foreground",
             )}
           >
             <BookOpenIcon

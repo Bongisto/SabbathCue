@@ -268,7 +268,7 @@ export function DesignCanvas() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="glass-panel-header flex h-14 shrink-0 items-center gap-2 border-b border-white/[0.06] px-3">
+      <div className="glass-panel-header flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3">
         <Button variant="ghost" size="icon-xs" className="text-muted-foreground">
           <MousePointer2Icon className="size-3.5" />
         </Button>
@@ -305,7 +305,7 @@ export function DesignCanvas() {
       </div>
 
       {/* Status bar */}
-      <div className="glass-panel-header flex h-8 shrink-0 items-center border-t border-white/[0.06] px-3 text-[0.5625rem] text-muted-foreground/70">
+      <div className="glass-panel-header flex h-8 shrink-0 items-center border-t border-[var(--border-subtle)] px-3 text-[0.5625rem] text-muted-foreground/70">
         <span>Output: {WS_WIDTH} × {WS_HEIGHT}px</span>
         <span className="mx-2">·</span>
         <span>Zoom: {zoomLevel}%</span>
