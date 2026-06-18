@@ -160,6 +160,14 @@ describe("handleDashboardKeyboardEvent", () => {
     expect(useDashboardWorkspaceStore.getState().workspace).toBe("hymns")
   })
 
+  it("opens the Library workspace with Ctrl+5", () => {
+    handleDashboardKeyboardEvent(
+      new KeyboardEvent("keydown", { key: "5", ctrlKey: true })
+    )
+
+    expect(useDashboardWorkspaceStore.getState().workspace).toBe("library")
+  })
+
   it("suspends dashboard shortcuts while the tutorial is running", () => {
     useTutorialStore.setState({ isRunning: true })
 

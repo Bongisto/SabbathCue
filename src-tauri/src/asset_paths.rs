@@ -88,6 +88,13 @@ pub fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("Unable to resolve app data directory: {e}"))
 }
 
+pub fn library_media_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app_data_dir(app)?.join("library").join("media");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Unable to create library media directory: {e}"))?;
+    Ok(dir)
+}
+
 pub fn bible_db_path(app: &AppHandle) -> PathBuf {
     first_existing(
         [

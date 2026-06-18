@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, type DragEvent } from "react"
 import * as fabric from "fabric"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { renderVerse } from "@/lib/verse-renderer"
@@ -260,6 +260,38 @@ export function DesignCanvas() {
     setZoomLevel(Math.round(newZoom * 100))
   }, [resyncLatestTheme])
 
+  const handleLibraryImageDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      const raw = event.dataTransfer.getData(
+        "application/x-sabbathcue-library-image"
+      )
+      if (!raw) return
+      event.preventDefault()
+      try {
+        const image = JSON.parse(raw) as { thumbnail?: string }
+        if (!image.thumbnail) return
+        const broadcast = useBroadcastStore.getState()
+        broadcast.updateDraft({
+          background: {
+            type: "image",
+            color: draftTheme?.background.color ?? "#000000",
+            gradient: null,
+            image: {
+              url: image.thumbnail,
+              fit: "cover",
+              blur: 0,
+              brightness: 1,
+              tint: null,
+            },
+          },
+        })
+      } catch (error) {
+        console.warn("[theme-designer] invalid library image drop", error)
+      }
+    },
+    [draftTheme?.background.color],
+  )
+
   const elementLabel =
     selectedElement === "verse" ? "verse"
       : selectedElement === "reference" ? "reference"
@@ -295,7 +327,21 @@ export function DesignCanvas() {
       </div>
 
       {/* Canvas container */}
-      <div ref={containerRef} className="relative min-h-0 flex-1">
+      <div
+        ref={containerRef}
+        className="relative min-h-0 flex-1"
+        onDragOver={(event) => {
+          if (
+            event.dataTransfer.types.includes(
+              "application/x-sabbathcue-library-image"
+            )
+          ) {
+            event.preventDefault()
+            event.dataTransfer.dropEffect = "copy"
+          }
+        }}
+        onDrop={handleLibraryImageDrop}
+      >
         <canvas ref={canvasElRef} />
         {!draftTheme && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-base,#18181b)]">

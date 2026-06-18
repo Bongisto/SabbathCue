@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BookOpenIcon,
   ClipboardListIcon,
+  LibraryIcon,
   LayoutGridIcon,
   PlayCircleIcon,
   RadioIcon,
@@ -44,6 +45,12 @@ export const DASHBOARD_WORKSPACE_NAV: DashboardWorkspaceNavItem[] = [
     icon: BookOpenIcon,
     dividerBefore: true,
     shortcut: "Ctrl/Cmd + 4",
+  },
+  {
+    id: "library",
+    label: "Church Library",
+    icon: LibraryIcon,
+    shortcut: "Ctrl/Cmd + 5",
   },
   {
     id: "settings",

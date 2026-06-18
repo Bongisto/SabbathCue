@@ -29,7 +29,7 @@ describe("WorkspaceTopNav", () => {
     const nav = screen.getByRole("navigation", { name: "Workspaces" })
     expect(nav).toBeTruthy()
     const buttons = screen.getAllByRole("button")
-    expect(buttons).toHaveLength(7)
+    expect(buttons).toHaveLength(8)
     for (const button of buttons) {
       expect(button.getAttribute("aria-label")).toBeTruthy()
     }
@@ -54,6 +54,12 @@ describe("WorkspaceTopNav", () => {
     fireEvent.click(screen.getByRole("button", { name: /SDA Hymns Search/ }))
     expect(useDashboardWorkspaceStore.getState().workspace).toBe("hymns")
     expect(useServicePlanStore.getState().plannerOpen).toBe(false)
+  })
+
+  it("switches to the Library workspace", () => {
+    renderTopNav()
+    fireEvent.click(screen.getByRole("button", { name: /Church Library/ }))
+    expect(useDashboardWorkspaceStore.getState().workspace).toBe("library")
   })
 
   it("marks the active workspace icon with aria-current", () => {

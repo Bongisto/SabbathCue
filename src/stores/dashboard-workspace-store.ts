@@ -5,6 +5,7 @@ export type DashboardWorkspace =
   | "run-service"
   | "service-plans"
   | "hymns"
+  | "library"
   | "live-service"
   | "settings"
   | "help-legal"

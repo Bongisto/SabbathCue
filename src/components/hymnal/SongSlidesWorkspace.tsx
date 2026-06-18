@@ -8,6 +8,7 @@ import { presentItem, selectPreviewItem } from "@/lib/presentation-workflow"
 import { splitLyricLineForReadableSlides } from "@/lib/text-slide-chunking"
 import { cn } from "@/lib/utils"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
+import { useLibraryStore } from "@/stores/library-store"
 import { useQueueStore } from "@/stores/queue-store"
 import type { HymnPresentationItemData, QueueItem } from "@/types"
 import {
@@ -133,6 +134,26 @@ export function SongSlidesWorkspace() {
     registerDeck(activeIndex)
   }
 
+  const handleSaveToLibrary = () => {
+    if (deck.length === 0) return
+    useLibraryStore.getState().addAsset({
+      id: crypto.randomUUID(),
+      name: title.trim() || "Song Deck",
+      type: "song",
+      collectionIds: [],
+      song: {
+        title: title.trim() || "Custom Song",
+        sections: slideLines.map((lines, index) => ({
+          kind: "verse",
+          index: index + 1,
+          lines,
+        })),
+      },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    })
+  }
+
   const handleUpload = async (file: File | undefined) => {
     if (!file) return
     const text = await file.text()
@@ -213,6 +234,9 @@ export function SongSlidesWorkspace() {
               <Button size="xs" variant="outline" disabled={deck.length === 0} onClick={handleQueueAll}>
                 <PlusIcon className="mr-1 size-3" />
                 Queue
+              </Button>
+              <Button size="xs" variant="outline" disabled={deck.length === 0} onClick={handleSaveToLibrary}>
+                Save
               </Button>
               <Button size="xs" disabled={!activeSlide} onClick={handleLive}>
                 <PlayIcon className="mr-1 size-3" />
