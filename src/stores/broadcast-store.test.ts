@@ -56,6 +56,47 @@ describe("broadcast store sync", () => {
     )
   })
 
+  it("falls back to a real transition duration when the active theme has 0ms", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const base = useBroadcastStore.getState().themes[0]
+    const zeroDurationTheme = {
+      ...base,
+      id: "zero-duration",
+      transition: { ...base.transition, type: "fade" as const, duration: 0 },
+    }
+    useBroadcastStore.setState({
+      themes: [zeroDurationTheme, ...useBroadcastStore.getState().themes],
+      activeThemeId: "zero-duration",
+      isLive: true,
+      liveTransitionType: "fade",
+    })
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().commitLiveItem({
+      reference: "John 3:16",
+      segments: [{ text: "For God so loved the world", verseNumber: 16 }],
+    })
+
+    const mainCall = emitToMock.mock.calls.find((c) => c[0] === "broadcast")
+    expect(mainCall?.[2].transition.type).toBe("fade")
+    expect(mainCall?.[2].transition.duration).toBeGreaterThan(0)
+  })
+
+  it("keeps an instant cut (none) at 0ms duration", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    useBroadcastStore.setState({ isLive: true, liveTransitionType: "none" })
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().commitLiveItem({
+      reference: "John 3:16",
+      segments: [{ text: "x" }],
+    })
+
+    const mainCall = emitToMock.mock.calls.find((c) => c[0] === "broadcast")
+    expect(mainCall?.[2].transition.type).toBe("none")
+    expect(mainCall?.[2].transition.duration).toBe(0)
+  })
+
   it("emits a blank item when live output is off", async () => {
     const { useBroadcastStore } = await import("./broadcast-store")
     const theme = useBroadcastStore.getState().themes[0]

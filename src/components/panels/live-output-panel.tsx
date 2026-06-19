@@ -37,6 +37,21 @@ const LIVE_TRANSITION_OPTIONS: { value: BroadcastTransitionType; label: string }
   { value: "scale", label: "Scale" },
 ]
 
+/// CSS animation class for the in-app live preview, matching the selected
+/// transition. "none" (Cut) is instant, so no class.
+export function liveTransitionClass(type: BroadcastTransitionType): string {
+  switch (type) {
+    case "fade":
+      return "live-anim-fade"
+    case "slide":
+      return "live-anim-slide"
+    case "scale":
+      return "live-anim-scale"
+    default:
+      return ""
+  }
+}
+
 function navigateLiveDeck(
   kind: "hymn" | "slideDeck" | "egw",
   index: number
@@ -208,6 +223,12 @@ function LiveStage({
   visibleItem: ReturnType<typeof useBroadcastStore.getState>["liveItem"]
   isFullscreenLayout: boolean
 }) {
+  const transitionType = useBroadcastStore((s) => s.liveTransitionType)
+  // Re-key on content change so the transition animation replays each time a
+  // new verse/slide goes live, matching the selected transition.
+  const contentKey = visibleItem
+    ? `${visibleItem.reference}#${visibleItem.hymnSlide?.slideIndex ?? 0}`
+    : "empty"
   return (
     <div
       data-slot="live-output-stage"
@@ -226,13 +247,22 @@ function LiveStage({
         )}
       >
         {visibleItem && activeTheme ? (
-          <CanvasPresentation
-            theme={activeTheme}
-            item={visibleItem}
-            className={
-              isFullscreenLayout ? "[&_canvas]:rounded-none" : undefined
-            }
-          />
+          <div
+            key={contentKey}
+            data-slot="live-output-anim"
+            className={cn(
+              "flex h-full w-full items-center justify-center",
+              liveTransitionClass(transitionType)
+            )}
+          >
+            <CanvasPresentation
+              theme={activeTheme}
+              item={visibleItem}
+              className={
+                isFullscreenLayout ? "[&_canvas]:rounded-none" : undefined
+              }
+            />
+          </div>
         ) : (
           <PanelEmptyState
             icon={<EyeOffIcon className="size-8" />}

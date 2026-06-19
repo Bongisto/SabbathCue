@@ -152,15 +152,23 @@ function findThemeById(themes: BroadcastTheme[], id: string): BroadcastTheme | n
   return themes.find((theme) => theme.id === id) ?? themes[0] ?? null
 }
 
+/// Fallback so an animated transition is never silently instant when a theme
+/// (e.g. an older persisted/custom one) carries a 0ms or missing duration.
+const DEFAULT_TRANSITION_DURATION_MS = 500
+
 function transitionForTheme(
   theme: BroadcastTheme,
   type: BroadcastTransitionType,
 ): BroadcastTransition {
-  return {
-    ...theme.transition,
-    type,
-    duration: type === "none" ? 0 : theme.transition.duration,
+  if (type === "none") {
+    return { ...theme.transition, type, duration: 0 }
   }
+  const themeDuration = theme.transition?.duration
+  const duration =
+    themeDuration && themeDuration > 0
+      ? themeDuration
+      : DEFAULT_TRANSITION_DURATION_MS
+  return { ...theme.transition, type, duration }
 }
 
 function buildBroadcastPayload(
