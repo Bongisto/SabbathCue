@@ -171,3 +171,13 @@ describe("fullscreen stylesheet contract", () => {
     expect(rule).toContain("border: 0 !important")
   })
 })
+
+describe("liveTransitionClass", () => {
+  it("maps the selected transition to a preview animation class", async () => {
+    const { liveTransitionClass } = await import("./live-output-panel")
+    expect(liveTransitionClass("fade")).toBe("live-anim-fade")
+    expect(liveTransitionClass("slide")).toBe("live-anim-slide")
+    expect(liveTransitionClass("scale")).toBe("live-anim-scale")
+    expect(liveTransitionClass("none")).toBe("")
+  })
+})

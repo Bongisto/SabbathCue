@@ -84,6 +84,50 @@ describe("detection store", () => {
     expect(detections[1].verse_ref).toBe("Strong Semantic")
   })
 
+  it("keeps a freshly spoken EGW detection even when the box is full of higher-confidence Bible hits", () => {
+    const store = useDetectionStore.getState()
+
+    // Box fills with five 100% Bible hits during a session.
+    for (let i = 1; i <= 5; i += 1) {
+      store.addDetection(
+        makeDetection({
+          verse_ref: `John ${i}:1`,
+          book_number: 43,
+          chapter: i,
+          verse: 1,
+          confidence: 1,
+        })
+      )
+    }
+
+    now += 1000
+    // Then an Ellen White reference is spoken (lower confidence).
+    store.addDetection(
+      makeDetection({
+        content_type: "egw",
+        verse_ref: "Steps to Christ 1:2",
+        verse_text: "Nature and revelation testify of God's love.",
+        book_name: "Steps to Christ",
+        book_number: 2,
+        chapter: 1,
+        verse: 2,
+        confidence: 0.94,
+        egw_paragraph: {
+          id: 1,
+          book_number: 2,
+          book_title: "Steps to Christ",
+          chapter: 1,
+          chapter_title: "God's Love for Man",
+          paragraph: 2,
+          text: "Nature and revelation testify of God's love.",
+        },
+      })
+    )
+
+    const detections = useDetectionStore.getState().detections
+    expect(detections.some((d) => d.content_type === "egw")).toBe(true)
+  })
+
   it("dedupes hymn detections by hymn number and keeps verses distinct", () => {
     const store = useDetectionStore.getState()
 

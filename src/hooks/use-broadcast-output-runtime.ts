@@ -373,6 +373,11 @@ export function useBroadcastOutputRuntime({
   ) => {
     cancelTransition()
     const transition = payload.transition
+    logDebug("transition received", {
+      type: transition?.type ?? "missing",
+      duration: transition?.duration ?? 0,
+      hasPrevious: previousPayload !== null,
+    })
     if (!transition || transition.type === "none" || transition.duration <= 0) {
       draw()
       pushNdiBurst()
@@ -411,6 +416,7 @@ export function useBroadcastOutputRuntime({
     draw,
     drawRenderedCanvas,
     drawTransitionFrame,
+    logDebug,
     pushNdiBurst,
     renderPayloadToCanvas,
   ])

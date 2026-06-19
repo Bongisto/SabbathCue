@@ -47,6 +47,20 @@ function sourcePriority(detection: DetectionResultWithMeta): number {
   return detection.source === "direct" ? 1 : 0
 }
 
+// "Recent detections" retains the most-recent items so a freshly spoken
+// detection (e.g. a 94% Ellen White paragraph) is never crowded out of the box
+// by stale higher-confidence Bible hits. Survivors are then ordered for display.
+function capForDisplay(
+  list: DetectionResultWithMeta[],
+  now: number
+): DetectionResultWithMeta[] {
+  const kept = [...list]
+    .sort((a, b) => (b.received_at ?? 0) - (a.received_at ?? 0))
+    .slice(0, MAX_RECENT_DETECTIONS)
+  kept.sort((a, b) => compareDetections(a, b, now))
+  return kept
+}
+
 function compareDetections(
   a: DetectionResultWithMeta,
   b: DetectionResultWithMeta,
@@ -222,8 +236,7 @@ export const useDetectionStore = create<DetectionState>((set) => ({
         }
         const newDetections = [...state.detections]
         newDetections[existingIndex] = updated
-        newDetections.sort((a, b) => compareDetections(a, b, now))
-        return { detections: newDetections.slice(0, MAX_RECENT_DETECTIONS) }
+        return { detections: capForDisplay(newDetections, now) }
       }
 
       // New detection
@@ -232,8 +245,7 @@ export const useDetectionStore = create<DetectionState>((set) => ({
         received_at: now,
       }
       const newDetections = [withMeta, ...state.detections]
-      newDetections.sort((a, b) => compareDetections(a, b, now))
-      return { detections: newDetections.slice(0, MAX_RECENT_DETECTIONS) }
+      return { detections: capForDisplay(newDetections, now) }
     }),
   addDetections: (incoming) =>
     set((state) => {
@@ -270,18 +282,12 @@ export const useDetectionStore = create<DetectionState>((set) => ({
         }
       }
 
-      const sorted = [...map.values()]
-        .sort((a, b) =>
-          compareDetections(
-            { ...a.detection, received_at: a.received_at },
-            { ...b.detection, received_at: b.received_at },
-            now
-          )
-        )
-        .map((item) => ({ ...item.detection, received_at: item.received_at }))
-        .slice(0, MAX_RECENT_DETECTIONS)
+      const withMeta = [...map.values()].map((item) => ({
+        ...item.detection,
+        received_at: item.received_at,
+      }))
 
-      return { detections: sorted }
+      return { detections: capForDisplay(withMeta, now) }
     }),
   setDetections: (detections) =>
     set({

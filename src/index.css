@@ -655,3 +655,27 @@
   border-radius: 0.75rem;
   background: rgba(0, 0, 0, 0.15);
 }
+
+/* In-app live preview transition animations (mirror the projector's cut/fade/slide/scale). */
+@keyframes live-anim-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes live-anim-slide {
+  from { opacity: 0; transform: translate3d(5%, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes live-anim-scale {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.live-anim-fade { animation: live-anim-fade 320ms ease-in-out; }
+.live-anim-slide { animation: live-anim-slide 320ms ease-in-out; }
+.live-anim-scale { animation: live-anim-scale 320ms ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .live-anim-fade,
+  .live-anim-slide,
+  .live-anim-scale {
+    animation: none;
+  }
+}
