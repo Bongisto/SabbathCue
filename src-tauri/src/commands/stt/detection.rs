@@ -24,6 +24,7 @@ pub(crate) fn is_detection_paused(app: &AppHandle) -> bool {
 }
 
 pub(crate) const SEMANTIC_WINDOW_SEGMENTS: usize = 4;
+pub(crate) const FINAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(100);
 pub(crate) const PARTIAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const LIVE_SEMANTIC_CAP: usize = 5;
@@ -97,6 +98,11 @@ pub(crate) fn enqueue_final_semantic_job(
     text: String,
 ) {
     if text.trim().is_empty() {
+        return;
+    }
+
+    if text.split_whitespace().count() < FINAL_SEMANTIC_MIN_WORDS {
+        log::debug!("[DET-TRACE] seq={seq} skip=semantic_enqueue reason=tiny_window label=final");
         return;
     }
 
@@ -628,23 +634,19 @@ pub(crate) fn run_semantic_detection(
         t0.elapsed()
     );
 
-    // Resolve verse text from DB for merged results, and add EGW paragraph
-    // matches so spoken Ellen White quotes surface even without explicit refs.
+    // Resolve verse text from DB for merged results. Explicit EGW references
+    // are handled above; live semantic output intentionally avoids EGW BM25
+    // quote matches because short sermon windows produced noisy DA/PP hits.
     let app_managed: State<'_, Mutex<AppState>> = app.state();
     let Ok(app_state) = app_managed.lock() else {
         log::error!("Failed to lock AppState for verse resolution");
         return;
     };
 
-    let mut results: Vec<crate::commands::detection::DetectionResult> = merged
+    let results: Vec<crate::commands::detection::DetectionResult> = merged
         .iter()
         .map(|m| crate::commands::detection::to_result(&app_state, m))
         .collect();
-    let egw_results = crate::commands::detection::detect_egw_fts(&app_state, transcript);
-    if !egw_results.is_empty() {
-        log::info!("[DET-EGW] FTS matched {} paragraph(s)", egw_results.len());
-        results.extend(egw_results);
-    }
 
     drop(app_state);
     let results = finalize_live_semantic_results(results);
@@ -787,6 +789,7 @@ pub(crate) fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found
                         // This handles "Genesis chapter" → pause → "5" → go to chapter 5
                         let lower = transcript.to_lowercase();
                         if lower.contains("chapter")
+                            && !lower.contains("verse")
                             && !lower.contains("next")
                             && !lower.contains("previous")
                         {
@@ -955,18 +958,24 @@ mod tests {
             "command window must not enqueue a semantic job"
         );
 
+        enqueue_final_semantic_job(&slot, &notify, &sent, &replaced, 3, "one".to_string());
+        assert!(
+            slot.lock().unwrap().is_none(),
+            "tiny final window must not enqueue a semantic job"
+        );
+
         // Sermon prose — must enqueue so paraphrase detection still runs.
         enqueue_final_semantic_job(
             &slot,
             &notify,
             &sent,
             &replaced,
-            3,
+            4,
             "for God so loved the world that he gave his only begotten son".to_string(),
         );
         assert_eq!(
             slot.lock().unwrap().as_ref().map(|(seq, _)| *seq),
-            Some(3),
+            Some(4),
             "prose window must enqueue a semantic job"
         );
     }

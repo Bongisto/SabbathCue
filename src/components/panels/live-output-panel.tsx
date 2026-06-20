@@ -15,6 +15,7 @@ import {
 import { commitPreviewToLive, presentItem } from "@/lib/presentation-workflow"
 import { cn } from "@/lib/utils"
 import { convertTauriFileSrc } from "@/lib/tauri-runtime"
+import { useBroadcastVideo } from "@/hooks/use-broadcast-video"
 import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
@@ -32,7 +33,10 @@ import {
 import { toast } from "sonner"
 import type { BroadcastTransitionType } from "@/types"
 
-const LIVE_TRANSITION_OPTIONS: { value: BroadcastTransitionType; label: string }[] = [
+const LIVE_TRANSITION_OPTIONS: {
+  value: BroadcastTransitionType
+  label: string
+}[] = [
   { value: "none", label: "Cut" },
   { value: "fade", label: "Fade" },
   { value: "slide", label: "Slide" },
@@ -242,12 +246,20 @@ function LiveStage({
   isFullscreenLayout: boolean
 }) {
   const transitionType = useBroadcastStore((s) => s.liveTransitionType)
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
+    null
+  )
   // Re-key on content change so the transition animation replays each time a
   // new verse/slide goes live, matching the selected transition.
   const contentKey = visibleItem
     ? `${visibleItem.reference}#${visibleItem.hymnSlide?.slideIndex ?? 0}`
     : "empty"
   const videoSrc = liveVideoSrc(visibleItem)
+  useBroadcastVideo({
+    video: videoElement,
+    item: visibleItem?.kind === "video" ? visibleItem : null,
+    outputId: "operator",
+  })
   return (
     <div
       data-slot="live-output-stage"
@@ -286,6 +298,7 @@ function LiveStage({
               ) : (
                 <video
                   key={videoSrc}
+                  ref={setVideoElement}
                   src={videoSrc}
                   poster={visibleItem.video?.poster}
                   controls

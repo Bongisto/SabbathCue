@@ -15,7 +15,8 @@ import { useQueueStore } from "@/stores/queue-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
 import { useBibleStore } from "@/stores/bible-store"
-import type { QueueItem } from "@/types"
+import { useEgwStore } from "@/stores/egw-store"
+import type { EgwParagraph, QueueItem, Verse } from "@/types"
 
 const { invokeMock } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
@@ -43,23 +44,43 @@ function makeSlide(index: number): HymnPresentationItemData {
   }
 }
 
-function makeEgwSlide(index: number): EgwPresentationItemData {
+function makeVerse(verse: number): Verse {
+  return {
+    id: verse,
+    translation_id: 1,
+    book_number: 1,
+    book_name: "Genesis",
+    book_abbreviation: "Gen",
+    chapter: 1,
+    verse,
+    text: `Verse ${verse} text.`,
+  }
+}
+
+function makeEgwParagraph(paragraph: number): EgwParagraph {
+  return {
+    id: paragraph,
+    book_number: 1,
+    book_title: "Test Book",
+    chapter: 1,
+    chapter_title: "Chapter",
+    paragraph,
+    text: `Sample paragraph ${paragraph} text.`,
+  }
+}
+
+function makeEgwSlide(
+  index: number,
+  paragraph = makeEgwParagraph(1)
+): EgwPresentationItemData {
   return {
     kind: "egw",
-    paragraph: {
-      id: 1,
-      book_number: 1,
-      book_title: "Test Book",
-      chapter: 1,
-      chapter_title: "Chapter",
-      paragraph: 1,
-      text: "Sample paragraph text.",
-    },
-    reference: `Test Book 1:1 (${index + 1}/2)`,
-    slideId: `egw-1-${index}`,
+    paragraph,
+    reference: `Test Book 1:${paragraph.paragraph} (${index + 1}/2)`,
+    slideId: `egw-${paragraph.id}-${index}`,
     slideIndex: index,
     slideCount: 2,
-    segments: [{ text: "Sample paragraph text." }],
+    segments: [{ text: paragraph.text }],
   }
 }
 
@@ -144,6 +165,8 @@ describe("handleDashboardKeyboardEvent", () => {
     useServicePlanStore.setState({ plannerOpen: false })
     useTutorialStore.setState({ isRunning: false })
     useBibleStore.getState().selectVerse(null)
+    useBibleStore.getState().setCurrentChapter([])
+    useEgwStore.setState({ currentParagraphs: [] })
     useTranscriptStore.setState({ isTranscribing: false })
   })
 
@@ -343,6 +366,45 @@ describe("handleDashboardKeyboardEvent", () => {
     )
   })
 
+  it("advances a staged scripture preview with arrow keys", () => {
+    const verses = [makeVerse(1), makeVerse(2), makeVerse(3)]
+    useBibleStore.getState().setCurrentChapter(verses)
+    useBroadcastStore.getState().setPreviewItem({
+      kind: "scripture",
+      reference: "Genesis 1:1",
+      scripture: verses[0],
+      segments: [{ verseNumber: 1, text: verses[0].text }],
+    })
+
+    handleDashboardKeyboardEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight" })
+    )
+
+    expect(useBroadcastStore.getState().previewItem?.scripture?.verse).toBe(2)
+    expect(useBibleStore.getState().selectedVerse?.verse).toBe(2)
+  })
+
+  it("advances a live scripture verse with arrow keys", () => {
+    const verses = [makeVerse(1), makeVerse(2), makeVerse(3)]
+    useBibleStore.getState().setCurrentChapter(verses)
+    useBroadcastStore.setState({
+      isLive: true,
+      liveItem: {
+        kind: "scripture",
+        reference: "Genesis 1:2",
+        scripture: verses[1],
+        segments: [{ verseNumber: 2, text: verses[1].text }],
+      },
+    })
+
+    handleDashboardKeyboardEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft" })
+    )
+
+    expect(useBroadcastStore.getState().liveItem?.scripture?.verse).toBe(1)
+    expect(useBibleStore.getState().selectedVerse?.verse).toBe(1)
+  })
+
   it("advances a staged sermon slide preview with arrow keys", () => {
     const deck = useSermonSlideStore.getState().deck
     useBroadcastStore.getState().setPreviewItem(deck[0])
@@ -378,6 +440,34 @@ describe("handleDashboardKeyboardEvent", () => {
     expect(useBroadcastStore.getState().previewItem?.hymnSlide?.screenId).toBe(
       "egw-1-1"
     )
+  })
+
+  it("advances to the next EGW paragraph after the final paragraph slide", () => {
+    const first = makeEgwParagraph(1)
+    const second = makeEgwParagraph(2)
+    const deck = [makeEgwSlide(0, first), makeEgwSlide(1, first)]
+    useEgwStore.setState({ currentParagraphs: [first, second] })
+    useEgwSlideStore.getState().setDeck(deck, 1)
+    useBroadcastStore.getState().setPreviewItem({
+      kind: "egw",
+      reference: deck[1].reference,
+      segments: deck[1].segments,
+      egwParagraph: first,
+      hymnSlide: {
+        screenId: deck[1].slideId,
+        slideIndex: deck[1].slideIndex,
+        slideCount: deck[1].slideCount,
+      },
+    })
+
+    handleDashboardKeyboardEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight" })
+    )
+
+    expect(useEgwSlideStore.getState().activeIndex).toBe(0)
+    expect(
+      useBroadcastStore.getState().previewItem?.egwParagraph?.paragraph
+    ).toBe(2)
   })
 
   it("advances a live sermon slide with arrow keys", () => {

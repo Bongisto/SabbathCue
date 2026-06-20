@@ -20,6 +20,8 @@ export interface PresentationRenderData {
   reference: string
   segments: PresentationSegment[]
   kind?: PresentationItemKind
+  scripture?: Verse
+  egwParagraph?: EgwParagraph
   slideImageUrl?: string
   video?: VideoPresentationSource
   hymnSlide?: {
@@ -156,12 +158,15 @@ export function getPresentationReference(item: PresentationItem): string {
   return item.reference
 }
 
-export function getPresentationRenderData(item: PresentationItem): PresentationRenderData {
+export function getPresentationRenderData(
+  item: PresentationItem
+): PresentationRenderData {
   if (item.kind === "scripture") {
     return {
       kind: "scripture",
       reference: item.reference,
       segments: [{ verseNumber: item.verse.verse, text: item.verse.text }],
+      scripture: item.verse,
     }
   }
 
@@ -197,6 +202,7 @@ export function getPresentationRenderData(item: PresentationItem): PresentationR
       kind: "egw",
       reference: item.reference,
       segments: item.segments,
+      egwParagraph: item.paragraph,
       hymnSlide: {
         screenId: item.slideId,
         slideIndex: item.slideIndex,

@@ -18,8 +18,12 @@ describe("toVerseRenderData", () => {
     const result = toVerseRenderData(sampleVerse, "NKJV")
 
     expect(result).toEqual({
+      kind: "scripture",
       reference: "Genesis 1:2 (NKJV)",
-      segments: [{ verseNumber: 2, text: "The earth was without form and void." }],
+      scripture: sampleVerse,
+      segments: [
+        { verseNumber: 2, text: "The earth was without form and void." },
+      ],
     })
   })
 
@@ -33,12 +37,18 @@ describe("toVerseRenderData", () => {
           "Finally it closes with a practical phrase that should be kept visible without forcing the renderer to shrink everything dramatically.",
         ].join(" "),
       },
-      "KJV",
+      "KJV"
     )
 
     expect(result.segments.length).toBeGreaterThan(1)
     expect(result.segments[0].verseNumber).toBe(2)
-    expect(result.segments.slice(1).every((segment) => segment.verseNumber === undefined)).toBe(true)
-    expect(result.segments.every((segment) => segment.text.length <= 150)).toBe(true)
+    expect(
+      result.segments
+        .slice(1)
+        .every((segment) => segment.verseNumber === undefined)
+    ).toBe(true)
+    expect(result.segments.every((segment) => segment.text.length <= 150)).toBe(
+      true
+    )
   })
 })

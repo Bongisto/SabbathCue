@@ -35,6 +35,15 @@ enum WsCommand {
     Close,
 }
 
+fn should_retry_connection_error(error: &SttError) -> bool {
+    !matches!(
+        error,
+        SttError::ConnectionFailed(message)
+            if message.contains("HTTP 429")
+                || message.contains("Maximum number of concurrent sessions")
+    )
+}
+
 impl GladiaClient {
     pub fn new(config: SttConfig) -> Self {
         Self {
@@ -110,7 +119,8 @@ impl GladiaClient {
                     log::warn!(
                         "GladiaClient: connection error (attempt {attempts}/{MAX_RECONNECT_ATTEMPTS}): {error}"
                     );
-                    if attempts >= MAX_RECONNECT_ATTEMPTS {
+                    if attempts >= MAX_RECONNECT_ATTEMPTS || !should_retry_connection_error(&error)
+                    {
                         let _ = event_tx
                             .send(TranscriptEvent::Error(error.to_string()))
                             .await;
@@ -426,5 +436,21 @@ mod tests {
         let event = parse_one(r#"{"type":"audio_chunk","data":{"ok":true}}"#).await;
 
         assert!(event.is_none());
+    }
+
+    #[test]
+    fn does_not_retry_gladia_concurrent_session_limit() {
+        let error = SttError::ConnectionFailed(
+            "Gladia live session failed with HTTP 429: {\"message\":\"Maximum number of concurrent sessions\"}".into(),
+        );
+
+        assert!(!should_retry_connection_error(&error));
+    }
+
+    #[test]
+    fn retries_transient_connection_errors() {
+        let error = SttError::ConnectionFailed("websocket disconnected".into());
+
+        assert!(should_retry_connection_error(&error));
     }
 }

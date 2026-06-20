@@ -24,6 +24,20 @@ pub(crate) fn partial_semantic_detection_enabled(low_power: Option<bool>) -> boo
     !low_power.unwrap_or(false)
 }
 
+pub(crate) fn partial_semantic_detection_enabled_for_provider(
+    low_power: Option<bool>,
+    provider: &str,
+) -> bool {
+    partial_semantic_detection_enabled(low_power) && provider != "gladia"
+}
+
+pub(crate) fn final_semantic_detection_allowed(provider: &str, confidence: f64) -> bool {
+    if provider != "gladia" || confidence <= 0.0 {
+        return true;
+    }
+    confidence >= 0.50
+}
+
 /// Truncate a string to at most `max_bytes`, snapping to a valid UTF-8 char boundary.
 pub(crate) fn truncate_safe(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
@@ -77,7 +91,10 @@ pub(crate) fn word_count(text: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{partial_semantic_detection_enabled, transcript_logging_decision};
+    use super::{
+        final_semantic_detection_allowed, partial_semantic_detection_enabled,
+        partial_semantic_detection_enabled_for_provider, transcript_logging_decision,
+    };
 
     #[test]
     fn low_power_mode_disables_partial_semantic_detection() {
@@ -87,6 +104,24 @@ mod tests {
         assert!(partial_semantic_detection_enabled(None));
         assert!(partial_semantic_detection_enabled(Some(false)));
         assert!(!partial_semantic_detection_enabled(Some(true)));
+    }
+
+    #[test]
+    fn gladia_partials_do_not_run_semantic_detection() {
+        assert!(!partial_semantic_detection_enabled_for_provider(
+            None, "gladia"
+        ));
+        assert!(partial_semantic_detection_enabled_for_provider(
+            None, "deepgram"
+        ));
+    }
+
+    #[test]
+    fn gladia_low_confidence_finals_do_not_run_semantic_detection() {
+        assert!(!final_semantic_detection_allowed("gladia", 0.40));
+        assert!(final_semantic_detection_allowed("gladia", 0.50));
+        assert!(final_semantic_detection_allowed("gladia", 0.0));
+        assert!(final_semantic_detection_allowed("deepgram", 0.20));
     }
 
     #[test]

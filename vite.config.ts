@@ -47,6 +47,15 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
+    watch: {
+      ignored: [
+        "**/build/**",
+        "**/src-tauri/target/**",
+        "**/web/.next/**",
+        "**/web/out/**",
+        "**/*.log",
+      ],
+    },
   },
   preview: {
     port: 3000,
