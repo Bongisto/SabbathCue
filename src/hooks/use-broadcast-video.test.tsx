@@ -3,6 +3,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { useBroadcastVideo } from "./use-broadcast-video"
+import type { PresentationRenderData } from "@/types"
 import type { VideoTransportCommand } from "@/lib/broadcast-video-control"
 
 const { videoListenerRef } = vi.hoisted(() => ({
@@ -15,12 +16,15 @@ const { videoListenerRef } = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({
-    listen: vi.fn((event: string, callback: typeof videoListenerRef.current) => {
-      if (event === "broadcast:video-control") videoListenerRef.current = callback
-      return Promise.resolve(() => {
-        videoListenerRef.current = null
-      })
-    }),
+    listen: vi.fn(
+      (event: string, callback: typeof videoListenerRef.current) => {
+        if (event === "broadcast:video-control")
+          videoListenerRef.current = callback
+        return Promise.resolve(() => {
+          videoListenerRef.current = null
+        })
+      }
+    ),
   }),
 }))
 
@@ -30,6 +34,17 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 function TestBroadcastVideo({ video }: { video: HTMLVideoElement }) {
   useBroadcastVideo({ video, item: null, outputId: "main" })
+  return null
+}
+
+function TestBroadcastVideoWithItem({
+  video,
+  item,
+}: {
+  video: HTMLVideoElement
+  item: PresentationRenderData
+}) {
+  useBroadcastVideo({ video, item, outputId: "operator" })
   return null
 }
 
@@ -75,5 +90,36 @@ describe("useBroadcastVideo", () => {
     })
 
     expect(setSinkId).toHaveBeenCalledWith("speaker-1")
+  })
+
+  it("does not require mocked play to return a promise", async () => {
+    const video = document.createElement("video")
+    const play = vi.fn()
+    Object.defineProperties(video, {
+      load: { value: vi.fn() },
+      pause: { value: vi.fn() },
+      play: { value: play },
+    })
+
+    await act(async () => {
+      root.render(
+        <TestBroadcastVideoWithItem
+          video={video}
+          item={{
+            kind: "video",
+            reference: "Welcome Video",
+            segments: [{ text: "Welcome Video" }],
+            video: {
+              source: "url",
+              videoId: "video-1",
+              title: "Welcome Video",
+              url: "https://cdn.example.com/welcome.mp4",
+            },
+          }}
+        />
+      )
+    })
+
+    expect(play).toHaveBeenCalled()
   })
 })
