@@ -66,6 +66,11 @@ pub(crate) fn check_translation_command(app: &AppHandle, transcript: &str) {
         if let Some(ref db) = app_state.bible_db {
             if let Ok(translations) = db.list_translations() {
                 if let Some(t) = translations.iter().find(|t| t.abbreviation == abbrev) {
+                    if app_state.active_translation_id == t.id {
+                        log::debug!("[STT] Voice command: {abbrev} already active");
+                        return;
+                    }
+
                     app_state.active_translation_id = t.id;
                     log::info!("[STT] Voice command: switched to {abbrev} (id={})", t.id);
                     drop(app_state);

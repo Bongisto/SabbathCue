@@ -28,14 +28,20 @@ export interface VideoTimeUpdatePayload {
   ended: boolean
 }
 
-export const BROADCAST_OUTPUT_LABELS = ["broadcast", "broadcast-alt"] as const
+export const BROADCAST_OUTPUT_LABELS = [
+  "broadcast",
+  "broadcast-alt",
+  "main",
+] as const
 
 export function clampVideoVolume(volume: number): number {
   if (!Number.isFinite(volume)) return 1
   return Math.max(0, Math.min(1, volume))
 }
 
-export function buildVideoCommand(command: VideoTransportCommand): VideoTransportCommand {
+export function buildVideoCommand(
+  command: VideoTransportCommand
+): VideoTransportCommand {
   if (command.type === "seek") {
     return {
       ...command,
@@ -60,16 +66,16 @@ export function videoSourceUrl(video: VideoPresentationSource): string | null {
 
 export async function emitVideoCommand(
   command: VideoTransportCommand,
-  labels = BROADCAST_OUTPUT_LABELS,
+  labels = BROADCAST_OUTPUT_LABELS
 ): Promise<void> {
   const payload = buildVideoCommand(command)
   await Promise.all(
-    labels.map((label) => emitTo(label, VIDEO_TRANSPORT_EVENT, payload)),
+    labels.map((label) => emitTo(label, VIDEO_TRANSPORT_EVENT, payload))
   )
 }
 
 export async function emitVideoTimeUpdate(
-  payload: VideoTimeUpdatePayload,
+  payload: VideoTimeUpdatePayload
 ): Promise<void> {
   await emitTo("main", VIDEO_TIMEUPDATE_EVENT, payload)
 }

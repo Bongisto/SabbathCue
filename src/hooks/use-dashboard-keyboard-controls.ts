@@ -2,8 +2,14 @@ import { useEffect } from "react"
 import {
   commitPreviewToLive,
   presentItem,
+  presentVerse,
+  previewEgwParagraph,
+  presentEgwParagraph,
+  selectPreviewVerse,
   selectPreviewItem,
 } from "@/lib/presentation-workflow"
+import { bibleActions } from "@/hooks/use-bible"
+import { egwActions } from "@/hooks/use-egw"
 import { presentQueuedItem, previewQueuedItem } from "@/lib/queue-presentation"
 import { restoreQueuedHymnDeckForRenderItem } from "@/lib/queued-hymn-deck"
 import {
@@ -30,7 +36,9 @@ import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
-import type { PresentationRenderData } from "@/types"
+import { useBibleStore } from "@/stores/bible-store"
+import { useEgwStore } from "@/stores/egw-store"
+import type { EgwParagraph, PresentationRenderData, Verse } from "@/types"
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -115,6 +123,160 @@ function presentOrPreview(
   else selectPreviewItem(next)
 }
 
+function scriptureFromTarget(
+  targetItem: PresentationRenderData | null
+): Verse | null {
+  if (targetItem?.kind !== "scripture") return null
+  return targetItem.scripture ?? useBibleStore.getState().selectedVerse
+}
+
+function findAdjacentVerse(
+  current: Verse,
+  verses: Verse[],
+  delta: number
+): Verse | null {
+  const currentIndex = verses.findIndex(
+    (verse) =>
+      verse.book_number === current.book_number &&
+      verse.chapter === current.chapter &&
+      verse.verse === current.verse
+  )
+  if (currentIndex < 0) return null
+  const next = verses[currentIndex + delta]
+  if (!next) return null
+  if (
+    next.book_number !== current.book_number ||
+    next.chapter !== current.chapter
+  ) {
+    return null
+  }
+  return next
+}
+
+async function advanceScripture(
+  delta: number,
+  targetItem: PresentationRenderData | null,
+  isLive: boolean
+): Promise<void> {
+  const current = scriptureFromTarget(targetItem)
+  if (!current) return
+
+  const bible = useBibleStore.getState()
+  let chapter = bible.currentChapter.filter(
+    (verse) =>
+      verse.book_number === current.book_number &&
+      verse.chapter === current.chapter
+  )
+
+  if (chapter.length === 0) {
+    chapter = await bibleActions.loadChapter(
+      current.book_number,
+      current.chapter,
+      current.translation_id
+    )
+  }
+
+  const next =
+    findAdjacentVerse(current, chapter, delta) ??
+    (await bibleActions.fetchVerse(
+      current.book_number,
+      current.chapter,
+      current.verse + delta,
+      current.translation_id
+    ))
+
+  if (!next) return
+  if (isLive) presentVerse(next, { navigate: true })
+  else selectPreviewVerse(next, { navigate: true })
+}
+
+function queueScriptureAdvance(
+  delta: number,
+  targetItem: PresentationRenderData | null,
+  isLive: boolean
+): boolean {
+  if (!scriptureFromTarget(targetItem)) return false
+  void advanceScripture(delta, targetItem, isLive).catch((error) => {
+    console.warn("[keyboard] scripture navigation failed", error)
+  })
+  return true
+}
+
+function egwParagraphFromTarget(
+  targetItem: PresentationRenderData | null
+): EgwParagraph | null {
+  if (targetItem?.kind !== "egw") return null
+  if (targetItem.egwParagraph) return targetItem.egwParagraph
+
+  const egwSlides = useEgwSlideStore.getState()
+  return egwSlides.deck[egwSlides.activeIndex]?.paragraph ?? null
+}
+
+function findAdjacentEgwParagraph(
+  current: EgwParagraph,
+  paragraphs: EgwParagraph[],
+  delta: number
+): EgwParagraph | null {
+  const currentIndex = paragraphs.findIndex(
+    (paragraph) =>
+      paragraph.id === current.id ||
+      (paragraph.book_number === current.book_number &&
+        paragraph.chapter === current.chapter &&
+        paragraph.paragraph === current.paragraph)
+  )
+  if (currentIndex < 0) return null
+  const next = paragraphs[currentIndex + delta]
+  if (!next) return null
+  if (
+    next.book_number !== current.book_number ||
+    next.chapter !== current.chapter
+  ) {
+    return null
+  }
+  return next
+}
+
+async function advanceEgwParagraph(
+  delta: number,
+  targetItem: PresentationRenderData | null,
+  isLive: boolean
+): Promise<void> {
+  const current = egwParagraphFromTarget(targetItem)
+  if (!current) return
+
+  let paragraphs = useEgwStore
+    .getState()
+    .currentParagraphs.filter(
+      (paragraph) =>
+        paragraph.book_number === current.book_number &&
+        paragraph.chapter === current.chapter
+    )
+
+  if (paragraphs.length === 0) {
+    paragraphs = await egwActions.loadChapter(
+      current.book_number,
+      current.chapter
+    )
+  }
+
+  const next = findAdjacentEgwParagraph(current, paragraphs, delta)
+  if (!next) return
+  if (isLive) presentEgwParagraph(next)
+  else previewEgwParagraph(next)
+}
+
+function queueEgwParagraphAdvance(
+  delta: number,
+  targetItem: PresentationRenderData | null,
+  isLive: boolean
+): boolean {
+  if (!egwParagraphFromTarget(targetItem)) return false
+  void advanceEgwParagraph(delta, targetItem, isLive).catch((error) => {
+    console.warn("[keyboard] EGW navigation failed", error)
+  })
+  return true
+}
+
 function advanceHymnDeck(
   delta: number,
   targetItem: PresentationRenderData | null,
@@ -152,7 +314,7 @@ function advanceEgwDeck(
   )
   const nextIndex = clampDeckIndex(deck.length, currentIndex, delta)
   const next = egwSlides.deck[nextIndex]
-  if (!next || nextIndex === currentIndex) return true
+  if (!next || nextIndex === currentIndex) return false
   egwSlides.setDeck(egwSlides.deck, nextIndex)
   presentOrPreview(next, isLive)
   return true
@@ -185,15 +347,21 @@ function advancePresentationDeck(delta: number): boolean {
     ? broadcast.liveItem
     : broadcast.previewItem
   const deckKind = presentationDeckKind(targetItem)
-  if (!deckKind) return false
+  if (!deckKind) {
+    return queueScriptureAdvance(delta, targetItem, broadcast.isLive)
+  }
 
   if (broadcast.isLive && deckKind === "hymn" && advanceLiveHymnGroup(delta)) {
     return true
   }
   if (deckKind === "hymn")
     return advanceHymnDeck(delta, targetItem, broadcast.isLive)
-  if (deckKind === "egw")
-    return advanceEgwDeck(delta, targetItem, broadcast.isLive)
+  if (deckKind === "egw") {
+    return (
+      advanceEgwDeck(delta, targetItem, broadcast.isLive) ||
+      queueEgwParagraphAdvance(delta, targetItem, broadcast.isLive)
+    )
+  }
   return advanceSermonDeck(delta, targetItem, broadcast.isLive)
 }
 

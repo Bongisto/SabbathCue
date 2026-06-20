@@ -346,10 +346,20 @@ impl ReadingMode {
         let (chapter_num, verse_num) = extract_chapter_and_verse(trimmed)?;
         log::debug!("[READING] Extracted: chapter={chapter_num}, verse={verse_num:?}");
 
-        // Ignore if it's the same chapter we're already in AND no specific verse
-        if chapter_num == self.chapter && verse_num.is_none() {
-            log::debug!("[READING] Ignoring same chapter {chapter_num} without specific verse");
-            return None;
+        // Ignore references that only restate the current position. A direct
+        // reference already starts reading mode; replaying the same transcript
+        // through chapter navigation would restart it a second time.
+        if chapter_num == self.chapter {
+            if let Some(verse) = verse_num {
+                if self.current_verse() == Some(verse) {
+                    log::debug!("[READING] Ignoring current chapter {chapter_num} verse {verse}");
+                    self.bare_number_context = BareNumberContext::None;
+                    return None;
+                }
+            } else {
+                log::debug!("[READING] Ignoring same chapter {chapter_num} without specific verse");
+                return None;
+            }
         }
 
         if let Some(verse) = verse_num {
@@ -1140,6 +1150,19 @@ mod tests {
         let change = result.unwrap();
         assert_eq!(change.new_chapter, 5);
         assert_eq!(change.start_verse, Some(7));
+    }
+
+    #[test]
+    fn current_chapter_verse_command_is_not_restarted() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> =
+            (1..=26).map(|i| (i, format!("Verse {i} text."))).collect();
+        rm.start(2, "Exodus", 20, 9, verses);
+
+        let result = rm.check_chapter_command("Exodus chapter 20 verse 9");
+
+        assert_eq!(result, None);
+        assert_eq!(rm.current_verse(), Some(9));
     }
 
     #[test]

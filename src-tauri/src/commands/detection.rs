@@ -420,15 +420,19 @@ fn best_egw_alias_match<'a>(
 }
 
 /// Confidence assigned to EGW paragraphs matched by keyword (below explicit references).
+#[cfg(test)]
 const EGW_FTS_CONFIDENCE: f64 = 0.55;
 
 /// Minimum word count before running EGW keyword search.
+#[cfg(test)]
 const EGW_FTS_MIN_WORDS: usize = 5;
 
 /// Maximum EGW paragraphs surfaced per detection pass.
+#[cfg(test)]
 const EGW_FTS_LIMIT: usize = 2;
 
 /// Detect EGW paragraphs by BM25 keyword search of the transcript window.
+#[cfg(test)]
 pub(crate) fn detect_egw_fts(state: &AppState, text: &str) -> Vec<DetectionResult> {
     if text.split_whitespace().count() < EGW_FTS_MIN_WORDS {
         return Vec::new();
