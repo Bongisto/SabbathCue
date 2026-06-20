@@ -54,6 +54,7 @@ sidecars/*
 embeddings/*
 
 .claude/CLAUDE.md
+.claude/settings.local.json
 
 rhema-technical-plan-v3.4.md
 detailed-plan.md

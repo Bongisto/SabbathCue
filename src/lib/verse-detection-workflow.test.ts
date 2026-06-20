@@ -8,6 +8,7 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useQueueStore } from "@/stores/queue-store"
+import { useSettingsStore } from "@/stores/settings-store"
 import type { DetectionResult, QueueItem, ReadingAdvance } from "@/types"
 
 const { emitToMock, invokeMock } = vi.hoisted(() => ({
@@ -125,7 +126,11 @@ describe("verse detection workflow", () => {
     useBroadcastStore.setState({
       isLive: false,
       liveItem: null,
+      previewItem: null,
       readingModeAutoLive: true,
+    })
+    useSettingsStore.setState({
+      autoPreviewDetections: true,
     })
   })
 
@@ -174,6 +179,53 @@ describe("verse detection workflow", () => {
     ])
   })
 
+  it("keeps detection and queueing automatic when auto preview is off", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
+
+    await handleVerseDetections([makeDetection()])
+
+    expect(useDetectionStore.getState().detections).toHaveLength(1)
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useBroadcastStore.getState().previewItem).toBeNull()
+    expect(useQueueStore.getState().items).toEqual([
+      expect.objectContaining({
+        source: "ai-direct",
+        presentation: expect.objectContaining({
+          reference: "John 3:16",
+        }),
+      }),
+    ])
+  })
+
+  it("does not auto-preview direct detections below 85 percent", async () => {
+    await handleVerseDetections([makeDetection({ confidence: 0.84 })])
+
+    expect(useDetectionStore.getState().detections).toHaveLength(1)
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useBroadcastStore.getState().previewItem).toBeNull()
+    expect(useQueueStore.getState().items).toEqual([
+      expect.objectContaining({
+        confidence: 0.84,
+        source: "ai-direct",
+        presentation: expect.objectContaining({
+          reference: "John 3:16",
+        }),
+      }),
+    ])
+  })
+
+  it("auto-previews direct detections at 85 percent", async () => {
+    await handleVerseDetections([
+      makeDetection({ confidence: 0.85, auto_queued: false }),
+    ])
+
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_number: 43,
+      chapter: 3,
+      verse: 16,
+    })
+  })
+
   it("queues semantic detections without pending navigation", async () => {
     await handleVerseDetections([
       makeDetection({
@@ -211,7 +263,7 @@ describe("verse detection workflow", () => {
       }),
       makeDetection({
         auto_queued: false,
-        confidence: 0.64,
+        confidence: 0.86,
       }),
     ])
 

@@ -44,7 +44,7 @@ function snapshot(video: HTMLVideoElement, outputId: string, ended = false) {
 
 function loadVideoSource(
   element: HTMLVideoElement,
-  source: VideoPresentationSource | null | undefined,
+  source: VideoPresentationSource | null | undefined
 ): void {
   const src = source ? resolveNativeVideoSrc(source) : null
   if (!source || !src) {
@@ -58,13 +58,34 @@ function loadVideoSource(
     element.loop = Boolean(source.loop)
     element.load()
   }
-  void element.play().catch(() => undefined)
+  playVideo(element)
 }
 
 function stopVideo(element: HTMLVideoElement): void {
   element.pause()
   element.removeAttribute("src")
   element.load()
+}
+
+function isJsdomNativeMediaPlay(element: HTMLVideoElement): boolean {
+  return (
+    import.meta.env.MODE === "test" &&
+    element.play ===
+      element.ownerDocument.defaultView?.HTMLMediaElement?.prototype.play
+  )
+}
+
+function playVideo(element: HTMLVideoElement): void {
+  if (isJsdomNativeMediaPlay(element)) return
+  try {
+    const result = element.play()
+    if (result && typeof result.catch === "function") {
+      void result.catch(() => undefined)
+    }
+  } catch {
+    // jsdom implements media methods as throwing stubs; browsers/Tauri reject
+    // the returned promise instead.
+  }
 }
 
 function isBroadcastOutputId(outputId: string): outputId is BroadcastOutputId {
@@ -84,29 +105,37 @@ function reportAudioSinkFailure(outputId: string, error: unknown): void {
 function applyPlaybackCommand(
   element: HTMLVideoElement,
   payload: ReturnType<typeof buildVideoCommand>,
-  outputId: string,
+  outputId: string
 ): void {
-  if (payload.type === "play") void element.play().catch(() => undefined)
+  if (payload.type === "play") playVideo(element)
   if (payload.type === "pause") element.pause()
   if (payload.type === "restart") {
     element.currentTime = 0
-    void element.play().catch(() => undefined)
+    playVideo(element)
   }
   if (payload.type === "seek") element.currentTime = payload.currentTime
   if (payload.type === "setVolume") element.volume = payload.volume
   if (payload.type === "setMuted") element.muted = payload.muted
   if (payload.type === "setLoop") element.loop = payload.loop
   if (payload.type === "setSinkId" && "setSinkId" in element) {
-    void (element as HTMLVideoElement & { setSinkId: (sinkId: string) => Promise<void> })
+    void (
+      element as HTMLVideoElement & {
+        setSinkId: (sinkId: string) => Promise<void>
+      }
+    )
       .setSinkId(payload.sinkId)
       .catch((error) => reportAudioSinkFailure(outputId, error))
   }
   if (payload.type === "stop") stopVideo(element)
 }
 
-function syncVideoItem(element: HTMLVideoElement, item: PresentationRenderData | null): void {
+function syncVideoItem(
+  element: HTMLVideoElement,
+  item: PresentationRenderData | null
+): void {
   const source = item?.video
-  const src = source && source.source !== "youtube" ? resolveNativeVideoSrc(source) : null
+  const src =
+    source && source.source !== "youtube" ? resolveNativeVideoSrc(source) : null
   if (!source || !src) {
     stopVideo(element)
     return
@@ -118,7 +147,7 @@ function syncVideoItem(element: HTMLVideoElement, item: PresentationRenderData |
     element.load()
   }
   element.muted = false
-  void element.play().catch(() => undefined)
+  playVideo(element)
 }
 
 export function useBroadcastVideo({
@@ -157,10 +186,11 @@ export function useBroadcastVideo({
         applyPlaybackCommand(element, payload, outputId)
         return
       }
-      if (!itemRef.current?.video || itemRef.current.video.source === "youtube") return
+      if (!itemRef.current?.video || itemRef.current.video.source === "youtube")
+        return
       applyPlaybackCommand(element, payload, outputId)
     },
-    [outputId],
+    [outputId]
   )
 
   useEffect(() => {
@@ -172,13 +202,18 @@ export function useBroadcastVideo({
   useEffect(() => {
     if (!video) return
     if (!isTauriRuntime()) return
-    const currentWindow = getCurrentWebviewWindow()
-    const unlisten = currentWindow.listen<VideoTransportCommand>(
-      VIDEO_TRANSPORT_EVENT,
-      (event) => applyCommand(event.payload),
-    )
+    let unlisten: Promise<() => void> | null = null
+    try {
+      const currentWindow = getCurrentWebviewWindow()
+      unlisten = currentWindow.listen<VideoTransportCommand>(
+        VIDEO_TRANSPORT_EVENT,
+        (event) => applyCommand(event.payload)
+      )
+    } catch {
+      return
+    }
     return () => {
-      void unlisten.then((fn) => fn())
+      void unlisten?.then((fn) => fn())
     }
   }, [applyCommand, video])
 

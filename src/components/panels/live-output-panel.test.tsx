@@ -3,7 +3,13 @@ import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { readFileSync } from "node:fs"
 import path from "node:path"
+import { fireEvent } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { useBibleStore } from "@/stores/bible-store"
+
+const { presentVerseMock } = vi.hoisted(() => ({
+  presentVerseMock: vi.fn(),
+}))
 
 vi.mock("@/components/ui/canvas-verse", () => ({
   CanvasPresentation: () => React.createElement("div", { "data-testid": "canvas-presentation" }),
@@ -16,6 +22,11 @@ vi.mock("@/components/broadcast/VideoControlBar", () => ({
 vi.mock("@/lib/presentation-workflow", () => ({
   commitPreviewToLive: vi.fn(),
   presentItem: vi.fn(),
+  presentVerse: (...args: unknown[]) => presentVerseMock(...args),
+  previewEgwParagraph: vi.fn(),
+  presentEgwParagraph: vi.fn(),
+  selectPreviewItem: vi.fn(),
+  selectPreviewVerse: vi.fn(),
 }))
 
 const setWindowFullscreenMock = vi.fn().mockResolvedValue(undefined)
@@ -36,6 +47,7 @@ vi.mock("@/stores/broadcast-store", () => {
     selector(broadcastState)
   const selectActiveTheme = (state: Record<string, unknown>) => state.activeTheme
   useBroadcastStore.getState = () => ({
+    ...broadcastState,
     setLive: vi.fn(),
     setReadingModeAutoLive: vi.fn(),
     setLiveTransitionType: setLiveTransitionTypeMock,
@@ -66,6 +78,8 @@ describe("LiveOutputPanel fullscreen chrome contract", () => {
 
   beforeEach(() => {
     setLiveTransitionTypeMock.mockClear()
+    presentVerseMock.mockClear()
+    useBibleStore.getState().setCurrentChapter([])
     broadcastState = {
       isLive: false,
       liveItem: null,
@@ -155,6 +169,46 @@ describe("LiveOutputPanel fullscreen chrome contract", () => {
     expect(container.querySelector("[data-slot='live-output-anim']")?.className).toContain(
       "live-anim-fade",
     )
+  })
+
+  it("uses focused arrow keys to navigate live scripture", () => {
+    const verse16 = {
+      id: 316,
+      translation_id: 1,
+      book_number: 43,
+      book_name: "John",
+      book_abbreviation: "John",
+      chapter: 3,
+      verse: 16,
+      text: "For God so loved the world.",
+    }
+    const verse17 = {
+      ...verse16,
+      id: 317,
+      verse: 17,
+      text: "For God sent not his Son.",
+    }
+    useBibleStore.getState().setCurrentChapter([verse16, verse17])
+    broadcastState = {
+      ...broadcastState,
+      isLive: true,
+      liveItem: {
+        kind: "scripture",
+        reference: "John 3:16 (KJV)",
+        scripture: verse16,
+        segments: [{ verseNumber: 16, text: verse16.text }],
+      },
+    }
+
+    const panel = renderPanel()
+
+    act(() => {
+      fireEvent.keyDown(panel, { key: "ArrowRight" })
+    })
+
+    expect(presentVerseMock).toHaveBeenCalledWith(verse17, {
+      navigate: true,
+    })
   })
 
   it("drives Tauri window fullscreen and applies the layout attribute synchronously", async () => {

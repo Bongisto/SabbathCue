@@ -11,12 +11,15 @@ import { useBibleStore } from "@/stores/bible-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useQueueStore } from "@/stores/queue-store"
+import { useSettingsStore } from "@/stores/settings-store"
 import type {
   DetectionResult,
   EgwParagraph,
   ReadingAdvance,
   Verse,
 } from "@/types"
+
+export const AUTO_PREVIEW_MIN_CONFIDENCE = 0.85
 
 function detectionLikeToVerse({
   book_number,
@@ -132,6 +135,7 @@ function selectPreviewDirectHit(
   const directHits = detections.filter(
     (d) =>
       d.source === "direct" &&
+      d.confidence >= AUTO_PREVIEW_MIN_CONFIDENCE &&
       !d.is_chapter_only &&
       (isEgwDetection(d) || d.book_number > 0)
   )
@@ -163,7 +167,8 @@ async function queueDetectedVerse(
     return
   }
 
-  const { verse } = resolvedDetection ?? (await resolveDetectionVerse(detection))
+  const { verse } =
+    resolvedDetection ?? (await resolveDetectionVerse(detection))
   if (
     !detection.is_chapter_only &&
     detection.source === "direct" &&
@@ -206,8 +211,13 @@ function reportDetectionBatchError(error: unknown): void {
 async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
   useDetectionStore.getState().addDetections(detections)
 
-  const directHit = selectPreviewDirectHit(detections)
-  const resolvedDetections = new WeakMap<DetectionResult, ResolvedDetectionVerse>()
+  const directHit = useSettingsStore.getState().autoPreviewDetections
+    ? selectPreviewDirectHit(detections)
+    : null
+  const resolvedDetections = new WeakMap<
+    DetectionResult,
+    ResolvedDetectionVerse
+  >()
   if (directHit) {
     if (isEgwDetection(directHit)) {
       if (directHit.auto_queued) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, type CSSProperties } from "react"
 import { SparklesIcon, ChevronLeftIcon } from "lucide-react"
 import type { TooltipRenderProps, Controls } from "react-joyride"
 
@@ -48,9 +48,15 @@ export function TutorialTooltip({
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [])
 
+  const tooltipStyle = {
+    ...(tooltipProps as { style?: CSSProperties }).style,
+    background: "var(--bg-deep)",
+  }
+
   return (
     <div
       {...tooltipProps}
+      style={tooltipStyle}
       className="glass-panel z-[70] w-[340px] overflow-hidden shadow-2xl shadow-black/25"
     >
       <div className="flex items-center gap-2.5 border-b border-[var(--border-subtle)] px-4 pt-4 pb-3">
