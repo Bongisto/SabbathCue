@@ -1,16 +1,49 @@
 // @vitest-environment jsdom
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { fireEvent, waitFor } from "@testing-library/react"
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
 
 const fetchVerseMock = vi.fn()
 const selectVerseMock = vi.fn()
+const navigateToVerseMock = vi.fn()
 const setPreviewItemMock = vi.fn()
 const setLiveItemMock = vi.fn()
 const setLiveMock = vi.fn()
 
 let previewItem: unknown = null
 let selectedVerse: unknown = null
+let currentChapter: unknown[] = []
+
+const books = [
+  {
+    id: 43,
+    translation_id: 1,
+    book_number: 43,
+    name: "John",
+    abbreviation: "John",
+    testament: "NT",
+  },
+]
+
+const translations = [
+  {
+    id: 1,
+    abbreviation: "KJV",
+    title: "King James Version",
+    language: "English",
+    is_copyrighted: false,
+    is_downloaded: true,
+  },
+]
 
 vi.mock("@/components/ui/canvas-verse", () => ({
   CanvasPresentation: () => React.createElement("div", { "data-testid": "canvas-presentation" }),
@@ -19,6 +52,7 @@ vi.mock("@/components/ui/canvas-verse", () => ({
 vi.mock("@/hooks/use-bible", () => ({
   bibleActions: {
     fetchVerse: (...args: unknown[]) => fetchVerseMock(...args),
+    navigateToVerse: (...args: unknown[]) => navigateToVerseMock(...args),
     selectVerse: (...args: unknown[]) => selectVerseMock(...args),
   },
 }))
@@ -27,11 +61,18 @@ vi.mock("@/stores/bible-store", () => {
   const useBibleStore = (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
       activeTranslationId: 1,
+      books,
+      currentChapter,
       selectedVerse,
+      translations,
     })
   useBibleStore.getState = () => ({
+    activeTranslationId: 1,
+    books,
+    currentChapter,
     selectedVerse,
     selectVerse: selectVerseMock,
+    translations,
   })
   return { useBibleStore }
 })
@@ -67,8 +108,10 @@ describe("PreviewPanel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    fetchVerseMock.mockResolvedValue(null)
     previewItem = null
     selectedVerse = null
+    currentChapter = []
   })
 
   afterEach(async () => {
@@ -107,5 +150,84 @@ describe("PreviewPanel", () => {
 
     expect(fetchVerseMock).not.toHaveBeenCalled()
     expect(setPreviewItemMock).not.toHaveBeenCalled()
+  })
+
+  it("quick-previews a complete Bible reference", async () => {
+    const verse = {
+      id: 316,
+      translation_id: 1,
+      book_number: 43,
+      book_name: "John",
+      book_abbreviation: "John",
+      chapter: 3,
+      verse: 16,
+      text: "For God so loved the world.",
+    }
+    fetchVerseMock.mockResolvedValueOnce(verse)
+
+    await renderPanel()
+
+    const input = container?.querySelector<HTMLInputElement>(
+      'input[placeholder^="Quick preview"]'
+    )
+    expect(input).not.toBeNull()
+
+    await act(async () => {
+      fireEvent.change(input!, { target: { value: "John 3:16" } })
+    })
+
+    await waitFor(() => {
+      expect(fetchVerseMock).toHaveBeenCalledWith(43, 3, 16, 1)
+    })
+    expect(setPreviewItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reference: "John 3:16 (KJV)",
+      })
+    )
+  })
+
+  it("uses focused arrow keys to navigate the staged scripture preview", async () => {
+    const verse16 = {
+      id: 316,
+      translation_id: 1,
+      book_number: 43,
+      book_name: "John",
+      book_abbreviation: "John",
+      chapter: 3,
+      verse: 16,
+      text: "For God so loved the world.",
+    }
+    const verse17 = {
+      ...verse16,
+      id: 317,
+      verse: 17,
+      text: "For God sent not his Son.",
+    }
+    currentChapter = [verse16, verse17]
+    selectedVerse = verse16
+    previewItem = {
+      kind: "scripture",
+      reference: "John 3:16 (KJV)",
+      scripture: verse16,
+      segments: [{ verseNumber: 16, text: verse16.text }],
+    }
+
+    await renderPanel()
+
+    const panel = container?.querySelector<HTMLElement>(
+      '[data-slot="preview-panel"]'
+    )
+    expect(panel).not.toBeNull()
+
+    await act(async () => {
+      fireEvent.keyDown(panel!, { key: "ArrowRight" })
+    })
+
+    expect(setPreviewItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reference: "John 3:17 (KJV)",
+      })
+    )
+    expect(navigateToVerseMock).toHaveBeenCalledWith(43, 3, 17)
   })
 })

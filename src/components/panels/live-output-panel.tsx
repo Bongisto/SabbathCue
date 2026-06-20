@@ -1,4 +1,10 @@
-import { useMemo, useRef, useState, useEffect } from "react"
+import {
+  useMemo,
+  useRef,
+  useState,
+  useEffect,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CanvasPresentation } from "@/components/ui/canvas-verse"
@@ -22,6 +28,10 @@ import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
 import { PresentationDeckControls } from "@/components/panels/presentation-deck-controls"
 import { presentationDeckKind } from "@/lib/presentation-deck-navigation"
+import {
+  advancePresentationTarget,
+  isPresentationNavigationEditableTarget,
+} from "@/lib/presentation-panel-navigation"
 import {
   EyeIcon,
   EyeOffIcon,
@@ -363,6 +373,30 @@ export function LiveOutputPanel({ className }: { className?: string }) {
 
   const toggleFullscreen = () => setPanelFullscreen(!isFullscreen)
 
+  const handlePanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.repeat ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      isPresentationNavigationEditableTarget(event.target)
+    ) {
+      return
+    }
+
+    const delta =
+      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0
+    if (delta === 0) return
+
+    if (
+      advancePresentationTarget(delta, useBroadcastStore.getState().liveItem, true)
+    ) {
+      event.preventDefault()
+    }
+  }
+
   // Window fullscreen has no built-in Escape handling (unlike the HTML5
   // Fullscreen API), so restore it here.
   useEffect(() => {
@@ -385,8 +419,10 @@ export function LiveOutputPanel({ className }: { className?: string }) {
       ref={panelRef}
       data-slot="live-output-panel"
       data-fullscreen-layout={isFullscreenLayout ? "true" : undefined}
+      tabIndex={0}
+      onKeyDown={handlePanelKeyDown}
       className={cn(
-        "glass-panel relative flex min-h-0 flex-col overflow-hidden",
+        "glass-panel relative flex min-h-0 flex-col overflow-hidden outline-none",
         isFullscreenLayout &&
           "!fixed !inset-0 !z-[80] !h-screen !w-screen !rounded-none !border-0",
         className

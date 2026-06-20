@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DetectionsPanel } from "./detections-panel"
+import { useSettingsStore } from "@/stores/settings-store"
 import type { DetectionResult, Verse } from "@/types"
 
 const {
@@ -83,9 +90,13 @@ vi.mock("@/hooks/use-detection", () => ({
 }))
 
 vi.mock("@/lib/presentation-workflow", () => ({
+  AUTO_PREVIEW_MIN_CONFIDENCE: 0.85,
+  createEgwQueueItem: vi.fn(() => ({ id: "egw-queue-item" })),
   createScriptureQueueItem: vi.fn(() => ({ id: "queue-item" })),
   detectionToVerse: vi.fn(() => verse),
   presentVerse: (...args: unknown[]) => presentVerseMock(...args),
+  presentEgwParagraph: vi.fn(),
+  previewEgwParagraph: vi.fn(),
   selectPreviewVerse: (...args: unknown[]) => selectPreviewVerseMock(...args),
 }))
 
@@ -112,6 +123,7 @@ describe("DetectionsPanel", () => {
     presentHymnMock.mockClear()
     previewHymnMock.mockClear()
     queueHymnMock.mockClear()
+    useSettingsStore.setState({ autoPreviewDetections: true })
   })
 
   afterEach(() => {
@@ -126,8 +138,18 @@ describe("DetectionsPanel", () => {
     expect(selectPreviewVerseMock).toHaveBeenCalledWith(verse)
     expect(selectPreviewVerseMock).not.toHaveBeenCalledWith(
       verse,
-      expect.objectContaining({ navigate: true }),
+      expect.objectContaining({ navigate: true })
     )
+  })
+
+  it("toggles automatic detection preview from the panel header", () => {
+    render(<DetectionsPanel />)
+
+    fireEvent.click(
+      screen.getByRole("switch", { name: /auto preview detections/i })
+    )
+
+    expect(useSettingsStore.getState().autoPreviewDetections).toBe(false)
   })
 
   it("presents a detection without navigating the Bible search panel", () => {
@@ -138,7 +160,7 @@ describe("DetectionsPanel", () => {
     expect(presentVerseMock).toHaveBeenCalledWith(verse)
     expect(presentVerseMock).not.toHaveBeenCalledWith(
       verse,
-      expect.objectContaining({ navigate: true }),
+      expect.objectContaining({ navigate: true })
     )
   })
 

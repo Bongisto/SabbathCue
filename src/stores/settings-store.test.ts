@@ -61,6 +61,7 @@ describe("settings store", () => {
     mockGet.mockImplementation(async (key: string) => {
       if (key === "gain") return 2.5
       if (key === "sttProvider") return "deepgram"
+      if (key === "autoPreviewDetections") return false
       return null
     })
 
@@ -71,6 +72,7 @@ describe("settings store", () => {
     const state = useSettingsStore.getState()
     expect(state.gain).toBe(2.5)
     expect(state.sttProvider).toBe("deepgram")
+    expect(state.autoPreviewDetections).toBe(false)
     // Defaults remain for keys with null
     expect(state.autoMode).toBe(false)
     expect(state.confidenceThreshold).toBe(0.8)
@@ -87,6 +89,7 @@ describe("settings store", () => {
     expect(after.gain).toBe(1.0)
     expect(after.sttProvider).toBe("vosk")
     expect(after.autoMode).toBe(false)
+    expect(after.autoPreviewDetections).toBe(true)
   })
 
   it("does not trust persisted Deepgram key status when keychain status is unavailable", async () => {
