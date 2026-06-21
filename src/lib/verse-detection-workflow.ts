@@ -211,9 +211,8 @@ function reportDetectionBatchError(error: unknown): void {
 async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
   useDetectionStore.getState().addDetections(detections)
 
-  const directHit = useSettingsStore.getState().autoPreviewDetections
-    ? selectPreviewDirectHit(detections)
-    : null
+  const autoPreview = useSettingsStore.getState().autoPreviewDetections
+  const directHit = autoPreview ? selectPreviewDirectHit(detections) : null
   const resolvedDetections = new WeakMap<
     DetectionResult,
     ResolvedDetectionVerse
@@ -231,6 +230,10 @@ async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
       selectPreviewVerse(resolved.verse)
     }
   }
+
+  // With auto-preview on, detections only stage to preview; the queue stays
+  // operator-driven (nothing auto-queues, even in Auto broadcast mode).
+  if (autoPreview) return
 
   for (const detection of detections) {
     await queueDetectedVerse(detection, resolvedDetections.get(detection))

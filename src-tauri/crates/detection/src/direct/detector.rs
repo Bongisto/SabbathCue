@@ -835,7 +835,7 @@ impl DirectDetector {
         for book_match in effective_matches {
             if let Some(verse_ref) = parser::parse_reference(text, book_match) {
                 // Resolve any partial references using context
-                let resolved = self.context.resolve(&verse_ref);
+                let mut resolved = self.context.resolve(&verse_ref);
 
                 // Skip if we couldn't resolve to a meaningful reference
                 if resolved.book_number == 0 || resolved.chapter == 0 {
@@ -856,8 +856,24 @@ impl DirectDetector {
                 if resolved.verse_start == 0 {
                     // Detect if chapter was explicitly spoken or defaulted.
                     let after_book = text[book_match.end..].trim();
-                    let has_explicit_chapter = after_book.starts_with(|c: char| c.is_ascii_digit())
+                    let mut has_explicit_chapter = after_book
+                        .starts_with(|c: char| c.is_ascii_digit())
                         || after_book.to_lowercase().starts_with("chapter");
+
+                    // A bare re-mention of a book (no chapter spoken) must not
+                    // clobber a chapter already established for the same book.
+                    // e.g. "Philippians chapter 4 … this book philippians …
+                    // verse 3" must stay in chapter 4, not reset to 1.
+                    if !has_explicit_chapter {
+                        if let Some(prev) = self.incomplete.as_ref() {
+                            if !prev.chapter_is_default
+                                && prev.verse_ref.book_number == resolved.book_number
+                            {
+                                resolved.chapter = prev.verse_ref.chapter;
+                                has_explicit_chapter = true;
+                            }
+                        }
+                    }
                     self.incomplete = Some(IncompleteRef {
                         verse_ref: resolved.clone(),
                         timestamp: Instant::now(),
@@ -865,28 +881,34 @@ impl DirectDetector {
                     });
                     self.context.update(&resolved);
 
-                    let mut chapter_start = resolved.clone();
-                    chapter_start.verse_start = 1;
-                    let snippet = extract_snippet(text, book_match.start, book_match.end);
-                    #[expect(
-                        clippy::cast_possible_truncation,
-                        reason = "timestamp millis won't exceed u64 for centuries"
-                    )]
-                    let now = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_millis() as u64;
+                    // Only surface a chapter-only detection when the chapter is
+                    // actually known (spoken or inherited). A lone book name with
+                    // no chapter — often a mis-heard keyterm like "Esther" — is
+                    // held for refinement but not emitted or auto-staged.
+                    if has_explicit_chapter {
+                        let mut chapter_start = resolved.clone();
+                        chapter_start.verse_start = 1;
+                        let snippet = extract_snippet(text, book_match.start, book_match.end);
+                        #[expect(
+                            clippy::cast_possible_truncation,
+                            reason = "timestamp millis won't exceed u64 for centuries"
+                        )]
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
 
-                    detections.push(Detection {
-                        verse_ref: chapter_start.clone(),
-                        verse_id: None,
-                        confidence: 0.88,
-                        source: DetectionSource::DirectReference,
-                        transcript_snippet: snippet,
-                        detected_at: now,
-                        is_chapter_only: true,
-                    });
-                    self.push_recent(&chapter_start);
+                        detections.push(Detection {
+                            verse_ref: chapter_start.clone(),
+                            verse_id: None,
+                            confidence: 0.88,
+                            source: DetectionSource::DirectReference,
+                            transcript_snippet: snippet,
+                            detected_at: now,
+                            is_chapter_only: true,
+                        });
+                        self.push_recent(&chapter_start);
+                    }
                     continue;
                 }
 
@@ -1081,6 +1103,45 @@ fn ceil_char_boundary(text: &str, mut idx: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lone_book_name_without_chapter_is_not_emitted() {
+        // A mis-heard bare book name (no chapter spoken) must not surface as
+        // Book 1:1 (the "Esther" false positive from Deepgram keyterm bias).
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("the judgment is possibly good news esther");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn suppressed_bare_book_still_completes_with_a_later_chapter_verse() {
+        // Suppressing the bare-book emission must not lose the held reference:
+        // a following "chapter N verse M" still completes it.
+        let mut detector = DirectDetector::new();
+        assert!(detector.detect("let us turn to esther").is_empty());
+        let results = detector.detect("chapter 4 verse 14");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_name, "Esther");
+        assert_eq!(results[0].verse_ref.chapter, 4);
+        assert_eq!(results[0].verse_ref.verse_start, 14);
+    }
+
+    #[test]
+    fn bare_book_rementions_keep_the_spoken_chapter() {
+        // A bare re-mention of a book must not reset a chapter already spoken
+        // for it: "Philippians chapter 4 … this book philippians … verse 3"
+        // must resolve to 4:3, not 1:3.
+        let mut detector = DirectDetector::new();
+        detector.detect("turn to philippians chapter 4 what is in this book");
+        detector.detect("what is contained in this book philippians");
+        let results = detector.detect("and we're going to read verse 3");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_name, "Philippians");
+        assert_eq!(results[0].verse_ref.chapter, 4);
+        assert_eq!(results[0].verse_ref.verse_start, 3);
+    }
 
     #[test]
     fn test_basic_reference() {
@@ -1862,10 +1923,9 @@ mod tests {
         // "...Acts" → "chapter three..." → "22..."
         let mut detector = DirectDetector::new();
 
-        // Segment 1: Book-only "Acts"
+        // Segment 1: Book-only "Acts" — held for refinement, not emitted.
         let results = detector.detect("God had put in his mouth. Acts");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_chapter_only);
+        assert!(results.is_empty());
         assert!(detector.incomplete.is_some());
         let inc = detector.incomplete.as_ref().unwrap();
         assert_eq!(inc.verse_ref.book_name, "Acts");
@@ -1893,8 +1953,7 @@ mod tests {
         let mut detector = DirectDetector::new();
 
         let results = detector.detect("let's read Acts");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_chapter_only);
+        assert!(results.is_empty()); // bare book held for refinement, not emitted
 
         let results = detector.detect("chapter 3 verse 22");
         let result = results.iter().find(|r| !r.is_chapter_only).unwrap();
@@ -1954,8 +2013,7 @@ mod tests {
         let mut detector = DirectDetector::new();
 
         let results = detector.detect("turn to Acts");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_chapter_only);
+        assert!(results.is_empty()); // bare book held for refinement, not emitted
         assert!(detector.incomplete.as_ref().unwrap().chapter_is_default);
 
         // Bare "3" = chapter (because book-only)

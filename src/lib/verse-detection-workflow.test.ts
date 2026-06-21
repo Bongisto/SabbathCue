@@ -157,6 +157,7 @@ describe("verse detection workflow", () => {
   })
 
   it("queues an auto-queued direct detection with the active translation", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     await handleVerseDetections([makeDetection()])
 
     expect(useQueueStore.getState().items).toEqual([
@@ -204,15 +205,8 @@ describe("verse detection workflow", () => {
     expect(useDetectionStore.getState().detections).toHaveLength(1)
     expect(useBibleStore.getState().selectedVerse).toBeNull()
     expect(useBroadcastStore.getState().previewItem).toBeNull()
-    expect(useQueueStore.getState().items).toEqual([
-      expect.objectContaining({
-        confidence: 0.84,
-        source: "ai-direct",
-        presentation: expect.objectContaining({
-          reference: "John 3:16",
-        }),
-      }),
-    ])
+    // Auto-preview on ⇒ nothing auto-queues, even below the preview threshold.
+    expect(useQueueStore.getState().items).toHaveLength(0)
   })
 
   it("auto-previews direct detections at 85 percent", async () => {
@@ -227,7 +221,19 @@ describe("verse detection workflow", () => {
     })
   })
 
+  it("does not auto-queue detections while auto preview is on", async () => {
+    await handleVerseDetections([makeDetection()])
+
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_number: 43,
+      chapter: 3,
+      verse: 16,
+    })
+    expect(useQueueStore.getState().items).toHaveLength(0)
+  })
+
   it("queues semantic detections without pending navigation", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     await handleVerseDetections([
       makeDetection({
         source: "semantic",
@@ -273,15 +279,9 @@ describe("verse detection workflow", () => {
       chapter: 3,
       verse: 16,
     })
-    expect(useQueueStore.getState().items).toEqual([
-      expect.objectContaining({
-        source: "ai-semantic",
-        confidence: 0.99,
-        presentation: expect.objectContaining({
-          reference: "Romans 8:28",
-        }),
-      }),
-    ])
+    // Direct hit wins the preview; with auto-preview on, the semantic
+    // suggestion is not auto-queued.
+    expect(useQueueStore.getState().items).toHaveLength(0)
   })
 
   it("keeps non-auto-queued semantic detections out of the queue", async () => {
@@ -299,6 +299,7 @@ describe("verse detection workflow", () => {
   })
 
   it("queues chapter-only direct detections without selecting preview", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     await handleVerseDetections([
       makeDetection({
         verse_ref: "John 3",
@@ -327,6 +328,7 @@ describe("verse detection workflow", () => {
   })
 
   it("refines a chapter-only queue item instead of adding a duplicate verse", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     useQueueStore.setState({
       items: [makeQueueItem()],
       activeIndex: null,
@@ -658,6 +660,7 @@ describe("verse detection workflow", () => {
   })
 
   it("serializes overlapping detection batches", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     const order: string[] = []
     invokeMock.mockImplementation(async () => {
       order.push("fetch")
@@ -725,6 +728,7 @@ describe("verse detection workflow", () => {
   })
 
   it("queues text fetched from the current translation", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     invokeMock.mockResolvedValueOnce({
       id: 25,
       translation_id: 7,
@@ -774,6 +778,7 @@ describe("verse detection workflow", () => {
   })
 
   it("falls back to loaded current chapter text when verse fetch is unavailable", async () => {
+    useSettingsStore.setState({ autoPreviewDetections: false })
     useBibleStore.setState({
       currentChapter: [
         {
