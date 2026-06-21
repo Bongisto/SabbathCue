@@ -41,18 +41,19 @@ export function isPresentationNavigationEditableTarget(
   if (
     tagName === "input" ||
     tagName === "textarea" ||
-    tagName === "select" ||
-    tagName === "button"
+    tagName === "select"
   ) {
     return true
   }
 
-  // Also skip arrow-nav when a button or list option is focused (e.g. an open
-  // quick-search dropdown) so arrows drive the list/control, not presentation.
-  // The panel container itself is a <div>, so panel-focused nav still works.
+  // Skip arrow-nav when a list/menu option is focused (e.g. an open dropdown)
+  // so arrows drive the list, not presentation. Buttons are excluded on
+  // purpose: they don't consume arrow keys, and guarding them would kill
+  // keyboard nav whenever a button is focused (after clicking the on-screen
+  // arrow controls or any toolbar button).
   return Boolean(
     target.closest(
-      '[contenteditable="true"], input, textarea, select, button, [role="textbox"], [role="combobox"], [role="spinbutton"], [role="button"], [role="menuitem"], [role="option"]'
+      '[contenteditable="true"], input, textarea, select, [role="textbox"], [role="combobox"], [role="spinbutton"], [role="menuitem"], [role="option"]'
     )
   )
 }

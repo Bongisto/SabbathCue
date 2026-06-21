@@ -55,8 +55,8 @@ afterEach(() => {
 })
 
 describe("isPresentationNavigationEditableTarget", () => {
-  it("treats text-editing and interactive controls as editable", () => {
-    for (const tag of ["input", "textarea", "select", "button"]) {
+  it("treats text-editing controls as editable", () => {
+    for (const tag of ["input", "textarea", "select"]) {
       expect(
         isPresentationNavigationEditableTarget(document.createElement(tag))
       ).toBe(true)
@@ -73,9 +73,14 @@ describe("isPresentationNavigationEditableTarget", () => {
     expect(isPresentationNavigationEditableTarget(option)).toBe(true)
   })
 
-  it("treats a bare panel container as non-editable", () => {
+  it("treats a bare panel container and buttons as non-editable", () => {
     const panel = document.createElement("div")
     expect(isPresentationNavigationEditableTarget(panel)).toBe(false)
+    // Buttons must not block keyboard nav: focus lands on them after a click
+    // (on-screen arrows, toolbar) and they don't consume arrow keys.
+    expect(
+      isPresentationNavigationEditableTarget(document.createElement("button"))
+    ).toBe(false)
   })
 
   it("returns false for null and non-HTMLElement targets", () => {
