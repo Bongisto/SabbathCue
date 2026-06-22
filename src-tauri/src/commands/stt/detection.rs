@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
 
 use crate::state::AppState;
-use rhema_detection::{DetectionMerger, DirectDetector};
+use rhema_detection::{DetectionMerger, DirectDetector, ReadingMode};
 
 use super::utils::{transcript_logging_enabled, truncate_safe};
 
@@ -312,6 +312,67 @@ pub(crate) fn finalize_live_semantic_results(
     });
     merged.truncate(LIVE_SEMANTIC_CAP);
     merged
+}
+
+fn active_reading_bible_scope(app: &AppHandle) -> Option<(i32, i32, String)> {
+    let reading_mode_state: State<'_, Mutex<ReadingMode>> = app.state();
+    let Ok(reading_mode) = reading_mode_state.lock() else {
+        log::warn!("[DET-SEMANTIC] ReadingMode busy; semantic scope filter skipped");
+        return None;
+    };
+
+    if !reading_mode.is_active() {
+        return None;
+    }
+
+    let book_number = reading_mode.current_book();
+    let chapter = reading_mode.current_chapter();
+    if book_number <= 0 || chapter <= 0 {
+        return None;
+    }
+
+    Some((
+        book_number,
+        chapter,
+        reading_mode.current_book_name().to_string(),
+    ))
+}
+
+fn filter_semantic_results_to_reading_scope(
+    results: Vec<crate::commands::detection::DetectionResult>,
+    scope: Option<(i32, i32)>,
+) -> Vec<crate::commands::detection::DetectionResult> {
+    let Some((book_number, chapter)) = scope else {
+        return results;
+    };
+
+    results
+        .into_iter()
+        .filter(|result| {
+            result.content_type != "bible"
+                || (result.book_number == book_number && result.chapter == chapter)
+        })
+        .collect()
+}
+
+fn filter_live_semantic_results_to_reading_scope(
+    app: &AppHandle,
+    results: Vec<crate::commands::detection::DetectionResult>,
+) -> Vec<crate::commands::detection::DetectionResult> {
+    let Some((book_number, chapter, book_name)) = active_reading_bible_scope(app) else {
+        return results;
+    };
+
+    let before = results.len();
+    let results = filter_semantic_results_to_reading_scope(results, Some((book_number, chapter)));
+    let suppressed = before.saturating_sub(results.len());
+    if suppressed > 0 {
+        log::info!(
+            "[DET-SEMANTIC] Suppressed {suppressed} out-of-scope Bible result(s) while reading {book_name} {chapter}"
+        );
+    }
+
+    results
 }
 
 fn mark_egw_auto_queue(
@@ -649,6 +710,7 @@ pub(crate) fn run_semantic_detection(
         .collect();
 
     drop(app_state);
+    let results = filter_live_semantic_results_to_reading_scope(app, results);
     let results = finalize_live_semantic_results(results);
 
     if results.is_empty() {
@@ -922,7 +984,8 @@ pub(crate) fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found
 #[cfg(test)]
 mod tests {
     use super::{
-        enqueue_final_semantic_job, enqueue_partial_semantic_job, finalize_live_semantic_results,
+        enqueue_final_semantic_job, enqueue_partial_semantic_job,
+        filter_semantic_results_to_reading_scope, finalize_live_semantic_results,
         replace_semantic_job, take_semantic_job, DeepgramSemanticBuffer, LIVE_SEMANTIC_CAP,
         PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS,
     };
@@ -1195,6 +1258,34 @@ mod tests {
         assert_eq!(finalized.len(), LIVE_SEMANTIC_CAP);
         assert!(finalized.iter().any(|r| r.verse_ref == "Romans 8:28"));
         assert!(finalized.iter().any(|r| r.verse_ref == "Genesis 1:1"));
+    }
+
+    #[test]
+    fn reading_scope_filter_suppresses_out_of_chapter_semantic_bible_results() {
+        let results = vec![
+            make_detection_result("Isaiah 53:7", 23, 53, 7, 1.00),
+            make_detection_result("Revelation 13:8", 66, 13, 8, 0.91),
+            make_detection_result("Revelation 20:12", 66, 20, 12, 0.89),
+        ];
+
+        let filtered = filter_semantic_results_to_reading_scope(results, Some((66, 13)));
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].verse_ref, "Revelation 13:8");
+    }
+
+    #[test]
+    fn reading_scope_filter_is_noop_without_active_scope() {
+        let results = vec![
+            make_detection_result("Isaiah 53:7", 23, 53, 7, 1.00),
+            make_detection_result("Revelation 13:8", 66, 13, 8, 0.91),
+        ];
+
+        let filtered = filter_semantic_results_to_reading_scope(results, None);
+
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().any(|r| r.verse_ref == "Isaiah 53:7"));
+        assert!(filtered.iter().any(|r| r.verse_ref == "Revelation 13:8"));
     }
 
     #[test]

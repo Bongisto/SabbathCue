@@ -661,7 +661,7 @@ fn is_previous_verse_command(command: &str) -> bool {
 /// Extract a verse number from text containing "verse N" anywhere.
 ///
 /// Matches phrases like "let's go to verse five", "give me verse 4",
-/// "verse three", or bare SINGLE numbers like "3." or "five".
+/// "verse three", or whole-utterance bare SINGLE numbers like "3." or "five".
 ///
 /// Returns None for two-number patterns like "5 2" or "five two" which
 /// should be handled as "chapter 5 verse 2" by `check_chapter_command`.
@@ -695,11 +695,18 @@ fn extract_verse_number(text: &str) -> Option<i32> {
             );
             return None; // Let check_chapter_command handle it
         }
-        // Single number - return it as verse
-        return Some(first_num);
+        if is_only_command_punctuation(rest_trimmed) {
+            return Some(first_num);
+        }
     }
 
     None
+}
+
+fn is_only_command_punctuation(text: &str) -> bool {
+    text.trim()
+        .chars()
+        .all(|ch| matches!(ch, '.' | ',' | '?' | '!'))
 }
 
 fn has_reference_context_before_verse(text: &str, verse_pos: usize) -> bool {
@@ -957,6 +964,11 @@ mod tests {
     fn test_extract_verse_number_bare() {
         assert_eq!(extract_verse_number("3."), Some(3));
         assert_eq!(extract_verse_number("12"), Some(12));
+        assert_eq!(extract_verse_number("2 books right"), None);
+        assert_eq!(
+            extract_verse_number("3 books a third book was opened"),
+            None
+        );
     }
 
     #[test]
@@ -983,6 +995,25 @@ mod tests {
 
         assert_eq!(result, None);
         assert_eq!(rm.current_verse(), Some(1));
+    }
+
+    #[test]
+    fn reading_mode_ignores_book_count_numbers_after_revelation_reference() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=22)
+            .map(|i| (i, format!("Revelation 20 verse {i}.")))
+            .collect();
+        rm.start(66, "Revelation", 20, 12, verses);
+
+        let two_books =
+            rm.check_transcript("so we see there again that there are at least 2 books right");
+        let three_books = rm.check_transcript(
+            "so far and then it says and another book so that is now we have at least 3 books",
+        );
+
+        assert_eq!(two_books, None);
+        assert_eq!(three_books, None);
+        assert_eq!(rm.current_verse(), Some(12));
     }
 
     // --- Bug fix: all chapter verses loaded for backward navigation ---
@@ -1091,12 +1122,12 @@ mod tests {
     #[test]
     fn chapter_only_sermon_transition_does_not_emit_verse_one() {
         let mut rm = ReadingMode::new();
-        let verses: Vec<(i32, String)> =
-            (1..=20).map(|i| (i, format!("Revelation 20 verse {i}."))).collect();
+        let verses: Vec<(i32, String)> = (1..=20)
+            .map(|i| (i, format!("Revelation 20 verse {i}.")))
+            .collect();
         rm.start(66, "Revelation", 20, 12, verses);
 
-        let result =
-            rm.check_chapter_command("let's now turn a few chapters back to chapter 13");
+        let result = rm.check_chapter_command("let's now turn a few chapters back to chapter 13");
 
         assert!(result.is_some());
         let change = result.unwrap();
@@ -1268,6 +1299,7 @@ mod tests {
         assert_eq!(extract_verse_number("five?"), Some(5));
         assert_eq!(extract_verse_number("verse five"), Some(5));
         assert_eq!(extract_verse_number("5"), Some(5));
+        assert_eq!(extract_verse_number("three books"), None);
 
         // Two numbers should return None (defer to chapter command handler)
         assert_eq!(extract_verse_number("five two"), None);

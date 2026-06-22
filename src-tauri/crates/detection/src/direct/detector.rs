@@ -1170,6 +1170,8 @@ mod tests {
             "what we notice in verse 10 is that at the same time that judgment begins",
             "let's turn to revelation chapter 20 and we're going to read verse 12",
             "the books were opened and another book was opened which is the book of life",
+            "so we see there again that there are at least 2 books right",
+            "so far and then it says and another book so that is now we have at least 3 books",
             "let's now turn a few chapters back to chapter 13 revelation chapter 13 and we're going to read verse 8",
             "what's the name of this book the full name of the book of life the lamb's book of life",
             "now what we're going to see if we turn to philippians chapter 4",
@@ -1193,9 +1195,50 @@ mod tests {
         assert!(refs.contains(&"Revelation 20:12".to_string()));
         assert!(refs.contains(&"Revelation 13:8".to_string()));
         assert!(refs.contains(&"Philippians 4:3".to_string()));
+        assert!(!refs.contains(&"Revelation 20:2".to_string()));
+        assert!(!refs.contains(&"Revelation 20:3".to_string()));
         assert!(!refs.contains(&"Revelation 1:1".to_string()));
         assert!(!refs.contains(&"Revelation 3:1".to_string()));
         assert!(!refs.contains(&"Philippians 4:13".to_string()));
+    }
+
+    #[test]
+    fn revelation_thirteen_book_of_life_sermon_does_not_become_isaiah() {
+        let mut detector = DirectDetector::new();
+        let mut refs = Vec::new();
+
+        for segment in [
+            "revelation chapter 13 and we're going to read verse 8",
+            "now this verse is translated differently depending on which version of the bible that you're using",
+            "but we won't focus on that for this morning",
+            "it says all who dwell on the earth will worship him that is the beast the sea beast",
+            "whose names have not been written in the book of life of the lamb slain from the foundation of the world",
+            "what I want us to get from this verse is the full name of this verse of this book rather",
+            "the full name of this book is the book of life of the lamb",
+            "say that differently the lamb's book of life",
+            "okay this lamb we are told was slain from the foundation of the world",
+        ] {
+            refs.extend(
+                detector
+                    .detect(segment)
+                    .into_iter()
+                    .map(|detection| {
+                        format!(
+                            "{} {}:{} {:.2}",
+                            detection.verse_ref.book_name,
+                            detection.verse_ref.chapter,
+                            detection.verse_ref.verse_start,
+                            detection.confidence
+                        )
+                    }),
+            );
+        }
+
+        assert!(refs.iter().any(|r| r.starts_with("Revelation 13:8")));
+        assert!(
+            refs.iter().all(|r| !r.starts_with("Isaiah ")),
+            "unexpected refs: {refs:?}"
+        );
     }
 
     #[test]
