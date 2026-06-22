@@ -276,7 +276,7 @@ export function DetectionsPanel({ className }: { className?: string }) {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <span
             className="inline-flex items-center gap-1 rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[0.5625rem] text-muted-foreground uppercase"
-            title="Semantic detections remain visible from 63%; the threshold controls automatic output only."
+            title="Semantic detections remain visible from 70%; the threshold controls automatic output only."
           >
             <BrainCircuitIcon className="size-2.5" />
             {semanticStatus?.has_semantic ? "Semantic" : "Keyword"}

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
 
 use crate::state::AppState;
-use rhema_detection::{DetectionMerger, DirectDetector, ReadingMode};
+use rhema_detection::{DetectionMerger, DirectDetector, MergedDetection, ReadingMode, VerseRef};
 
 use super::utils::{transcript_logging_enabled, truncate_safe};
 
@@ -30,12 +30,57 @@ pub(crate) const PARTIAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const LIVE_SEMANTIC_CAP: usize = 3;
 const LIVE_SEMANTIC_OVERLAP_BOOST: f64 = 0.10;
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct DirectReadingCandidate {
+    verse_ref: VerseRef,
+    confidence: f64,
+    is_chapter_only: bool,
+}
+
 /// Maximum trailing words of the rolling transcript window fed to live
 /// semantic + FTS5 detection.
 pub(crate) const LIVE_DETECTION_WINDOW_WORDS: usize = 12;
 
 /// Clear the rolling detection window after this much silence between finals.
 pub(crate) const WINDOW_RESET_GAP: Duration = Duration::from_secs(8);
+
+fn is_direct_reading_handoff(detection: &rhema_detection::Detection) -> bool {
+    detection.confidence >= 0.90 || detection.is_chapter_only
+}
+
+fn direct_reading_candidates(merged: &[MergedDetection]) -> Vec<DirectReadingCandidate> {
+    merged
+        .iter()
+        .filter(|merged| is_direct_reading_handoff(&merged.detection))
+        .map(|merged| DirectReadingCandidate {
+            verse_ref: merged.detection.verse_ref.clone(),
+            confidence: merged.detection.confidence,
+            is_chapter_only: merged.detection.is_chapter_only,
+        })
+        .collect()
+}
+
+fn choose_reading_candidate(
+    candidates: &[DirectReadingCandidate],
+    active_scope: Option<(i32, i32)>,
+) -> Option<DirectReadingCandidate> {
+    if let Some((book_number, chapter)) = active_scope {
+        if let Some(candidate) = candidates.iter().find(|candidate| {
+            candidate.verse_ref.book_number == book_number && candidate.verse_ref.chapter == chapter
+        }) {
+            return Some(candidate.clone());
+        }
+
+        if let Some(candidate) = candidates
+            .iter()
+            .find(|candidate| candidate.verse_ref.book_number == book_number)
+        {
+            return Some(candidate.clone());
+        }
+    }
+
+    candidates.first().cloned()
+}
 
 /// Return the last `max_words` whitespace-delimited words of `text`, re-joined
 /// with single spaces.
@@ -375,6 +420,52 @@ fn filter_live_semantic_results_to_reading_scope(
     results
 }
 
+fn filter_direct_results_to_scope_if_present(
+    results: Vec<crate::commands::detection::DetectionResult>,
+    scope: Option<(i32, i32)>,
+) -> Vec<crate::commands::detection::DetectionResult> {
+    let Some((book_number, chapter)) = scope else {
+        return results;
+    };
+
+    let has_active_match = results.iter().any(|result| {
+        result.content_type == "bible"
+            && result.book_number == book_number
+            && result.chapter == chapter
+    });
+    if !has_active_match {
+        return results;
+    }
+
+    results
+        .into_iter()
+        .filter(|result| {
+            result.content_type != "bible"
+                || (result.book_number == book_number && result.chapter == chapter)
+        })
+        .collect()
+}
+
+fn filter_live_direct_results_to_reading_scope(
+    app: &AppHandle,
+    results: Vec<crate::commands::detection::DetectionResult>,
+) -> Vec<crate::commands::detection::DetectionResult> {
+    let Some((book_number, chapter, book_name)) = active_reading_bible_scope(app) else {
+        return results;
+    };
+
+    let before = results.len();
+    let results = filter_direct_results_to_scope_if_present(results, Some((book_number, chapter)));
+    let suppressed = before.saturating_sub(results.len());
+    if suppressed > 0 {
+        log::info!(
+            "[DET-DIRECT] Suppressed {suppressed} out-of-scope Bible result(s) while reading {book_name} {chapter}"
+        );
+    }
+
+    results
+}
+
 fn mark_egw_auto_queue(
     app: &AppHandle,
     results: &mut [crate::commands::detection::DetectionResult],
@@ -422,7 +513,7 @@ fn emit_egw_direct_detections(
 /// Run direct (regex/pattern) detection only. Instant, no ONNX.
 /// Uses SEPARATE Mutex<DirectDetector> and Mutex<DetectionMerger> so it
 /// never blocks on the semantic worker, and cooldown state persists across calls.
-/// Returns true if high-confidence results were found (>= 0.90).
+/// Returns direct references that are strong enough to hand reading mode to.
 #[expect(
     clippy::similar_names,
     clippy::too_many_lines,
@@ -433,7 +524,7 @@ pub(crate) fn run_direct_detection(
     seq: u64,
     latest_seq: &Arc<AtomicU64>,
     transcript: &str,
-) -> bool {
+) -> Vec<DirectReadingCandidate> {
     // [DIAG] AppState mutex contention on the direct-detection hot path.
     static LOCK_OK: AtomicU64 = AtomicU64::new(0);
     static LOCK_CONTENDED: AtomicU64 = AtomicU64::new(0);
@@ -442,7 +533,7 @@ pub(crate) fn run_direct_detection(
     // latest accepted transcript sequence, skip emission.
     if seq < latest_seq.load(Ordering::Acquire) {
         log::debug!("[DET-DIRECT] Skipping stale job seq={seq}");
-        return false;
+        return Vec::new();
     }
     let t0 = std::time::Instant::now();
     let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
@@ -450,7 +541,7 @@ pub(crate) fn run_direct_detection(
         Ok(d) => d,
         Err(e) => {
             log::error!("Failed to lock DirectDetector: {e}");
-            return false;
+            return Vec::new();
         }
     };
     let direct_results = detector.detect(transcript);
@@ -458,11 +549,8 @@ pub(crate) fn run_direct_detection(
 
     if direct_results.is_empty() {
         emit_egw_direct_detections(app, seq, latest_seq, transcript);
-        return false;
+        return Vec::new();
     }
-
-    // Check if any result has high confidence before merging
-    let has_high_confidence = direct_results.iter().any(|d| d.confidence >= 0.90);
 
     // Merge using the managed merger (persists cooldown state across calls,
     // preventing duplicate emissions when running on both partials and finals)
@@ -471,14 +559,15 @@ pub(crate) fn run_direct_detection(
         Ok(m) => m,
         Err(e) => {
             log::error!("Failed to lock DetectionMerger: {e}");
-            return false;
+            return Vec::new();
         }
     };
     let merged = merger.merge(direct_results, vec![]);
     drop(merger);
+    let reading_candidates = direct_reading_candidates(&merged);
     if merged.is_empty() {
         emit_egw_direct_detections(app, seq, latest_seq, transcript);
-        return has_high_confidence;
+        return reading_candidates;
     }
 
     // Resolve verse info from DB (needs AppState, but only briefly for DB lookup)
@@ -491,7 +580,7 @@ pub(crate) fn run_direct_detection(
         // Check for stale sequence BEFORE emitting in fallback path
         if seq < latest_seq.load(Ordering::Acquire) {
             log::debug!("[DET-DIRECT] Skipping stale emission in fallback path seq={seq}");
-            return has_high_confidence;
+            return Vec::new();
         }
 
         // AppState is locked, so emit results without verse text.
@@ -516,6 +605,7 @@ pub(crate) fn run_direct_detection(
                 }
             })
             .collect();
+        let results = filter_live_direct_results_to_reading_scope(app, results);
         for r in &results {
             log::info!(
                 "[DET-DIRECT] Found: {} ({:.0}%) (no DB)",
@@ -524,7 +614,7 @@ pub(crate) fn run_direct_detection(
             );
         }
         let _ = app.emit("verse_detections", &results);
-        return has_high_confidence;
+        return reading_candidates;
     };
     let ok = LOCK_OK.fetch_add(1, Ordering::Relaxed) + 1;
     if ok % 50 == 0 {
@@ -543,6 +633,7 @@ pub(crate) fn run_direct_detection(
     if results.len() > egw_start {
         mark_egw_auto_queue(app, &mut results[egw_start..]);
     }
+    let results = filter_live_direct_results_to_reading_scope(app, results);
 
     for r in &results {
         log::info!(
@@ -555,7 +646,7 @@ pub(crate) fn run_direct_detection(
     // Final stale check before emission
     if seq < latest_seq.load(Ordering::Acquire) {
         log::debug!("[DET-DIRECT] Skipping emission for stale seq={seq}");
-        return has_high_confidence;
+        return Vec::new();
     }
 
     log::info!(
@@ -574,7 +665,7 @@ pub(crate) fn run_direct_detection(
     } else {
         log::info!("[DET-DIRECT] Detection took {:?}", t0.elapsed());
     }
-    has_high_confidence
+    reading_candidates
 }
 
 /// Run hybrid semantic detection combining FTS5 BM25 with vector search.
@@ -750,32 +841,31 @@ pub(crate) fn run_semantic_detection(
     clippy::too_many_lines,
     reason = "sequential state-machine logic is clearer in one flow"
 )]
-pub(crate) fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found: bool) -> bool {
+pub(crate) fn check_reading_mode(
+    app: &AppHandle,
+    transcript: &str,
+    direct_candidates: Vec<DirectReadingCandidate>,
+) -> bool {
     use rhema_detection::ReadingMode;
 
     // If direct detection found a verse, consider starting/restarting reading mode.
     // BUT: if reading mode is already active on a book/chapter, do NOT restart
     // on a different book — false positives from bare numbers (e.g., "verse 5"
     // getting matched as "Job 3:5") would hijack the reading session.
-    if direct_found {
-        let verse_info = {
-            let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
-            let Ok(detector) = detector_state.lock() else {
-                return false;
-            };
-            detector.recent_detections().front().cloned()
+    if !direct_candidates.is_empty() {
+        let active_scope = {
+            let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+            rm_managed.lock().ok().and_then(|rm| {
+                if rm.is_active() || rm.has_verses() {
+                    Some((rm.current_book(), rm.current_chapter()))
+                } else {
+                    None
+                }
+            })
         };
 
-        if let Some(recent) = verse_info {
-            // Get the confidence of the detection to distinguish explicit refs from false positives
-            let detection_confidence = {
-                let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
-                detector_state
-                    .lock()
-                    .ok()
-                    .and_then(|d| d.recent_detections().front().map(|_| 0.95)) // Direct detections are always high confidence
-                    .unwrap_or(0.0)
-            };
+        if let Some(candidate) = choose_reading_candidate(&direct_candidates, active_scope) {
+            let recent = candidate.verse_ref.clone();
 
             let should_start = {
                 let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
@@ -791,7 +881,7 @@ pub(crate) fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found
                         {
                             false // Same book+chapter — already tracking this
                         } else if rm.current_book() != recent.book_number
-                            && detection_confidence >= 0.90
+                            && (candidate.confidence >= 0.90 || candidate.is_chapter_only)
                         {
                             // Different book with high confidence — explicit new reference
                             // (e.g., "John 1:1" after reading Exodus). Restart.
@@ -984,11 +1074,14 @@ pub(crate) fn check_reading_mode(app: &AppHandle, transcript: &str, direct_found
 #[cfg(test)]
 mod tests {
     use super::{
-        enqueue_final_semantic_job, enqueue_partial_semantic_job,
+        choose_reading_candidate, direct_reading_candidates, enqueue_final_semantic_job,
+        enqueue_partial_semantic_job, filter_direct_results_to_scope_if_present,
         filter_semantic_results_to_reading_scope, finalize_live_semantic_results,
-        replace_semantic_job, take_semantic_job, DeepgramSemanticBuffer, LIVE_SEMANTIC_CAP,
-        PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS,
+        replace_semantic_job, take_semantic_job, DeepgramSemanticBuffer, DirectReadingCandidate,
+        LIVE_SEMANTIC_CAP, PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS,
+        SEMANTIC_WINDOW_SEGMENTS,
     };
+    use rhema_detection::{Detection, DetectionSource, MergedDetection, VerseRef};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -1074,6 +1167,96 @@ mod tests {
             is_chapter_only: false,
             egw_paragraph: None,
         }
+    }
+
+    fn make_merged_direct(
+        book_name: &str,
+        book_number: i32,
+        chapter: i32,
+        verse: i32,
+        confidence: f64,
+        is_chapter_only: bool,
+    ) -> MergedDetection {
+        MergedDetection {
+            detection: Detection {
+                verse_ref: VerseRef {
+                    book_number,
+                    book_name: book_name.to_string(),
+                    chapter,
+                    verse_start: verse,
+                    verse_end: None,
+                },
+                verse_id: None,
+                confidence,
+                source: DetectionSource::DirectReference,
+                transcript_snippet: "snippet".to_string(),
+                detected_at: 0,
+                is_chapter_only,
+            },
+            auto_queued: false,
+        }
+    }
+
+    #[test]
+    fn direct_reading_candidates_include_chapter_only_handoffs_below_ninety_percent() {
+        let merged = vec![make_merged_direct("Philippians", 50, 4, 1, 0.88, true)];
+
+        let candidates = direct_reading_candidates(&merged);
+
+        assert_eq!(
+            candidates,
+            vec![DirectReadingCandidate {
+                verse_ref: VerseRef {
+                    book_number: 50,
+                    book_name: "Philippians".to_string(),
+                    chapter: 4,
+                    verse_start: 1,
+                    verse_end: None,
+                },
+                confidence: 0.88,
+                is_chapter_only: true,
+            }]
+        );
+    }
+
+    #[test]
+    fn choose_reading_candidate_prefers_active_scope_over_stale_first_candidate() {
+        let candidates = direct_reading_candidates(&[
+            make_merged_direct("Isaiah", 23, 4, 3, 1.0, false),
+            make_merged_direct("Philippians", 50, 4, 3, 1.0, false),
+            make_merged_direct("Revelation", 66, 1, 3, 1.0, false),
+        ]);
+
+        let selected = choose_reading_candidate(&candidates, Some((50, 4)));
+
+        assert_eq!(
+            selected.map(|candidate| candidate.verse_ref.book_name),
+            Some("Philippians".to_string())
+        );
+    }
+
+    #[test]
+    fn direct_scope_filter_keeps_active_chapter_when_batch_contains_it() {
+        let results = vec![
+            make_detection_result("Isaiah 4:3", 23, 4, 3, 1.0),
+            make_detection_result("Philippians 4:3", 50, 4, 3, 1.0),
+            make_detection_result("Revelation 1:3", 66, 1, 3, 1.0),
+        ];
+
+        let filtered = filter_direct_results_to_scope_if_present(results, Some((50, 4)));
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].verse_ref, "Philippians 4:3");
+    }
+
+    #[test]
+    fn direct_scope_filter_allows_new_book_when_active_chapter_absent() {
+        let results = vec![make_detection_result("Revelation 1:3", 66, 1, 3, 1.0)];
+
+        let filtered = filter_direct_results_to_scope_if_present(results, Some((50, 4)));
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].verse_ref, "Revelation 1:3");
     }
 
     /// Test helper to verify stale sequence suppression logic.

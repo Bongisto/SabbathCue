@@ -29,7 +29,7 @@ pub(crate) const FTS5_MIN_CONFIDENCE: f64 = 0.50;
 
 /// Detection results at or above this confidence are visible to operators.
 /// Auto-live/auto-queue uses the UI threshold separately.
-pub(crate) const OPERATOR_DETECTION_THRESHOLD: f64 = 0.63;
+pub(crate) const OPERATOR_DETECTION_THRESHOLD: f64 = 0.70;
 
 const AUTO_QUEUE_DISABLED_THRESHOLD: f64 = f64::INFINITY;
 

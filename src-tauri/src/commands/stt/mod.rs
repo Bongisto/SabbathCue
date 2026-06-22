@@ -361,8 +361,9 @@ pub async fn start_transcription(
             let app_clone = det_app.clone();
             let latest_seq = det_latest_seq.clone();
             let _ = tokio::task::spawn_blocking(move || {
-                let direct_found = run_direct_detection(&app_clone, seq, &latest_seq, &transcript);
-                check_reading_mode(&app_clone, &transcript, direct_found);
+                let direct_candidates =
+                    run_direct_detection(&app_clone, seq, &latest_seq, &transcript);
+                check_reading_mode(&app_clone, &transcript, direct_candidates);
             })
             .await;
         }
