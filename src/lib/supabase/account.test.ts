@@ -50,6 +50,7 @@ describe("supabase account lib", () => {
           created_at: "2026-01-01T00:00:00.000Z",
           suspended: false,
           suspend_reason: null,
+          access_expires_at: "2026-07-01T00:00:00.000Z",
           device_count: 1,
           last_seen_at: null,
           is_admin: true,
@@ -70,6 +71,7 @@ describe("supabase account lib", () => {
           created_at: "2026-01-01T00:00:00.000Z",
           suspended: false,
           suspend_reason: null,
+          access_expires_at: "2026-07-01T00:00:00.000Z",
           device_count: 1,
           last_seen_at: null,
           is_admin: true,
@@ -104,6 +106,32 @@ describe("supabase account lib", () => {
       p_user_id: "user-1",
       p_suspended: false,
       p_reason: null,
+    })
+  })
+
+  it("adminSetAccess sends the expected renewal payload", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null })
+
+    const { adminSetAccess } = await import("@/lib/supabase/account")
+    const result = await adminSetAccess("user-1", 30)
+
+    expect(result).toEqual({ ok: true })
+    expect(mockRpc).toHaveBeenCalledWith("admin_set_access", {
+      p_user_id: "user-1",
+      p_days: 30,
+    })
+  })
+
+  it("adminSetAccess sends the expected annual renewal payload", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null })
+
+    const { adminSetAccess } = await import("@/lib/supabase/account")
+    const result = await adminSetAccess("user-1", 365)
+
+    expect(result).toEqual({ ok: true })
+    expect(mockRpc).toHaveBeenCalledWith("admin_set_access", {
+      p_user_id: "user-1",
+      p_days: 365,
     })
   })
 

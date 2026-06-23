@@ -97,6 +97,16 @@ export const transcriptionActions = {
     transcript.setConnectionStatus("disconnected")
   },
 
+  async setLiveGain(gain: number): Promise<void> {
+    if (!useTranscriptStore.getState().isTranscribing) return
+
+    try {
+      await invokeTauri("set_input_gain", { gain })
+    } catch (error) {
+      console.warn("[transcription] Could not update live input gain", error)
+    }
+  },
+
   async dumpMemory(
     onMissingApiKey?: (provider: SttProvider) => void
   ): Promise<void> {
@@ -199,14 +209,18 @@ export function useTranscriptionEventBridge() {
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_partial", (payload) => {
-    recordWorkflowTrace("transcription.partial", "Partial transcript received", {
-      ...traceTranscriptDetails({
-        text: payload.text,
-        confidence: payload.confidence,
-        isFinal: false,
-        wordCount: payload.words.length,
-      }),
-    })
+    recordWorkflowTrace(
+      "transcription.partial",
+      "Partial transcript received",
+      {
+        ...traceTranscriptDetails({
+          text: payload.text,
+          confidence: payload.confidence,
+          isFinal: false,
+          wordCount: payload.words.length,
+        }),
+      }
+    )
     useTranscriptStore.getState().setPartial(payload.text)
   })
 

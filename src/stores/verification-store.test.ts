@@ -9,13 +9,15 @@ const mockClearVerification = vi.fn()
 const mockHeartbeatDeviceRegistration = vi.fn()
 
 vi.mock("@/lib/verification/verification-provider", () => ({
-  loadCachedVerification: (...args: unknown[]) => mockLoadCachedVerification(...args),
+  loadCachedVerification: (...args: unknown[]) =>
+    mockLoadCachedVerification(...args),
   signIn: (...args: unknown[]) => mockSignIn(...args),
   signUp: (...args: unknown[]) => mockSignUp(...args),
   signOut: (...args: unknown[]) => mockSignOut(...args),
   refreshVerification: (...args: unknown[]) => mockRefreshVerification(...args),
   clearVerification: (...args: unknown[]) => mockClearVerification(...args),
-  heartbeatDeviceRegistration: (...args: unknown[]) => mockHeartbeatDeviceRegistration(...args),
+  heartbeatDeviceRegistration: (...args: unknown[]) =>
+    mockHeartbeatDeviceRegistration(...args),
 }))
 
 describe("verification-store", () => {
@@ -44,13 +46,13 @@ describe("verification-store", () => {
       accessTokenExpiresAt: null,
       lastVerifiedAt: null,
       offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
       error: null,
       errorCode: null,
     })
 
-    const { hydrateVerification, useVerificationStore, isAppVerified } = await import(
-      "./verification-store"
-    )
+    const { hydrateVerification, useVerificationStore, isAppVerified } =
+      await import("./verification-store")
 
     await hydrateVerification()
 
@@ -66,11 +68,13 @@ describe("verification-store", () => {
       accessTokenExpiresAt: Date.now() + 60_000,
       lastVerifiedAt: Date.now(),
       offlineGraceExpiresAt: 0,
+      accessExpiresAt: Date.now() + 60_000,
       error: null,
       errorCode: null,
     })
 
-    const { useVerificationStore, isAppVerified } = await import("./verification-store")
+    const { useVerificationStore, isAppVerified } =
+      await import("./verification-store")
 
     await useVerificationStore.getState().signIn("user@example.com", "secret")
 
@@ -88,6 +92,7 @@ describe("verification-store", () => {
       accessTokenExpiresAt: null,
       lastVerifiedAt: null,
       offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
       error: null,
       errorCode: null,
     })
@@ -117,6 +122,7 @@ describe("verification-store", () => {
       accessTokenExpiresAt: Date.now() + 60_000,
       lastVerifiedAt: Date.now(),
       offlineGraceExpiresAt: 0,
+      accessExpiresAt: Date.now() + 60_000,
       error: null,
       errorCode: null,
     })
@@ -127,13 +133,13 @@ describe("verification-store", () => {
       accessTokenExpiresAt: null,
       lastVerifiedAt: null,
       offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
       error: "This account has been suspended. Contact support for assistance.",
       errorCode: "suspended",
     })
 
-    const { useVerificationStore, isAppVerified } = await import(
-      "./verification-store"
-    )
+    const { useVerificationStore, isAppVerified } =
+      await import("./verification-store")
 
     await useVerificationStore.getState().signIn("user@example.com", "secret")
     mockHeartbeatDeviceRegistration.mockClear()
@@ -156,16 +162,20 @@ describe("verification-store", () => {
       accessTokenExpiresAt: null,
       lastVerifiedAt: null,
       offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
       error: "Invalid login credentials",
       errorCode: "invalid_credentials",
     })
 
-    const { useVerificationStore, isAppVerified } = await import("./verification-store")
+    const { useVerificationStore, isAppVerified } =
+      await import("./verification-store")
 
     await useVerificationStore.getState().signIn("user@example.com", "wrong")
 
     expect(useVerificationStore.getState().status).toBe("error")
-    expect(useVerificationStore.getState().errorCode).toBe("invalid_credentials")
+    expect(useVerificationStore.getState().errorCode).toBe(
+      "invalid_credentials"
+    )
     expect(isAppVerified()).toBe(false)
   })
 
@@ -177,11 +187,13 @@ describe("verification-store", () => {
       accessTokenExpiresAt: null,
       lastVerifiedAt: null,
       offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
       error: null,
       errorCode: null,
     })
 
-    const { useVerificationStore, isAppVerified } = await import("./verification-store")
+    const { useVerificationStore, isAppVerified } =
+      await import("./verification-store")
 
     useVerificationStore.setState({
       status: "verified",
@@ -205,11 +217,13 @@ describe("verification-store", () => {
       accessTokenExpiresAt: Date.now() - 1000,
       lastVerifiedAt: Date.now() - 5000,
       offlineGraceExpiresAt: Date.now() + 1000,
+      accessExpiresAt: Date.now() + 1000,
       error: null,
       errorCode: null,
     })
 
-    const { hydrateVerification, isAppVerified } = await import("./verification-store")
+    const { hydrateVerification, isAppVerified } =
+      await import("./verification-store")
 
     await hydrateVerification()
 

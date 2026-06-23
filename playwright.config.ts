@@ -1,8 +1,13 @@
 import { defineConfig, devices } from "@playwright/test"
+import { existsSync } from "node:fs"
 
 const previewBaseUrl = "http://127.0.0.1:3000"
 const broadcastEntryUrl = `${previewBaseUrl}/broadcast-output.html?output=main&e2e=1`
 const usesExternalServer = process.env.SABBATHCUE_E2E_EXTERNAL_SERVER === "1"
+const localChromePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+const browserChannel =
+  process.env.SABBATHCUE_E2E_BROWSER_CHANNEL ??
+  (process.platform === "win32" && existsSync(localChromePath) ? "chrome" : undefined)
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -26,7 +31,10 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        ...(browserChannel ? { channel: browserChannel } : {}),
+      },
     },
   ],
 })

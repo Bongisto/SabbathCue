@@ -1,12 +1,19 @@
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
+import { generateFumadocsSource } from "./generate-fumadocs-source.mjs";
 
 const PORT = Number(process.env.PORT ?? 3029);
 const URL = `http://localhost:${PORT}`;
 
+await generateFumadocsSource();
+
 const child = spawn("next", ["dev", "-p", String(PORT)], {
   stdio: "inherit",
   shell: true,
+  env: {
+    ...process.env,
+    _FUMADOCS_MDX: "1",
+  },
 });
 
 child.on("exit", (code) => process.exit(code ?? 0));

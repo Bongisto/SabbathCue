@@ -49,7 +49,10 @@ describe("verification-provider", () => {
     mockClearSessionMetadata.mockReset()
 
     mockGetOrCreateDeviceId.mockResolvedValue("device-1")
-    mockRegisterDevice.mockResolvedValue({ ok: true })
+    mockRegisterDevice.mockResolvedValue({
+      ok: true,
+      accessExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    })
     mockGetSessionMetadata.mockResolvedValue(null)
   })
 
@@ -113,6 +116,7 @@ describe("verification-provider", () => {
       accessTokenExpiresAt: Date.now() - 1000,
       lastVerifiedAt: Date.now() - 60_000,
       offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() + 60_000,
     })
 
     const { loadCachedVerification } =
@@ -128,7 +132,7 @@ describe("verification-provider", () => {
     )
   })
 
-  it("loadCachedVerification derives the grace window from lastVerifiedAt for legacy metadata", async () => {
+  it("loadCachedVerification derives the grace window from lastVerifiedAt when access is active", async () => {
     mockGetRefreshToken.mockResolvedValue("stored-token")
     mockRestoreSession.mockResolvedValue({
       ok: false,
@@ -141,6 +145,7 @@ describe("verification-provider", () => {
       accessTokenExpiresAt: Date.now() - 1000,
       lastVerifiedAt: Date.now() - 24 * 60 * 60 * 1000,
       offlineGraceExpiresAt: 0,
+      accessExpiresAt: Date.now() + 60_000,
     })
 
     const { loadCachedVerification } =
@@ -163,6 +168,32 @@ describe("verification-provider", () => {
       accessTokenExpiresAt: Date.now() - 1000,
       lastVerifiedAt: Date.now() - 30 * 24 * 60 * 60 * 1000,
       offlineGraceExpiresAt: Date.now() - 60_000,
+      accessExpiresAt: Date.now() + 60_000,
+    })
+
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
+    const result = await loadCachedVerification()
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: "error", errorCode: "network" })
+    )
+  })
+
+  it("loadCachedVerification denies offline grace once account access has expired", async () => {
+    mockGetRefreshToken.mockResolvedValue("stored-token")
+    mockRestoreSession.mockResolvedValue({
+      ok: false,
+      code: "network",
+      message: "Unable to reach the authentication service.",
+    })
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() - 1000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() - 1000,
     })
 
     const { loadCachedVerification } =
@@ -193,6 +224,7 @@ describe("verification-provider", () => {
       accessTokenExpiresAt: Date.now() - 1000,
       lastVerifiedAt: Date.now() - 60_000,
       offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() + 60_000,
     })
 
     const { loadCachedVerification } =
@@ -228,6 +260,33 @@ describe("verification-provider", () => {
     expect(mockSetSessionMetadata).not.toHaveBeenCalled()
   })
 
+  it("loadCachedVerification returns error(trial_expired) when access has ended", async () => {
+    mockGetRefreshToken.mockResolvedValue("stored-token")
+    mockRestoreSession.mockResolvedValue({
+      ok: true,
+      userId: "user-1",
+      refreshToken: "rotated-token",
+      accessTokenExpiresAt: 1_700_000_000_000,
+    })
+    mockRegisterDevice.mockResolvedValue({
+      ok: false,
+      code: "trial_expired",
+    })
+
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
+    const result = await loadCachedVerification()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "error",
+        errorCode: "trial_expired",
+        error: "Your access has ended. Contact the developer to renew.",
+      })
+    )
+    expect(mockSetSessionMetadata).not.toHaveBeenCalled()
+  })
+
   it("loadCachedVerification returns verified and persists metadata on success", async () => {
     mockGetRefreshToken.mockResolvedValue("stored-token")
     mockRestoreSession.mockResolvedValue({
@@ -254,6 +313,7 @@ describe("verification-provider", () => {
       expect.objectContaining({
         verifiedUserId: "user-1",
         verifiedDeviceId: "device-1",
+        accessExpiresAt: expect.any(Number),
       })
     )
   })
@@ -332,6 +392,48 @@ describe("verification-provider", () => {
       expect.objectContaining({ status: "error", errorCode: "suspended" })
     )
     expect(mockClearSessionMetadata).toHaveBeenCalled()
+  })
+
+  it("heartbeat returns a trial_expired snapshot and clears metadata when access ends", async () => {
+    mockRegisterDevice.mockResolvedValue({ ok: false, code: "trial_expired" })
+
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
+    const result = await heartbeatDeviceRegistration()
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: "error", errorCode: "trial_expired" })
+    )
+    expect(mockClearSessionMetadata).toHaveBeenCalled()
+  })
+
+  it("heartbeat refreshes cached access expiry on success", async () => {
+    const nextAccessExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000
+    mockRegisterDevice.mockResolvedValue({
+      ok: true,
+      accessExpiresAt: nextAccessExpiresAt,
+    })
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() + 60_000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() + 60_000,
+      verifiedEmail: "user@example.com",
+    })
+
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
+    const result = await heartbeatDeviceRegistration()
+
+    expect(result).toBeNull()
+    expect(mockSetSessionMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessExpiresAt: nextAccessExpiresAt,
+        verifiedEmail: "user@example.com",
+      })
+    )
   })
 
   it("heartbeat returns null on transient registration failure", async () => {

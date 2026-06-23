@@ -21,6 +21,8 @@ import type {
 } from "@/types/verification"
 
 const APP_VERSION = packageJson.version
+const ACCESS_ENDED_MESSAGE =
+  "Your access has ended. Contact the developer to renew."
 
 /** How long a previously verified session may keep working without connectivity. */
 export const OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000
@@ -60,6 +62,7 @@ function emptySnapshot(
     accessTokenExpiresAt: null,
     lastVerifiedAt: null,
     offlineGraceExpiresAt: null,
+    accessExpiresAt: null,
     error,
     errorCode,
     verifiedEmail: null,
@@ -70,7 +73,8 @@ function sessionFromAuth(
   userId: string,
   deviceId: string,
   accessTokenExpiresAt: number,
-  email: string | null
+  email: string | null,
+  accessExpiresAt: number | null
 ): VerificationSession {
   const timestamp = now()
   return {
@@ -79,6 +83,7 @@ function sessionFromAuth(
     accessTokenExpiresAt,
     lastVerifiedAt: timestamp,
     offlineGraceExpiresAt: timestamp + OFFLINE_GRACE_MS,
+    accessExpiresAt,
     verifiedEmail: email,
   }
 }
@@ -93,6 +98,7 @@ function snapshotFromSession(
     accessTokenExpiresAt: session.accessTokenExpiresAt,
     lastVerifiedAt: session.lastVerifiedAt,
     offlineGraceExpiresAt: session.offlineGraceExpiresAt,
+    accessExpiresAt: session.accessExpiresAt,
     error: null,
     errorCode: null,
     verifiedEmail: session.verifiedEmail ?? null,
@@ -128,6 +134,10 @@ async function completeVerification(
       )
     }
 
+    if (registration.code === "trial_expired") {
+      return emptySnapshot("error", ACCESS_ENDED_MESSAGE, "trial_expired")
+    }
+
     const message = registration.message ?? "Device registration failed."
     return emptySnapshot(
       "error",
@@ -136,7 +146,13 @@ async function completeVerification(
     )
   }
 
-  const session = sessionFromAuth(userId, deviceId, accessTokenExpiresAt, email)
+  const session = sessionFromAuth(
+    userId,
+    deviceId,
+    accessTokenExpiresAt,
+    email,
+    registration.accessExpiresAt
+  )
   await setSessionMetadata(session)
   return snapshotFromSession(session)
 }
@@ -156,6 +172,9 @@ async function offlineGraceSnapshot(): Promise<VerificationStateSnapshot | null>
       ? session.offlineGraceExpiresAt
       : session.lastVerifiedAt + OFFLINE_GRACE_MS
   if (now() > graceExpiresAt) return null
+  if (session.accessExpiresAt === null || now() > session.accessExpiresAt) {
+    return null
+  }
 
   return snapshotFromSession(session)
 }
@@ -245,7 +264,7 @@ export async function clearVerification(): Promise<VerificationStateSnapshot> {
 
 /**
  * Periodic re-registration while the app is running. Returns a blocking
- * snapshot when the account was suspended mid-session; null means no state
+ * snapshot when access was revoked mid-session; null means no state
  * change (transient network failures never kick an active session).
  */
 export async function heartbeatDeviceRegistration(): Promise<VerificationStateSnapshot | null> {
@@ -265,6 +284,24 @@ export async function heartbeatDeviceRegistration(): Promise<VerificationStateSn
       "This account has been suspended. Contact support for assistance.",
       "suspended"
     )
+  }
+
+  if (!registration.ok && registration.code === "trial_expired") {
+    await clearSessionMetadata()
+    return emptySnapshot("error", ACCESS_ENDED_MESSAGE, "trial_expired")
+  }
+
+  if (registration.ok) {
+    const session = await getSessionMetadata()
+    if (session) {
+      const timestamp = now()
+      await setSessionMetadata({
+        ...session,
+        accessExpiresAt: registration.accessExpiresAt,
+        lastVerifiedAt: timestamp,
+        offlineGraceExpiresAt: timestamp + OFFLINE_GRACE_MS,
+      })
+    }
   }
 
   return null

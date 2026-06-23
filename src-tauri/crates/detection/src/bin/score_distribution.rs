@@ -28,21 +28,63 @@ const OLD_SCORE_FLOOR: f64 = 0.55;
 const AGREEMENT_BONUS: f64 = 0.02;
 
 const PROBES: &[(&str, &str)] = &[
-    ("quote", "For God so loved the world that he gave his only begotten son"),
+    (
+        "quote",
+        "For God so loved the world that he gave his only begotten son",
+    ),
     ("quote", "The Lord is my shepherd I shall not want"),
-    ("quote", "In the beginning God created the heaven and the earth"),
-    ("quote", "I can do all things through Christ which strengtheneth me"),
-    ("quote", "Trust in the Lord with all thine heart and lean not unto thine own understanding"),
-    ("para", "God loved us so much that he sent his only son to save everyone who believes"),
-    ("para", "the Lord looks after me like a shepherd so I never go without"),
-    ("para", "we are rescued by grace when we believe, not by anything we earn"),
-    ("para", "let your light shine in front of people so they notice your good works"),
-    ("para", "give all your worries to God because he genuinely cares about you"),
-    ("prose", "good morning church it is so wonderful to be together with you today"),
-    ("prose", "as we continue our sermon series this morning let us settle our hearts"),
-    ("prose", "the offering plates will be passed down each row in just a moment"),
-    ("prose", "a big thank you to the worship team for leading us so beautifully"),
-    ("prose", "please remember the fellowship lunch in the hall after the service"),
+    (
+        "quote",
+        "In the beginning God created the heaven and the earth",
+    ),
+    (
+        "quote",
+        "I can do all things through Christ which strengtheneth me",
+    ),
+    (
+        "quote",
+        "Trust in the Lord with all thine heart and lean not unto thine own understanding",
+    ),
+    (
+        "para",
+        "God loved us so much that he sent his only son to save everyone who believes",
+    ),
+    (
+        "para",
+        "the Lord looks after me like a shepherd so I never go without",
+    ),
+    (
+        "para",
+        "we are rescued by grace when we believe, not by anything we earn",
+    ),
+    (
+        "para",
+        "let your light shine in front of people so they notice your good works",
+    ),
+    (
+        "para",
+        "give all your worries to God because he genuinely cares about you",
+    ),
+    (
+        "prose",
+        "good morning church it is so wonderful to be together with you today",
+    ),
+    (
+        "prose",
+        "as we continue our sermon series this morning let us settle our hearts",
+    ),
+    (
+        "prose",
+        "the offering plates will be passed down each row in just a moment",
+    ),
+    (
+        "prose",
+        "a big thank you to the worship team for leading us so beautifully",
+    ),
+    (
+        "prose",
+        "please remember the fellowship lunch in the hall after the service",
+    ),
 ];
 
 fn main() {
@@ -53,10 +95,10 @@ fn main() {
         .unwrap_or_else(|| "models/minilm-l6-v2-int8/onnx/model_quantized.onnx".into());
     let tokenizer =
         arg(&args, "--tokenizer").unwrap_or_else(|| "models/minilm-l6-v2/tokenizer.json".into());
-    let embeddings =
-        arg(&args, "--embeddings").unwrap_or_else(|| "embeddings/kjv-nkjv-nlt-minilm-l6-v2.bin".into());
-    let ids =
-        arg(&args, "--ids").unwrap_or_else(|| "embeddings/kjv-nkjv-nlt-minilm-l6-v2-ids.bin".into());
+    let embeddings = arg(&args, "--embeddings")
+        .unwrap_or_else(|| "embeddings/kjv-nkjv-nlt-minilm-l6-v2.bin".into());
+    let ids = arg(&args, "--ids")
+        .unwrap_or_else(|| "embeddings/kjv-nkjv-nlt-minilm-l6-v2-ids.bin".into());
     let verses = arg(&args, "--verses").unwrap_or_else(|| "data/verses-for-embedding.json".into());
 
     let embedder = OnnxEmbedder::load(&PathBuf::from(&model), &PathBuf::from(&tokenizer))
@@ -66,8 +108,10 @@ fn main() {
         .expect("load embeddings index");
     let refs = load_refs(&verses);
 
-    let mut probes: Vec<(String, String)> =
-        PROBES.iter().map(|(c, t)| ((*c).into(), (*t).into())).collect();
+    let mut probes: Vec<(String, String)> = PROBES
+        .iter()
+        .map(|(c, t)| ((*c).into(), (*t).into()))
+        .collect();
     if let Some(path) = arg(&args, "--input") {
         let text = std::fs::read_to_string(&path).expect("read --input file");
         for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {

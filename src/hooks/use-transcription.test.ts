@@ -285,6 +285,29 @@ describe("use-transcription", () => {
     })
   })
 
+  describe("transcriptionActions.setLiveGain", () => {
+    it("invokes set_input_gain while transcription is active", async () => {
+      mockInvoke.mockResolvedValue(undefined)
+      const { useTranscriptStore, transcriptionActions } = await loadModules()
+
+      useTranscriptStore.setState({ isTranscribing: true })
+
+      await transcriptionActions.setLiveGain(1.25)
+
+      expect(mockInvoke).toHaveBeenCalledWith("set_input_gain", { gain: 1.25 })
+    })
+
+    it("does not invoke set_input_gain while transcription is inactive", async () => {
+      const { useTranscriptStore, transcriptionActions } = await loadModules()
+
+      useTranscriptStore.setState({ isTranscribing: false })
+
+      await transcriptionActions.setLiveGain(1.25)
+
+      expect(mockInvoke).not.toHaveBeenCalled()
+    })
+  })
+
   describe("transcriptionActions.dumpMemory", () => {
     it("clears visible transcript without restarting when transcription is inactive", async () => {
       const { useTranscriptStore, transcriptionActions } = await loadModules()

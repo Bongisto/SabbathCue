@@ -19,13 +19,22 @@ describe("registerDevice", () => {
     mockRpc.mockReset()
   })
 
-  it("returns ok when the RPC reports status ok", async () => {
-    mockRpc.mockResolvedValue({ data: { status: "ok" }, error: null })
+  it("returns ok with access expiry when the RPC reports status ok", async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        status: "ok",
+        access_expires_at: "2026-07-01T00:00:00.000Z",
+      },
+      error: null,
+    })
 
     const { registerDevice } = await import("@/lib/supabase/devices")
     const result = await registerDevice("device-1", "windows", "0.1.3")
 
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({
+      ok: true,
+      accessExpiresAt: Date.parse("2026-07-01T00:00:00.000Z"),
+    })
     expect(mockRpc).toHaveBeenCalledWith("register_device", {
       p_device_id: "device-1",
       p_os: "windows",
@@ -35,7 +44,10 @@ describe("registerDevice", () => {
   })
 
   it("returns device_limit_reached when the RPC reports the limit", async () => {
-    mockRpc.mockResolvedValue({ data: { status: "device_limit_reached" }, error: null })
+    mockRpc.mockResolvedValue({
+      data: { status: "device_limit_reached" },
+      error: null,
+    })
 
     const { registerDevice } = await import("@/lib/supabase/devices")
     const result = await registerDevice("device-3", "windows", "0.1.3")
@@ -50,6 +62,18 @@ describe("registerDevice", () => {
     const result = await registerDevice("device-1", "windows", "0.1.3")
 
     expect(result).toEqual({ ok: false, code: "suspended" })
+  })
+
+  it("returns trial_expired when the RPC reports ended access", async () => {
+    mockRpc.mockResolvedValue({
+      data: { status: "trial_expired" },
+      error: null,
+    })
+
+    const { registerDevice } = await import("@/lib/supabase/devices")
+    const result = await registerDevice("device-1", "windows", "0.1.3")
+
+    expect(result).toEqual({ ok: false, code: "trial_expired" })
   })
 
   it("returns error when the RPC fails", async () => {

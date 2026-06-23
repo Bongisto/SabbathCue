@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
+import { openSupportEmail } from "@/lib/support-contact"
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { useTutorialStore } from "@/stores/tutorial-store"
-import { GraduationCapIcon, KeyIcon, RefreshCwIcon } from "lucide-react"
+import {
+  GraduationCapIcon,
+  KeyIcon,
+  MailIcon,
+  RefreshCwIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 import {
   DASHBOARD_KEYBOARD_SHORTCUTS,
@@ -75,6 +81,28 @@ export function HelpSection() {
           </Button>
         </div>
 
+        <div className="glass-panel flex items-center justify-between gap-3 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <MailIcon className="size-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Contact developer</p>
+              <p className="text-xs text-muted-foreground">
+                Renew access or send a support request
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void openSupportEmail()}
+          >
+            <MailIcon className="mr-1.5 size-3.5" />
+            Contact
+          </Button>
+        </div>
+
         <div className="glass-panel flex items-center justify-between p-4">
           <div className="flex items-start gap-3">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--shell-bg-sunken)]">
@@ -113,7 +141,7 @@ export function HelpSection() {
                                     </span>
                                   ) : null}
                                 </span>
-                              ),
+                              )
                             )}
                           </span>
                           <span className="leading-relaxed text-muted-foreground">

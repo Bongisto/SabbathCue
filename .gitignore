@@ -32,6 +32,7 @@ build
 src-tauri/target/
 src-tauri/src-tauri/
 tmp/
+.tmp/
 supabase/.temp/
 releases/**/SabbathCue*.exe
 releases/**/*.msi

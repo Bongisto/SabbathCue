@@ -416,9 +416,14 @@ test.describe("operator flow harness", () => {
     expect(workflowStages.indexOf("transcription.final")).toBeLessThan(
       workflowStages.indexOf("detection.event"),
     )
-    expect(workflowStages.indexOf("reading.accepted")).toBeLessThan(
-      workflowStages.indexOf("live.auto_commit"),
+    const readingAcceptedIndex = workflowStages.indexOf("reading.accepted")
+    expect(readingAcceptedIndex).toBeGreaterThanOrEqual(0)
+
+    const readingAutoCommitIndex = workflowStages.indexOf(
+      "live.auto_commit",
+      readingAcceptedIndex + 1,
     )
+    expect(readingAutoCommitIndex).toBeGreaterThan(readingAcceptedIndex)
   })
 
   test("theme switch updates active theme id and renders on broadcast output", async ({

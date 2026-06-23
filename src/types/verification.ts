@@ -12,6 +12,7 @@ export type VerificationErrorCode =
   | "email_not_confirmed"
   | "device_limit_reached"
   | "suspended"
+  | "trial_expired"
   | "network"
   | "unknown"
 
@@ -23,6 +24,8 @@ export interface VerificationStateSnapshot {
   lastVerifiedAt: number | null
   /** When offline access expires if the network is unreachable (0 in legacy metadata). */
   offlineGraceExpiresAt: number | null
+  /** Server-enforced account access expiry. Null means no offline access. */
+  accessExpiresAt: number | null
   error: string | null
   errorCode: VerificationErrorCode | null
   /** Signed-in account email for display; absent in legacy stored metadata. */
@@ -36,6 +39,8 @@ export interface VerificationSession {
   lastVerifiedAt: number
   /** When offline access expires if the network is unreachable (0 in legacy metadata). */
   offlineGraceExpiresAt: number
+  /** Server-enforced account access expiry. Null means no offline access. */
+  accessExpiresAt: number | null
   /** Signed-in account email for display; absent in legacy stored metadata. */
   verifiedEmail?: string | null
 }

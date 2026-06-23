@@ -7,7 +7,7 @@ use cpal::{SampleFormat, Stream, StreamConfig};
 use crossbeam_channel::Sender;
 
 use crate::error::AudioError;
-use crate::types::{AudioConfig, AudioFrame};
+use crate::types::{read_gain, AudioConfig, AudioFrame, GainHandle};
 
 /// Holds a live audio capture stream.
 /// Dropping this struct (or calling `stop`) will end the capture.
@@ -31,8 +31,8 @@ impl AudioCapture {
 /// Start capturing audio from the given device (or default) and send frames
 /// through the provided crossbeam sender.
 ///
-/// Audio is converted to mono 16-bit PCM at 16 kHz, with the specified gain
-/// applied.
+/// Audio is converted to mono 16-bit PCM at 16 kHz, with the shared gain
+/// handle read live by the audio callback.
 ///
 /// `device_lost` is an out-parameter the caller passes in: it is set to `true`
 /// when cpal's stream-error callback fires (typically because the OS device
@@ -56,6 +56,7 @@ pub fn start(
     config: AudioConfig,
     sender: Sender<AudioFrame>,
     device_lost: Arc<AtomicBool>,
+    gain_handle: GainHandle,
 ) -> Result<AudioCapture, AudioError> {
     let host = cpal::default_host();
 
@@ -107,8 +108,6 @@ pub fn start(
     let sample_format = supported_config.sample_format();
 
     let target_sample_rate: u32 = 16_000;
-    let gain = config.gain;
-
     let stream_config: StreamConfig = supported_config.into();
 
     // Build a fresh err callback per match arm. cpal takes the callback by
@@ -129,7 +128,7 @@ pub fn start(
                 source_channels,
                 source_sample_rate,
                 target_sample_rate,
-                gain,
+                gain_handle.clone(),
             );
             device.build_input_stream(
                 &stream_config,
@@ -146,7 +145,7 @@ pub fn start(
                 source_channels,
                 source_sample_rate,
                 target_sample_rate,
-                gain,
+                gain_handle.clone(),
             );
             device.build_input_stream(
                 &stream_config,
@@ -175,7 +174,7 @@ pub fn start(
                 source_channels,
                 source_sample_rate,
                 target_sample_rate,
-                gain,
+                gain_handle.clone(),
             );
             device.build_input_stream(
                 &stream_config,
@@ -214,13 +213,13 @@ struct AudioProcessor {
     source_channels: usize,
     source_rate: u32,
     target_rate: u32,
-    gain: f32,
+    gain: GainHandle,
     resampler: LinearResampler,
     pending_samples: Vec<i16>,
 }
 
 impl AudioProcessor {
-    fn new(source_channels: usize, source_rate: u32, target_rate: u32, gain: f32) -> Self {
+    fn new(source_channels: usize, source_rate: u32, target_rate: u32, gain: GainHandle) -> Self {
         Self {
             source_channels,
             source_rate,
@@ -260,6 +259,7 @@ impl AudioProcessor {
         };
         let frames = input_samples.chunks_exact(self.source_channels);
         let remainder = frames.remainder().to_vec();
+        let gain = read_gain(&self.gain);
 
         let gained: Vec<i16> = frames
             .map(|frame| {
@@ -270,8 +270,7 @@ impl AudioProcessor {
                     reason = "clamped audio sample intentionally narrows to i16"
                 )]
                 {
-                    ((mono as f32) * self.gain).clamp(f32::from(i16::MIN), f32::from(i16::MAX))
-                        as i16
+                    ((mono as f32) * gain).clamp(f32::from(i16::MIN), f32::from(i16::MAX)) as i16
                 }
             })
             .collect();
@@ -397,6 +396,7 @@ impl LinearResampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{new_gain_handle, set_gain};
 
     #[test]
     fn streaming_resampler_matches_single_pass_across_callback_boundaries() {
@@ -419,7 +419,7 @@ mod tests {
     #[test]
     fn downmix_carries_incomplete_frame_between_callbacks() {
         let (sender, receiver) = crossbeam_channel::bounded(4);
-        let mut processor = AudioProcessor::new(2, 16_000, 16_000, 1.0);
+        let mut processor = AudioProcessor::new(2, 16_000, 16_000, new_gain_handle(1.0));
 
         processor.process_i16_and_send(&[10], &sender);
         assert!(receiver.try_recv().is_err());
@@ -428,5 +428,19 @@ mod tests {
         let frame = receiver.recv().expect("frame should be sent");
 
         assert_eq!(frame.samples, vec![20, 30]);
+    }
+
+    #[test]
+    fn processor_reads_live_gain_updates() {
+        let (sender, receiver) = crossbeam_channel::bounded(4);
+        let gain = new_gain_handle(1.0);
+        let mut processor = AudioProcessor::new(1, 16_000, 16_000, gain.clone());
+
+        processor.process_i16_and_send(&[100], &sender);
+        assert_eq!(receiver.recv().expect("first frame").samples, vec![100]);
+
+        set_gain(&gain, 2.0);
+        processor.process_i16_and_send(&[100], &sender);
+        assert_eq!(receiver.recv().expect("second frame").samples, vec![200]);
     }
 }

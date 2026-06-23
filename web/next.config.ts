@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
-import { fileURLToPath } from "node:url";
 import { createMDX } from "fumadocs-mdx/next";
+import { fileURLToPath } from "node:url";
+
+const webRoot = fileURLToPath(new URL(".", import.meta.url));
+
+// scripts/generate-fumadocs-source.mjs owns .source generation. Skipping the
+// package init avoids Fumadocs' esbuild config compile walking above this repo
+// on Windows shells with restricted parent-directory access.
+process.env._FUMADOCS_MDX = "1";
 
 const nextConfig: NextConfig = {
   output: "export",
@@ -14,13 +21,15 @@ const nextConfig: NextConfig = {
   // so disable the optimizer and let the browser fetch assets as-is.
   images: { unoptimized: true },
   turbopack: {
-    root: fileURLToPath(new URL(".", import.meta.url)),
+    root: webRoot,
   },
   experimental: {
     optimizePackageImports: ["@tabler/icons-react", "lucide-react"],
   },
 };
 
-const withMDX = createMDX();
+const withMDX = createMDX({
+  configPath: "source.config.ts",
+});
 
 export default withMDX(nextConfig);

@@ -18,6 +18,12 @@ import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 import { cn } from "@/lib/utils"
 import { requestPasswordReset } from "@/lib/supabase/auth"
 import {
+  buildRenewalEmailOptions,
+  openSupportEmail,
+  RENEWAL_PLANS,
+  type RenewalPlanId,
+} from "@/lib/support-contact"
+import {
   accentThemeClassName,
   useAccentThemeStore,
 } from "@/stores/accent-theme-store"
@@ -35,7 +41,7 @@ const MIN_PASSWORD_LENGTH = 6
 
 const AUTH_MODE_OPTIONS = [
   { value: "sign-in", label: "Sign in" },
-  { value: "create-account", label: "Create account" },
+  { value: "create-account", label: "Start trial" },
 ] satisfies Array<{ value: AuthMode; label: string }>
 
 function formatErrorMessage(
@@ -57,6 +63,8 @@ function formatErrorMessage(
         error ??
         "This account has been suspended. Contact support for assistance."
       )
+    case "trial_expired":
+      return error ?? "Your access has ended. Contact the developer to renew."
     case "network":
       return "Unable to connect. Check your network and try again."
     default:
@@ -85,7 +93,7 @@ function validatePassword(password: string): string | null {
 function modeTitle(mode: AuthMode, status: VerificationStatus): string {
   if (status === "expired") return "Session expired"
   if (status === "checking") return "Checking your account"
-  return mode === "create-account" ? "Create your account" : "Sign in"
+  return mode === "create-account" ? "Start your free trial" : "Sign in"
 }
 
 function modeDescription(mode: AuthMode, status: VerificationStatus): string {
@@ -96,7 +104,7 @@ function modeDescription(mode: AuthMode, status: VerificationStatus): string {
     return "This should only take a moment."
   }
   if (mode === "create-account") {
-    return "Use the email address you want connected to this installation."
+    return "Create an account to start 14 days of SabbathCue access."
   }
   return "Continue with your SabbathCue account."
 }
@@ -293,14 +301,11 @@ function authFeedback({
   }
 }
 
-function submitLabelFor(
-  mode: AuthMode,
-  pendingAction: PendingAction
-): string {
+function submitLabelFor(mode: AuthMode, pendingAction: PendingAction): string {
   if (mode === "create-account") {
     return pendingAction === "create-account"
-      ? "Creating account"
-      : "Create account"
+      ? "Starting trial"
+      : "Start 14-day trial"
   }
   return pendingAction === "sign-in" ? "Signing in" : "Sign in"
 }
@@ -419,6 +424,82 @@ function AuthFooterActions({
           Clear session
         </Button>
       ) : null}
+    </div>
+  )
+}
+
+function TrialExpiredPanel({
+  busy,
+  message,
+  onSelectPlan,
+  onRetry,
+  onSignOut,
+}: {
+  busy: boolean
+  message: string
+  onSelectPlan: (planId: RenewalPlanId) => void
+  onRetry: () => void
+  onSignOut: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-5 text-left">
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/12 text-amber-700 dark:text-amber-300">
+          <ShieldAlertIcon className="size-5" />
+        </div>
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-foreground">
+            Access ended
+          </h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {message}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        {RENEWAL_PLANS.map((plan) => (
+          <Button
+            key={plan.id}
+            className="h-auto w-full justify-between gap-3 px-3 py-2 text-left"
+            disabled={busy}
+            type="button"
+            variant="outline"
+            onClick={() => onSelectPlan(plan.id)}
+          >
+            <span className="flex min-w-0 flex-col">
+              <span className="text-sm font-semibold">{plan.name}</span>
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {plan.price} {plan.term}
+              </span>
+            </span>
+            <MailIcon className="size-4" />
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[var(--border-dim)] pt-4">
+        <Button
+          disabled={busy}
+          size="sm"
+          type="button"
+          variant="ghost"
+          onClick={onRetry}
+        >
+          <LoaderCircleIcon className="size-4" />
+          Retry
+        </Button>
+        <Button
+          disabled={busy}
+          size="sm"
+          type="button"
+          variant="ghost"
+          onClick={onSignOut}
+        >
+          <ArrowLeftIcon className="size-4" />
+          Sign out
+        </Button>
+      </div>
     </div>
   )
 }
@@ -628,6 +709,7 @@ export function VerificationScreen() {
   const status = useVerificationStore((s) => s.status)
   const error = useVerificationStore((s) => s.error)
   const errorCode = useVerificationStore((s) => s.errorCode)
+  const verifiedEmail = useVerificationStore((s) => s.verifiedEmail)
   const signIn = useVerificationStore((s) => s.signIn)
   const signUp = useVerificationStore((s) => s.signUp)
   const signOut = useVerificationStore((s) => s.signOut)
@@ -651,6 +733,7 @@ export function VerificationScreen() {
     localTone,
     status,
   })
+  const isTrialExpired = status === "error" && errorCode === "trial_expired"
 
   function setModeAndClear(nextMode: AuthMode) {
     setMode(nextMode)
@@ -737,7 +820,24 @@ export function VerificationScreen() {
                   <ShieldCheckIcon className="size-5 text-[var(--brand-accent)]" />
                 </div>
 
-                {showReset ? (
+                {isTrialExpired ? (
+                  <TrialExpiredPanel
+                    busy={isBusy}
+                    message={
+                      feedback.message ??
+                      "Your access has ended. Contact the developer to renew."
+                    }
+                    onSelectPlan={(planId) =>
+                      void openSupportEmail({
+                        ...buildRenewalEmailOptions(planId, {
+                          accountEmail: verifiedEmail,
+                        }),
+                      })
+                    }
+                    onRetry={() => void refresh()}
+                    onSignOut={() => void signOut()}
+                  />
+                ) : showReset ? (
                   <PasswordResetForm
                     busy={pendingAction === "reset-password"}
                     initialEmail={email.trim()}

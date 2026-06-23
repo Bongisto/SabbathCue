@@ -778,10 +778,7 @@ pub(crate) fn run_semantic_detection(
 
     let t0 = std::time::Instant::now();
     if transcript_logging_enabled() {
-        log::info!(
-            "[DET-SEMANTIC] Running on: {:?}",
-            truncate_safe(&query, 80)
-        );
+        log::info!("[DET-SEMANTIC] Running on: {:?}", truncate_safe(&query, 80));
     } else {
         log::info!("[DET-SEMANTIC] Running");
     }

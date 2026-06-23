@@ -923,7 +923,10 @@ mod tests {
         let mut rm = ReadingMode::new();
         let verses = vec![
             (1, "alpha beta gamma delta".to_string()),
-            (2, "one two three four five six seven eight nine ten".to_string()),
+            (
+                2,
+                "one two three four five six seven eight nine ten".to_string(),
+            ),
         ];
         rm.start(1, "Test", 1, 1, verses);
 

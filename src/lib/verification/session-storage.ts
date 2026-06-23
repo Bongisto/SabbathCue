@@ -16,16 +16,37 @@ export function resetSessionStorageForTests(): void {
   storePromise = null
 }
 
-function isSession(value: unknown): value is VerificationSession {
-  if (!value || typeof value !== "object") return false
+function normalizeSession(value: unknown): VerificationSession | null {
+  if (!value || typeof value !== "object") return null
   const candidate = value as Record<string, unknown>
-  return (
-    typeof candidate.verifiedUserId === "string" &&
-    typeof candidate.verifiedDeviceId === "string" &&
-    typeof candidate.accessTokenExpiresAt === "number" &&
-    typeof candidate.lastVerifiedAt === "number" &&
-    typeof candidate.offlineGraceExpiresAt === "number"
-  )
+  if (
+    typeof candidate.verifiedUserId !== "string" ||
+    typeof candidate.verifiedDeviceId !== "string" ||
+    typeof candidate.accessTokenExpiresAt !== "number" ||
+    typeof candidate.lastVerifiedAt !== "number" ||
+    typeof candidate.offlineGraceExpiresAt !== "number"
+  ) {
+    return null
+  }
+
+  const accessExpiresAt =
+    typeof candidate.accessExpiresAt === "number" &&
+    Number.isFinite(candidate.accessExpiresAt)
+      ? candidate.accessExpiresAt
+      : null
+
+  return {
+    verifiedUserId: candidate.verifiedUserId,
+    verifiedDeviceId: candidate.verifiedDeviceId,
+    accessTokenExpiresAt: candidate.accessTokenExpiresAt,
+    lastVerifiedAt: candidate.lastVerifiedAt,
+    offlineGraceExpiresAt: candidate.offlineGraceExpiresAt,
+    accessExpiresAt,
+    verifiedEmail:
+      typeof candidate.verifiedEmail === "string"
+        ? candidate.verifiedEmail
+        : null,
+  }
 }
 
 export async function getRefreshToken(): Promise<string | null> {
@@ -59,11 +80,12 @@ export async function getSessionMetadata(): Promise<VerificationSession | null> 
 
   const store = await getStore()
   const metadata = await store.get<VerificationSession>(METADATA_KEY)
-  if (!isSession(metadata)) return null
-  return metadata
+  return normalizeSession(metadata)
 }
 
-export async function setSessionMetadata(session: VerificationSession): Promise<void> {
+export async function setSessionMetadata(
+  session: VerificationSession
+): Promise<void> {
   if (!isTauriRuntime()) return
 
   const store = await getStore()

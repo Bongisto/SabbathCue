@@ -6,6 +6,7 @@ export interface AdminAccountRow {
   created_at: string
   suspended: boolean
   suspend_reason: string | null
+  access_expires_at: string | null
   device_count: number
   last_seen_at: string | null
   is_admin: boolean
@@ -83,6 +84,28 @@ export async function adminSetSuspended(
       return {
         ok: false,
         message: failureMessage(error, "Suspension update failed."),
+      }
+    }
+    return { ok: true }
+  } catch {
+    return { ok: false, message: "Unable to reach the account service." }
+  }
+}
+
+export async function adminSetAccess(
+  userId: string,
+  days: number
+): Promise<AccountActionResult> {
+  try {
+    const supabase = getSupabaseClient()
+    const { error } = await supabase.rpc("admin_set_access", {
+      p_user_id: userId,
+      p_days: days,
+    })
+    if (error) {
+      return {
+        ok: false,
+        message: failureMessage(error, "Access update failed."),
       }
     }
     return { ok: true }

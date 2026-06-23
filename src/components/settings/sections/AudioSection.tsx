@@ -7,13 +7,24 @@ import {
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { useAudioDevices } from "@/hooks/use-audio-devices"
+import { transcriptionActions } from "@/hooks/use-transcription"
 import { useSettingsStore } from "@/stores/settings-store"
+import { useTranscriptStore } from "@/stores/transcript-store"
 
 export function AudioSection() {
   const { audioDeviceId, setAudioDeviceId, gain, setGain } = useSettingsStore()
+  const isTranscribing = useTranscriptStore((s) => s.isTranscribing)
   const { devices, loading } = useAudioDevices()
 
   const gainPercent = Math.round((gain / 2.0) * 100)
+
+  function handleGainChange([value]: number[]) {
+    const nextGain = ((value ?? 50) / 100) * 2.0
+    setGain(nextGain)
+    if (isTranscribing) {
+      void transcriptionActions.setLiveGain(nextGain)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,7 +74,7 @@ export function AudioSection() {
           max={100}
           step={1}
           value={[gainPercent]}
-          onValueChange={([v]) => setGain((v / 100) * 2.0)}
+          onValueChange={handleGainChange}
         />
         <p className="text-[0.625rem] text-muted-foreground">
           Amplifies the incoming audio signal before transcription. 50% is unity

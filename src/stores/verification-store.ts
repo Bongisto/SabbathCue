@@ -108,6 +108,7 @@ export const useVerificationStore = create<VerificationStore>(() => ({
   accessTokenExpiresAt: null,
   lastVerifiedAt: null,
   offlineGraceExpiresAt: null,
+  accessExpiresAt: null,
   error: null,
   errorCode: null,
   isHydrated: false,

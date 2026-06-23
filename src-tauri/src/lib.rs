@@ -82,6 +82,7 @@ pub fn run() {
             commands::assets::validate_service_attachment_path,
             commands::audio::get_audio_devices,
             commands::stt::start_transcription,
+            commands::stt::set_input_gain,
             commands::stt::stop_transcription,
             commands::broadcast::list_monitors,
             commands::broadcast::ensure_broadcast_window,

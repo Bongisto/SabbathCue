@@ -114,8 +114,7 @@ impl SemanticDetector {
                                 2 => AGREEMENT_BONUS,
                                 _ => AGREEMENT_BONUS * 2.0,
                             };
-                            let confidence =
-                                (result.best_similarity + agreement_bonus).min(1.0);
+                            let confidence = (result.best_similarity + agreement_bonus).min(1.0);
                             detections.push(Self::make_detection(
                                 result.verse_id,
                                 confidence,

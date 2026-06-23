@@ -264,7 +264,11 @@ export function VideoControlBar({ item }: VideoControlBarProps) {
   }, [canRouteAudio])
 
   useEffect(() => {
-    void refreshAudioOutputs()
+    const timer = window.setTimeout(() => {
+      void refreshAudioOutputs()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [refreshAudioOutputs, item.video?.videoId])
 
   if (sourceMissing) {

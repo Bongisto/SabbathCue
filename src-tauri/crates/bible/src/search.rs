@@ -241,7 +241,10 @@ impl BibleDb {
 
         // Tier 1: Exact phrase match
         let phrase = build_phrase_query(query);
-        log::debug!("[FTS5-BM25] phrase tier: {} terms", query_terms(query).count());
+        log::debug!(
+            "[FTS5-BM25] phrase tier: {} terms",
+            query_terms(query).count()
+        );
         let mut all_results = run_fts_query(&conn, &phrase, fetch_limit)?;
 
         // Tier 2: AND with stop words filtered (~5-20ms)
@@ -260,7 +263,10 @@ impl BibleDb {
         if dedup_count(&all_results) < limit {
             let or_q = build_or_query(query);
             if !or_q.is_empty() {
-                log::debug!("[FTS5-BM25] OR tier: {} terms", or_q.matches(" OR ").count() + 1);
+                log::debug!(
+                    "[FTS5-BM25] OR tier: {} terms",
+                    or_q.matches(" OR ").count() + 1
+                );
                 all_results.extend(run_fts_query(&conn, &or_q, fetch_limit)?);
             }
         }

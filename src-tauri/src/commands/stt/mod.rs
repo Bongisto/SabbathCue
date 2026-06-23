@@ -11,7 +11,7 @@ mod voice;
 use std::collections::VecDeque;
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use futures_util::FutureExt;
@@ -23,7 +23,7 @@ use crate::events::{
     EVENT_AUDIO_SOURCE_RECOVERED, EVENT_TRANSCRIPT_FINAL, EVENT_TRANSCRIPT_PARTIAL,
 };
 use crate::state::AppState;
-use rhema_audio::{AudioConfig, AudioFrame};
+use rhema_audio::{new_gain_handle, set_gain, AudioConfig, AudioFrame, GainHandle};
 use rhema_stt::TranscriptEvent;
 
 use self::detection::{
@@ -43,6 +43,12 @@ use self::voice::{check_stt_voice_command, check_translation_command};
 use crate::commands::transcript_router::{
     TranscriptEventKind, TranscriptRouteInput, TranscriptRouter,
 };
+
+static LIVE_INPUT_GAIN: OnceLock<GainHandle> = OnceLock::new();
+
+fn live_input_gain() -> GainHandle {
+    LIVE_INPUT_GAIN.get_or_init(|| new_gain_handle(1.0)).clone()
+}
 
 fn spawn_stt_task<F>(name: &'static str, future: F) -> tauri::async_runtime::JoinHandle<()>
 where
@@ -145,6 +151,8 @@ pub async fn start_transcription(
 
     // Spawn audio-capture + fan-out thread (cpal `Stream` is !Send).
     let gain_val = gain.unwrap_or(1.0).clamp(0.0, 2.0);
+    let gain_handle = live_input_gain();
+    set_gain(&gain_handle, gain_val);
     let fan_active = stt_active.clone();
     let fan_app = app.clone();
 
@@ -169,42 +177,44 @@ pub async fn start_transcription(
                 let config = AudioConfig {
                     device_id: device_id.clone(),
                     sample_rate: 16_000,
-                    gain: gain_val,
+                    gain: rhema_audio::read_gain(&gain_handle),
                 };
 
                 let (audio_tx, audio_rx) = crossbeam_channel::bounded::<AudioFrame>(128);
                 device_lost.store(false, Ordering::SeqCst);
 
-                let capture =
-                    match rhema_audio::capture::start(config, audio_tx, device_lost.clone()) {
-                        Ok(c) => {
-                            if announced_lost {
-                                log::info!("[AUDIO] Source recovered — capture rebuilt");
-                                let _ = fan_app.emit(EVENT_AUDIO_SOURCE_RECOVERED, ());
-                                announced_lost = false;
-                            }
-                            c
+                let capture = match rhema_audio::capture::start(
+                    config,
+                    audio_tx,
+                    device_lost.clone(),
+                    gain_handle.clone(),
+                ) {
+                    Ok(c) => {
+                        if announced_lost {
+                            log::info!("[AUDIO] Source recovered — capture rebuilt");
+                            let _ = fan_app.emit(EVENT_AUDIO_SOURCE_RECOVERED, ());
+                            announced_lost = false;
                         }
-                        Err(e) => {
-                            if !announced_lost {
-                                log::warn!(
-                                    "[AUDIO] Source unavailable: {e} — waiting for reconnect"
-                                );
-                                let _ = fan_app.emit(EVENT_AUDIO_SOURCE_LOST, ());
-                                announced_lost = true;
-                                // Drop level meter to zero so UI reflects the gap.
-                                let _ = fan_app.emit(
-                                    EVENT_AUDIO_LEVEL,
-                                    AudioLevelPayload {
-                                        rms: 0.0,
-                                        peak: 0.0,
-                                    },
-                                );
-                            }
-                            std::thread::sleep(Duration::from_millis(750));
-                            continue 'outer;
+                        c
+                    }
+                    Err(e) => {
+                        if !announced_lost {
+                            log::warn!("[AUDIO] Source unavailable: {e} — waiting for reconnect");
+                            let _ = fan_app.emit(EVENT_AUDIO_SOURCE_LOST, ());
+                            announced_lost = true;
+                            // Drop level meter to zero so UI reflects the gap.
+                            let _ = fan_app.emit(
+                                EVENT_AUDIO_LEVEL,
+                                AudioLevelPayload {
+                                    rms: 0.0,
+                                    peak: 0.0,
+                                },
+                            );
                         }
-                    };
+                        std::thread::sleep(Duration::from_millis(750));
+                        continue 'outer;
+                    }
+                };
 
                 log::info!("Audio capture started on fanout thread");
 
@@ -680,6 +690,13 @@ pub async fn start_transcription(
     }
 
     Ok(())
+}
+
+/// Update input gain for an active capture without restarting transcription.
+#[tauri::command]
+pub fn set_input_gain(gain: f32) {
+    let handle = live_input_gain();
+    set_gain(&handle, gain);
 }
 
 /// Stop the transcription pipeline (audio capture + STT provider).
