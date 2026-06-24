@@ -1,12 +1,10 @@
-import { useCallback, useState } from "react"
 import { invokeTauri } from "@/lib/tauri-runtime"
+import { useApiKeySettings } from "@/hooks/use-api-key-settings"
 import {
   restartActiveTranscriptionIfNeeded,
   type ProviderChangeHandler,
 } from "@/hooks/use-deepgram-key-settings"
 import { useSettingsStore } from "@/stores/settings-store"
-
-const SAVED_KEY_DISPLAY = "Saved in secure keychain"
 
 export async function saveGladiaApiKey(
   apiKey: string
@@ -37,66 +35,17 @@ export function useGladiaKeySettings(
 ) {
   const { hasGladiaApiKey, setHasGladiaApiKey } = useSettingsStore()
 
-  const [keyValue, setKeyValue] = useState("")
-  const [editingSavedKey, setEditingSavedKey] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [keyError, setKeyError] = useState<string | null>(null)
-
-  const displayedKeyValue =
-    hasGladiaApiKey && !editingSavedKey && !keyValue
-      ? SAVED_KEY_DISPLAY
-      : keyValue
-  const keyActionLabel = hasGladiaApiKey ? "Update" : "Save"
-
-  const handleSaveKey = useCallback(async () => {
-    setKeyError(null)
-    const result = await saveGladiaApiKey(keyValue)
-    setHasGladiaApiKey(result.hasKey)
-    if (result.error) {
-      setKeyError(result.error)
-      return
-    }
-    if (result.hasKey) {
-      setKeyValue("")
-      setEditingSavedKey(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-      await restartActiveTranscriptionIfNeeded()
-    }
-  }, [keyValue, setHasGladiaApiKey])
-
-  const handleKeyAction = useCallback(async () => {
-    if (hasGladiaApiKey && !editingSavedKey && !keyValue) {
-      setEditingSavedKey(true)
-      return
-    }
-    await handleSaveKey()
-  }, [editingSavedKey, handleSaveKey, hasGladiaApiKey, keyValue])
-
-  const handleClearKey = useCallback(async () => {
-    setKeyError(null)
-    const result = await clearGladiaApiKey()
-    if (result.error) {
-      setKeyError(result.error)
-      return
-    }
-    setHasGladiaApiKey(false)
-    setKeyValue("")
-    setEditingSavedKey(false)
-  }, [setHasGladiaApiKey])
+  const keySettings = useApiKeySettings({
+    hasKey: hasGladiaApiKey,
+    setHasKey: setHasGladiaApiKey,
+    save: saveGladiaApiKey,
+    clear: clearGladiaApiKey,
+    onSaved: restartActiveTranscriptionIfNeeded,
+  })
 
   return {
     hasGladiaApiKey,
-    keyValue,
-    setKeyValue,
-    editingSavedKey,
-    setEditingSavedKey,
-    saved,
-    keyError,
-    displayedKeyValue,
-    keyActionLabel,
-    handleKeyAction,
-    handleClearKey,
+    ...keySettings,
     handleProviderChange,
   }
 }

@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react"
 import { invokeTauri } from "@/lib/tauri-runtime"
+import { useApiKeySettings } from "@/hooks/use-api-key-settings"
 import { transcriptionActions } from "@/hooks/use-transcription"
 import { useSettingsStore, type SttProvider } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 
-const SAVED_KEY_DISPLAY = "Saved in secure keychain"
 const STT_RESTART_DELAY_MS = 350
 export type ProviderChangeHandler = (provider: SttProvider) => void
 
@@ -48,53 +48,14 @@ export function useDeepgramKeySettings() {
     setHasDeepgramApiKey,
   } = useSettingsStore()
 
-  const [keyValue, setKeyValue] = useState("")
-  const [editingSavedKey, setEditingSavedKey] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [keyError, setKeyError] = useState<string | null>(null)
   const [switchingStt, setSwitchingStt] = useState(false)
 
-  const displayedKeyValue =
-    hasDeepgramApiKey && !editingSavedKey && !keyValue
-      ? SAVED_KEY_DISPLAY
-      : keyValue
-  const keyActionLabel = hasDeepgramApiKey ? "Update" : "Save"
-
-  const handleSaveKey = useCallback(async () => {
-    setKeyError(null)
-    const result = await saveDeepgramApiKey(keyValue)
-    setHasDeepgramApiKey(result.hasKey)
-    if (result.error) {
-      setKeyError(result.error)
-      return
-    }
-    if (result.hasKey) {
-      setKeyValue("")
-      setEditingSavedKey(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    }
-  }, [keyValue, setHasDeepgramApiKey])
-
-  const handleKeyAction = useCallback(async () => {
-    if (hasDeepgramApiKey && !editingSavedKey && !keyValue) {
-      setEditingSavedKey(true)
-      return
-    }
-    await handleSaveKey()
-  }, [editingSavedKey, handleSaveKey, hasDeepgramApiKey, keyValue])
-
-  const handleClearKey = useCallback(async () => {
-    setKeyError(null)
-    const result = await clearDeepgramApiKey()
-    if (result.error) {
-      setKeyError(result.error)
-      return
-    }
-    setHasDeepgramApiKey(false)
-    setKeyValue("")
-    setEditingSavedKey(false)
-  }, [setHasDeepgramApiKey])
+  const keySettings = useApiKeySettings({
+    hasKey: hasDeepgramApiKey,
+    setHasKey: setHasDeepgramApiKey,
+    save: saveDeepgramApiKey,
+    clear: clearDeepgramApiKey,
+  })
 
   const restartActiveTranscription = useCallback(async () => {
     setSwitchingStt(true)
@@ -117,17 +78,8 @@ export function useDeepgramKeySettings() {
   return {
     sttProvider,
     hasDeepgramApiKey,
-    keyValue,
-    setKeyValue,
-    editingSavedKey,
-    setEditingSavedKey,
-    saved,
-    keyError,
+    ...keySettings,
     switchingStt,
-    displayedKeyValue,
-    keyActionLabel,
-    handleKeyAction,
-    handleClearKey,
     handleProviderChange,
   }
 }
