@@ -129,20 +129,14 @@ export function hydrateSettings(): Promise<void> {
         }
       }
 
-      // Resolve keyring-backed secret presence (Deepgram key) and write only a boolean flag.
-      // This is best-effort: if the command isn't available (web/dev), we just keep defaults.
-      try {
-        const has = await invokeTauri<boolean>("has_deepgram_api_key")
-        patch.hasDeepgramApiKey = has
-      } catch {
-        // ignore
-      }
-      try {
-        const has = await invokeTauri<boolean>("has_gladia_api_key")
-        patch.hasGladiaApiKey = has
-      } catch {
-        // ignore
-      }
+      // Resolve keyring-backed secret presence (Deepgram + Gladia) and write only a boolean flag.
+      // Best-effort and independent: if a command isn't available (web/dev), keep the default.
+      const [deepgram, gladia] = await Promise.all([
+        invokeTauri<boolean>("has_deepgram_api_key").catch(() => undefined),
+        invokeTauri<boolean>("has_gladia_api_key").catch(() => undefined),
+      ])
+      if (deepgram !== undefined) patch.hasDeepgramApiKey = deepgram
+      if (gladia !== undefined) patch.hasGladiaApiKey = gladia
 
       if (Object.keys(patch).length > 0) {
         useSettingsStore.setState(patch)
