@@ -86,6 +86,43 @@ fn choose_reading_candidate(
     candidates.first().cloned()
 }
 
+/// Decide whether a fresh direct detection should (re)start reading mode.
+///
+/// Same book+chapter normally means "already tracking this" — but a specific
+/// verse reference (not a bare chapter default) that names a different verse
+/// than the current position re-anchors reading mode to it. Without this, a
+/// chapter-only hit ("Malachi 3" → 3:1) pins the cursor at verse 1 even after
+/// the speaker announces "verses 16-18", and stray word-overlap can then
+/// false-advance to a nearby low verse. Chapter-only hits never re-anchor, so
+/// this cannot thrash the cursor back to verse 1.
+fn should_restart_reading(
+    active: bool,
+    current_book: i32,
+    current_chapter: i32,
+    current_verse: Option<i32>,
+    candidate: &DirectReadingCandidate,
+) -> bool {
+    let recent = &candidate.verse_ref;
+
+    if !active {
+        // Not active (fresh or paused) — any explicit reference (re)starts.
+        return true;
+    }
+
+    if current_book == recent.book_number && current_chapter == recent.chapter {
+        // Re-anchor only to a specific verse that differs from where we are.
+        return !candidate.is_chapter_only && current_verse != Some(recent.verse_start);
+    }
+
+    if current_book != recent.book_number {
+        // Different book — only an explicit, high-confidence reference restarts.
+        return candidate.confidence >= 0.90 || candidate.is_chapter_only;
+    }
+
+    // Same book, different chapter — natural progression.
+    true
+}
+
 /// Return the last `max_words` whitespace-delimited words of `text`, re-joined
 /// with single spaces.
 pub(crate) fn clamp_to_recent_words(text: &str, max_words: usize) -> String {
@@ -927,30 +964,13 @@ pub(crate) fn check_reading_mode(
             let should_start = {
                 let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
                 match rm_managed.lock() {
-                    Ok(rm) => {
-                        if !rm.is_active() && !rm.has_verses() {
-                            true // Not active, no verses loaded — start fresh
-                        } else if !rm.is_active() && rm.has_verses() {
-                            // Paused — restart on any new explicit reference
-                            true
-                        } else if rm.current_book() == recent.book_number
-                            && rm.current_chapter() == recent.chapter
-                        {
-                            false // Same book+chapter — already tracking this
-                        } else if rm.current_book() != recent.book_number
-                            && (candidate.confidence >= 0.90 || candidate.is_chapter_only)
-                        {
-                            // Different book with high confidence — explicit new reference
-                            // (e.g., "John 1:1" after reading Exodus). Restart.
-                            true
-                        } else if rm.current_book() == recent.book_number {
-                            // Same book, different chapter — natural progression
-                            true
-                        } else {
-                            // Different book, low confidence — likely false positive
-                            false
-                        }
-                    }
+                    Ok(rm) => should_restart_reading(
+                        rm.is_active(),
+                        rm.current_book(),
+                        rm.current_chapter(),
+                        rm.current_verse(),
+                        &candidate,
+                    ),
                     Err(_) => false,
                 }
             };
@@ -1134,8 +1154,8 @@ mod tests {
         choose_reading_candidate, direct_reading_candidates, enqueue_final_semantic_job,
         enqueue_partial_semantic_job, filter_direct_results_to_scope_if_present,
         filter_semantic_results_to_reading_scope, finalize_live_semantic_results,
-        replace_semantic_job, strip_reference_scaffolding, take_semantic_job,
-        DeepgramSemanticBuffer, DirectReadingCandidate, LIVE_SEMANTIC_CAP,
+        replace_semantic_job, should_restart_reading, strip_reference_scaffolding,
+        take_semantic_job, DeepgramSemanticBuffer, DirectReadingCandidate, LIVE_SEMANTIC_CAP,
         PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS,
     };
     use rhema_detection::{Detection, DetectionSource, MergedDetection, VerseRef};
@@ -1297,6 +1317,69 @@ mod tests {
                 is_chapter_only: true,
             }]
         );
+    }
+
+    fn reading_candidate(
+        book_number: i32,
+        chapter: i32,
+        verse: i32,
+        confidence: f64,
+        is_chapter_only: bool,
+    ) -> DirectReadingCandidate {
+        DirectReadingCandidate {
+            verse_ref: VerseRef {
+                book_number,
+                book_name: "Book".to_string(),
+                chapter,
+                verse_start: verse,
+                verse_end: None,
+            },
+            confidence,
+            is_chapter_only,
+        }
+    }
+
+    #[test]
+    fn reanchors_to_specific_verse_within_active_chapter() {
+        // Reading Malachi 3 anchored at the chapter-only default (3:1); a later
+        // explicit "Malachi 3:16" must re-anchor forward, not be ignored.
+        let candidate = reading_candidate(39, 3, 16, 1.0, false);
+        assert!(should_restart_reading(true, 39, 3, Some(1), &candidate));
+    }
+
+    #[test]
+    fn chapter_only_hit_does_not_reanchor_within_active_chapter() {
+        // The repeated chapter-only "Malachi 3" (→3:1) must never drag the
+        // cursor back to verse 1 once we are reading 3:16.
+        let candidate = reading_candidate(39, 3, 1, 0.88, true);
+        assert!(!should_restart_reading(true, 39, 3, Some(16), &candidate));
+    }
+
+    #[test]
+    fn same_specific_verse_does_not_restart() {
+        let candidate = reading_candidate(39, 3, 16, 1.0, false);
+        assert!(!should_restart_reading(true, 39, 3, Some(16), &candidate));
+    }
+
+    #[test]
+    fn inactive_reading_mode_always_restarts_on_reference() {
+        let candidate = reading_candidate(39, 3, 16, 1.0, false);
+        assert!(should_restart_reading(false, 39, 3, Some(16), &candidate));
+        assert!(should_restart_reading(false, 0, 0, None, &candidate));
+    }
+
+    #[test]
+    fn different_book_restarts_only_when_explicit() {
+        let high = reading_candidate(43, 1, 1, 1.0, false);
+        assert!(should_restart_reading(true, 39, 3, Some(16), &high));
+        let low = reading_candidate(43, 1, 1, 0.70, false);
+        assert!(!should_restart_reading(true, 39, 3, Some(16), &low));
+    }
+
+    #[test]
+    fn same_book_new_chapter_restarts() {
+        let candidate = reading_candidate(39, 4, 1, 0.88, true);
+        assert!(should_restart_reading(true, 39, 3, Some(16), &candidate));
     }
 
     #[test]

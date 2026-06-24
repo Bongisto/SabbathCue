@@ -59,13 +59,16 @@ pub(crate) fn check_translation_command(app: &AppHandle, transcript: &str) {
 
         // Find the translation ID for this abbreviation
         let managed: State<'_, Mutex<AppState>> = app.state();
-        let Ok(mut app_state) = managed.try_lock() else {
+        let Ok(mut app_state) = managed.lock() else {
             return;
         };
 
         if let Some(ref db) = app_state.bible_db {
             if let Ok(translations) = db.list_translations() {
-                if let Some(t) = translations.iter().find(|t| t.abbreviation == abbrev) {
+                if let Some(t) = translations
+                    .iter()
+                    .find(|t| t.abbreviation.eq_ignore_ascii_case(&abbrev))
+                {
                     if app_state.active_translation_id == t.id {
                         log::debug!("[STT] Voice command: {abbrev} already active");
                         return;

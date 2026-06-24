@@ -247,6 +247,7 @@ impl ReadingMode {
         // BUT exclude "next chapter" and "previous chapter" commands
         if !trimmed.contains("next")
             && !trimmed.contains("previous")
+            && !trimmed.contains("verse")
             && ((trimmed.contains("chapter") && trimmed.ends_with("chapter"))
                 || trimmed.ends_with("chapter?")
                 || trimmed.ends_with("chapter."))
@@ -1247,6 +1248,24 @@ mod tests {
         let change = result.unwrap();
         assert_eq!(change.new_chapter, 5);
         assert_eq!(change.start_verse, Some(7));
+        assert!(change.emit_start_verse);
+    }
+
+    #[test]
+    fn same_chapter_verse_command_works_when_chapter_is_trailing_word() {
+        // "verse 2 in the same chapter" ends in "chapter"; the trailing-keyword
+        // guard must not swallow it as an "expecting a chapter number" command.
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
+        rm.start(1, "Genesis", 5, 1, verses);
+
+        let result = rm.check_chapter_command("verse 2 in the same chapter");
+
+        assert!(result.is_some());
+        let change = result.unwrap();
+        assert_eq!(change.new_chapter, 5);
+        assert_eq!(change.start_verse, Some(2));
         assert!(change.emit_start_verse);
     }
 
