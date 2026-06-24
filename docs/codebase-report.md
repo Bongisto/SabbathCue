@@ -3,6 +3,10 @@
 > Evidence-based assessment. Every claim below is backed by a file reference or a
 > command that was executed against the working tree, with its result quoted.
 > Verification commands were run on 2026-06-17 against branch `whisper-stt-powerpoint`.
+>
+> **2026-06-24 follow-up:** The body below is the 2026-06-17 architecture snapshot.
+> Current maintainability findings and refactor-branch status live in
+> [CODE_QUALITY_REPORT.md](../CODE_QUALITY_REPORT.md).
 
 Legend: 🔴 high risk · 🟡 watch · 🟢 healthy
 

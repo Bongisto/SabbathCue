@@ -1,7 +1,7 @@
 # Code Refactoring & Improvement Plan
 
-> **Unified action plan** synthesizing the three living reports for `sabbathcue`/`rhema`:
-> [PERFORMANCE_TEST_REPORT.md](PERFORMANCE_TEST_REPORT.md) · [DEBUGGING_REPORT.md](DEBUGGING_REPORT.md) · [SECURITY_TEST_REPORT.md](SECURITY_TEST_REPORT.md).
+> **Unified action plan** synthesizing the living reports for `sabbathcue`/`rhema`:
+> [CODE_QUALITY_REPORT.md](CODE_QUALITY_REPORT.md) · [PERFORMANCE_TEST_REPORT.md](PERFORMANCE_TEST_REPORT.md) · [DEBUGGING_REPORT.md](DEBUGGING_REPORT.md) · [SECURITY_TEST_REPORT.md](SECURITY_TEST_REPORT.md).
 > This is the single "what to do next" list. Each item links back to the finding it resolves.
 > Legend: `[ ]` todo · `[~]` in progress · `[x]` done · 🔴 high · 🟡 medium · 🟢 low/healthy
 
@@ -9,14 +9,14 @@
 
 ## 0. Snapshot
 
-| Field           | Value                                                                                                                        |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Target          | `sabbathcue`/`rhema` — full repo                                                                                             |
-| Date            | 2026-06-18                                                                                                                   |
-| Commit          | `d43f1de` (branch `main`)                                                                                                    |
-| Reviewer        | Claude (Opus 4.8)                                                                                                            |
-| Goal            | Reduce bundle weight + oversized hot-path files; close security verify-items; add measurement to CI — **no feature changes** |
-| Test safety net | **Yes** — 603 unit tests / 89 files green (~13 s); typecheck + lint clean; e2e configured                                    |
+| Field           | Value                                                                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target          | `sabbathcue`/`rhema` — full repo                                                                                                                                      |
+| Date            | 2026-06-24 (quality audit + refactor branch validation) · 2026-06-18 (perf/security baseline)                                                                         |
+| Commit          | Audit baseline `9db05ab` (`main`); execution branch through `c61347c` (`refactor/code-quality-safe-fixes`)                                                            |
+| Reviewer        | Claude (Opus 4.8)                                                                                                                                                     |
+| Goal            | Reduce bundle weight + oversized hot-path files; close security verify-items; add measurement to CI — **no feature changes**                                          |
+| Test safety net | **Yes** — 697 unit tests / 99 files green (~24 s); coverage, build, e2e, lint, TypeScript, and Rust workspace checks green on the refactor branch after `c61347c`     |
 
 **Verdict:** The codebase is **healthy and well-disciplined** (0 lint errors, 0 `any`, 0 debt markers, 0 npm vulns, secrets in OS keychain, strict CSP). There is **no correctness crisis and no rewrite case.** The work is incremental hardening: trim the bundle, split a handful of god-files, verify a few security items, and bolt measurement onto CI so this stays true.
 
@@ -45,11 +45,11 @@
 
 | #   | Item                                                                                                  | Source             | Technique           | Files affected                                                                                                              | Risk |                                                                 Status                                                                  |
 | --- | ----------------------------------------------------------------------------------------------------- | ------------------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------- | :--: | :-------------------------------------------------------------------------------------------------------------------------------------: |
-| R1  | Split monolithic `vendor` chunk (877 KB / 253 KB gz) into react / state / supabase / tauri sub-chunks | PERF-001           | edit `manualChunks` | [vite.config.ts](vite.config.ts)                                                                                            |  🟢  |                          `[x]` **done 2026-06-18** — vendor → 460 KB / 134 KB gz + react/supabase/tauri/state                           |
+| R1  | Split monolithic `vendor` chunk (877 KB / 253 KB gz) into react / state / supabase / tauri sub-chunks | PERF-001           | edit `manualChunks` | [vite.config.ts](vite.config.ts)                                                                                            |  🟢  |                          `[x]` **done 2026-06-18** — current branch vendor → 471 KB / 139 KB gz + react/supabase/tauri/state             |
 | R2  | Confirm `fabric`/`canvas` (280 KB) and `pdf.worker` (1.14 MB) are lazy, not in first-paint graph      | PERF-002, PERF-005 | `React.lazy` audit  | design-canvas, theme-designer, ppt-import                                                                                   |  🟢  |                                                                  `[ ]`                                                                  |
-| R3  | Verify Tailwind content-globbing prunes unused CSS (`verse-renderer.css` 167 KB)                      | PERF-004           | build config check  | tailwind/vite config                                                                                                        |  🟢  |                                                                  `[ ]`                                                                  |
-| R4  | Extract `wrapText` / layout-math / draw from `verse-renderer.ts` (1,197 LOC, hot path)                | DBG #2             | extract module      | [src/lib/verse-renderer.ts](src/lib/verse-renderer.ts)                                                                      |  🟡  |                                                                  `[ ]`                                                                  |
-| R5  | Data-drive or split builtin themes (1,467 LOC)                                                        | DBG #1             | extract data        | [src/lib/builtin-themes.ts](src/lib/builtin-themes.ts)                                                                      |  🟢  |                                                                  `[ ]`                                                                  |
+| R3  | Verify Tailwind content-globbing prunes unused CSS (`verse-renderer.css` 172 KB)                      | PERF-004           | build config check  | tailwind/vite config                                                                                                        |  🟢  |                                                                  `[ ]`                                                                  |
+| R4  | Extract `wrapText` / layout-math / draw from `verse-renderer.ts` (1,126 LOC, hot path)                | DBG #2             | extract module      | [src/lib/verse-renderer.ts](src/lib/verse-renderer.ts)                                                                      |  🟡  |                                                                  `[ ]`                                                                  |
+| R5  | Data-drive or split builtin themes (1,422 LOC)                                                        | DBG #1             | extract data        | [src/lib/builtin-themes.ts](src/lib/builtin-themes.ts)                                                                      |  🟢  |                                                                  `[ ]`                                                                  |
 | R6  | Introduce leveled logger; replace 67 stray `console.*`                                                | DBG #6 / SEC §2.12 | wrap + replace      | `src/**` (67 sites)                                                                                                         |  🟢  |                                                                  `[ ]`                                                                  |
 | R7  | **Verify RLS enabled + explicit policies on every Supabase table; least-privilege RPCs**              | SEC-001            | DB review           | `supabase/migrations/**`                                                                                                    |  🟡  |                                                                  `[ ]`                                                                  |
 | R8  | Gate Rust crate advisories in CI                                                                      | SEC-002            | tooling             | [src-tauri/deny.toml](src-tauri/deny.toml)                                                                                  |  🟢  | `[x]` **done 2026-06-18** — `cargo deny check` already in CI (0 issues / 696 crates); hardened `workspace → all` + 8 documented ignores |
@@ -57,14 +57,20 @@
 | R10 | Live-service runtime profiling (FPS, memory growth, detection latency over 90 min)                    | PERF-003           | instrument + soak   | `main.tsx`, broadcast path                                                                                                  |  🟡  |                                                                  `[ ]`                                                                  |
 | R11 | Add `starts_with(app_dir)` containment after `canonicalize()` for imported assets                     | SEC-003            | guard clause        | [src-tauri/src/commands/assets.rs](src-tauri/src/commands/assets.rs)                                                        |  🟢  |                                                                  `[ ]`                                                                  |
 | R12 | Confirm verification/device token storage location + logout invalidation                              | SEC-004            | review              | [src/lib/verification/session-storage.ts](src/lib/verification/session-storage.ts)                                          |  🟢  |                                                                  `[ ]`                                                                  |
-| R13 | Decouple video-control + persistence from `broadcast-store` (856 LOC)                                 | DBG #3             | store slices        | [src/stores/broadcast-store.ts](src/stores/broadcast-store.ts)                                                              |  🟡  |                                                                  `[ ]`                                                                  |
+| R13 | Continue `broadcast-store` decomposition (now 318 LOC facade + slices)                               | CQ-002, DBG #3     | store slices        | [src/stores/broadcast-store.ts](src/stores/broadcast-store.ts), `src/stores/broadcast/**`                                  |  🟡  | `[~]` **partial 2026-06-24** — output issues, designer, monitor/projector, video, and persistence extracted; theme/live facade remains |
+| R14 | Continue live detection loop peel from `stt/detection.rs` (now 1,154 LOC)                            | CQ-001             | extract module      | `src-tauri/src/commands/stt/detection.rs`, `src-tauri/src/commands/stt/detection_logic.rs`, `src-tauri/src/commands/stt/detection_jobs.rs`, `crates/detection/**` |  🔴  | `[~]` **partial 2026-06-24** — pure detection logic and semantic job scheduling extracted; live session orchestration remains          |
+| R15 | Shared `supabase/rpc.ts` — consolidate 4 duplicate RPC modules                                        | CQ-003             | extract helper      | `src/lib/supabase/*.ts`                                                                                                     |  🟢  |                                                                  `[ ]`                                                                  |
+| R16 | Generic `useApiKeySettings` (Deepgram + Gladia hooks)                                                 | CQ-004             | extract hook        | `src/hooks/use-*-key-settings.ts`                                                                                           |  🟢  |                                                                  `[ ]`                                                                  |
+| R17 | Pure `resolveDetectionVerse`; decouple from `reportOutputIssue`                                       | CQ-005             | extract + boundary  | [src/lib/verse-detection-workflow.ts](src/lib/verse-detection-workflow.ts)                                                  |  🟢  |                                                                  `[ ]`                                                                  |
+| R18 | Isolate e2e/demo harness to entry boundary (`bootstrap({ mode })`)                                    | CQ-006             | entry refactor      | `src/main.tsx`, `use-tauri-event.ts`, `workflow-trace.ts`                                                                   |  🟢  |                                                                  `[ ]`                                                                  |
+| R19 | Hymnal static data → lazy JSON or SQLite asset                                                        | CQ-008             | asset move          | `src/data/sda-hymnal-*`                                                                                                     |  🟢  |                                                                  `[ ]`                                                                  |
 
 ---
 
 ## 3. Pre-flight Safety Checklist
 
-- [x] Test safety net covers target behavior (603 tests; verse-renderer & broadcast have dedicated tests)
-- [x] Tests green and fast (~13 s) — run before/after every step
+- [x] Test safety net covers target behavior (697 tests; verse-renderer & broadcast have dedicated tests)
+- [x] Tests green and fast (~24 s for unit tests) — run before/after every step
 - [ ] Work on a branch; small, reviewable PRs per item
 - [x] Behavior-preservation agreed: R1–R6, R13 are **structure-only**; R7–R12 are verification/tooling
 - [x] Rollback plan: each step is one revertable commit; tree currently clean
@@ -72,7 +78,7 @@
 
 ## 4. Per-Item Loop
 
-1. [ ] Confirm tests green (`npx vitest --run` + `npx tsc --noEmit` + `npx eslint .`)
+1. [ ] Confirm tests green (`npm.cmd run test:unit` + `npm.cmd run build` + `npm.cmd run lint`)
 2. [ ] Make **one** small change
 3. [ ] Re-run tests / rebuild — still green? bundle changed as expected?
 4. [ ] Commit (`refactor: split vendor chunk`, `chore(ci): add coverage gate`, `fix(security): contain asset path`)
@@ -91,11 +97,11 @@
 
 | Metric                       | Before (2026-06-18)         | After                   | Δ                        |
 | ---------------------------- | --------------------------- | ----------------------- | ------------------------ |
-| Largest single raw chunk     | 877 KB (`vendor`)           | 460 KB (`vendor`)       | **−417 KB** (R1)         |
-| `vendor` gzipped             | 253 KB                      | 134 KB                  | **−119 KB** (R1)         |
+| Largest app vendor chunk     | 877 KB (`vendor`)           | 471 KB (`vendor`)       | **−406 KB** (R1)         |
+| `vendor` gzipped             | 253 KB                      | 139 KB                  | **−114 KB** (R1)         |
 | Total JS bundle (raw)        | 3.9 MB                      | 3.9 MB                  | ~0 (split, not removed)  |
-| Max non-data file (LOC)      | 1,467 (`builtin-themes.ts`) | 1,467                   | pending (R5)             |
-| Test coverage (all `src/**`) | not instrumented            | **39.6% / gated**       | ✅ measured + gated (R9) |
+| Max frontend logic file (LOC) | 1,197 (`verse-renderer.ts`) | 1,126                   | pending (R4)             |
+| Test coverage (all `src/**`) | not instrumented            | **43.64% statements / gated** | ✅ measured + gated (R9) |
 | Max cyclomatic complexity    | not measured                | **58 / warn-gated @20** | ✅ measured (R9)         |
 | Duplication %                | not measured                | **0.71% / gated <3%**   | ✅ measured + gated (R9) |
 | Lint errors                  | 0                           | 0                       | ➖                       |
@@ -113,10 +119,11 @@
 ### Appendix — commands used to produce the baseline
 
 ```bash
-npx tsc --noEmit              # typecheck — clean
-npx eslint .                  # lint — 0 errors
-npx vitest --run              # 603 tests / 89 files pass (~13 s)
-npx vite build                # production build (9.2 s) + bundle report
+npm.cmd run typecheck         # typecheck — clean
+npm.cmd run lint              # lint — 0 errors
+npm.cmd run test:unit         # 697 tests / 99 files pass (~24 s)
+npm.cmd run build             # production build + bundle report
+npm.cmd run test:e2e          # 8 Playwright tests pass
 npm audit --json              # 0 vulnerabilities
 git log --since='12 months ago' --name-only --format=format: \
   | grep -v '^$' | sort | uniq -c | sort -rn | head   # churn hotspots
