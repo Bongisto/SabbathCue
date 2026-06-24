@@ -223,6 +223,33 @@ describe("verse detection workflow", () => {
     })
   })
 
+  it("auto-previews semantic Bible detections at the settings threshold", async () => {
+    useSettingsStore.setState({ confidenceThreshold: 0.85 })
+    await handleVerseDetections([
+      makeDetection({
+        source: "semantic",
+        verse_ref: "Daniel 7:10",
+        verse_text: "The court was seated, and the books were opened.",
+        book_name: "Daniel",
+        book_number: 27,
+        chapter: 7,
+        verse: 10,
+        confidence: 0.9,
+        auto_queued: false,
+        transcript_snippet: "the court was seated and the books were opened",
+      }),
+    ])
+
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_number: 27,
+      chapter: 7,
+      verse: 10,
+    })
+    expect(useBroadcastStore.getState().liveItem?.reference).toBe(
+      "Daniel 7:10 (KJV)"
+    )
+  })
+
   it("does not auto-queue detections while auto mode is staging preview", async () => {
     await handleVerseDetections([makeDetection()])
 

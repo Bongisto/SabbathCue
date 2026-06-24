@@ -14,6 +14,15 @@ const FTS5_RANK0_CONFIDENCE: f64 = 0.68;
 /// Confidence decrease per FTS5 rank position (rank 1 = 0.64, rank 2 = 0.60, etc.).
 const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
 
+/// BM25 score where a live text hit is strong enough to trust above the
+/// operator auto threshold. BM25 is negative; lower is stronger.
+const FTS5_STRONG_MATCH_RANK: f64 = -16.0;
+const FTS5_STRONG_MATCH_CONFIDENCE: f64 = 0.86;
+
+/// Very strong phrase/AND matches should score like a near-verbatim quote.
+const FTS5_EXCELLENT_MATCH_RANK: f64 = -24.0;
+const FTS5_EXCELLENT_MATCH_CONFIDENCE: f64 = 0.92;
+
 /// FTS5 results below this confidence are not included.
 const FTS5_MIN_CONFIDENCE: f64 = 0.50;
 
@@ -120,7 +129,6 @@ impl DetectionPipeline {
     ///
     /// FTS5-only results are added with rank-derived confidence. Vector and
     /// FTS5 overlap is collapsed into one boosted candidate.
-    #[expect(clippy::cast_precision_loss, reason = "rank index is small")]
     pub fn process_hybrid_with_fts(
         &mut self,
         text: &str,
@@ -156,7 +164,7 @@ impl DetectionPipeline {
             .collect();
 
         for (rank, fts) in fts_results.iter().enumerate() {
-            let confidence = FTS5_RANK0_CONFIDENCE - (rank as f64 * FTS5_CONFIDENCE_DECAY);
+            let confidence = fts_confidence(rank, fts.rank);
             log::debug!(
                 "[DET-SEMANTIC] FTS5 candidate idx={rank} bm25={:.3} {} {}:{} conf={:.0}%",
                 fts.rank,
@@ -220,6 +228,18 @@ impl DetectionPipeline {
     /// Run a standalone semantic search query (for the search UI).
     pub fn semantic_search(&mut self, query: &str, k: usize) -> Vec<(i64, f64)> {
         self.semantic.search_query(query, k)
+    }
+}
+
+#[expect(clippy::cast_precision_loss, reason = "rank index is small")]
+fn fts_confidence(rank: usize, bm25_rank: f64) -> f64 {
+    let rank_confidence = FTS5_RANK0_CONFIDENCE - (rank as f64 * FTS5_CONFIDENCE_DECAY);
+    if bm25_rank <= FTS5_EXCELLENT_MATCH_RANK {
+        rank_confidence.max(FTS5_EXCELLENT_MATCH_CONFIDENCE)
+    } else if bm25_rank <= FTS5_STRONG_MATCH_RANK {
+        rank_confidence.max(FTS5_STRONG_MATCH_CONFIDENCE)
+    } else {
+        rank_confidence
     }
 }
 
@@ -621,6 +641,26 @@ mod tests {
                 .iter()
                 .any(|r| r.detection.verse_ref.book_name == "Isaiah"),
             "keyword-noise match below the floor must be dropped"
+        );
+    }
+
+    #[test]
+    fn live_fts_confidence_uses_bm25_strength_for_quote_matches() {
+        let strong = fts_confidence(0, -16.0);
+        let excellent = fts_confidence(0, -24.0);
+        let weak = fts_confidence(0, -13.0);
+
+        assert!(
+            strong >= FTS5_STRONG_MATCH_CONFIDENCE,
+            "strong verse-text BM25 matches must clear common auto thresholds"
+        );
+        assert!(
+            excellent >= FTS5_EXCELLENT_MATCH_CONFIDENCE,
+            "excellent verse-text BM25 matches should score like near-verbatim quotes"
+        );
+        assert!(
+            weak < FTS5_STRONG_MATCH_CONFIDENCE,
+            "weak live BM25 matches must not receive quote confidence"
         );
     }
 

@@ -151,7 +151,20 @@ async function resolveDetectionVerse(
   }
 }
 
-function selectPreviewDirectHit(
+function bestDetection(detections: DetectionResult[]): DetectionResult | null {
+  if (detections.length === 0) return null
+
+  let best = detections[0]
+  for (let i = 1; i < detections.length; i += 1) {
+    const candidate = detections[i]
+    if (candidate.confidence > best.confidence) {
+      best = candidate
+    }
+  }
+  return best
+}
+
+function selectPreviewHit(
   detections: DetectionResult[],
   minConfidence: number
 ): DetectionResult | null {
@@ -162,16 +175,18 @@ function selectPreviewDirectHit(
       !d.is_chapter_only &&
       (isEgwDetection(d) || d.book_number > 0)
   )
-  if (directHits.length === 0) return null
+  const directHit = bestDetection(directHits)
+  if (directHit) return directHit
 
-  let best = directHits[0]
-  for (let i = 1; i < directHits.length; i += 1) {
-    const candidate = directHits[i]
-    if (candidate.confidence > best.confidence) {
-      best = candidate
-    }
-  }
-  return best
+  return bestDetection(
+    detections.filter(
+      (d) =>
+        d.source === "semantic" &&
+        d.confidence >= minConfidence &&
+        !d.is_chapter_only &&
+        d.book_number > 0
+    )
+  )
 }
 
 async function queueDetectedVerse(
@@ -266,29 +281,29 @@ async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
     autoMode: settings.autoMode,
     confidenceThreshold: settings.confidenceThreshold,
   })
-  const directHit = autoPreview
-    ? selectPreviewDirectHit(detections, settings.confidenceThreshold)
+  const previewHit = autoPreview
+    ? selectPreviewHit(detections, settings.confidenceThreshold)
     : null
   const resolvedDetections = new WeakMap<
     DetectionResult,
     ResolvedDetectionVerse
   >()
-  if (directHit) {
-    if (isEgwDetection(directHit)) {
+  if (previewHit) {
+    if (isEgwDetection(previewHit)) {
       recordWorkflowTrace("detection.preview.selected", "EGW direct hit selected", {
-        detection: traceDetectionDetails(directHit),
-        autoQueued: directHit.auto_queued,
+        detection: traceDetectionDetails(previewHit),
+        autoQueued: previewHit.auto_queued,
       })
-      if (directHit.auto_queued) {
-        presentEgwParagraph(directHit.egw_paragraph)
+      if (previewHit.auto_queued) {
+        presentEgwParagraph(previewHit.egw_paragraph)
       } else {
-        previewEgwParagraph(directHit.egw_paragraph)
+        previewEgwParagraph(previewHit.egw_paragraph)
       }
     } else {
-      const resolved = await resolveDetectionVerse(directHit)
-      resolvedDetections.set(directHit, resolved)
-      recordWorkflowTrace("detection.preview.selected", "Direct hit selected for preview", {
-        detection: traceDetectionDetails(directHit),
+      const resolved = await resolveDetectionVerse(previewHit)
+      resolvedDetections.set(previewHit, resolved)
+      recordWorkflowTrace("detection.preview.selected", "Detection selected for preview", {
+        detection: traceDetectionDetails(previewHit),
         verse: traceVerseDetails(resolved.verse),
         usedFallback: resolved.usedFallback,
         fallbackReason: resolved.fallbackReason,
