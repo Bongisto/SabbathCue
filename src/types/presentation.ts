@@ -154,10 +154,6 @@ export type PresentationItem =
   | EgwPresentationItemData
   | VideoPresentationItemData
 
-export function getPresentationReference(item: PresentationItem): string {
-  return item.reference
-}
-
 export function getPresentationRenderData(
   item: PresentationItem
 ): PresentationRenderData {

@@ -3,7 +3,7 @@ import type {
   PresentationItem,
   SlideDeckPresentationItemData,
 } from "./presentation"
-import { getPresentationReference, getScriptureVerse } from "./presentation"
+import { getScriptureVerse } from "./presentation"
 
 export interface QueueItem {
   id: string
@@ -41,5 +41,5 @@ export function getVerseFromItem(item: QueueItem) {
 }
 
 export function getReferenceFromItem(item: QueueItem) {
-  return getPresentationReference(item.presentation)
+  return item.presentation.reference
 }

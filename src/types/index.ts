@@ -59,7 +59,6 @@ export type {
   PresentationItem,
 } from "./presentation"
 export {
-  getPresentationReference,
   getPresentationRenderData,
   getScriptureVerse,
 } from "./presentation"
