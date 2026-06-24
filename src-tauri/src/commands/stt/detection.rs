@@ -1,10 +1,8 @@
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, State};
-use tokio::sync::Notify;
 
 use crate::state::AppState;
 use rhema_detection::{DetectionMerger, DirectDetector, ReadingMode};
@@ -12,13 +10,18 @@ use rhema_detection::{DetectionMerger, DirectDetector, ReadingMode};
 // Re-export the helpers that were previously `pub(crate)` in this module so
 // other modules (and the test module) keep importing them from here.
 pub(crate) use super::detection_logic::{
-    clamp_to_recent_words, strip_reference_scaffolding, transcript_defers_to_direct,
-    DirectReadingCandidate,
+    clamp_to_recent_words, strip_reference_scaffolding, DirectReadingCandidate,
 };
 use super::detection_logic::{
     choose_reading_candidate, direct_reading_candidates,
     filter_direct_results_to_scope_if_present, filter_semantic_results_to_reading_scope,
     should_restart_reading,
+};
+// Re-export the job-scheduling machinery so mod.rs and the test module keep
+// importing it from this module.
+pub(crate) use super::detection_jobs::{
+    enqueue_direct_detection_job, enqueue_final_semantic_job, enqueue_partial_semantic_job,
+    finalize_live_semantic_results, take_semantic_job, DeepgramSemanticBuffer,
 };
 use super::utils::{transcript_logging_enabled, truncate_safe};
 
@@ -39,11 +42,11 @@ pub(crate) const FINAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(100);
 pub(crate) const PARTIAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const LIVE_SEMANTIC_CAP: usize = 3;
-const LIVE_SEMANTIC_OVERLAP_BOOST: f64 = 0.10;
+pub(crate) const LIVE_SEMANTIC_OVERLAP_BOOST: f64 = 0.10;
 /// Minimum confidence for a live semantic/FTS detection to be emitted. Mirrors
 /// the frontend display floor (`MIN_SEMANTIC_DISPLAY_CONFIDENCE`) so low-confidence
 /// keyword matches never reach the UI or the IPC channel.
-const LIVE_SEMANTIC_MIN_CONFIDENCE: f64 = 0.70;
+pub(crate) const LIVE_SEMANTIC_MIN_CONFIDENCE: f64 = 0.70;
 
 /// Maximum trailing words of the rolling transcript window fed to live
 /// semantic + FTS5 detection.
@@ -51,267 +54,6 @@ pub(crate) const LIVE_DETECTION_WINDOW_WORDS: usize = 12;
 
 /// Clear the rolling detection window after this much silence between finals.
 pub(crate) const WINDOW_RESET_GAP: Duration = Duration::from_secs(8);
-
-/// Take the latest pending semantic job from a shared slot, recovering from
-/// poisoned locks so the worker doesn't die permanently.
-pub(crate) fn take_semantic_job(
-    slot: &Arc<Mutex<Option<(u64, String)>>>,
-    label: &str,
-) -> Option<(u64, String)> {
-    match slot.lock() {
-        Ok(mut guard) => guard.take(),
-        Err(poisoned) => {
-            log::error!("[DET-SEMANTIC] {label} semantic slot lock poisoned; recovering");
-            let mut guard = poisoned.into_inner();
-            guard.take()
-        }
-    }
-}
-
-/// Replace the latest pending semantic job in a shared slot, recovering from
-/// poisoned locks. Returns true if a previous job was replaced.
-fn replace_semantic_job(
-    slot: &Arc<Mutex<Option<(u64, String)>>>,
-    job: (u64, String),
-    label: &str,
-) -> bool {
-    match slot.lock() {
-        Ok(mut guard) => guard.replace(job).is_some(),
-        Err(poisoned) => {
-            log::error!("[DET-SEMANTIC] {label} semantic slot lock poisoned; recovering");
-            let mut guard = poisoned.into_inner();
-            guard.replace(job).is_some()
-        }
-    }
-}
-
-pub(crate) fn enqueue_final_semantic_job(
-    job_slot: &Arc<Mutex<Option<(u64, String)>>>,
-    notify: &Arc<Notify>,
-    sent_counter: &Arc<AtomicU64>,
-    replaced_counter: &Arc<AtomicU64>,
-    seq: u64,
-    text: String,
-) {
-    if text.trim().is_empty() {
-        return;
-    }
-
-    if text.split_whitespace().count() < FINAL_SEMANTIC_MIN_WORDS {
-        log::debug!("[DET-TRACE] seq={seq} skip=semantic_enqueue reason=tiny_window label=final");
-        return;
-    }
-
-    // Explicit references and voice commands are owned by the direct + command
-    // paths. Skipping the enqueue (rather than suppressing later in the worker)
-    // also prevents these utterances from evicting a pending prose job from the
-    // latest-wins slot, so genuine paraphrase detections still run.
-    if transcript_defers_to_direct(&text) {
-        log::debug!(
-            "[DET-TRACE] seq={seq} skip=semantic_enqueue reason=reference_or_command label=final"
-        );
-        return;
-    }
-
-    let replaced = replace_semantic_job(job_slot, (seq, text), "final");
-    let n = sent_counter.fetch_add(1, Ordering::Relaxed) + 1;
-
-    if replaced {
-        let replaced_count = replaced_counter.fetch_add(1, Ordering::Relaxed) + 1;
-        let sent = sent_counter.load(Ordering::Relaxed);
-        log::debug!(
-            "[QUEUE] final_semantic latest-wins replaced stale work sent={sent} replaced={replaced_count}"
-        );
-    } else if n % 25 == 0 {
-        let replaced_count = replaced_counter.load(Ordering::Relaxed);
-        log::info!("[QUEUE] final_semantic latest-wins sent={n} replaced={replaced_count}");
-    }
-
-    notify.notify_one();
-}
-
-pub(crate) fn enqueue_partial_semantic_job(
-    job_slot: &Arc<Mutex<Option<(u64, String)>>>,
-    notify: &Arc<Notify>,
-    sent_counter: &Arc<AtomicU64>,
-    replaced_counter: &Arc<AtomicU64>,
-    seq: u64,
-    text: String,
-) {
-    if text.trim().is_empty() {
-        return;
-    }
-
-    if transcript_defers_to_direct(&text) {
-        log::debug!(
-            "[DET-TRACE] seq={seq} skip=semantic_enqueue reason=reference_or_command label=partial"
-        );
-        return;
-    }
-
-    let replaced = replace_semantic_job(job_slot, (seq, text), "partial");
-    let n = sent_counter.fetch_add(1, Ordering::Relaxed) + 1;
-
-    if replaced {
-        let replaced_count = replaced_counter.fetch_add(1, Ordering::Relaxed) + 1;
-        let sent = sent_counter.load(Ordering::Relaxed);
-        log::debug!(
-            "[QUEUE] partial_semantic latest-wins replaced stale work sent={sent} replaced={replaced_count}"
-        );
-    } else if n % 25 == 0 {
-        let replaced_count = replaced_counter.load(Ordering::Relaxed);
-        log::info!("[QUEUE] partial_semantic latest-wins sent={n} replaced={replaced_count}");
-    }
-
-    notify.notify_one();
-}
-
-pub(crate) fn enqueue_direct_detection_job(
-    detect_tx: &tokio::sync::mpsc::Sender<(u64, String)>,
-    latest_accepted_seq: &Arc<AtomicU64>,
-    sent_counter: &Arc<AtomicU64>,
-    dropped_counter: &Arc<AtomicU64>,
-    seq: u64,
-    text: String,
-    source: &str,
-) {
-    match detect_tx.try_send((seq, text)) {
-        Ok(()) => {
-            latest_accepted_seq.store(seq, Ordering::Release);
-            let n = sent_counter.fetch_add(1, Ordering::Relaxed) + 1;
-            if n % 25 == 0 {
-                let depth = detect_tx.max_capacity() - detect_tx.capacity();
-                let dropped = dropped_counter.load(Ordering::Relaxed);
-                log::info!(
-                    "[QUEUE] detect_tx source={source} sent={n} dropped={dropped} depth={depth}/{}",
-                    detect_tx.max_capacity()
-                );
-            }
-        }
-        Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
-            let dropped = dropped_counter.fetch_add(1, Ordering::Relaxed) + 1;
-            let sent = sent_counter.load(Ordering::Relaxed);
-            log::warn!(
-                "[QUEUE] detect_tx DROPPED source={source} (consumer behind) sent={sent} dropped={dropped}"
-            );
-        }
-        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {}
-    }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct DeepgramSemanticBuffer {
-    parts: Vec<String>,
-    seq: u64,
-}
-
-impl DeepgramSemanticBuffer {
-    pub(crate) fn push_final(
-        &mut self,
-        seq: u64,
-        text: String,
-        speech_final: bool,
-    ) -> Option<(u64, String)> {
-        self.parts.push(text);
-        self.seq = seq;
-        if speech_final {
-            self.flush_with_seq(seq)
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn flush(&mut self) -> Option<(u64, String)> {
-        self.flush_with_seq(self.seq)
-    }
-
-    pub(crate) fn flush_with_seq(&mut self, seq: u64) -> Option<(u64, String)> {
-        if self.parts.is_empty() || seq == 0 {
-            return None;
-        }
-
-        let text = self.parts.join(" ");
-        self.clear();
-        Some((seq, text))
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.parts.clear();
-        self.seq = 0;
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.parts.is_empty()
-    }
-}
-
-fn semantic_result_key(result: &crate::commands::detection::DetectionResult) -> String {
-    if result.content_type == "egw" {
-        return format!(
-            "egw:{}:{}:{}",
-            result.book_number, result.chapter, result.verse
-        );
-    }
-    if result.book_number > 0 && result.chapter > 0 && result.verse > 0 {
-        format!("{}:{}:{}", result.book_number, result.chapter, result.verse)
-    } else {
-        result.verse_ref.clone()
-    }
-}
-
-pub(crate) fn finalize_live_semantic_results(
-    results: Vec<crate::commands::detection::DetectionResult>,
-) -> Vec<crate::commands::detection::DetectionResult> {
-    let mut grouped: HashMap<String, (crate::commands::detection::DetectionResult, usize)> =
-        HashMap::new();
-
-    for result in results {
-        if result.confidence < LIVE_SEMANTIC_MIN_CONFIDENCE {
-            continue;
-        }
-        let key = semantic_result_key(&result);
-        match grouped.get_mut(&key) {
-            Some((existing, overlap_count)) => {
-                *overlap_count += 1;
-                existing.confidence = existing.confidence.max(result.confidence);
-                existing.auto_queued |= result.auto_queued;
-                if existing.verse_text.is_empty() && !result.verse_text.is_empty() {
-                    existing.verse_text.clone_from(&result.verse_text);
-                }
-                if existing.transcript_snippet.is_empty() && !result.transcript_snippet.is_empty() {
-                    existing
-                        .transcript_snippet
-                        .clone_from(&result.transcript_snippet);
-                }
-                if existing.book_number <= 0 && result.book_number > 0 {
-                    *existing = result;
-                }
-            }
-            None => {
-                grouped.insert(key, (result, 1));
-            }
-        }
-    }
-
-    let mut merged = grouped
-        .into_values()
-        .map(|(mut result, overlap_count)| {
-            if overlap_count > 1 {
-                result.confidence = (result.confidence + LIVE_SEMANTIC_OVERLAP_BOOST).min(0.98);
-            }
-            result
-        })
-        .collect::<Vec<_>>();
-
-    merged.sort_by(|a, b| {
-        b.confidence
-            .partial_cmp(&a.confidence)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.verse_ref.cmp(&b.verse_ref))
-    });
-    merged.truncate(LIVE_SEMANTIC_CAP);
-    merged
-}
 
 fn active_reading_bible_scope(app: &AppHandle) -> Option<(i32, i32, String)> {
     let reading_mode_state: State<'_, Mutex<ReadingMode>> = app.state();
@@ -982,10 +724,11 @@ mod tests {
         choose_reading_candidate, direct_reading_candidates, enqueue_final_semantic_job,
         enqueue_partial_semantic_job, filter_direct_results_to_scope_if_present,
         filter_semantic_results_to_reading_scope, finalize_live_semantic_results,
-        replace_semantic_job, should_restart_reading, strip_reference_scaffolding,
-        take_semantic_job, DeepgramSemanticBuffer, DirectReadingCandidate, LIVE_SEMANTIC_CAP,
+        should_restart_reading, strip_reference_scaffolding, take_semantic_job,
+        DeepgramSemanticBuffer, DirectReadingCandidate, LIVE_SEMANTIC_CAP,
         PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS,
     };
+    use crate::commands::stt::detection_jobs::replace_semantic_job;
     use rhema_detection::{Detection, DetectionSource, MergedDetection, VerseRef};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -1289,7 +1032,7 @@ mod tests {
 
     #[test]
     fn defers_to_direct_for_explicit_references_and_commands() {
-        use super::transcript_defers_to_direct as defers;
+        use crate::commands::stt::detection_logic::transcript_defers_to_direct as defers;
 
         // Explicit scripture references — the direct path is authoritative.
         assert!(defers("John chapter 8 verse 9"));
@@ -1310,7 +1053,7 @@ mod tests {
 
     #[test]
     fn does_not_defer_for_sermon_prose() {
-        use super::transcript_defers_to_direct as defers;
+        use crate::commands::stt::detection_logic::transcript_defers_to_direct as defers;
 
         // Spoken verse content must stay eligible for semantic paraphrase
         // detection (e.g. this should still surface John 3:16).
