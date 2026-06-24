@@ -99,7 +99,11 @@ test("broadcast output paints the same payload committed from preview", async ({
   const canvas = page.locator("canvas")
   await expect(canvas).toBeVisible()
 
-  await page.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__))
+  // Fail fast (and legibly) if the page never mounts, instead of hanging the
+  // full 60s test budget on the default no-timeout waitForFunction.
+  await page.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__), null, {
+    timeout: 15_000,
+  })
   await page.evaluate(
     ({ theme, item }) => {
       window.__SABBATHCUE_BROADCAST_TEST__?.render({ theme, item })
@@ -169,7 +173,9 @@ test("broadcast output switches to the native video overlay for video payloads",
     waitUntil: "domcontentloaded",
   })
 
-  await page.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__))
+  await page.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__), null, {
+    timeout: 15_000,
+  })
   await page.evaluate(
     ({ theme, item }) => {
       window.__SABBATHCUE_BROADCAST_TEST__?.render({ theme, item })

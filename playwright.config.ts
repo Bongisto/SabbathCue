@@ -12,6 +12,9 @@ const browserChannel =
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
+  // Browser e2e occasionally races a cold/contended CI runner (slow chunk load
+  // delays the React mount). Retry transient failures on CI; never locally.
+  retries: process.env.CI ? 2 : 0,
   expect: {
     timeout: 5_000,
   },

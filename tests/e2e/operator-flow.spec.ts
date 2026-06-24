@@ -77,7 +77,10 @@ const e2eTheme = {
 test.describe("operator flow harness", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/?e2e=1", { waitUntil: "domcontentloaded" })
-    await page.waitForFunction(() => Boolean(window.__SABBATHCUE_OPERATOR_E2E__))
+    // Fail fast if the app never mounts rather than hanging the 60s test budget.
+    await page.waitForFunction(() => Boolean(window.__SABBATHCUE_OPERATOR_E2E__), null, {
+      timeout: 15_000,
+    })
   })
 
   test("queue next and prev navigation updates active index and live reference", async ({ page }) => {
@@ -458,7 +461,11 @@ test.describe("operator flow harness", () => {
     await broadcastPage.goto("/broadcast-output.html?output=main&e2e=1", {
       waitUntil: "domcontentloaded",
     })
-    await broadcastPage.waitForFunction(() => Boolean(window.__SABBATHCUE_BROADCAST_TEST__))
+    await broadcastPage.waitForFunction(
+      () => Boolean(window.__SABBATHCUE_BROADCAST_TEST__),
+      null,
+      { timeout: 15_000 },
+    )
     await broadcastPage.evaluate(
       ({ theme, item }) => {
         window.__SABBATHCUE_BROADCAST_TEST__?.render({ theme, item })
