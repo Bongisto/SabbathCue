@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client"
+import { isNetworkError } from "@/lib/supabase/errors"
 import { PASSWORD_RESET_REDIRECT_URL } from "@/lib/supabase/password-reset-url"
 import {
   clearToken,
@@ -46,17 +47,6 @@ export type RestoreSessionResult =
       accessTokenExpiresAt: number
     }
   | { ok: false; code: "expired" | "network" | "unknown"; message: string }
-
-function isNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return (
-    message.includes("fetch") ||
-    message.includes("network") ||
-    message.includes("failed to fetch") ||
-    message.includes("networkerror")
-  )
-}
 
 function isSupabaseConfigurationError(error: unknown): boolean {
   return (

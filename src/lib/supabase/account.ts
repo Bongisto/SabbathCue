@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client"
+import { failureMessage } from "@/lib/supabase/errors"
 
 export interface AdminAccountRow {
   user_id: string
@@ -13,13 +14,6 @@ export interface AdminAccountRow {
 }
 
 export type AccountActionResult = { ok: true } | { ok: false; message: string }
-
-function failureMessage(
-  error: { message?: string } | null,
-  fallback: string
-): string {
-  return error?.message?.trim() ? error.message : fallback
-}
 
 /** Whether the signed-in user may use the admin dashboard. */
 export async function fetchIsAdmin(): Promise<boolean> {

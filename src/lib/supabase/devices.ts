@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client"
+import { isNetworkError } from "@/lib/supabase/errors"
 
 export type RegisterDeviceResult =
   | { ok: true; accessExpiresAt: number | null }
@@ -6,17 +7,6 @@ export type RegisterDeviceResult =
   | { ok: false; code: "suspended" }
   | { ok: false; code: "trial_expired" }
   | { ok: false; code: "error"; message: string }
-
-function isNetworkError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return (
-    message.includes("fetch") ||
-    message.includes("network") ||
-    message.includes("failed to fetch") ||
-    message.includes("networkerror")
-  )
-}
 
 function parseRegisterDeviceStatus(data: unknown): RegisterDeviceResult {
   if (!data || typeof data !== "object") {

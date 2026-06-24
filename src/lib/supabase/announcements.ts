@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase/client"
+import { failureMessage } from "@/lib/supabase/errors"
 
 export interface ActiveAnnouncement {
   id: string
@@ -22,13 +23,6 @@ export interface AdminAnnouncementRow {
 export type AnnouncementActionResult =
   | { ok: true }
   | { ok: false; message: string }
-
-function failureMessage(
-  error: { message?: string } | null,
-  fallback: string
-): string {
-  return error?.message?.trim() ? error.message : fallback
-}
 
 export async function fetchActiveAnnouncements(): Promise<
   | { ok: true; announcements: ActiveAnnouncement[] }
