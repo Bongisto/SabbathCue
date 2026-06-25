@@ -67,23 +67,21 @@ jobs:
       - name: Download Whisper model
         run: bun run download:whisper
 
-      - name: Cache MiniLM models
+      - name: Cache gte-small model
         uses: actions/cache@v4
         with:
-          path: |
-            models/minilm-l6-v2
-            models/minilm-l6-v2-int8
-          key: minilm-models-${{ hashFiles('data/export-minilm-onnx.py') }}
+          path: models/gte-small
+          key: gte-small-model-${{ hashFiles('data/download-gte-small.ts') }}
 
       - name: Cache embeddings
         uses: actions/cache@v4
         with:
           path: embeddings
-          key: minilm-embeddings-${{ hashFiles('data/precompute-embeddings.py') }}
+          key: gte-small-embeddings-${{ hashFiles('data/download-gte-small.ts') }}
 
-      - name: Prepare MiniLM semantic assets
+      - name: Prepare gte-small semantic assets
         run: |
-          bun run download:model
+          bun run download:gte-small
           bun run export:verses
           bun run precompute:embeddings
 
