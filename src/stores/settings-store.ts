@@ -5,6 +5,9 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 
 export type SttProvider = "deepgram" | "gladia" | "vosk"
 
+const DEFAULT_CONFIDENCE_THRESHOLD = 0.98
+const LEGACY_DEFAULT_CONFIDENCE_THRESHOLD = 0.8
+
 interface SettingsState {
   hasDeepgramApiKey: boolean
   hasGladiaApiKey: boolean
@@ -40,7 +43,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   gain: 1.0,
   autoMode: false,
   autoPreviewDetections: true,
-  confidenceThreshold: 0.8,
+  confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
   cooldownMs: 2500,
   onboardingComplete: false,
   sttProvider: "vosk",
@@ -79,6 +82,16 @@ function parseSttProvider(value: unknown): SttProvider {
   // Migrate removed/legacy local providers (whisper, faster-whisper,
   // legacy-whisper, sherpa) to the supported local model.
   return "vosk"
+}
+
+function parseConfidenceThreshold(value: unknown): unknown {
+  if (
+    typeof value === "number" &&
+    Math.abs(value - LEGACY_DEFAULT_CONFIDENCE_THRESHOLD) < Number.EPSILON
+  ) {
+    return DEFAULT_CONFIDENCE_THRESHOLD
+  }
+  return value
 }
 
 let tauriStore: Store | null = null
@@ -123,6 +136,9 @@ export function hydrateSettings(): Promise<void> {
         if (value !== undefined && value !== null) {
           if (key === "sttProvider") {
             patch.sttProvider = parseSttProvider(value)
+          } else if (key === "confidenceThreshold") {
+            ;(patch as Record<string, unknown>)[key] =
+              parseConfidenceThreshold(value)
           } else {
             ;(patch as Record<string, unknown>)[key] = value
           }

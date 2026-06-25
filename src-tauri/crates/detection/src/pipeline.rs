@@ -428,8 +428,8 @@ mod tests {
         let mut pipeline = DetectionPipeline::new();
         let results = pipeline.process("John 3:16");
         assert!(!results.is_empty());
-        // Direct references have confidence >= 0.90 which is above the
-        // default auto_queue_threshold (0.80), so should be auto-queued.
+        // Exact direct references have 1.0 confidence, above the conservative
+        // default auto_queue_threshold (0.98), so should be auto-queued.
         assert!(results[0].auto_queued);
     }
 

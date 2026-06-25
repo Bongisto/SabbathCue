@@ -103,10 +103,20 @@ fn build_asset_status(app: &AppHandle) -> AssetStatus {
     let vosk_worker_path = asset_paths::vosk_worker_path(app);
     let vosk_worker = vosk_worker_path.exists();
     let (vosk_runtime, vosk_runtime_error) = vosk_runtime_status(&vosk_worker_path);
-    let onnx_model = asset_paths::onnx_model_path(app).exists();
-    let tokenizer = asset_paths::tokenizer_path(app).exists();
-    let embeddings = asset_paths::embeddings_path(app).exists();
-    let embedding_ids = asset_paths::embedding_ids_path(app).exists();
+    let onnx_model_path = asset_paths::onnx_model_path(app);
+    let tokenizer_path = asset_paths::tokenizer_path(app);
+    let embeddings_path = asset_paths::embeddings_path(app);
+    let embedding_ids_path = asset_paths::embedding_ids_path(app);
+    let onnx_model = onnx_model_path.exists();
+    let tokenizer = tokenizer_path.exists();
+    let embeddings = embeddings_path.exists();
+    let embedding_ids = embedding_ids_path.exists();
+    let semantic_assets_compatible = asset_paths::semantic_assets_are_compatible(
+        &onnx_model_path,
+        &tokenizer_path,
+        &embeddings_path,
+        &embedding_ids_path,
+    );
     let ndi_sdk = asset_paths::ndi_library_path(app).exists();
 
     AssetStatus {
@@ -121,7 +131,11 @@ fn build_asset_status(app: &AppHandle) -> AssetStatus {
         tokenizer,
         embeddings,
         embedding_ids,
-        semantic_ready: onnx_model && tokenizer && embeddings && embedding_ids,
+        semantic_ready: onnx_model
+            && tokenizer
+            && embeddings
+            && embedding_ids
+            && semantic_assets_compatible,
         ndi_sdk,
     }
 }

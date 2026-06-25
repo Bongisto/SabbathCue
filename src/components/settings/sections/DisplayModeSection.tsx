@@ -79,8 +79,8 @@ export function DisplayModeSection() {
             Semantic and testimony-based suggestions still appear for review.
           </p>
           <p className="text-[0.625rem] font-medium text-foreground">
-            Tip: 90% gives the best results — high-certainty verses go live
-            while everything else waits for your review.
+            Tip: 98% keeps autocue conservative - exact references go live
+            while uncertain semantic suggestions wait for review.
           </p>
         </div>
       )}

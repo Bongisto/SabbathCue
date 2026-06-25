@@ -25,6 +25,8 @@ import type {
   Verse,
 } from "@/types"
 
+const SEMANTIC_AUTO_PREVIEW_CONFIDENCE = 0.98
+
 function detectionLikeToVerse({
   book_number,
   book_name,
@@ -178,11 +180,15 @@ function selectPreviewHit(
   const directHit = bestDetection(directHits)
   if (directHit) return directHit
 
+  const semanticMinConfidence = Math.max(
+    minConfidence,
+    SEMANTIC_AUTO_PREVIEW_CONFIDENCE
+  )
   return bestDetection(
     detections.filter(
       (d) =>
         d.source === "semantic" &&
-        d.confidence >= minConfidence &&
+        d.confidence >= semanticMinConfidence &&
         !d.is_chapter_only &&
         d.book_number > 0
     )
@@ -311,7 +317,7 @@ async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
       previewVerseAndMaybeAutoLive(resolved.verse, { autoLive: true })
     }
   } else if (autoPreview) {
-    recordWorkflowTrace("detection.preview.skipped", "No direct hit met preview criteria", {
+    recordWorkflowTrace("detection.preview.skipped", "No trusted hit met preview criteria", {
       count: detections.length,
       confidenceThreshold: settings.confidenceThreshold,
     })

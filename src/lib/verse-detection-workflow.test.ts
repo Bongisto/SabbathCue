@@ -223,7 +223,7 @@ describe("verse detection workflow", () => {
     })
   })
 
-  it("auto-previews semantic Bible detections at the settings threshold", async () => {
+  it("does not auto-preview semantic Bible detections at the direct threshold", async () => {
     useSettingsStore.setState({ confidenceThreshold: 0.85 })
     await handleVerseDetections([
       makeDetection({
@@ -235,6 +235,28 @@ describe("verse detection workflow", () => {
         chapter: 7,
         verse: 10,
         confidence: 0.9,
+        auto_queued: false,
+        transcript_snippet: "the court was seated and the books were opened",
+      }),
+    ])
+
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
+    expect(useBroadcastStore.getState().liveItem).toBeNull()
+    expect(useQueueStore.getState().items).toHaveLength(0)
+  })
+
+  it("auto-previews semantic Bible detections only at the strict semantic floor", async () => {
+    useSettingsStore.setState({ confidenceThreshold: 0.85 })
+    await handleVerseDetections([
+      makeDetection({
+        source: "semantic",
+        verse_ref: "Daniel 7:10",
+        verse_text: "The court was seated, and the books were opened.",
+        book_name: "Daniel",
+        book_number: 27,
+        chapter: 7,
+        verse: 10,
+        confidence: 0.98,
         auto_queued: false,
         transcript_snippet: "the court was seated and the books were opened",
       }),

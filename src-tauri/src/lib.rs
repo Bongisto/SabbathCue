@@ -196,6 +196,22 @@ pub fn run() {
             log::info!("Resolved embedding ids path: {}", ids_path.display());
 
             if model_path.exists() && tokenizer_path.exists() {
+                if !asset_paths::semantic_assets_are_compatible(
+                    &model_path,
+                    &tokenizer_path,
+                    &embeddings_path,
+                    &ids_path,
+                ) {
+                    log::warn!(
+                        "Semantic search disabled: model/tokenizer/embedding assets are from different families (model={}, tokenizer={}, embeddings={}, ids={})",
+                        model_path.display(),
+                        tokenizer_path.display(),
+                        embeddings_path.display(),
+                        ids_path.display()
+                    );
+                    return Ok(());
+                }
+
                 use rhema_detection::semantic::embedder::TextEmbedder;
                 use rhema_detection::semantic::index::VectorIndex;
                 match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {

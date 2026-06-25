@@ -7,7 +7,7 @@ use crate::types::{Detection, DetectionSource};
 const DEFAULT_CONFIDENCE_THRESHOLD: f64 = 0.45;
 
 /// Default auto-queue threshold — detections above this are auto-queued.
-const DEFAULT_AUTO_QUEUE_THRESHOLD: f64 = 0.80;
+const DEFAULT_AUTO_QUEUE_THRESHOLD: f64 = 0.98;
 
 /// Default cooldown in milliseconds between auto-displayed results.
 const DEFAULT_COOLDOWN_MS: u64 = 2500;
@@ -482,13 +482,13 @@ mod tests {
             "John",
             3,
             16,
-            0.96,
+            0.99,
             DetectionSource::DirectReference,
         )];
 
         let results = merger.merge(direct, vec![]);
         assert_eq!(results.len(), 1);
-        // 0.96 >= 0.80 auto_queue_threshold and no cooldown yet
+        // 0.99 >= 0.98 auto_queue_threshold and no cooldown yet
         assert!(results[0].auto_queued);
     }
 
@@ -528,13 +528,13 @@ mod tests {
             "John",
             3,
             16,
-            0.95,
-            DetectionSource::Semantic { similarity: 0.95 },
+            0.99,
+            DetectionSource::Semantic { similarity: 0.99 },
         )];
 
         let results = merger.merge(vec![], semantic);
         assert_eq!(results.len(), 1);
-        // 0.95 >= 0.80 auto_queue_threshold, but semantic is auto-queue-ineligible.
+        // 0.99 >= 0.98 auto_queue_threshold, but semantic is auto-queue-ineligible.
         assert!(!results[0].auto_queued);
     }
 
@@ -553,7 +553,7 @@ mod tests {
 
         let results = merger.merge(vec![], semantic);
         assert_eq!(results.len(), 1);
-        // 0.50 < 0.80 auto_queue_threshold
+        // 0.50 < 0.98 auto_queue_threshold
         assert!(!results[0].auto_queued);
     }
 
@@ -611,8 +611,8 @@ mod tests {
         let mut merger = DetectionMerger::new();
 
         let direct = vec![
-            make_detection(43, "John", 3, 16, 0.96, DetectionSource::DirectReference),
-            make_detection(45, "Romans", 8, 28, 0.92, DetectionSource::DirectReference),
+            make_detection(43, "John", 3, 16, 0.99, DetectionSource::DirectReference),
+            make_detection(45, "Romans", 8, 28, 0.98, DetectionSource::DirectReference),
         ];
         let semantic = vec![make_detection(
             1,
@@ -644,7 +644,7 @@ mod tests {
             "John",
             3,
             16,
-            0.96,
+            0.99,
             DetectionSource::DirectReference,
         )];
         let semantic = vec![make_detection(

@@ -75,7 +75,7 @@ describe("settings store", () => {
     expect(state.autoPreviewDetections).toBe(false)
     // Defaults remain for keys with null
     expect(state.autoMode).toBe(false)
-    expect(state.confidenceThreshold).toBe(0.8)
+    expect(state.confidenceThreshold).toBe(0.98)
   })
 
   it("hydrate with no persisted values falls back to defaults", async () => {
@@ -90,6 +90,19 @@ describe("settings store", () => {
     expect(after.sttProvider).toBe("vosk")
     expect(after.autoMode).toBe(false)
     expect(after.autoPreviewDetections).toBe(true)
+  })
+
+  it("migrates the legacy default confidence threshold to the conservative default", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "confidenceThreshold") return 0.8
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
+    await hydrateSettings()
+
+    expect(useSettingsStore.getState().confidenceThreshold).toBe(0.98)
   })
 
   it("does not trust persisted Deepgram key status when keychain status is unavailable", async () => {

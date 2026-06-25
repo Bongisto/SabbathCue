@@ -64,6 +64,38 @@ fn named_asset_candidates(roots: &[PathBuf], subdir: &str, filenames: &[&str]) -
         .collect()
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SemanticAssetFamily {
+    GteSmall,
+    MiniLmL6V2,
+}
+
+fn semantic_asset_family(path: &Path) -> Option<SemanticAssetFamily> {
+    let path = path.to_string_lossy().to_ascii_lowercase();
+    if path.contains("gte-small") {
+        Some(SemanticAssetFamily::GteSmall)
+    } else if path.contains("minilm-l6-v2") {
+        Some(SemanticAssetFamily::MiniLmL6V2)
+    } else {
+        None
+    }
+}
+
+pub fn semantic_assets_are_compatible(
+    model_path: &Path,
+    tokenizer_path: &Path,
+    embeddings_path: &Path,
+    ids_path: &Path,
+) -> bool {
+    let Some(model_family) = semantic_asset_family(model_path) else {
+        return false;
+    };
+
+    [tokenizer_path, embeddings_path, ids_path]
+        .iter()
+        .all(|path| semantic_asset_family(path) == Some(model_family))
+}
+
 fn is_vosk_model_dir(path: &Path) -> bool {
     path.join("conf").join("model.conf").exists()
         && path.join("am").join("final.mdl").exists()
@@ -316,7 +348,12 @@ pub fn tokenizer_path(app: &AppHandle) -> PathBuf {
                 .resource_dir()
                 .ok()
                 .map(|p| p.join("models").join("gte-small").join("tokenizer.json")),
-            Some(dev_root().join("models").join("gte-small").join("tokenizer.json")),
+            Some(
+                dev_root()
+                    .join("models")
+                    .join("gte-small")
+                    .join("tokenizer.json"),
+            ),
             app_data_dir(app)
                 .ok()
                 .map(|p| p.join("models").join("minilm-l6-v2").join("tokenizer.json")),
@@ -557,6 +594,36 @@ mod tests {
                 root_b.join("embeddings").join(LEGACY_EMBEDDINGS_FILENAME),
             ]
         );
+    }
+
+    #[test]
+    fn semantic_assets_are_compatible_accepts_matching_gte_assets() {
+        assert!(semantic_assets_are_compatible(
+            Path::new("models/gte-small/onnx/model_quantized.onnx"),
+            Path::new("models/gte-small/tokenizer.json"),
+            Path::new("embeddings/kjv-nkjv-nlt-gte-small.bin"),
+            Path::new("embeddings/kjv-nkjv-nlt-gte-small-ids.bin"),
+        ));
+    }
+
+    #[test]
+    fn semantic_assets_are_compatible_rejects_gte_model_with_legacy_index() {
+        assert!(!semantic_assets_are_compatible(
+            Path::new("models/gte-small/onnx/model_quantized.onnx"),
+            Path::new("models/gte-small/tokenizer.json"),
+            Path::new("embeddings/kjv-nkjv-nlt-minilm-l6-v2.bin"),
+            Path::new("embeddings/kjv-nkjv-nlt-minilm-l6-v2-ids.bin"),
+        ));
+    }
+
+    #[test]
+    fn semantic_assets_are_compatible_rejects_mixed_model_and_tokenizer() {
+        assert!(!semantic_assets_are_compatible(
+            Path::new("models/gte-small/onnx/model_quantized.onnx"),
+            Path::new("models/minilm-l6-v2/tokenizer.json"),
+            Path::new("embeddings/kjv-nkjv-nlt-gte-small.bin"),
+            Path::new("embeddings/kjv-nkjv-nlt-gte-small-ids.bin"),
+        ));
     }
 }
 
