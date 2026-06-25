@@ -129,9 +129,16 @@ impl DetectionMerger {
         for detection in deduped {
             // Only direct references auto-queue. Semantic suggestions are
             // operator review hints, not display-worthy on their own.
+            //
+            // Chapter-only placeholders (verse defaults to 1, e.g. "Revelation
+            // chapter 20" before "verse 12" is spoken) must not auto-queue —
+            // they would jump the queue/reading to the wrong verse. They still
+            // surface as an operator hint and are refined once the real verse
+            // arrives.
             let eligible = detection.confidence >= self.auto_queue_threshold
                 && cooldown_ok
-                && matches!(detection.source, DetectionSource::DirectReference);
+                && matches!(detection.source, DetectionSource::DirectReference)
+                && !detection.is_chapter_only;
             let auto_queued = eligible && !auto_queue_used;
             if auto_queued {
                 auto_queue_used = true;
@@ -483,6 +490,33 @@ mod tests {
         assert_eq!(results.len(), 1);
         // 0.96 >= 0.80 auto_queue_threshold and no cooldown yet
         assert!(results[0].auto_queued);
+    }
+
+    #[test]
+    fn chapter_only_direct_detection_does_not_auto_queue() {
+        // "Revelation chapter 20" (before the verse is spoken) surfaces a
+        // chapter-only placeholder at 0.88 — verse defaults to 1. It must NOT
+        // auto-queue, or the operator's queue/reading jumps to the wrong verse
+        // (Revelation 20:1) until the real verse ("verse 12") arrives. It stays
+        // visible as an operator hint (>= operator threshold), just not queued.
+        let mut merger = DetectionMerger::new();
+
+        let mut chapter_only = make_detection(
+            66,
+            "Revelation",
+            20,
+            1,
+            0.88,
+            DetectionSource::DirectReference,
+        );
+        chapter_only.is_chapter_only = true;
+
+        let results = merger.merge(vec![chapter_only], vec![]);
+        assert_eq!(results.len(), 1, "chapter-only result still surfaces");
+        assert!(
+            !results[0].auto_queued,
+            "chapter-only placeholder (verse 1) must not auto-queue"
+        );
     }
 
     #[test]
