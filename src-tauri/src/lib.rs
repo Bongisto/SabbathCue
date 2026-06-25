@@ -76,6 +76,7 @@ pub fn run() {
             commands::detection::stop_reading_mode,
             commands::detection::update_detection_settings,
             commands::detection::set_detection_paused,
+            commands::detection::set_explicit_citations_only,
             commands::detection::detection_control_status,
             commands::assets::asset_status,
             commands::assets::get_service_attachment_limits,

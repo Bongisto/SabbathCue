@@ -5,6 +5,7 @@ import type { DetectionResult } from "@/types"
 
 export interface DetectionControlStatus {
   detection_paused: boolean
+  explicit_citations_only: boolean
 }
 
 // Stable action functions (same pattern as use-bible.ts)
@@ -53,9 +54,15 @@ async function setDetectionPaused(paused: boolean) {
   return invokeTauri<boolean>("set_detection_paused", { paused })
 }
 
+async function setExplicitCitationsOnly(enabled: boolean) {
+  if (!isTauriRuntime()) return enabled
+
+  return invokeTauri<boolean>("set_explicit_citations_only", { enabled })
+}
+
 async function getDetectionControlStatus() {
   if (!isTauriRuntime()) {
-    return { detection_paused: false }
+    return { detection_paused: false, explicit_citations_only: false }
   }
 
   return invokeTauri<DetectionControlStatus>("detection_control_status")
@@ -65,6 +72,7 @@ export const detectionActions = {
   detectVerses,
   getDetectionStatus,
   setDetectionPaused,
+  setExplicitCitationsOnly,
   getDetectionControlStatus,
   clearDetections: () => useDetectionStore.getState().clearDetections(),
   removeDetection: (verseRef: string) =>

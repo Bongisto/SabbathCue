@@ -8,6 +8,7 @@ const mockSetLiveVerse = vi.fn()
 const mockSelectVerse = vi.fn()
 const mockSetReadingModeAutoLive = vi.fn()
 const mockSetDetectionPaused = vi.fn().mockResolvedValue(true)
+const mockSetExplicitCitationsOnly = vi.fn().mockResolvedValue(true)
 const mockStop = vi.fn()
 const mockInvoke = vi.fn().mockResolvedValue(undefined)
 
@@ -88,7 +89,12 @@ vi.mock("@/stores/service-plan-store", () => ({
 vi.mock("@/hooks/use-detection", () => ({
   detectionActions: {
     setDetectionPaused: mockSetDetectionPaused,
-    getDetectionControlStatus: () => Promise.resolve({ detection_paused: false }),
+    setExplicitCitationsOnly: mockSetExplicitCitationsOnly,
+    getDetectionControlStatus: () =>
+      Promise.resolve({
+        detection_paused: false,
+        explicit_citations_only: false,
+      }),
   },
 }))
 
@@ -305,6 +311,24 @@ describe("OperatorStatusStrip emergency controls", () => {
       })
       await click(getButtonByTitle("Resume suggestions"))
       expect(mockSetDetectionPaused).toHaveBeenCalledWith(false)
+    })
+  })
+
+  describe("Explicit citations only", () => {
+    it("calls setExplicitCitationsOnly(true) when Citations only is clicked", async () => {
+      await renderStrip()
+      await click(getButtonByTitle("Citations only"))
+      expect(mockSetExplicitCitationsOnly).toHaveBeenCalledWith(true)
+    })
+
+    it("calls setExplicitCitationsOnly(false) when Allow paraphrases is clicked", async () => {
+      await renderStrip()
+      await click(getButtonByTitle("Citations only"))
+      await act(async () => {
+        await Promise.resolve()
+      })
+      await click(getButtonByTitle("Allow paraphrases"))
+      expect(mockSetExplicitCitationsOnly).toHaveBeenCalledWith(false)
     })
   })
 })

@@ -37,6 +37,18 @@ pub(crate) fn is_detection_paused(app: &AppHandle) -> bool {
     paused
 }
 
+/// Check whether the operator has restricted detection to explicit spoken
+/// citations only. When enabled, the semantic (paraphrase) emission path is
+/// suppressed; direct references and explicit EGW references still emit.
+pub(crate) fn is_explicit_citations_only(app: &AppHandle) -> bool {
+    let state: State<'_, Mutex<AppState>> = app.state();
+    let explicit_only = match state.lock() {
+        Ok(s) => s.explicit_citations_only.load(Ordering::Relaxed),
+        Err(_) => false,
+    };
+    explicit_only
+}
+
 pub(crate) const SEMANTIC_WINDOW_SEGMENTS: usize = 4;
 pub(crate) const FINAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(100);
@@ -370,6 +382,16 @@ pub(crate) fn run_semantic_detection(
             );
         }
         let _ = app.emit("verse_detections", &egw_explicit);
+        return;
+    }
+
+    // Explicit-citations-only mode: the direct path and the explicit EGW catch
+    // above already cover spoken references. Everything below is paraphrase /
+    // thematic matching (FTS5 + vector), which by design surfaces verses that
+    // were never cited — so suppress it entirely when the operator asks for
+    // explicit citations only.
+    if is_explicit_citations_only(app) {
+        log::info!("[DET-TRACE] seq={seq} skip=semantic reason=explicit_only");
         return;
     }
 
@@ -1139,6 +1161,34 @@ mod tests {
             .store(false, std::sync::atomic::Ordering::SeqCst);
         assert!(!app_state
             .detection_paused
+            .load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    /// `explicit_citations_only` gates the semantic (paraphrase) emission path.
+    /// It MUST default to false so paraphrase detection stays on unless an
+    /// operator deliberately switches to explicit-citation-only mode.
+    #[test]
+    fn test_explicit_citations_only_state() {
+        let app_state = crate::state::AppState::new();
+        assert!(
+            !app_state
+                .explicit_citations_only
+                .load(std::sync::atomic::Ordering::Relaxed),
+            "explicit_citations_only should default to false"
+        );
+
+        app_state
+            .explicit_citations_only
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        assert!(app_state
+            .explicit_citations_only
+            .load(std::sync::atomic::Ordering::Relaxed));
+
+        app_state
+            .explicit_citations_only
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        assert!(!app_state
+            .explicit_citations_only
             .load(std::sync::atomic::Ordering::Relaxed));
     }
 
