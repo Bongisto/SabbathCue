@@ -239,6 +239,7 @@ export function VideoControlBar({ item }: VideoControlBarProps) {
     const unlisten = listen<VideoTimeUpdatePayload>(
       VIDEO_TIMEUPDATE_EVENT,
       (event) => {
+        if (event.payload.outputId !== "main") return
         useBroadcastStore.getState().setVideoTransport(event.payload)
         if (event.payload.ended) {
           useBroadcastStore.getState().handleVideoEnded()

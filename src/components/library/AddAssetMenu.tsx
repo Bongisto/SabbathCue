@@ -34,6 +34,8 @@ import { useLibraryStore } from "@/stores/library-store"
 import type { LibraryAsset } from "@/types/library"
 import type { SlideDeckPresentationItemData } from "@/types"
 
+const LIBRARY_PRESENTATION_IMAGE_MAX_SIZE = 1920
+
 interface AddAssetMenuProps {
   onCreateSong: () => void
 }
@@ -59,7 +61,10 @@ export function AddAssetMenu({ onCreateSong }: AddAssetMenuProps) {
       saveLibraryImage(selected),
       readImageThumbnail(selected),
     ])
-    const thumbnail = await downscaleImageToThumbnail(dataUrl)
+    const thumbnail = await downscaleImageToThumbnail(
+      dataUrl,
+      LIBRARY_PRESENTATION_IMAGE_MAX_SIZE
+    )
     addAsset({
       id: crypto.randomUUID(),
       name: saved.fileName.replace(/\.[^.]+$/, ""),

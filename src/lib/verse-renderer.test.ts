@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest"
-import { clampCornerRadius, textForPresentation } from "./verse-renderer"
-import type { PresentationRenderData, VerseRenderData } from "@/types"
+import { describe, expect, it, vi } from "vitest"
+import { BUILTIN_THEMES } from "./builtin-themes"
+import { clampCornerRadius, renderPresentation, textForPresentation } from "./verse-renderer"
+import type { BroadcastTheme, PresentationRenderData, VerseRenderData } from "@/types"
 
 describe("textForPresentation", () => {
   it("flows chunked scripture as one continuous paragraph", () => {
@@ -67,3 +68,84 @@ describe("clampCornerRadius", () => {
     expect(clampCornerRadius(100, 20, -4)).toBe(0)
   })
 })
+
+describe("renderPresentation slide deck images", () => {
+  it("draws themed slide images inside the theme text area", () => {
+    const { context, drawImage } = createRenderContext()
+    const theme = testTheme()
+    const imageUrl = "data:image/png;base64,slide"
+    const image = {
+      naturalWidth: 2000,
+      naturalHeight: 1000,
+    } as HTMLImageElement
+
+    renderPresentation(
+      context,
+      theme,
+      {
+        kind: "slideDeck",
+        reference: "Slide",
+        segments: [{ text: "Slide" }],
+        slideImageUrl: imageUrl,
+        applyTheme: true,
+        hymnSlide: {
+          screenId: "slide-1",
+          slideIndex: 0,
+          slideCount: 1,
+        },
+      },
+      { imageCache: new Map([[imageUrl, image]]) }
+    )
+
+    expect(drawImage).toHaveBeenCalledWith(image, 250, 375, 500, 250)
+  })
+})
+
+function testTheme(): BroadcastTheme {
+  return {
+    ...BUILTIN_THEMES[0],
+    resolution: { width: 1000, height: 1000 },
+    background: {
+      type: "solid",
+      color: "#101010",
+      gradient: null,
+      image: null,
+    },
+    textBox: {
+      ...BUILTIN_THEMES[0].textBox,
+      enabled: false,
+    },
+    layout: {
+      ...BUILTIN_THEMES[0].layout,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      textAreaWidth: 50,
+      textAreaHeight: 50,
+    },
+  }
+}
+
+function createRenderContext(): {
+  context: CanvasRenderingContext2D
+  drawImage: ReturnType<typeof vi.fn>
+} {
+  const drawImage = vi.fn()
+  const gradient = { addColorStop: vi.fn() }
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    fillRect: vi.fn(),
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    arcTo: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    fillText: vi.fn(),
+    drawImage,
+    measureText: vi.fn((text: string) => ({ width: text.length * 10 })),
+    createLinearGradient: vi.fn(() => gradient),
+    createRadialGradient: vi.fn(() => gradient),
+  } as unknown as CanvasRenderingContext2D
+  return { context, drawImage }
+}

@@ -30,6 +30,8 @@ vi.mock("@/lib/presentation-workflow", () => ({
 }))
 
 const setWindowFullscreenMock = vi.fn().mockResolvedValue(undefined)
+const setLiveMock = vi.fn()
+const setLiveItemMock = vi.fn()
 const setLiveTransitionTypeMock = vi.fn()
 let broadcastState: Record<string, unknown>
 vi.mock("./live-output-panel-fullscreen", async (importOriginal) => {
@@ -48,7 +50,8 @@ vi.mock("@/stores/broadcast-store", () => {
   const selectActiveTheme = (state: Record<string, unknown>) => state.activeTheme
   useBroadcastStore.getState = () => ({
     ...broadcastState,
-    setLive: vi.fn(),
+    setLive: setLiveMock,
+    setLiveItem: setLiveItemMock,
     setReadingModeAutoLive: vi.fn(),
     setLiveTransitionType: setLiveTransitionTypeMock,
     reportOutputIssue: vi.fn(),
@@ -78,6 +81,8 @@ describe("LiveOutputPanel fullscreen chrome contract", () => {
   })
 
   beforeEach(() => {
+    setLiveMock.mockClear()
+    setLiveItemMock.mockClear()
     setLiveTransitionTypeMock.mockClear()
     presentVerseMock.mockClear()
     useBibleStore.getState().setCurrentChapter([])
@@ -140,6 +145,29 @@ describe("LiveOutputPanel fullscreen chrome contract", () => {
       cut?.click()
     })
     expect(setLiveTransitionTypeMock).toHaveBeenCalledWith("none")
+  })
+
+  it("offers a fade-to-black live action", () => {
+    broadcastState = {
+      ...broadcastState,
+      isLive: true,
+      liveItem: {
+        reference: "John 3:16",
+        segments: [{ text: "For God so loved the world." }],
+      },
+    }
+    renderPanel()
+
+    const fadeBlack = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Fade Black",
+    )
+    expect(fadeBlack).not.toBeNull()
+
+    act(() => {
+      fadeBlack?.click()
+    })
+    expect(setLiveMock).toHaveBeenCalledWith(false, { transitionType: "fade" })
+    expect(setLiveItemMock).toHaveBeenCalledWith(null)
   })
 
   it("renders live video media instead of the text canvas", () => {

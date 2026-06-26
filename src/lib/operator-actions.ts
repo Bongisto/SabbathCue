@@ -6,8 +6,9 @@ import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
 
 export function clearLiveOutput(): void {
-  useBroadcastStore.getState().setLiveItem(null)
-  useBroadcastStore.getState().setLive(false)
+  const broadcast = useBroadcastStore.getState()
+  broadcast.setLive(false)
+  broadcast.setLiveItem(null)
 }
 
 export function clearPreviewOutput(): void {
@@ -17,6 +18,12 @@ export function clearPreviewOutput(): void {
 
 export function blackoutOutput(): void {
   clearLiveOutput()
+}
+
+export function fadeLiveOutputToBlack(): void {
+  const broadcast = useBroadcastStore.getState()
+  broadcast.setLive(false, { transitionType: "fade" })
+  broadcast.setLiveItem(null)
 }
 
 export function toggleLiveOutputVisibility(): void {

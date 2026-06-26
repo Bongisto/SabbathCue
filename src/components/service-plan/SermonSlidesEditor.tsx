@@ -255,7 +255,7 @@ export function SermonSlidesEditor({
             type="checkbox"
             checked={applyTheme ?? false}
             onChange={(event) => onApplyThemeChange(event.target.checked)}
-            className="h-3.5 w-3.5 rounded border-input accent-primary"
+            className="h-3.5 w-3.5 rounded border-[var(--border-subtle)] accent-primary"
           />
           Apply current theme to these slides
         </label>
@@ -285,7 +285,7 @@ export function SermonSlidesEditor({
                   <img
                     src={slide.thumbnailUrl}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
                   <span className="text-[0.625rem] text-muted-foreground">

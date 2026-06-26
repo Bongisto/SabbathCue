@@ -48,6 +48,18 @@ function TestBroadcastVideoWithItem({
   return null
 }
 
+const videoItem: PresentationRenderData = {
+  kind: "video",
+  reference: "Welcome Video",
+  segments: [{ text: "Welcome Video" }],
+  video: {
+    source: "url",
+    videoId: "video-1",
+    title: "Welcome Video",
+    url: "https://cdn.example.com/welcome.mp4",
+  },
+}
+
 describe("useBroadcastVideo", () => {
   let container: HTMLDivElement
   let root: Root
@@ -105,21 +117,86 @@ describe("useBroadcastVideo", () => {
       root.render(
         <TestBroadcastVideoWithItem
           video={video}
-          item={{
-            kind: "video",
-            reference: "Welcome Video",
-            segments: [{ text: "Welcome Video" }],
-            video: {
-              source: "url",
-              videoId: "video-1",
-              title: "Welcome Video",
-              url: "https://cdn.example.com/welcome.mp4",
-            },
-          }}
+          item={videoItem}
         />
       )
     })
 
     expect(play).toHaveBeenCalled()
+  })
+
+  it("rewinds before replaying an ended video", async () => {
+    const video = document.createElement("video")
+    const play = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperties(video, {
+      duration: { value: 10 },
+      load: { value: vi.fn() },
+      pause: { value: vi.fn() },
+      play: { value: play },
+    })
+
+    await act(async () => {
+      root.render(<TestBroadcastVideoWithItem video={video} item={videoItem} />)
+    })
+    await vi.waitFor(() => expect(videoListenerRef.current).not.toBeNull())
+
+    video.currentTime = 10
+    await act(async () => {
+      videoListenerRef.current?.({ payload: { type: "play" } })
+    })
+
+    expect(video.currentTime).toBe(0)
+    expect(play).toHaveBeenCalled()
+  })
+
+  it("restarts when the same source is loaded again", async () => {
+    const video = document.createElement("video")
+    const play = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperties(video, {
+      load: { value: vi.fn() },
+      pause: { value: vi.fn() },
+      play: { value: play },
+    })
+
+    await act(async () => {
+      root.render(<TestBroadcastVideo video={video} />)
+    })
+    await vi.waitFor(() => expect(videoListenerRef.current).not.toBeNull())
+
+    await act(async () => {
+      videoListenerRef.current?.({ payload: { type: "load", item: videoItem } })
+    })
+    video.currentTime = 7
+    await act(async () => {
+      videoListenerRef.current?.({ payload: { type: "load", item: videoItem } })
+    })
+
+    expect(video.currentTime).toBe(0)
+    expect(play).toHaveBeenCalledTimes(2)
+  })
+
+  it("stops stale video even after item state has cleared", async () => {
+    const video = document.createElement("video")
+    const load = vi.fn()
+    const pause = vi.fn()
+    Object.defineProperties(video, {
+      load: { value: load },
+      pause: { value: pause },
+      play: { value: vi.fn().mockResolvedValue(undefined) },
+    })
+    video.src = "https://cdn.example.com/welcome.mp4"
+
+    await act(async () => {
+      root.render(<TestBroadcastVideo video={video} />)
+    })
+    await vi.waitFor(() => expect(videoListenerRef.current).not.toBeNull())
+
+    await act(async () => {
+      videoListenerRef.current?.({ payload: { type: "stop" } })
+    })
+
+    expect(pause).toHaveBeenCalled()
+    expect(load).toHaveBeenCalled()
+    expect(video.getAttribute("src")).toBeNull()
   })
 })

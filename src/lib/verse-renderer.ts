@@ -527,27 +527,34 @@ function drawSlideDeckImage(
   theme: BroadcastTheme,
   data: PresentationRenderData,
   imageCache?: Map<string, HTMLImageElement>,
+  targetRect?: VerseLayoutRect,
 ): boolean {
   if (data.kind !== "slideDeck" || !data.slideImageUrl) return false
   const img = imageCache?.get(data.slideImageUrl)
   if (!img) return false
 
   const { width, height } = theme.resolution
+  const bounds =
+    data.applyTheme && targetRect
+      ? targetRect
+      : { x: 0, y: 0, width, height }
+  const targetWidth = Math.max(1, bounds.width)
+  const targetHeight = Math.max(1, bounds.height)
   const imgRatio = img.naturalWidth / img.naturalHeight
-  const canvasRatio = width / height
-  let drawX = 0
-  let drawY = 0
-  let drawW = width
-  let drawH = height
+  const targetRatio = targetWidth / targetHeight
+  let drawX = bounds.x
+  let drawY = bounds.y
+  let drawW = targetWidth
+  let drawH = targetHeight
 
-  if (imgRatio > canvasRatio) {
-    drawW = width
-    drawH = width / imgRatio
-    drawY = (height - drawH) / 2
+  if (imgRatio > targetRatio) {
+    drawW = targetWidth
+    drawH = targetWidth / imgRatio
+    drawY = bounds.y + (targetHeight - drawH) / 2
   } else {
-    drawH = height
-    drawW = height * imgRatio
-    drawX = (width - drawW) / 2
+    drawH = targetHeight
+    drawW = targetHeight * imgRatio
+    drawX = bounds.x + (targetWidth - drawW) / 2
   }
 
   ctx.save()
@@ -563,7 +570,7 @@ function drawSlideDeckImage(
       theme.background.type === "image" ? theme.background.image?.tint : null
     if (tint) {
       ctx.fillStyle = tint
-      ctx.fillRect(0, 0, width, height)
+      ctx.fillRect(drawX, drawY, drawW, drawH)
     }
   }
   ctx.restore()
@@ -1196,7 +1203,13 @@ function renderPresentationImpl(
     return metrics
   }
 
-  if (drawSlideDeckImage(ctx, scaledTheme, data as PresentationRenderData, options?.imageCache)) {
+  if (drawSlideDeckImage(
+    ctx,
+    scaledTheme,
+    data as PresentationRenderData,
+    options?.imageCache,
+    metrics.textAreaRect
+  )) {
     drawHymnSlideCounter(ctx, scaledTheme, data as PresentationRenderData)
     ctx.restore()
     return metrics

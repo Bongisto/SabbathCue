@@ -12,7 +12,19 @@ export async function downscaleImageToThumbnail(
   const ctx = canvas.getContext("2d")
   if (!ctx) return dataUrl
   ctx.drawImage(image, 0, 0, width, height)
-  return canvas.toDataURL("image/jpeg", 0.78)
+  const mimeType = canvasOutputMimeType(dataUrl)
+  if (mimeType === "image/jpeg" || mimeType === "image/webp") {
+    return canvas.toDataURL(mimeType, 0.92)
+  }
+  return canvas.toDataURL(mimeType)
+}
+
+function canvasOutputMimeType(dataUrl: string): "image/jpeg" | "image/png" | "image/webp" {
+  const mimeType = dataUrl.match(/^data:(image\/[^;,]+)[;,]/)?.[1]
+  if (mimeType === "image/jpeg" || mimeType === "image/png" || mimeType === "image/webp") {
+    return mimeType
+  }
+  return "image/png"
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {

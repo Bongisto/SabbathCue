@@ -43,6 +43,17 @@ function snapshot(video: HTMLVideoElement, outputId: string, ended = false) {
   }
 }
 
+function seekToStart(element: HTMLVideoElement): void {
+  element.currentTime = 0
+}
+
+function rewindIfEnded(element: HTMLVideoElement): void {
+  const duration = Number.isFinite(element.duration) ? element.duration : 0
+  if (element.ended || (duration > 0 && element.currentTime >= duration)) {
+    seekToStart(element)
+  }
+}
+
 function loadVideoSource(
   element: HTMLVideoElement,
   source: VideoPresentationSource | null | undefined
@@ -58,6 +69,8 @@ function loadVideoSource(
     element.poster = source.poster ?? ""
     element.loop = Boolean(source.loop)
     element.load()
+  } else {
+    seekToStart(element)
   }
   playVideo(element)
 }
@@ -78,6 +91,7 @@ function isJsdomNativeMediaPlay(element: HTMLVideoElement): boolean {
 
 function playVideo(element: HTMLVideoElement): void {
   if (isJsdomNativeMediaPlay(element)) return
+  rewindIfEnded(element)
   try {
     const result = element.play()
     if (result && typeof result.catch === "function") {
@@ -200,7 +214,7 @@ export function useBroadcastVideo({
         loadVideoSource(element, payload.item.video)
         return
       }
-      if (payload.type === "setSinkId") {
+      if (payload.type === "setSinkId" || payload.type === "stop") {
         applyPlaybackCommand(element, payload, outputId)
         return
       }
@@ -240,6 +254,7 @@ export function useBroadcastVideo({
     if (!video) return
     const emitSnapshot = (ended = false) => {
       if (!isTauriRuntime()) return
+      if (!isBroadcastOutputId(outputId)) return
       void emitVideoTimeUpdate(snapshot(video, outputId, ended))
     }
     const handleTimeUpdate = () => {
@@ -252,14 +267,18 @@ export function useBroadcastVideo({
       emitSnapshot(true)
       onEndedRef.current?.()
     }
+    const handlePlay = () => {
+      rewindIfEnded(video)
+      emitSnapshot(false)
+    }
     const handleStateChange = () => emitSnapshot(false)
     video.addEventListener("timeupdate", handleTimeUpdate)
-    video.addEventListener("play", handleStateChange)
+    video.addEventListener("play", handlePlay)
     video.addEventListener("pause", handleStateChange)
     video.addEventListener("ended", handleEnded)
     return () => {
       video.removeEventListener("timeupdate", handleTimeUpdate)
-      video.removeEventListener("play", handleStateChange)
+      video.removeEventListener("play", handlePlay)
       video.removeEventListener("pause", handleStateChange)
       video.removeEventListener("ended", handleEnded)
     }

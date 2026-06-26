@@ -70,7 +70,7 @@ export interface BroadcastState
   togglePinTheme: (id: string) => void
   setActiveTheme: (id: string) => void
   setAltActiveTheme: (id: string) => void
-  setLive: (live: boolean) => void
+  setLive: (live: boolean, options?: BroadcastSyncOptions) => void
   setPreviewItem: (item: PresentationRenderData | null) => void
   setLiveItem: (item: PresentationRenderData | null) => void
   commitLiveItem: (
@@ -266,7 +266,7 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
     set({ altActiveThemeId })
     get().syncBroadcastOutputFor("alt")
   },
-  setLive: (isLive) => {
+  setLive: (isLive, options) => {
     const shouldStopVideo = !isLive && get().liveItem?.kind === "video"
     set({ isLive })
     recordWorkflowTrace(
@@ -277,7 +277,11 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
         live: tracePresentationDetails(get().liveItem),
       }
     )
-    get().syncBroadcastOutput()
+    get().syncBroadcastOutput(
+      !isLive
+        ? { transitionType: options?.transitionType ?? get().liveTransitionType }
+        : options
+    )
     if (shouldStopVideo) get().sendVideoCommand({ type: "stop" })
   },
   setPreviewItem: (previewItem) => {
@@ -297,7 +301,18 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
   commitLiveItem: (liveItem, options) => {
     const makeLive = options?.makeLive ?? true
     const previousWasVideo = get().liveItem?.kind === "video"
-    set(makeLive ? { liveItem, isLive: true } : { liveItem })
+    const sinkId =
+      liveItem.kind === "video" ? get().preferredAudioOutputDeviceId : ""
+    if (sinkId) get().sendVideoCommand({ type: "setSinkId", sinkId })
+    if (liveItem.kind === "video") {
+      set(
+        makeLive
+          ? { liveItem, isLive: true, videoTransport: null }
+          : { liveItem, videoTransport: null }
+      )
+    } else {
+      set(makeLive ? { liveItem, isLive: true } : { liveItem })
+    }
     recordWorkflowTrace("live.state", "Live commit state applied", {
       makeLive,
       isLive: get().isLive,
@@ -308,8 +323,6 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
     })
     if (liveItem.kind === "video") {
       get().sendVideoCommand({ type: "load", item: liveItem })
-      const sinkId = get().preferredAudioOutputDeviceId
-      if (sinkId) get().sendVideoCommand({ type: "setSinkId", sinkId })
     } else if (previousWasVideo) {
       get().sendVideoCommand({ type: "stop" })
     }

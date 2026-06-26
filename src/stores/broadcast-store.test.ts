@@ -523,8 +523,21 @@ describe("broadcast store sync", () => {
     }
 
     emitToMock.mockClear()
+    useBroadcastStore.setState({
+      videoTransport: {
+        outputId: "main",
+        currentTime: 12,
+        duration: 12,
+        paused: true,
+        muted: false,
+        volume: 1,
+        loop: false,
+        ended: true,
+      },
+    })
     useBroadcastStore.getState().commitLiveItem(item)
 
+    expect(useBroadcastStore.getState().videoTransport).toBeNull()
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:video-control",
@@ -562,6 +575,17 @@ describe("broadcast store sync", () => {
 
     useBroadcastStore.getState().commitLiveItem(item)
 
+    const sinkIndex = emitToMock.mock.calls.findIndex(
+      (call) =>
+        call[1] === "broadcast:video-control" &&
+        call[2]?.type === "setSinkId",
+    )
+    const updateIndex = emitToMock.mock.calls.findIndex(
+      (call) => call[1] === "broadcast:verse-update",
+    )
+    expect(sinkIndex).toBeGreaterThanOrEqual(0)
+    expect(updateIndex).toBeGreaterThanOrEqual(0)
+    expect(sinkIndex).toBeLessThan(updateIndex)
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:video-control",
@@ -577,6 +601,30 @@ describe("broadcast store sync", () => {
         type: "setSinkId",
         sinkId: "speaker-1",
       },
+    )
+  })
+
+  it("fades to black when hiding live output with a fade transition", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    useBroadcastStore.setState({
+      isLive: true,
+      liveTransitionType: "fade",
+      liveItem: {
+        reference: "John 3:16",
+        segments: [{ text: "For God so loved the world", verseNumber: 16 }],
+      },
+    })
+
+    emitToMock.mockClear()
+    useBroadcastStore.getState().setLive(false, { transitionType: "fade" })
+
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({
+        item: null,
+        transition: expect.objectContaining({ type: "fade" }),
+      }),
     )
   })
 })
