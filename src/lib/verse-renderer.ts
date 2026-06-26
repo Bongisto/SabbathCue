@@ -551,9 +551,21 @@ function drawSlideDeckImage(
   }
 
   ctx.save()
-  ctx.fillStyle = "#000"
-  ctx.fillRect(0, 0, width, height)
+  if (!data.applyTheme) {
+    // Default: full-bleed slide on black bars.
+    ctx.fillStyle = "#000"
+    ctx.fillRect(0, 0, width, height)
+  }
+  // When themed, the theme background drawn earlier shows through the bars.
   ctx.drawImage(img, drawX, drawY, drawW, drawH)
+  if (data.applyTheme) {
+    const tint =
+      theme.background.type === "image" ? theme.background.image?.tint : null
+    if (tint) {
+      ctx.fillStyle = tint
+      ctx.fillRect(0, 0, width, height)
+    }
+  }
   ctx.restore()
   return true
 }

@@ -56,6 +56,15 @@ describe("sermon slide deck", () => {
     expect(deck[1].sectionLabel).toBe("Second Point")
   })
 
+  it("defaults slides to no theme and propagates slidesApplyTheme when set", () => {
+    expect(buildSermonSlideDeck(item()).every((slide) => !slide.applyTheme)).toBe(
+      true
+    )
+
+    const themed = buildSermonSlideDeck({ ...item(), slidesApplyTheme: true })
+    expect(themed.every((slide) => slide.applyTheme === true)).toBe(true)
+  })
+
   it("ignores non-slide media and slides without image data", () => {
     const attachments = getOrderedSermonSlideAttachments({
       ...item(),

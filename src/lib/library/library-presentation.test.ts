@@ -68,6 +68,21 @@ describe("library presentation helpers", () => {
     })
   })
 
+  it("defaults imported slides to no theme and injects applyTheme when enabled", () => {
+    const off = libraryAssetToFirstPresentation(slideTemplateAsset())
+    expect(off?.renderData.applyTheme).toBeUndefined()
+    expect(off?.slideDeck?.every((slide) => !slide.applyTheme)).toBe(true)
+
+    const themed = libraryAssetToFirstPresentation({
+      ...slideTemplateAsset(),
+      applyTheme: true,
+    })
+    expect(themed?.renderData.applyTheme).toBe(true)
+    expect(themed?.slideDeck?.every((slide) => slide.applyTheme === true)).toBe(
+      true
+    )
+  })
+
   it("creates one ordered queue item for each slide in a slide-template asset", () => {
     const items = createQueueItemsForLibraryAsset(slideTemplateAsset())
 

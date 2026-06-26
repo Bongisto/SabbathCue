@@ -23,6 +23,7 @@ interface AssetCardProps {
 export function AssetCard({ asset }: AssetCardProps) {
   const collections = useLibraryStore((state) => state.collections)
   const deleteAsset = useLibraryStore((state) => state.deleteAsset)
+  const updateAsset = useLibraryStore((state) => state.updateAsset)
   const addAssetToCollection = useLibraryStore(
     (state) => state.addAssetToCollection
   )
@@ -87,6 +88,20 @@ export function AssetCard({ asset }: AssetCardProps) {
             {asset.type}
           </p>
         </div>
+
+        {asset.type === "slide-template" ? (
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={asset.applyTheme ?? false}
+              onChange={(event) =>
+                updateAsset(asset.id, { applyTheme: event.target.checked })
+              }
+              className="h-3 w-3 rounded border-input accent-primary"
+            />
+            Apply current theme to these slides
+          </label>
+        ) : null}
 
         <div className="mt-auto flex flex-wrap gap-1.5">
           {asset.type === "theme" ? (

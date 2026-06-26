@@ -272,6 +272,25 @@ export function useBroadcastOutputRuntime({
     img.src = url
   }, [draw, logDebug])
 
+  const preloadSlideImage = useCallback((item: PresentationRenderData | null) => {
+    if (item?.kind !== "slideDeck" || !item.slideImageUrl) return
+
+    const url = item.slideImageUrl
+    const cache = imageCacheRef.current
+    if (cache.has(url)) return
+
+    const img = new Image()
+    img.onload = () => {
+      cache.set(url, img)
+      logDebug("Slide image loaded", { url })
+      draw()
+    }
+    img.onerror = () => {
+      console.warn("[broadcast-output] failed to load slide image", { url })
+    }
+    img.src = url
+  }, [draw, logDebug])
+
   const pushNdiFrame = useCallback(async () => {
     if (!ndiConfigRef.current.active) return
     if (pushingRef.current) return
@@ -445,6 +464,7 @@ export function useBroadcastOutputRuntime({
       latestData.current = payload
       onPayloadChange?.(payload)
       preloadBackgroundImage(payload.theme)
+      preloadSlideImage(payload.item)
       logDebug("Received broadcast payload", {
         hasItem: Boolean(payload.item),
         themeId: payload.theme.id,
@@ -517,7 +537,7 @@ export function useBroadcastOutputRuntime({
       unlisten?.then((fn) => fn())
       unlistenNdiConfig?.then((fn) => fn())
     }
-  }, [animatePayload, cancelTransition, canvas, logDebug, onPayloadChange, outputId, preloadBackgroundImage, pushNdiBurst])
+  }, [animatePayload, cancelTransition, canvas, logDebug, onPayloadChange, outputId, preloadBackgroundImage, preloadSlideImage, pushNdiBurst])
 
   useEffect(() => {
     const timer = setInterval(() => {

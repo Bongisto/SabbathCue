@@ -257,4 +257,79 @@ describe("useBroadcastOutputRuntime", () => {
       root.unmount()
     })
   })
+
+  it("preloads an imported slide image into the render cache", async () => {
+    const { useBroadcastOutputRuntime } = await import("./use-broadcast-output-runtime")
+    const canvas = createCanvas()
+    const root = createRoot(document.createElement("div"))
+    const theme = makeTheme()
+    const slideUrl = "data:image/png;base64,SLIDE"
+
+    const images: Array<{ src: string; onload: (() => void) | null }> = []
+    const RealImage = globalThis.Image
+    class FakeImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      naturalWidth = 1920
+      naturalHeight = 1080
+      #src = ""
+      constructor() {
+        images.push(this as unknown as { src: string; onload: (() => void) | null })
+      }
+      set src(value: string) {
+        this.#src = value
+      }
+      get src() {
+        return this.#src
+      }
+    }
+    globalThis.Image = FakeImage as unknown as typeof Image
+
+    function Probe() {
+      useBroadcastOutputRuntime({ canvas, outputId: "main" })
+      return null
+    }
+
+    try {
+      await act(async () => {
+        root.render(React.createElement(Probe))
+        await Promise.resolve()
+      })
+
+      await act(async () => {
+        listeners.get("broadcast:verse-update")?.({
+          payload: {
+            theme,
+            item: {
+              kind: "slideDeck",
+              reference: "Deck - Slide 1",
+              segments: [{ text: "Slide 1" }],
+              slideImageUrl: slideUrl,
+            },
+            opacity: 1,
+            transition: { ...theme.transition, type: "none", duration: 0 },
+          },
+        })
+        await Promise.resolve()
+      })
+
+      const slideImage = images.find((img) => img.src === slideUrl)
+      expect(slideImage).toBeDefined()
+
+      mockRenderPresentation.mockClear()
+      await act(async () => {
+        slideImage?.onload?.()
+        await Promise.resolve()
+      })
+
+      const lastCall = mockRenderPresentation.mock.calls.at(-1)
+      const options = lastCall?.[3] as { imageCache?: Map<string, unknown> } | undefined
+      expect(options?.imageCache?.has(slideUrl)).toBe(true)
+    } finally {
+      globalThis.Image = RealImage
+      await act(async () => {
+        root.unmount()
+      })
+    }
+  })
 })

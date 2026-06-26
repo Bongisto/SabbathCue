@@ -31,6 +31,7 @@ export function buildSermonSlideDeck(
       sectionLabel: label,
       reference: `${item.title} - ${label}`,
       segments: [{ text: label }],
+      applyTheme: item.slidesApplyTheme || undefined,
     }
   })
 }

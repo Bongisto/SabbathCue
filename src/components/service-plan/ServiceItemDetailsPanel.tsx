@@ -92,6 +92,10 @@ export function ServiceItemDetailsPanel({
               ],
             })
           }
+          applyTheme={item.slidesApplyTheme}
+          onApplyThemeChange={(slidesApplyTheme) =>
+            onPatchItem({ slidesApplyTheme })
+          }
         />
       </EditorSection>
 

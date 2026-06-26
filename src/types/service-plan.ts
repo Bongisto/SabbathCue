@@ -68,6 +68,8 @@ export interface ServiceItem {
   checklist: ServiceChecklistItem[]
   outputTemplateId?: string
   slideDeckIds?: string[]
+  /** Render this item's sermon slides inside the active theme instead of full-bleed on black. */
+  slidesApplyTheme?: boolean
 }
 
 export interface ServicePlanSummary {

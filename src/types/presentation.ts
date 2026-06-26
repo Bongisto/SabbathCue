@@ -23,6 +23,8 @@ export interface PresentationRenderData {
   scripture?: Verse
   egwParagraph?: EgwParagraph
   slideImageUrl?: string
+  /** When true, imported slides keep the theme background in letterbox bars and the theme image tint over the slide. */
+  applyTheme?: boolean
   video?: VideoPresentationSource
   hymnSlide?: {
     screenId: string
@@ -144,6 +146,8 @@ export interface SlideDeckPresentationItemData {
   sectionLabel?: string
   reference: string
   segments: PresentationSegment[]
+  /** Per-deck toggle: render the slide inside the active theme rather than full-bleed on black. */
+  applyTheme?: boolean
 }
 
 export type PresentationItem =
@@ -185,6 +189,7 @@ export function getPresentationRenderData(
       reference: item.reference,
       segments: item.segments,
       slideImageUrl: item.slidePath,
+      applyTheme: item.applyTheme,
       hymnSlide: {
         screenId: item.slideId,
         slideIndex: item.slideIndex,

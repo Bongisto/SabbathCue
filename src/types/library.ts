@@ -55,6 +55,8 @@ export interface LibrarySongAsset extends LibraryAssetBase {
 export interface LibrarySlideTemplateAsset extends LibraryAssetBase {
   type: "slide-template"
   deck: SlideDeckPresentationItemData[]
+  /** Render this imported deck inside the active theme instead of full-bleed on black. */
+  applyTheme?: boolean
 }
 
 export interface LibraryVideoAsset extends LibraryAssetBase {

@@ -34,6 +34,8 @@ interface ServiceAttachmentValidation {
 interface SermonSlidesEditorProps {
   attachments: ServiceAttachment[]
   onChange: (attachments: ServiceAttachment[]) => void
+  applyTheme?: boolean
+  onApplyThemeChange?: (applyTheme: boolean) => void
 }
 
 function nextOrder(attachments: ServiceAttachment[]): number {
@@ -81,6 +83,8 @@ function orderedSlides(attachments: ServiceAttachment[]): ServiceAttachment[] {
 export function SermonSlidesEditor({
   attachments,
   onChange,
+  applyTheme,
+  onApplyThemeChange,
 }: SermonSlidesEditorProps) {
   const slides = orderedSlides(attachments)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -244,6 +248,18 @@ export function SermonSlidesEditor({
           </Button>
         </div>
       </div>
+
+      {onApplyThemeChange ? (
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={applyTheme ?? false}
+            onChange={(event) => onApplyThemeChange(event.target.checked)}
+            className="h-3.5 w-3.5 rounded border-input accent-primary"
+          />
+          Apply current theme to these slides
+        </label>
+      ) : null}
 
       {errorMessage ? (
         <p role="alert" className="text-xs text-destructive">

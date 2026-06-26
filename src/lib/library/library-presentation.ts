@@ -26,6 +26,14 @@ export function isPresentableLibraryAsset(asset: LibraryAsset): boolean {
   return asset.type !== "theme"
 }
 
+function deckWithApplyTheme(
+  deck: SlideDeckPresentationItemData[],
+  applyTheme: boolean | undefined
+): SlideDeckPresentationItemData[] {
+  if (!applyTheme) return deck
+  return deck.map((slide) => ({ ...slide, applyTheme: true }))
+}
+
 function imagePresentation(asset: Extract<LibraryAsset, { type: "image" }>) {
   const presentation: SlideDeckPresentationItemData = {
     kind: "slideDeck",
@@ -66,12 +74,13 @@ export function libraryAssetToFirstPresentation(
   }
 
   if (asset.type === "slide-template") {
-    const first = asset.deck[0]
+    const deck = deckWithApplyTheme(asset.deck, asset.applyTheme)
+    const first = deck[0]
     if (!first) return null
     return {
       presentation: first,
       renderData: getPresentationRenderData(first),
-      slideDeck: asset.deck,
+      slideDeck: deck,
     }
   }
 
@@ -144,13 +153,14 @@ export function createQueueItemsForLibraryAsset(asset: LibraryAsset): QueueItem[
   }
 
   if (asset.type === "slide-template") {
-    return asset.deck.map((slide) => ({
+    const deck = deckWithApplyTheme(asset.deck, asset.applyTheme)
+    return deck.map((slide) => ({
       id: crypto.randomUUID(),
       presentation: slide,
       confidence: 1,
       source: "manual",
       added_at: Date.now(),
-      slideDeck: asset.deck,
+      slideDeck: deck,
     }))
   }
 
