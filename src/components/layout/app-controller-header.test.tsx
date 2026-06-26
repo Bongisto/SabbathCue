@@ -1,14 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useAccentThemeStore } from "@/stores/accent-theme-store"
 import { useColorModeStore } from "@/stores/color-mode-store"
 import { AppControllerHeader } from "./app-controller-header"
-
-vi.mock("@/lib/operator-actions", () => ({
-  blackoutOutput: vi.fn(),
-}))
 
 function renderHeader() {
   return render(

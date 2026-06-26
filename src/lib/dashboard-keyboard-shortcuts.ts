@@ -40,7 +40,6 @@ export const DASHBOARD_KEYBOARD_SHORTCUTS: KeyboardShortcutGroup[] = [
         action: "Present active queue item",
       },
       { keys: "Ctrl/Cmd + Shift + L", action: "Show or hide live output" },
-      { keys: "Ctrl/Cmd + Shift + B", action: "Blackout output" },
       { keys: "Ctrl/Cmd + Shift + X", action: "Clear live output" },
       { keys: "Ctrl/Cmd + Shift + P", action: "Clear preview output" },
       {

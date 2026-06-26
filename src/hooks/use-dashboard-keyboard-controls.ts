@@ -2,7 +2,6 @@ import { useEffect } from "react"
 import { commitPreviewToLive } from "@/lib/presentation-workflow"
 import { presentQueuedItem, previewQueuedItem } from "@/lib/queue-presentation"
 import {
-  blackoutOutput,
   clearLiveOutput,
   clearPreviewOutput,
   toggleLiveOutputVisibility,
@@ -119,10 +118,6 @@ function handleCommandShortcut(event: KeyboardEvent, key: string): boolean {
   }
   if (key === "l") {
     toggleLiveOutputVisibility()
-    return true
-  }
-  if (event.shiftKey && key === "b") {
-    blackoutOutput()
     return true
   }
   if (event.shiftKey && key === "x") {

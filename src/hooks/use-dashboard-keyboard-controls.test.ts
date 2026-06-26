@@ -216,24 +216,6 @@ describe("handleDashboardKeyboardEvent", () => {
     expect(useDashboardWorkspaceStore.getState().workspace).toBe("live")
   })
 
-  it("blackouts live output with Ctrl+Shift+B", () => {
-    useBroadcastStore.setState({
-      isLive: true,
-      liveItem: {
-        kind: "hymn",
-        reference: "Joyful - Slide 1 of 3",
-        segments: [{ text: "Line 1" }],
-      },
-    })
-
-    handleDashboardKeyboardEvent(
-      new KeyboardEvent("keydown", { key: "b", ctrlKey: true, shiftKey: true })
-    )
-
-    expect(useBroadcastStore.getState().isLive).toBe(false)
-    expect(useBroadcastStore.getState().liveItem).toBeNull()
-  })
-
   it("sends the preview live with Ctrl+Enter", () => {
     useBroadcastStore.getState().setPreviewItem({
       kind: "hymn",

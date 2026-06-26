@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react"
-import { CircleDotIcon, MoonIcon, SunIcon, Trash2Icon } from "lucide-react"
+import { CircleDotIcon, MoonIcon, SunIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 import { AppLogo } from "@/components/ui/app-logo"
@@ -9,7 +9,6 @@ import {
 } from "@/stores/accent-theme-store"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useColorModeStore } from "@/stores/color-mode-store"
-import { blackoutOutput } from "@/lib/operator-actions"
 import { WorkspaceTopNav } from "@/components/layout/workspace-top-nav"
 import packageJson from "../../../package.json"
 
@@ -160,14 +159,6 @@ export function AppControllerHeader() {
             ))}
           </div>
         ) : null}
-        <button
-          type="button"
-          onClick={blackoutOutput}
-          className="btn-action flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/25"
-        >
-          <Trash2Icon className="size-[13px]" strokeWidth={2} />
-          <span>Blackout Output</span>
-        </button>
       </div>
     </header>
   )

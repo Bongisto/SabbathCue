@@ -277,11 +277,7 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
         live: tracePresentationDetails(get().liveItem),
       }
     )
-    get().syncBroadcastOutput(
-      !isLive
-        ? { transitionType: options?.transitionType ?? get().liveTransitionType }
-        : options
-    )
+    get().syncBroadcastOutput(isLive ? options : undefined)
     if (shouldStopVideo) get().sendVideoCommand({ type: "stop" })
   },
   setPreviewItem: (previewItem) => {

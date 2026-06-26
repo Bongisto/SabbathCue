@@ -16,10 +16,6 @@ export function clearPreviewOutput(): void {
   useBibleStore.getState().selectVerse(null)
 }
 
-export function blackoutOutput(): void {
-  clearLiveOutput()
-}
-
 export function toggleLiveOutputVisibility(): void {
   const broadcast = useBroadcastStore.getState()
   broadcast.setLive(!broadcast.isLive)

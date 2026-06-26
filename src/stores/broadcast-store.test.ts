@@ -147,6 +147,8 @@ describe("broadcast store sync", () => {
     emitToMock.mockClear()
     useBroadcastStore.getState().setLive(false)
 
+    const hideCall = emitToMock.mock.calls.find((c) => c[0] === "broadcast")
+    expect(hideCall?.[2].transition).toBeUndefined()
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
       "broadcast:verse-update",
@@ -660,27 +662,4 @@ describe("broadcast store sync", () => {
     )
   })
 
-  it("fades to black when hiding live output with a fade transition", async () => {
-    const { useBroadcastStore } = await import("./broadcast-store")
-    useBroadcastStore.setState({
-      isLive: true,
-      liveTransitionType: "fade",
-      liveItem: {
-        reference: "John 3:16",
-        segments: [{ text: "For God so loved the world", verseNumber: 16 }],
-      },
-    })
-
-    emitToMock.mockClear()
-    useBroadcastStore.getState().setLive(false, { transitionType: "fade" })
-
-    expect(emitToMock).toHaveBeenCalledWith(
-      "broadcast",
-      "broadcast:verse-update",
-      expect.objectContaining({
-        item: null,
-        transition: expect.objectContaining({ type: "fade" }),
-      }),
-    )
-  })
 })
