@@ -6,13 +6,13 @@ import {
 } from "./library-presentation"
 import { useQueueStore } from "@/stores/queue-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
-import type { LibraryAsset } from "@/types/library"
+import type { LibrarySlideTemplateAsset } from "@/types/library"
 
 vi.mock("@tauri-apps/api/event", () => ({
   emitTo: vi.fn().mockResolvedValue(undefined),
 }))
 
-function slideTemplateAsset(): LibraryAsset {
+function slideTemplateAsset(): LibrarySlideTemplateAsset {
   return {
     id: "deck-1",
     name: "Emergency Deck",
