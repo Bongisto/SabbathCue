@@ -11,7 +11,10 @@ import { useAudioStore } from "@/stores/audio-store"
 import { useBibleStore } from "@/stores/bible-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useSettingsStore, type SttProvider } from "@/stores/settings-store"
-import { useTranscriptStore } from "@/stores/transcript-store"
+import {
+  useTranscriptStore,
+  type TranscriptionIssue,
+} from "@/stores/transcript-store"
 import { handleSermonSlideVoiceControl } from "@/services/slides/sermon-slide-voice-control"
 import { loadHymnVoiceControl } from "@/services/hymnal/hymn-voice-control-loader"
 import {
@@ -51,6 +54,100 @@ const MISSING_SONIOX_KEY_MARKER = "No Soniox API key"
 const NOT_RUNNING_ERROR = "Transcription is not running"
 const MAYBE_HYMN_CUE_PATTERN =
   /\b(?:(?:sda|adventist|seventh(?:\s|-)?day\s+adventist)\s+(?:hymn|hymns|hymnal|hymnals|song|songs)|(?:hymn|hymns|hymnal|hymnals|song|songs))(?:\s+number)?\s+[a-z0-9]/i
+const BILLING_ERROR_PATTERN =
+  /\b(?:402|balance exhausted|insufficient balance|quota|credits?|billing|payment|tokens?|funds?|autopay)\b/i
+const AUTH_ERROR_PATTERN =
+  /\b(?:401|403|unauthorized|forbidden|invalid api key|authentication|permission denied)\b/i
+const NETWORK_ERROR_PATTERN =
+  /\b(?:connection failed|failed to connect|timeout|timed out|dns|network|websocket|socket closed|closed unexpectedly)\b/i
+const MODEL_MISSING_PATTERN =
+  /\b(?:model not found|model missing|worker not found|download.*model|missing.*model)\b/i
+
+const PROVIDER_LABELS: Record<SttProvider, string> = {
+  deepgram: "Deepgram",
+  gladia: "Gladia",
+  soniox: "Soniox",
+  vosk: "Vosk",
+}
+
+function isMissingApiKeyMessage(message: string): boolean {
+  return (
+    message.includes(MISSING_DEEPGRAM_KEY_MARKER) ||
+    message.includes(MISSING_GLADIA_KEY_MARKER) ||
+    message.includes(MISSING_SONIOX_KEY_MARKER)
+  )
+}
+
+function providerFromMessage(message: string): SttProvider | null {
+  if (message.includes(MISSING_DEEPGRAM_KEY_MARKER)) return "deepgram"
+  if (message.includes(MISSING_GLADIA_KEY_MARKER)) return "gladia"
+  if (message.includes(MISSING_SONIOX_KEY_MARKER)) return "soniox"
+  return null
+}
+
+export function classifyTranscriptionIssue(
+  message: string,
+  provider: SttProvider
+): TranscriptionIssue {
+  const issueProvider = providerFromMessage(message) ?? provider
+  const providerLabel = PROVIDER_LABELS[issueProvider]
+
+  if (isMissingApiKeyMessage(message)) {
+    return {
+      kind: "missing_api_key",
+      provider: issueProvider,
+      title: `${providerLabel} API key needed`,
+      description: `Add a ${providerLabel} API key in Speech settings, then start transcription again.`,
+      actionLabel: "Open settings",
+    }
+  }
+
+  if (BILLING_ERROR_PATTERN.test(message)) {
+    return {
+      kind: "billing",
+      provider: issueProvider,
+      title: `${providerLabel} needs more transcription credit`,
+      description: `${providerLabel} rejected the session because the account needs more credit, tokens, or billing setup. Add funds or enable autopay in the provider console, then start transcription again.`,
+    }
+  }
+
+  if (AUTH_ERROR_PATTERN.test(message)) {
+    return {
+      kind: "auth",
+      provider: issueProvider,
+      title: `${providerLabel} key was rejected`,
+      description: `Check that the ${providerLabel} API key is active and has permission to use speech transcription.`,
+      actionLabel: "Open settings",
+    }
+  }
+
+  if (NETWORK_ERROR_PATTERN.test(message)) {
+    return {
+      kind: "network",
+      provider: issueProvider,
+      title: `${providerLabel} connection failed`,
+      description:
+        "The transcription service could not be reached. Check the internet connection and try starting transcription again.",
+    }
+  }
+
+  if (provider === "vosk" && MODEL_MISSING_PATTERN.test(message)) {
+    return {
+      kind: "model_missing",
+      provider,
+      title: "Vosk model missing",
+      description:
+        "The local speech model could not be found. Download the Vosk model from setup, then start transcription again.",
+    }
+  }
+
+  return {
+    kind: issueProvider === "vosk" ? "unknown" : "provider",
+    provider: issueProvider,
+    title: `${providerLabel} transcription stopped`,
+    description: message,
+  }
+}
 
 export const transcriptionActions = {
   async start(
@@ -58,6 +155,7 @@ export const transcriptionActions = {
   ): Promise<boolean> {
     const transcript = useTranscriptStore.getState()
     transcript.setConnectionStatus("connecting")
+    transcript.clearIssue()
 
     const settings = useSettingsStore.getState()
     try {
@@ -69,19 +167,17 @@ export const transcriptionActions = {
         lowPower: settings.lowPowerMode,
       })
       transcript.setTranscribing(true)
+      transcript.clearIssue()
       return true
     } catch (e) {
       const msg = String(e)
+      const issue = classifyTranscriptionIssue(msg, settings.sttProvider)
       transcript.setConnectionStatus("error")
-      if (
-        (msg.includes(MISSING_DEEPGRAM_KEY_MARKER) ||
-          msg.includes(MISSING_GLADIA_KEY_MARKER) ||
-          msg.includes(MISSING_SONIOX_KEY_MARKER)) &&
-        onMissingApiKey
-      ) {
-        onMissingApiKey(settings.sttProvider)
+      transcript.setIssue(issue)
+      if (issue.kind === "missing_api_key" && onMissingApiKey) {
+        onMissingApiKey(issue.provider)
       } else {
-        toast.error("Could not start transcription", { description: msg })
+        toast.error(issue.title, { description: issue.description })
       }
       return false
     }
@@ -99,6 +195,7 @@ export const transcriptionActions = {
     transcript.setTranscribing(false)
     transcript.setPartial("")
     transcript.setConnectionStatus("disconnected")
+    transcript.clearIssue()
   },
 
   async setLiveGain(gain: number): Promise<void> {
@@ -121,6 +218,7 @@ export const transcriptionActions = {
 
     if (!wasTranscribing) {
       transcript.clearTranscript()
+      transcript.clearIssue()
       return
     }
 
@@ -171,11 +269,17 @@ export function useTranscriptionEventBridge() {
   // STT lifecycle events
   useTauriEvent("stt_connected", () => {
     recordWorkflowTrace("transcription.connected", "STT connected")
-    useTranscriptStore.getState().setConnectionStatus("connected")
+    const transcript = useTranscriptStore.getState()
+    transcript.setConnectionStatus("connected")
+    transcript.clearIssue()
   })
   useTauriEvent("stt_disconnected", () => {
     recordWorkflowTrace("transcription.disconnected", "STT disconnected")
-    useTranscriptStore.getState().setConnectionStatus("disconnected")
+    const transcript = useTranscriptStore.getState()
+    transcript.setTranscribing(false)
+    if (transcript.connectionStatus !== "error") {
+      transcript.setConnectionStatus("disconnected")
+    }
   })
   useTauriEvent<string>("stt_voice_control", (command) => {
     if (command === "stop") {
@@ -187,8 +291,14 @@ export function useTranscriptionEventBridge() {
   })
   useTauriEvent<string>("stt_error", (msg) => {
     recordWorkflowTrace("transcription.error", "STT error", { message: msg })
-    useTranscriptStore.getState().setConnectionStatus("error")
-    toast.error("Transcription error", { description: msg })
+    const provider = useSettingsStore.getState().sttProvider
+    const issue = classifyTranscriptionIssue(msg, provider)
+    const transcript = useTranscriptStore.getState()
+    transcript.setTranscribing(false)
+    transcript.setPartial("")
+    transcript.setConnectionStatus("error")
+    transcript.setIssue(issue)
+    toast.error(issue.title, { description: issue.description })
   })
   useTauriEvent("stt_speech_started", () => {
     useTranscriptStore.getState().setPartial("Speech detected...")
@@ -225,7 +335,9 @@ export function useTranscriptionEventBridge() {
         }),
       }
     )
-    useTranscriptStore.getState().setPartial(payload.text)
+    const transcript = useTranscriptStore.getState()
+    transcript.clearIssue()
+    transcript.setPartial(payload.text)
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_final", (payload) => {

@@ -34,6 +34,7 @@ async function loadModules() {
     useSettingsStore: settingsMod.useSettingsStore,
     transcriptionActions: hookMod.transcriptionActions,
     handleTranscriptFinalPayload: hookMod.handleTranscriptFinalPayload,
+    classifyTranscriptionIssue: hookMod.classifyTranscriptionIssue,
   }
 }
 
@@ -204,19 +205,62 @@ describe("use-transcription", () => {
       expect(useTranscriptStore.getState().connectionStatus).toBe("error")
     })
 
+    it("routes a missing-Soniox-key error and stores a visible issue", async () => {
+      mockInvoke.mockRejectedValue(
+        "No Soniox API key configured. Set it in Settings."
+      )
+      const { useSettingsStore, useTranscriptStore, transcriptionActions } =
+        await loadModules()
+      const onMissingApiKey = vi.fn()
+
+      useSettingsStore.setState({ sttProvider: "soniox" })
+      await transcriptionActions.start(onMissingApiKey)
+
+      expect(onMissingApiKey).toHaveBeenCalledWith("soniox")
+      expect(mockToastError).not.toHaveBeenCalled()
+      expect(useTranscriptStore.getState().lastIssue).toMatchObject({
+        kind: "missing_api_key",
+        provider: "soniox",
+        title: "Soniox API key needed",
+      })
+    })
+
     it("falls back to toast when missing-key error fires but no callback is provided", async () => {
       mockInvoke.mockRejectedValue("No Deepgram API key provided")
       const { transcriptionActions } = await loadModules()
 
       await transcriptionActions.start()
 
+      expect(mockToastError).toHaveBeenCalledWith("Deepgram API key needed", {
+        description:
+          "Add a Deepgram API key in Speech settings, then start transcription again.",
+      })
+    })
+
+    it("stores billing failures as actionable transcript issues", async () => {
+      mockInvoke.mockRejectedValue(
+        "Soniox error 402: Organization balance exhausted. Please either add funds manually or enable autopay."
+      )
+      const { useSettingsStore, useTranscriptStore, transcriptionActions } =
+        await loadModules()
+
+      useSettingsStore.setState({ sttProvider: "soniox" })
+      await transcriptionActions.start()
+
+      expect(useTranscriptStore.getState().lastIssue).toMatchObject({
+        kind: "billing",
+        provider: "soniox",
+        title: "Soniox needs more transcription credit",
+      })
       expect(mockToastError).toHaveBeenCalledWith(
-        "Could not start transcription",
-        { description: "No Deepgram API key provided" }
+        "Soniox needs more transcription credit",
+        {
+          description: expect.stringContaining("Add funds or enable autopay"),
+        }
       )
     })
 
-    it("surfaces any other start error as a toast", async () => {
+    it("surfaces local model errors as a specific issue", async () => {
       mockInvoke.mockRejectedValue("Vosk model not found")
       const { useTranscriptStore, transcriptionActions } = await loadModules()
       const onMissingApiKey = vi.fn()
@@ -224,11 +268,33 @@ describe("use-transcription", () => {
       await transcriptionActions.start(onMissingApiKey)
 
       expect(onMissingApiKey).not.toHaveBeenCalled()
-      expect(mockToastError).toHaveBeenCalledWith(
-        "Could not start transcription",
-        { description: "Vosk model not found" }
-      )
+      expect(mockToastError).toHaveBeenCalledWith("Vosk model missing", {
+        description:
+          "The local speech model could not be found. Download the Vosk model from setup, then start transcription again.",
+      })
       expect(useTranscriptStore.getState().connectionStatus).toBe("error")
+      expect(useTranscriptStore.getState().lastIssue?.kind).toBe(
+        "model_missing"
+      )
+    })
+  })
+
+  describe("classifyTranscriptionIssue", () => {
+    it("classifies auth, billing, network, and provider errors", async () => {
+      const { classifyTranscriptionIssue } = await loadModules()
+
+      expect(
+        classifyTranscriptionIssue("invalid api key", "deepgram")
+      ).toMatchObject({ kind: "auth", provider: "deepgram" })
+      expect(
+        classifyTranscriptionIssue("quota exceeded for this account", "gladia")
+      ).toMatchObject({ kind: "billing", provider: "gladia" })
+      expect(
+        classifyTranscriptionIssue("websocket closed unexpectedly", "soniox")
+      ).toMatchObject({ kind: "network", provider: "soniox" })
+      expect(
+        classifyTranscriptionIssue("provider returned malformed JSON", "gladia")
+      ).toMatchObject({ kind: "provider", provider: "gladia" })
     })
   })
 
@@ -249,6 +315,7 @@ describe("use-transcription", () => {
       expect(state.isTranscribing).toBe(false)
       expect(state.currentPartial).toBe("")
       expect(state.connectionStatus).toBe("disconnected")
+      expect(state.lastIssue).toBeNull()
       expect(mockToastError).not.toHaveBeenCalled()
     })
 
@@ -452,18 +519,26 @@ describe("use-transcription", () => {
   })
 
   describe("stt_error integration contract", () => {
-    it("surfaces stt errors via toast and sets connection status to error", async () => {
-      const { useTranscriptStore } = await loadModules()
+    it("surfaces stt errors via classified issue state", async () => {
+      const { useTranscriptStore, classifyTranscriptionIssue } =
+        await loadModules()
 
       // Simulate what the stt_error handler does
+      const issue = classifyTranscriptionIssue(
+        "Soniox error 402: Organization balance exhausted.",
+        "soniox"
+      )
       useTranscriptStore.getState().setConnectionStatus("error")
-      mockToastError("Transcription error", {
-        description: "WebSocket closed unexpectedly",
-      })
+      useTranscriptStore.getState().setIssue(issue)
+      mockToastError(issue.title, { description: issue.description })
 
       expect(useTranscriptStore.getState().connectionStatus).toBe("error")
-      expect(mockToastError).toHaveBeenCalledWith("Transcription error", {
-        description: "WebSocket closed unexpectedly",
+      expect(useTranscriptStore.getState().lastIssue).toMatchObject({
+        kind: "billing",
+        provider: "soniox",
+      })
+      expect(mockToastError).toHaveBeenCalledWith(issue.title, {
+        description: issue.description,
       })
     })
   })

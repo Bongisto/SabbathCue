@@ -11,8 +11,14 @@ import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { LevelMeter } from "@/components/ui/level-meter"
 import { Button } from "@/components/ui/button"
-import { MicIcon, MicOffIcon, Trash2Icon } from "lucide-react"
+import {
+  AlertTriangleIcon,
+  MicIcon,
+  MicOffIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { openSettings } from "@/lib/settings-dialog"
 import { useAudioStore } from "@/stores/audio-store"
 import type { SttProvider } from "@/stores/settings-store"
 import { useTranscriptStore } from "@/stores/transcript-store"
@@ -32,6 +38,19 @@ const LazyApiKeyPrompt = lazy(() =>
 function AudioLevelMeter() {
   const rms = useAudioStore((s) => s.level.rms)
   return <LevelMeter level={rms} bars={6} />
+}
+
+function providerLabel(provider: SttProvider): string {
+  switch (provider) {
+    case "deepgram":
+      return "Deepgram"
+    case "gladia":
+      return "Gladia"
+    case "soniox":
+      return "Soniox"
+    case "vosk":
+      return "Vosk"
+  }
 }
 
 /**
@@ -77,7 +96,11 @@ export function TranscriptPanel({ className }: { className?: string }) {
     dumpTranscriptMemory,
   } = useTranscription({ onMissingApiKey })
   const hasPartial = useTranscriptStore((s) => s.currentPartial.length > 0)
+  const lastIssue = useTranscriptStore((s) => s.lastIssue)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const openIssueSettings = useCallback(() => {
+    openSettings("speech")
+  }, [])
 
   // Auto-scroll on segment additions. Partial-driven scrolling lives in
   // LivePartialLine so the panel doesn't re-render per audio tick.
@@ -135,15 +158,48 @@ export function TranscriptPanel({ className }: { className?: string }) {
           {/* Faded top gradient */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b from-card to-transparent" />
 
-          {segments.length === 0 && !hasPartial && !isTranscribing && (
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <PanelEmptyState
-                icon={<MicOffIcon className="size-8" />}
-                title="No transcript yet"
-                description="Click Start transcribing to begin capturing live speech."
-              />
+          {lastIssue ? (
+            <div
+              aria-live="polite"
+              className="rounded-md border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-100"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-red-300" />
+                <div className="min-w-0 flex-1">
+                  <p className="leading-snug font-semibold">
+                    {lastIssue.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-red-100/80">
+                    {lastIssue.description}
+                  </p>
+                  {lastIssue.actionLabel ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="xs"
+                      className="mt-3"
+                      onClick={openIssueSettings}
+                    >
+                      {lastIssue.actionLabel}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </div>
-          )}
+          ) : null}
+
+          {segments.length === 0 &&
+            !hasPartial &&
+            !isTranscribing &&
+            !lastIssue && (
+              <div className="flex min-h-0 flex-1 items-center justify-center">
+                <PanelEmptyState
+                  icon={<MicOffIcon className="size-8" />}
+                  title="No transcript yet"
+                  description="Click Start transcribing to begin capturing live speech."
+                />
+              </div>
+            )}
 
           {/* Final segments — recent ones brighter, older ones fade */}
           {segments.map((seg, idx) => {
@@ -196,10 +252,10 @@ export function TranscriptPanel({ className }: { className?: string }) {
           <LazyApiKeyPrompt
             open={showKeyPrompt}
             onOpenChange={setShowKeyPrompt}
-            service={missingKeyProvider === "gladia" ? "Gladia" : "Deepgram"}
-            description={`Live transcription needs a ${
-              missingKeyProvider === "gladia" ? "Gladia" : "Deepgram"
-            } API key. Add it in settings so the app can start listening.`}
+            service={providerLabel(missingKeyProvider)}
+            description={`Live transcription needs a ${providerLabel(
+              missingKeyProvider
+            )} API key. Add it in settings so the app can start listening.`}
           />
         </Suspense>
       ) : null}

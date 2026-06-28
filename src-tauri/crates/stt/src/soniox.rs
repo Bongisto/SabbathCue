@@ -27,7 +27,7 @@ struct SonioxToken {
 }
 
 #[derive(Debug, Deserialize)]
-struct SonioxResponse {
+pub(crate) struct SonioxResponse {
     #[serde(default)]
     tokens: Vec<SonioxToken>,
     #[serde(default)]
@@ -74,8 +74,8 @@ pub(crate) fn parse_token_response(
     json: &SonioxResponse,
     finalized_text: &mut String,
 ) -> Result<Vec<TranscriptEvent>, SttError> {
-    if let Some(message) = json.error_message.as_ref() {
-        return Err(SttError::ParseError(message.clone()));
+    if let Some(message) = soniox_error_message(json) {
+        return Err(SttError::ParseError(message));
     }
 
     let mut events = Vec::new();
@@ -132,6 +132,15 @@ pub(crate) fn parse_token_response(
     Ok(events)
 }
 
+fn soniox_error_message(json: &SonioxResponse) -> Option<String> {
+    match (json.error_code, json.error_message.as_deref()) {
+        (Some(code), Some(message)) => Some(format!("Soniox error {code}: {message}")),
+        (Some(code), None) => Some(format!("Soniox error {code}")),
+        (None, Some(message)) => Some(format!("Soniox error: {message}")),
+        (None, None) => None,
+    }
+}
+
 impl SonioxClient {
     pub fn new(config: SttConfig) -> Self {
         Self {
@@ -161,6 +170,13 @@ impl SonioxClient {
             {
                 Ok(()) => break,
                 Err(error) => {
+                    if !matches!(
+                        error,
+                        SttError::ConnectionFailed(_) | SttError::SendError(_)
+                    ) {
+                        return Err(error);
+                    }
+
                     attempts += 1;
                     log::warn!(
                         "SonioxClient: connection error (attempt {attempts}/{MAX_RECONNECT_ATTEMPTS}): {error}"
@@ -203,6 +219,7 @@ impl SonioxClient {
 
         let send_error_flag = Arc::new(AtomicBool::new(false));
         let recv_error_flag = Arc::new(AtomicBool::new(false));
+        let fatal_server_error_flag = Arc::new(AtomicBool::new(false));
         let error_detail = Arc::new(Mutex::new(None::<String>));
         let (ws_tx, mut ws_rx) = mpsc::channel::<WsCommand>(64);
 
@@ -276,6 +293,7 @@ impl SonioxClient {
 
         let recv_cancelled = cancelled.clone();
         let recv_err = recv_error_flag.clone();
+        let fatal_server_err = fatal_server_error_flag.clone();
         let recv_error_detail = error_detail.clone();
         let recv_event_tx = event_tx.clone();
         let finalized_text = Arc::new(Mutex::new(String::new()));
@@ -295,18 +313,26 @@ impl SonioxClient {
                             }
                         };
 
-                        let mut events = match finalized_text.lock() {
-                            Ok(mut buffer) => parse_token_response(&parsed, &mut buffer),
+                        let events = match finalized_text.lock() {
+                            Ok(mut buffer) => match parse_token_response(&parsed, &mut buffer) {
+                                Ok(events) => events,
+                                Err(error) => {
+                                    log::warn!("SonioxClient receiver: token parse error: {error}");
+                                    fatal_server_err.store(true, Ordering::SeqCst);
+                                    if let Ok(mut detail) = recv_error_detail.lock() {
+                                        *detail = Some(match error {
+                                            SttError::ParseError(message) => message,
+                                            other => other.to_string(),
+                                        });
+                                    }
+                                    break;
+                                }
+                            },
                             Err(_) => continue,
                         };
 
-                        if let Err(error) = &mut events {
-                            log::warn!("SonioxClient receiver: token parse error: {error}");
-                            continue;
-                        }
-
-                        for event in events.as_ref().unwrap() {
-                            if recv_event_tx.send(event.clone()).await.is_err() {
+                        for event in events {
+                            if recv_event_tx.send(event).await.is_err() {
                                 return;
                             }
                         }
@@ -350,7 +376,15 @@ impl SonioxClient {
         audio_reader.abort();
         ws_writer.abort();
         receiver.abort();
-        let _ = tokio::join!(audio_reader, ws_writer, receiver);
+
+        if fatal_server_error_flag.load(Ordering::SeqCst) {
+            let detail = error_detail
+                .lock()
+                .ok()
+                .and_then(|detail| detail.clone())
+                .unwrap_or_else(|| "Soniox returned an error response".into());
+            return Err(SttError::ParseError(detail));
+        }
 
         if send_error_flag.load(Ordering::SeqCst) || recv_error_flag.load(Ordering::SeqCst) {
             let detail = error_detail
@@ -468,5 +502,24 @@ mod tests {
         assert!(events
             .iter()
             .any(|event| matches!(event, TranscriptEvent::UtteranceEnd)));
+    }
+
+    #[test]
+    fn server_error_code_returns_parse_error() {
+        let mut finalized = String::new();
+        let error = parse_token_response(
+            &SonioxResponse {
+                tokens: vec![],
+                error_code: Some(401),
+                error_message: Some("invalid API key".into()),
+            },
+            &mut finalized,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "parse error: Soniox error 401: invalid API key"
+        );
     }
 }
