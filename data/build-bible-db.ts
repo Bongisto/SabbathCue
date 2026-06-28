@@ -135,6 +135,11 @@ function insertTranslationData(db: Database, meta: (typeof TRANSLATIONS_META)[nu
   try {
     raw = readFileSync(filePath, "utf-8")
   } catch {
+    if (PUBLIC_RELEASE && meta.includeInPublicRelease) {
+      throw new Error(
+        `Required public release source missing: ${meta.file}. Run bun run download:bible-data and bun run convert:afrikaans-bible before building.`,
+      )
+    }
     console.log(`  skipped ${meta.file}: not found`)
     return
   }
