@@ -53,7 +53,7 @@ const MISSING_GLADIA_KEY_MARKER = "No Gladia API key"
 const MISSING_SONIOX_KEY_MARKER = "No Soniox API key"
 const NOT_RUNNING_ERROR = "Transcription is not running"
 const MAYBE_HYMN_CUE_PATTERN =
-  /\b(?:(?:sda|adventist|seventh(?:\s|-)?day\s+adventist)\s+(?:hymn|hymns|hymnal|hymnals|song|songs)|(?:hymn|hymns|hymnal|hymnals|song|songs))(?:\s+number)?\s+[a-z0-9]/i
+  /\b(?:(?:sda|adventist|adventiste|seventh(?:\s|-)?day\s+adventist|sewende(?:\s|-)?dag\s+adventiste)\s+(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke)|(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke))(?:\s+(?:number|nommer))?\s+[a-z0-9]/i
 const BILLING_ERROR_PATTERN =
   /\b(?:402|balance exhausted|insufficient balance|quota|credits?|billing|payment|tokens?|funds?|autopay)\b/i
 const AUTH_ERROR_PATTERN =

@@ -93,12 +93,20 @@ describe("hymn voice control", () => {
       expect(parseHymnCommand("Seventh-day Adventist hymnal 100")).toBe(100)
       expect(parseHymnCommand("hymnal 12")).toBe(12)
       expect(parseHymnCommand("hymn number 12")).toBe(12)
+      expect(parseHymnCommand("lied 12")).toBe(12)
+      expect(parseHymnCommand("SDA lied 100")).toBe(100)
+      expect(parseHymnCommand("Adventiste liedboek 100")).toBe(100)
+      expect(parseHymnCommand("Sewendedag Adventiste lied 100")).toBe(100)
+      expect(parseHymnCommand("lied nommer 12")).toBe(12)
     })
 
     it("accepts spoken hymn numbers", () => {
       expect(parseHymnCommand("hymn twelve")).toBe(12)
       expect(parseHymnCommand("song two hundred fifty one")).toBe(251)
       expect(parseHymnCommand("SDA hymnal one hundred")).toBe(100)
+      expect(parseHymnCommand("lied twaalf")).toBe(12)
+      expect(parseHymnCommand("lied drie en twintig")).toBe(23)
+      expect(parseHymnCommand("Sewendedag Adventiste lied een honderd")).toBe(100)
     })
 
     it("accepts natural service speech around hymn commands", () => {

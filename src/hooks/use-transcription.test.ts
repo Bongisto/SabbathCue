@@ -503,6 +503,9 @@ describe("use-transcription", () => {
         "SDA hymn 100",
         "Adventist hymn 100",
         "Seventh-day Adventist hymnal 100",
+        "SDA lied 100",
+        "Adventiste liedboek 100",
+        "Sewendedag Adventiste lied 100",
       ]) {
         handleHymnVoiceControlMock.mockClear()
 

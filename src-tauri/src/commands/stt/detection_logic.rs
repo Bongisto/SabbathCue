@@ -51,8 +51,10 @@ pub(crate) fn strip_reference_scaffolding(text: &str) -> String {
         let is_number = !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit());
         let prev = i.checked_sub(1).map(|p| cores[p].as_str());
         let next = cores.get(i + 1).map(String::as_str);
-        let is_scaffold = matches!(core, "chapter" | "chapters" | "verse" | "verses")
-            || (core == "it" && next == Some("says"))
+        let is_scaffold = matches!(
+            core,
+            "chapter" | "chapters" | "verse" | "verses" | "hoofstuk" | "hoofstukke" | "vers"
+        ) || (core == "it" && next == Some("says"))
             || (core == "says" && prev == Some("it"));
         if !is_number && !is_scaffold {
             out.push(token);

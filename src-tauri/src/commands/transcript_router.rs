@@ -161,67 +161,113 @@ pub(crate) fn looks_like_complete_reference(text: &str) -> bool {
     lower.contains(':')
         || lower.contains(" verse ")
         || lower.contains(" verses ")
+        || lower.contains(" vers ")
+        || lower.contains(" hoofstuk ")
         || has_two_numberish(&lower)
         || (lower.contains(" chapter ") && has_numberish(&lower))
+        || (lower.contains(" hoofstuk ") && has_numberish(&lower))
 }
 
 fn contains_book_hint(lower: &str) -> bool {
     const BOOK_HINTS: &[&str] = &[
         "genesis",
         "exodus",
+        "eksodus",
         "leviticus",
+        "levitikus",
         "numbers",
+        "numeri",
         "deuteronomy",
+        "deuteronomium",
         "joshua",
+        "josua",
         "judges",
+        "rigters",
         "ruth",
+        "rut",
         "samuel",
         "kings",
+        "konings",
         "chronicles",
+        "kronieke",
         "ezra",
+        "esra",
         "nehemiah",
+        "nehemia",
         "esther",
+        "ester",
         "job",
         "psalm",
         "proverb",
+        "spreuke",
         "ecclesiastes",
+        "prediker",
         "isaiah",
+        "jesaja",
         "jeremiah",
+        "jeremia",
         "lamentations",
+        "klaagliedere",
         "ezekiel",
+        "esegiel",
         "daniel",
         "hosea",
         "joel",
         "amos",
         "obadiah",
+        "obadja",
         "jonah",
+        "jona",
         "micah",
+        "miga",
         "nahum",
         "habakkuk",
         "zephaniah",
+        "sefanja",
         "haggai",
         "zechariah",
+        "sagaria",
         "malachi",
+        "maleagi",
         "matthew",
+        "matteus",
         "mark",
+        "markus",
         "luke",
+        "lukas",
         "john",
+        "johannes",
         "acts",
+        "handelinge",
         "romans",
+        "romeine",
         "corinthians",
+        "korintiers",
         "galatians",
+        "galasiers",
         "ephesians",
+        "effesiers",
         "philippians",
+        "filippense",
         "colossians",
+        "kolossense",
         "thessalonians",
+        "tessalonisense",
         "timothy",
+        "timoteus",
         "titus",
         "philemon",
+        "filemon",
         "hebrews",
+        "hebreers",
         "james",
+        "jakobus",
         "peter",
+        "petrus",
         "jude",
+        "judas",
         "revelation",
+        "openbaring",
     ];
 
     BOOK_HINTS.iter().any(|book| lower.contains(book))
@@ -246,32 +292,59 @@ fn is_numberish_token(word: &str) -> bool {
         || matches!(
             token,
             "one"
+                | "een"
                 | "two"
+                | "twee"
                 | "three"
+                | "drie"
                 | "four"
+                | "vier"
                 | "five"
+                | "vyf"
                 | "six"
+                | "ses"
                 | "seven"
+                | "sewe"
                 | "eight"
+                | "agt"
                 | "nine"
+                | "nege"
                 | "ten"
+                | "tien"
                 | "eleven"
+                | "elf"
                 | "twelve"
+                | "twaalf"
                 | "thirteen"
+                | "dertien"
                 | "fourteen"
+                | "veertien"
                 | "fifteen"
+                | "vyftien"
                 | "sixteen"
+                | "sestien"
                 | "seventeen"
+                | "sewentien"
                 | "eighteen"
+                | "agtien"
                 | "nineteen"
+                | "negentien"
                 | "twenty"
+                | "twintig"
                 | "thirty"
+                | "dertig"
                 | "forty"
+                | "veertig"
                 | "fifty"
+                | "vyftig"
                 | "sixty"
+                | "sestig"
                 | "seventy"
+                | "sewentig"
                 | "eighty"
+                | "tagtig"
                 | "ninety"
+                | "negentig"
         )
 }
 
@@ -330,6 +403,34 @@ mod tests {
         assert_eq!(
             route.authoritative_detection.as_deref(),
             Some("John three sixteen")
+        );
+    }
+
+    #[test]
+    fn partial_afrikaans_reference_is_authoritative() {
+        let mut router = TranscriptRouter::default();
+        let route = router.route(input(
+            TranscriptEventKind::Partial,
+            "Deuteronomium 16 vers 18",
+        ));
+
+        assert_eq!(
+            route.authoritative_detection.as_deref(),
+            Some("Deuteronomium 16 vers 18")
+        );
+    }
+
+    #[test]
+    fn partial_afrikaans_spoken_number_reference_is_authoritative() {
+        let mut router = TranscriptRouter::default();
+        let route = router.route(input(
+            TranscriptEventKind::Partial,
+            "Matteus twintig vers vyf en twintig",
+        ));
+
+        assert_eq!(
+            route.authoritative_detection.as_deref(),
+            Some("Matteus twintig vers vyf en twintig")
         );
     }
 

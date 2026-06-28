@@ -492,13 +492,22 @@ fn is_hymn_or_song_number_command(text: &str) -> bool {
     for (index, token) in tokens.iter().enumerate() {
         if !matches!(
             *token,
-            "hymn" | "hymns" | "hymnal" | "hymnals" | "song" | "songs"
+            "hymn"
+                | "hymns"
+                | "hymnal"
+                | "hymnals"
+                | "song"
+                | "songs"
+                | "lied"
+                | "liedere"
+                | "liedboek"
+                | "liedboeke"
         ) {
             continue;
         }
 
         let mut number_start = index + 1;
-        if tokens.get(number_start) == Some(&"number") {
+        if matches!(tokens.get(number_start), Some(&"number") | Some(&"nommer")) {
             number_start += 1;
         }
 
@@ -561,7 +570,7 @@ fn hymn_command_number_end(tokens: &[&str], start: usize) -> Option<usize> {
     let mut index = start;
     let mut saw_number = false;
     while let Some(token) = tokens.get(index) {
-        if *token == "and" && saw_number {
+        if matches!(*token, "and" | "en") && saw_number {
             index += 1;
             continue;
         }
@@ -1719,6 +1728,12 @@ mod tests {
             .is_empty());
         assert!(detector.detect("song two hundred fifty one").is_empty());
         assert!(detector.detect("please open song number 251").is_empty());
+        assert!(detector.detect("lied 12").is_empty());
+        assert!(detector.detect("Adventiste liedboek 100").is_empty());
+        assert!(detector
+            .detect("Sewendedag Adventiste lied nommer een honderd")
+            .is_empty());
+        assert!(detector.detect("lied drie en twintig").is_empty());
     }
 
     #[test]
@@ -2381,6 +2396,28 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "Johannes");
         assert_eq!(results[0].verse_ref.chapter, 3);
         assert_eq!(results[0].verse_ref.verse_start, 16);
+    }
+
+    #[test]
+    fn afrikaans_detects_deuteronomium_16_vers_18() {
+        let mut detector = DirectDetector::for_stt_language("af");
+        let results = detector.detect("Deuteronomium 16 vers 18");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_name, "Deuteronomium");
+        assert_eq!(results[0].verse_ref.chapter, 16);
+        assert_eq!(results[0].verse_ref.verse_start, 18);
+    }
+
+    #[test]
+    fn afrikaans_detects_matteus_20_vers_25() {
+        let mut detector = DirectDetector::for_stt_language("af");
+        let results = detector.detect("Matteus 20 vers 25");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_name, "Matteus");
+        assert_eq!(results[0].verse_ref.chapter, 20);
+        assert_eq!(results[0].verse_ref.verse_start, 25);
     }
 
     #[test]

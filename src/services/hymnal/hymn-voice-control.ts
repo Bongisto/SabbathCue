@@ -22,11 +22,12 @@ import type {
 const VALID_HYMN_NUMBERS: Set<number> = new Set(SDA_HYMNAL_INDEX.map((hymn) => hymn.number))
 const DEDUPE_WINDOW_MS = 5000
 
-const HYMN_CUE_WORD_PATTERN = "(?:hymn|hymns|hymnal|hymnals|song|songs)"
+const HYMN_CUE_WORD_PATTERN =
+  "(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke)"
 const HYMN_COLLECTION_PATTERN =
-  "(?:sda|adventist|seventh(?:\\s|-)?day\\s+adventist)"
+  "(?:sda|adventist|adventiste|seventh(?:\\s|-)?day\\s+adventist|sewende(?:\\s|-)?dag\\s+adventiste)"
 const HYMN_CUE_PATTERN = new RegExp(
-  `\\b(?:${HYMN_COLLECTION_PATTERN}\\s+${HYMN_CUE_WORD_PATTERN}|${HYMN_CUE_WORD_PATTERN})(?:\\s+number)?\\s+([a-z0-9][a-z0-9\\s-]*)`,
+  `\\b(?:${HYMN_COLLECTION_PATTERN}\\s+${HYMN_CUE_WORD_PATTERN}|${HYMN_CUE_WORD_PATTERN})(?:\\s+(?:number|nommer))?\\s+([a-z0-9][a-z0-9\\s-]*)`,
   "i"
 )
 
@@ -51,6 +52,26 @@ const ONES: Record<string, number> = {
   seventeen: 17,
   eighteen: 18,
   nineteen: 19,
+  nul: 0,
+  een: 1,
+  twee: 2,
+  drie: 3,
+  vier: 4,
+  vyf: 5,
+  ses: 6,
+  sewe: 7,
+  agt: 8,
+  nege: 9,
+  tien: 10,
+  elf: 11,
+  twaalf: 12,
+  dertien: 13,
+  veertien: 14,
+  vyftien: 15,
+  sestien: 16,
+  sewentien: 17,
+  agtien: 18,
+  negentien: 19,
 }
 
 const TENS: Record<string, number> = {
@@ -62,7 +83,18 @@ const TENS: Record<string, number> = {
   seventy: 70,
   eighty: 80,
   ninety: 90,
+  twintig: 20,
+  dertig: 30,
+  veertig: 40,
+  vyftig: 50,
+  sestig: 60,
+  sewentig: 70,
+  tagtig: 80,
+  negentig: 90,
 }
+
+const NUMBER_CONNECTORS = new Set(["and", "en"])
+const HUNDRED_WORDS = new Set(["hundred", "honderd"])
 
 let lastHandled: { hymnNumber: number; at: number } | null = null
 
@@ -82,10 +114,11 @@ function parseSpokenNumber(words: string[]): number | null {
   let total = 0
   let current = 0
 
-  for (const word of words) {
-    if (word === "and") continue
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index]
+    if (NUMBER_CONNECTORS.has(word)) continue
 
-    if (word === "hundred") {
+    if (HUNDRED_WORDS.has(word)) {
       current = (current === 0 ? 1 : current) * 100
       continue
     }
@@ -96,7 +129,20 @@ function parseSpokenNumber(words: string[]): number | null {
     }
 
     if (word in ONES) {
-      current += ONES[word]
+      const ones = ONES[word]
+      const next = words[index + 1]
+      const afterNext = words[index + 2]
+      if (
+        next !== undefined &&
+        afterNext !== undefined &&
+        NUMBER_CONNECTORS.has(next) &&
+        afterNext in TENS
+      ) {
+        current += TENS[afterNext] + ones
+        index += 2
+        continue
+      }
+      current += ones
       continue
     }
 

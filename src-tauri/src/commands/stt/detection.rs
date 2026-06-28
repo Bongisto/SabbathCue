@@ -1061,6 +1061,8 @@ mod tests {
         assert!(defers("Hymn number 46"));
         assert!(defers("Adventist hymnal 100"));
         assert!(defers("Seventh-day Adventist hymnal one hundred"));
+        assert!(defers("lied 12"));
+        assert!(defers("Sewendedag Adventiste lied nommer een honderd"));
         assert!(defers("I need the new living translation."));
         assert!(defers("King James Version"));
         assert!(defers("let's go to the next verse"));
@@ -1110,6 +1112,14 @@ mod tests {
         assert_eq!(
             super::clamp_to_recent_words("   spaced   out  ", 12),
             "spaced out"
+        );
+    }
+
+    #[test]
+    fn strip_reference_scaffolding_removes_afrikaans_reference_words() {
+        assert_eq!(
+            strip_reference_scaffolding("Deuteronomium 16 vers 18 Regters en opsigters"),
+            "Deuteronomium Regters en opsigters"
         );
     }
 
