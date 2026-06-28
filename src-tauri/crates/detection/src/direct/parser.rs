@@ -404,7 +404,8 @@ fn try_verse_only_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<Ve
                                 break;
                             }
                             Token::Word(w)
-                                if is_chapter_keyword(w) && consume_number(tokens, j + 1).is_some() =>
+                                if is_chapter_keyword(w)
+                                    && consume_number(tokens, j + 1).is_some() =>
                             {
                                 found = true;
                                 break;

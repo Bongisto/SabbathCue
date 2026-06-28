@@ -134,7 +134,7 @@ pub async fn start_transcription(
         let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
         if let Ok(mut detector) = detector_state.lock() {
             detector.set_stt_language(stt_language);
-        }
+        };
     }
 
     // Build the STT provider.
@@ -145,16 +145,17 @@ pub async fn start_transcription(
         gain,
         Some(stt_language),
     )
-    .await {
-            Ok(provider) => provider,
-            Err(error) => {
-                log::error!(
-                    "[STT] start_transcription failed to build provider {provider_name}: {error}"
-                );
-                stt_active.store(false, Ordering::SeqCst);
-                return Err(error);
-            }
-        };
+    .await
+    {
+        Ok(provider) => provider,
+        Err(error) => {
+            log::error!(
+                "[STT] start_transcription failed to build provider {provider_name}: {error}"
+            );
+            stt_active.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
+    };
 
     audio_active.store(true, Ordering::SeqCst);
 

@@ -62,6 +62,7 @@ describe("use-transcription", () => {
         deviceId: "dev-42",
         gain: 1.5,
         provider: "vosk",
+        sttLanguage: "en",
         lowPower: false,
       })
     })
@@ -82,6 +83,7 @@ describe("use-transcription", () => {
         deviceId: "dev-43",
         gain: 1.25,
         provider: "vosk",
+        sttLanguage: "en",
         lowPower: false,
       })
     })

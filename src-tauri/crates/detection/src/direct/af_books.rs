@@ -54,25 +54,13 @@ pub const AF_BOOKS: &[BookInfo] = &[
         number: 9,
         name: "1 Samuel",
         abbreviation: "1 Sam",
-        aliases: &[
-            "1 samuel",
-            "eerste samuel",
-            "1ste samuel",
-            "1 sam",
-            "1sam",
-        ],
+        aliases: &["1 samuel", "eerste samuel", "1ste samuel", "1 sam", "1sam"],
     },
     BookInfo {
         number: 10,
         name: "2 Samuel",
         abbreviation: "2 Sam",
-        aliases: &[
-            "2 samuel",
-            "tweede samuel",
-            "2de samuel",
-            "2 sam",
-            "2sam",
-        ],
+        aliases: &["2 samuel", "tweede samuel", "2de samuel", "2 sam", "2sam"],
     },
     BookInfo {
         number: 11,
@@ -365,23 +353,13 @@ pub const AF_BOOKS: &[BookInfo] = &[
         number: 52,
         name: "1 Tessalonisense",
         abbreviation: "1 Tess",
-        aliases: &[
-            "1 tessalonisense",
-            "1 tess",
-            "1tess",
-            "1 thessalonians",
-        ],
+        aliases: &["1 tessalonisense", "1 tess", "1tess", "1 thessalonians"],
     },
     BookInfo {
         number: 53,
         name: "2 Tessalonisense",
         abbreviation: "2 Tess",
-        aliases: &[
-            "2 tessalonisense",
-            "2 tess",
-            "2tess",
-            "2 thessalonians",
-        ],
+        aliases: &["2 tessalonisense", "2 tess", "2tess", "2 thessalonians"],
     },
     BookInfo {
         number: 54,
@@ -459,11 +437,6 @@ pub const AF_BOOKS: &[BookInfo] = &[
         number: 66,
         name: "Die openbaring",
         abbreviation: "Openb",
-        aliases: &[
-            "openbaring",
-            "die openbaring",
-            "revelation",
-            "apocalypse",
-        ],
+        aliases: &["openbaring", "die openbaring", "revelation", "apocalypse"],
     },
 ];

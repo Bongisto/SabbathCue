@@ -458,11 +458,15 @@ mod tests {
         )
         .unwrap();
 
-        assert!(
-            events
-                .iter()
-                .any(|event| matches!(event, TranscriptEvent::Final { speech_final: true, .. }))
-        );
-        assert!(events.iter().any(|event| matches!(event, TranscriptEvent::UtteranceEnd)));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            TranscriptEvent::Final {
+                speech_final: true,
+                ..
+            }
+        )));
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, TranscriptEvent::UtteranceEnd)));
     }
 }
