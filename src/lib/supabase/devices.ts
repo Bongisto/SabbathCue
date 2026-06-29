@@ -1,5 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client"
-import { isNetworkError } from "@/lib/supabase/errors"
+import { callRpc } from "@/lib/supabase/rpc"
 
 export type RegisterDeviceResult =
   | { ok: true; accessExpiresAt: number | null }
@@ -7,6 +6,8 @@ export type RegisterDeviceResult =
   | { ok: false; code: "suspended" }
   | { ok: false; code: "trial_expired" }
   | { ok: false; code: "error"; message: string }
+
+const DEVICE_CATCH = "Unable to reach the device registration service."
 
 function parseRegisterDeviceStatus(data: unknown): RegisterDeviceResult {
   if (!data || typeof data !== "object") {
@@ -48,39 +49,18 @@ export async function registerDevice(
   appVersion: string,
   label?: string
 ): Promise<RegisterDeviceResult> {
-  try {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase.rpc("register_device", {
+  const result = await callRpc<unknown>("register_device", {
+    args: {
       p_device_id: deviceId,
       p_os: os,
       p_app_version: appVersion,
       p_label: label ?? null,
-    })
-
-    if (error) {
-      if (isNetworkError(error)) {
-        return {
-          ok: false,
-          code: "error",
-          message: "Unable to reach the device registration service.",
-        }
-      }
-      return {
-        ok: false,
-        code: "error",
-        message: error.message || "Device registration failed.",
-      }
-    }
-
-    return parseRegisterDeviceStatus(data)
-  } catch (error) {
-    if (isNetworkError(error)) {
-      return {
-        ok: false,
-        code: "error",
-        message: "Unable to reach the device registration service.",
-      }
-    }
-    return { ok: false, code: "error", message: "Device registration failed." }
+    },
+    errorFallback: "Device registration failed.",
+    catchFallback: DEVICE_CATCH,
+  })
+  if (!result.ok) {
+    return { ok: false, code: "error", message: result.message }
   }
+  return parseRegisterDeviceStatus(result.data)
 }
