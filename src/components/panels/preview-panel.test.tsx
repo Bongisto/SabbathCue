@@ -104,13 +104,14 @@ vi.mock("@/stores/broadcast-store", () => {
     })
   const selectActiveTheme = (state: { themes: Array<{ id: string }>; activeThemeId: string }) =>
     state.themes.find((theme) => theme.id === state.activeThemeId) ?? state.themes[0] ?? null
+  const useItemTheme = (item: unknown) => (item ? { id: "mock-theme" } : null)
   useBroadcastStore.getState = () => ({
     previewItem,
     setPreviewItem: setPreviewItemMock,
     setLiveItem: setLiveItemMock,
     setLive: setLiveMock,
   })
-  return { selectActiveTheme, useBroadcastStore }
+  return { selectActiveTheme, useBroadcastStore, useItemTheme }
 })
 
 describe("PreviewPanel", () => {

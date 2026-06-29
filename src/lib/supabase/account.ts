@@ -1,5 +1,4 @@
-import { getSupabaseClient } from "@/lib/supabase/client"
-import { failureMessage } from "@/lib/supabase/errors"
+import { callRpc } from "@/lib/supabase/rpc"
 
 export interface AdminAccountRow {
   user_id: string
@@ -15,33 +14,25 @@ export interface AdminAccountRow {
 
 export type AccountActionResult = { ok: true } | { ok: false; message: string }
 
+const ACCOUNT_CATCH = "Unable to reach the account service."
+
 /** Whether the signed-in user may use the admin dashboard. */
 export async function fetchIsAdmin(): Promise<boolean> {
-  try {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase.rpc("is_app_admin")
-    if (error) return false
-    return data === true
-  } catch {
-    return false
-  }
+  const result = await callRpc<boolean>("is_app_admin", {
+    errorFallback: "",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  return result.ok && result.data === true
 }
 
 /** Permanently delete the signed-in user's own account. */
 export async function deleteOwnAccount(): Promise<AccountActionResult> {
-  try {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("delete_own_account")
-    if (error) {
-      return {
-        ok: false,
-        message: failureMessage(error, "Account deletion failed."),
-      }
-    }
-    return { ok: true }
-  } catch {
-    return { ok: false, message: "Unable to reach the account service." }
-  }
+  const result = await callRpc<null>("delete_own_account", {
+    errorFallback: "Account deletion failed.",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  if (!result.ok) return { ok: false, message: result.message }
+  return { ok: true }
 }
 
 function isAdminAccountRow(value: unknown): value is AdminAccountRow {
@@ -58,20 +49,15 @@ function isAdminAccountRow(value: unknown): value is AdminAccountRow {
 export async function adminListAccounts(): Promise<
   { ok: true; accounts: AdminAccountRow[] } | { ok: false; message: string }
 > {
-  try {
-    const supabase = getSupabaseClient()
-    const { data, error } = await supabase.rpc("admin_list_accounts")
-    if (error) {
-      return {
-        ok: false,
-        message: failureMessage(error, "Could not load accounts."),
-      }
-    }
-    const accounts = Array.isArray(data) ? data.filter(isAdminAccountRow) : []
-    return { ok: true, accounts }
-  } catch {
-    return { ok: false, message: "Unable to reach the account service." }
-  }
+  const result = await callRpc<unknown>("admin_list_accounts", {
+    errorFallback: "Could not load accounts.",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  if (!result.ok) return { ok: false, message: result.message }
+  const accounts = Array.isArray(result.data)
+    ? result.data.filter(isAdminAccountRow)
+    : []
+  return { ok: true, accounts }
 }
 
 export async function adminSetSuspended(
@@ -79,83 +65,52 @@ export async function adminSetSuspended(
   suspended: boolean,
   reason?: string
 ): Promise<AccountActionResult> {
-  try {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("admin_set_suspended", {
+  const result = await callRpc<null>("admin_set_suspended", {
+    args: {
       p_user_id: userId,
       p_suspended: suspended,
       p_reason: reason ?? null,
-    })
-    if (error) {
-      return {
-        ok: false,
-        message: failureMessage(error, "Suspension update failed."),
-      }
-    }
-    return { ok: true }
-  } catch {
-    return { ok: false, message: "Unable to reach the account service." }
-  }
+    },
+    errorFallback: "Suspension update failed.",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  if (!result.ok) return { ok: false, message: result.message }
+  return { ok: true }
 }
 
 export async function adminSetAccess(
   userId: string,
   days: number
 ): Promise<AccountActionResult> {
-  try {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("admin_set_access", {
-      p_user_id: userId,
-      p_days: days,
-    })
-    if (error) {
-      return {
-        ok: false,
-        message: failureMessage(error, "Access update failed."),
-      }
-    }
-    return { ok: true }
-  } catch {
-    return { ok: false, message: "Unable to reach the account service." }
-  }
+  const result = await callRpc<null>("admin_set_access", {
+    args: { p_user_id: userId, p_days: days },
+    errorFallback: "Access update failed.",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  if (!result.ok) return { ok: false, message: result.message }
+  return { ok: true }
 }
 
 export async function adminDeleteAccount(
   userId: string
 ): Promise<AccountActionResult> {
-  try {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("admin_delete_account", {
-      p_user_id: userId,
-    })
-    if (error) {
-      return {
-        ok: false,
-        message: failureMessage(error, "Account deletion failed."),
-      }
-    }
-    return { ok: true }
-  } catch {
-    return { ok: false, message: "Unable to reach the account service." }
-  }
+  const result = await callRpc<null>("admin_delete_account", {
+    args: { p_user_id: userId },
+    errorFallback: "Account deletion failed.",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  if (!result.ok) return { ok: false, message: result.message }
+  return { ok: true }
 }
 
 export async function requestAccountCancellation(
   accountEmail?: string | null
 ): Promise<AccountActionResult> {
-  try {
-    const supabase = getSupabaseClient()
-    const { error } = await supabase.rpc("request_account_cancellation", {
-      p_account_email: accountEmail ?? null,
-    })
-    if (error) {
-      return {
-        ok: false,
-        message: failureMessage(error, "Cancellation request failed."),
-      }
-    }
-    return { ok: true }
-  } catch {
-    return { ok: false, message: "Unable to reach the account service." }
-  }
+  const result = await callRpc<null>("request_account_cancellation", {
+    args: { p_account_email: accountEmail ?? null },
+    errorFallback: "Cancellation request failed.",
+    catchFallback: ACCOUNT_CATCH,
+  })
+  if (!result.ok) return { ok: false, message: result.message }
+  return { ok: true }
 }
