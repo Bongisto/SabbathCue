@@ -11,7 +11,7 @@ import {
   selectPreviewVerse,
 } from "@/lib/presentation-workflow"
 import { useBibleStore } from "@/stores/bible-store"
-import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import { useBroadcastStore, useItemTheme } from "@/stores/broadcast-store"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
@@ -42,7 +42,7 @@ function previewVideoSrc(item: PresentationRenderData): string | null {
 export function PreviewPanel({ className }: { className?: string }) {
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
   const previewItem = useBroadcastStore((s) => s.previewItem)
-  const activeTheme = useBroadcastStore(selectActiveTheme)
+  const activeTheme = useItemTheme(previewItem)
   const isLive = useBroadcastStore((s) => s.isLive)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
 

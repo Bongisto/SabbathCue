@@ -21,6 +21,7 @@ import {
   DownloadIcon,
   UploadIcon,
   CheckCircleIcon,
+  MusicIcon,
   PinIcon,
   PinOffIcon,
   EditIcon,
@@ -30,7 +31,7 @@ import { cn } from "@/lib/utils"
 import { importTheme, exportTheme } from "@/lib/theme-designer-files"
 import type { BroadcastTheme, VerseRenderData } from "@/types"
 
-type FilterTab = "all" | "pinned" | "custom"
+type FilterTab = "all" | "pinned" | "custom" | "hymns"
 
 const THUMBNAIL_VERSE: VerseRenderData = {
   reference: "John 3:16 (KJV)",
@@ -40,12 +41,14 @@ const THUMBNAIL_VERSE: VerseRenderData = {
 function ThemeCard({
   theme,
   isActive,
+  isHymnTheme,
   isRenaming,
   isSelected,
   onSelect,
 }: {
   theme: BroadcastTheme
   isActive: boolean
+  isHymnTheme: boolean
   isRenaming: boolean
   isSelected: boolean
   onSelect: () => void
@@ -131,6 +134,11 @@ function ThemeCard({
 
         {/* Tags */}
         <div className="flex shrink-0 items-center gap-1">
+          {isHymnTheme && (
+            <Badge className="bg-sky-600 text-[0.5rem] text-foreground hover:bg-sky-600">
+              Hymn
+            </Badge>
+          )}
           {theme.builtin && (
             <Badge variant="outline" className="text-[0.5rem]">
               Built-in
@@ -159,6 +167,15 @@ function ThemeCard({
             >
               <CheckCircleIcon className="mr-2 size-3.5" />
               Set as Active
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                useBroadcastStore.getState().setHymnTheme(theme.id)
+              }}
+            >
+              <MusicIcon className="mr-2 size-3.5" />
+              Use for hymns
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={(e) => {
@@ -212,6 +229,7 @@ function ThemeCard({
 export function ThemeLibrary() {
   const themes = useBroadcastStore((s) => s.themes)
   const activeThemeId = useBroadcastStore((s) => s.activeThemeId)
+  const hymnThemeId = useBroadcastStore((s) => s.hymnThemeId)
   const editingThemeId = useBroadcastStore((s) => s.editingThemeId)
   const renamingThemeId = useBroadcastStore((s) => s.renamingThemeId)
   const [search, setSearch] = useState("")
@@ -225,8 +243,13 @@ export function ThemeLibrary() {
     }
     if (filter === "pinned") result = result.filter((t) => t.pinned)
     if (filter === "custom") result = result.filter((t) => !t.builtin)
+    if (filter === "hymns") {
+      result = result.filter(
+        (t) => t.id.startsWith("builtin-hymnal-") || t.id === hymnThemeId
+      )
+    }
     return result
-  }, [themes, search, filter])
+  }, [themes, search, filter, hymnThemeId])
 
   const builtinThemes = filteredThemes.filter((t) => t.builtin)
   const customThemes = filteredThemes.filter((t) => !t.builtin)
@@ -280,6 +303,9 @@ export function ThemeLibrary() {
           </TabsTrigger>
           <TabsTrigger value="custom" className="capitalize">
             custom
+          </TabsTrigger>
+          <TabsTrigger value="hymns" className="capitalize">
+            hymns
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -349,6 +375,7 @@ export function ThemeLibrary() {
                   key={theme.id}
                   theme={theme}
                   isActive={theme.id === activeThemeId}
+                  isHymnTheme={theme.id === hymnThemeId}
                   isRenaming={theme.id === renamingThemeId}
                   isSelected={theme.id === editingThemeId}
                   onSelect={() => handleSelectTheme(theme.id)}
@@ -368,6 +395,7 @@ export function ThemeLibrary() {
                   key={theme.id}
                   theme={theme}
                   isActive={theme.id === activeThemeId}
+                  isHymnTheme={theme.id === hymnThemeId}
                   isRenaming={theme.id === renamingThemeId}
                   isSelected={theme.id === editingThemeId}
                   onSelect={() => handleSelectTheme(theme.id)}

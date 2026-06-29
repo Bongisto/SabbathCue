@@ -25,7 +25,7 @@ import {
   type VideoEndDecision,
   type VideoSlice,
 } from "@/stores/broadcast/video-slice"
-import { BUILTIN_THEMES } from "@/lib/builtin-themes"
+import { BUILTIN_THEMES, DEFAULT_HYMN_THEME_ID } from "@/lib/builtin-themes"
 import {
   recordWorkflowTrace,
   tracePresentationDetails,
@@ -53,6 +53,7 @@ export interface BroadcastState
   themes: BroadcastTheme[]
   activeThemeId: string
   altActiveThemeId: string
+  hymnThemeId: string
   isLive: boolean
   previewItem: PresentationRenderData | null
   liveItem: PresentationRenderData | null
@@ -70,6 +71,7 @@ export interface BroadcastState
   togglePinTheme: (id: string) => void
   setActiveTheme: (id: string) => void
   setAltActiveTheme: (id: string) => void
+  setHymnTheme: (id: string) => void
   setLive: (live: boolean, options?: BroadcastSyncOptions) => void
   setPreviewItem: (item: PresentationRenderData | null) => void
   setLiveItem: (item: PresentationRenderData | null) => void
@@ -94,6 +96,43 @@ export function findThemeById(
   id: string
 ): BroadcastTheme | null {
   return themes.find((theme) => theme.id === id) ?? themes[0] ?? null
+}
+
+/**
+ * The single hymn-scoping decision, shared by the projector output and every
+ * in-app surface: a hymn item uses the dedicated hymn theme; anything else uses
+ * the supplied base theme. Scripture/EGW/media are never affected.
+ */
+export function resolveThemeIdForItem(
+  item: PresentationRenderData | null | undefined,
+  baseThemeId: string,
+  hymnThemeId: string
+): string {
+  return item?.kind === "hymn" && hymnThemeId ? hymnThemeId : baseThemeId
+}
+
+/** Theme an output should use, keyed off the live item (per-output base theme). */
+export function resolveOutputThemeId(
+  state: Pick<
+    BroadcastState,
+    "liveItem" | "activeThemeId" | "altActiveThemeId" | "hymnThemeId"
+  >,
+  outputId: string
+): string {
+  const base = outputId === "alt" ? state.altActiveThemeId : state.activeThemeId
+  return resolveThemeIdForItem(state.liveItem, base, state.hymnThemeId)
+}
+
+/** Theme an in-app surface should use to render a specific item. */
+export function useItemTheme(
+  item: PresentationRenderData | null
+): BroadcastTheme | null {
+  return useBroadcastStore((s) =>
+    findThemeById(
+      s.themes,
+      resolveThemeIdForItem(item, s.activeThemeId, s.hymnThemeId)
+    )
+  )
 }
 
 /// Fallback so an animated transition is never silently instant when a theme
@@ -142,6 +181,7 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
   themes: [...BUILTIN_THEMES],
   activeThemeId: BUILTIN_THEMES[0].id,
   altActiveThemeId: BUILTIN_THEMES[0].id,
+  hymnThemeId: DEFAULT_HYMN_THEME_ID,
   isLive: false,
   previewItem: null,
   liveItem: null,
@@ -159,7 +199,7 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
         : [...s.themes, theme],
     })),
   deleteTheme: (id) => {
-    const { activeThemeId, altActiveThemeId } = get()
+    const { activeThemeId, altActiveThemeId, hymnThemeId, liveItem } = get()
     set((s) => {
       const themes = s.themes.filter((t) => t.id !== id || t.builtin)
       const fallbackId = themes[0]?.id ?? BUILTIN_THEMES[0].id
@@ -168,9 +208,15 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
         activeThemeId: s.activeThemeId === id ? fallbackId : s.activeThemeId,
         altActiveThemeId:
           s.altActiveThemeId === id ? fallbackId : s.altActiveThemeId,
+        hymnThemeId:
+          s.hymnThemeId === id ? DEFAULT_HYMN_THEME_ID : s.hymnThemeId,
       }
     })
-    if (activeThemeId === id || altActiveThemeId === id) {
+    if (
+      activeThemeId === id ||
+      altActiveThemeId === id ||
+      (hymnThemeId === id && liveItem?.kind === "hymn")
+    ) {
       get().syncBroadcastOutput()
     }
   },
@@ -227,7 +273,7 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
     })),
   syncBroadcastOutputFor: (outputId: string, options) => {
     const s = get()
-    const themeId = outputId === "alt" ? s.altActiveThemeId : s.activeThemeId
+    const themeId = resolveOutputThemeId(s, outputId)
     const label = outputId === "alt" ? "broadcast-alt" : "broadcast"
     const theme = findThemeById(s.themes, themeId)
     if (!theme) return
@@ -265,6 +311,10 @@ export const useBroadcastStore = create<BroadcastState>()((set, get, store) => (
   setAltActiveTheme: (altActiveThemeId) => {
     set({ altActiveThemeId })
     get().syncBroadcastOutputFor("alt")
+  },
+  setHymnTheme: (hymnThemeId) => {
+    set({ hymnThemeId })
+    if (get().liveItem?.kind === "hymn") get().syncBroadcastOutput()
   },
   setLive: (isLive, options) => {
     const shouldStopVideo = !isLive && get().liveItem?.kind === "video"

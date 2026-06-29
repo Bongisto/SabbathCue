@@ -22,7 +22,11 @@ import { commitPreviewToLive, presentItem } from "@/lib/presentation-workflow"
 import { cn } from "@/lib/utils"
 import { convertTauriFileSrc } from "@/lib/tauri-runtime"
 import { useBroadcastVideo } from "@/hooks/use-broadcast-video"
-import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import {
+  selectActiveTheme,
+  useBroadcastStore,
+  useItemTheme,
+} from "@/stores/broadcast-store"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
@@ -343,7 +347,6 @@ export function LiveOutputPanel({ className }: { className?: string }) {
   const liveItem = useBroadcastStore((s) => s.liveItem)
   const readingModeAutoLive = useBroadcastStore((s) => s.readingModeAutoLive)
   const liveTransitionType = useBroadcastStore((s) => s.liveTransitionType)
-  const activeTheme = useBroadcastStore(selectActiveTheme)
   const previewItem = useBroadcastStore((s) => s.previewItem)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isFullscreenLayout, setIsFullscreenLayout] = useState(false)
@@ -353,6 +356,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
     () => (isLive ? liveItem : null),
     [isLive, liveItem]
   )
+  const activeTheme = useItemTheme(visibleItem)
   const canCommitPreview = Boolean(previewItem)
   const setPanelFullscreen = async (fullscreen: boolean) => {
     try {

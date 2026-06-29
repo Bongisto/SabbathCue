@@ -22,7 +22,7 @@ import {
 } from "@/lib/library/library-presentation"
 import { presentQueuedItem, previewQueuedItem } from "@/lib/queue-presentation"
 import { cn } from "@/lib/utils"
-import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import { useItemTheme } from "@/stores/broadcast-store"
 import { useEmergencySlideStore } from "@/stores/emergency-slide-store"
 import { useLibraryStore } from "@/stores/library-store"
 import { useQueueStore } from "@/stores/queue-store"
@@ -67,7 +67,7 @@ function PresentationThumbnail({
   renderData: PresentationRenderData | null
   className?: string
 }) {
-  const activeTheme = useBroadcastStore(selectActiveTheme)
+  const activeTheme = useItemTheme(renderData)
 
   if (renderData?.kind === "video") {
     return (
