@@ -29,6 +29,8 @@ export const DASHBOARD_KEYBOARD_SHORTCUTS: KeyboardShortcutGroup[] = [
       { keys: "Ctrl/Cmd + 2", action: "Service Schedules" },
       { keys: "Ctrl/Cmd + 3", action: "Run Service Flow" },
       { keys: "Ctrl/Cmd + 4", action: "SDA Hymns Search" },
+      { keys: "Ctrl/Cmd + 7", action: "Detections" },
+      { keys: "Ctrl/Cmd + 8", action: "Scripture & EGW" },
     ],
   },
   {

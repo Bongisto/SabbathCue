@@ -1,0 +1,73 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import type { DetectionResult } from "@/types"
+import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
+
+const { detectionsRef, previewMock } = vi.hoisted(() => ({
+  detectionsRef: { current: [] as DetectionResult[] },
+  previewMock: vi.fn(),
+}))
+
+vi.mock("@/hooks/use-detection", () => ({
+  useDetection: () => ({ detections: detectionsRef.current }),
+}))
+
+// Isolate the bar from detection action internals (workflow / queue stores).
+vi.mock("@/components/panels/detections-panel", () => ({
+  getDetectionActions: () => ({
+    preview: previewMock,
+    present: vi.fn(),
+    queue: vi.fn(),
+  }),
+  SourceBadge: ({ source }: { source: string }) => <span>{source}</span>,
+}))
+
+import { LatestDetectionBar } from "./latest-detection-bar"
+
+const detection: DetectionResult = {
+  verse_ref: "John 3:16",
+  verse_text: "For God so loved the world.",
+  book_name: "John",
+  book_number: 43,
+  chapter: 3,
+  verse: 16,
+  confidence: 0.96,
+  source: "direct",
+  auto_queued: false,
+  transcript_snippet: "",
+  is_chapter_only: false,
+}
+
+beforeEach(() => {
+  detectionsRef.current = []
+  previewMock.mockClear()
+  useDashboardWorkspaceStore.setState({ workspace: "live" })
+})
+afterEach(() => cleanup())
+
+describe("LatestDetectionBar", () => {
+  it("shows an empty state with no detections", () => {
+    render(<LatestDetectionBar />)
+    expect(screen.getByText(/no detections yet/i)).toBeTruthy()
+  })
+
+  it("renders the most recent detection reference", () => {
+    detectionsRef.current = [detection]
+    render(<LatestDetectionBar />)
+    expect(screen.getByText("John 3:16")).toBeTruthy()
+  })
+
+  it("previews the latest detection from the quick action", () => {
+    detectionsRef.current = [detection]
+    render(<LatestDetectionBar />)
+    fireEvent.click(screen.getByRole("button", { name: /^preview$/i }))
+    expect(previewMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("navigates to the Detections page from the link", () => {
+    render(<LatestDetectionBar />)
+    fireEvent.click(screen.getByRole("button", { name: /open detections/i }))
+    expect(useDashboardWorkspaceStore.getState().workspace).toBe("detections")
+  })
+})

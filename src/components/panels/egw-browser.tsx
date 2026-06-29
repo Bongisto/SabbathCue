@@ -16,19 +16,19 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
+import { ResultCard } from "@/components/panels/search/ResultCard"
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   BookOpenIcon,
-  PlusIcon,
   SearchIcon,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { scrollIntoPanelView } from "@/lib/scroll-into-panel-view"
 import { useEgw, egwActions } from "@/hooks/use-egw"
 import { useEgwStore } from "@/stores/egw-store"
 import {
   createEgwQueueItem,
+  egwReference,
   presentEgwParagraph,
   previewEgwParagraph,
 } from "@/lib/presentation-workflow"
@@ -178,54 +178,21 @@ export function EgwBrowser() {
     scrollIntoPanelView(selectedParagraphRef.current)
   }, [selectedParagraphId])
 
-  const renderRow = (p: EgwParagraph, showRef: boolean) => (
-    <div
+  const renderRow = (p: EgwParagraph) => (
+    <ResultCard
       key={p.id}
-      ref={p.id === selectedParagraphId ? selectedParagraphRef : undefined}
-      onClick={() => handleParagraphClick(p)}
-      className={cn(
-        "group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors",
-        p.id === selectedParagraphId
-          ? "border border-lime-500/50 bg-lime-500/10"
-          : "border border-transparent hover:bg-[var(--shell-bg-sunken)]"
-      )}
-    >
-      <span className="w-8 shrink-0 text-right text-sm font-semibold text-primary">
-        {showRef ? `${p.chapter}:${p.paragraph}` : p.paragraph}
-      </span>
-      <div className="flex-1">
-        {showRef && (
-          <div className="mb-1 text-xs font-medium text-muted-foreground">
-            {p.book_title} — {p.chapter_title}
-          </div>
-        )}
-        <p className="text-sm leading-relaxed text-foreground/80">{p.text}</p>
-      </div>
-      <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          title="Present"
-          onClick={(e) => {
-            e.stopPropagation()
-            presentEgwParagraph(p)
-          }}
-        >
-          <ArrowRightIcon className="size-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          title="Add to queue"
-          onClick={(e) => {
-            e.stopPropagation()
-            useQueueStore.getState().addOrFlashItem(createEgwQueueItem(p))
-          }}
-        >
-          <PlusIcon className="size-3" />
-        </Button>
-      </div>
-    </div>
+      cardRef={p.id === selectedParagraphId ? selectedParagraphRef : undefined}
+      reference={egwReference(p)}
+      text={p.text}
+      badgeLabel="EGW"
+      badgeTone="egw"
+      selected={p.id === selectedParagraphId}
+      onPreview={() => handleParagraphClick(p)}
+      onLive={() => presentEgwParagraph(p)}
+      onQueue={() =>
+        useQueueStore.getState().addOrFlashItem(createEgwQueueItem(p))
+      }
+    />
   )
 
   return (
@@ -322,7 +289,7 @@ export function EgwBrowser() {
                   {currentChapterTitle}
                 </h3>
               )}
-              {currentParagraphs.map((p) => renderRow(p, false))}
+              {currentParagraphs.map((p) => renderRow(p))}
             </div>
           )
         ) : searchInput.trim().length < 3 ? (
@@ -343,7 +310,7 @@ export function EgwBrowser() {
           </div>
         ) : (
           <div className="flex flex-col gap-0 p-2">
-            {searchResults.map((p) => renderRow(p, true))}
+            {searchResults.map((p) => renderRow(p))}
           </div>
         )}
       </div>

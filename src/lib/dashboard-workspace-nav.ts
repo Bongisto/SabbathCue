@@ -6,7 +6,9 @@ import {
   LayoutGridIcon,
   ListOrderedIcon,
   PlayCircleIcon,
+  RadarIcon,
   RadioIcon,
+  SearchIcon,
   SettingsIcon,
   LifeBuoyIcon,
 } from "lucide-react"
@@ -26,6 +28,18 @@ export type DashboardWorkspaceNavItem = {
 /** Workspace navigation order, rendered as icon-first buttons in the top navigation. */
 export const DASHBOARD_WORKSPACE_NAV: DashboardWorkspaceNavItem[] = [
   { id: "live", label: "Live Desk", icon: LayoutGridIcon, shortcut: "Ctrl/Cmd + 1" },
+  {
+    id: "detections",
+    label: "Detections",
+    icon: RadarIcon,
+    shortcut: "Ctrl/Cmd + 7",
+  },
+  {
+    id: "scripture-search",
+    label: "Scripture & EGW",
+    icon: SearchIcon,
+    shortcut: "Ctrl/Cmd + 8",
+  },
   {
     id: "queue",
     label: "Queue",

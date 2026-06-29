@@ -76,6 +76,16 @@ function handleWorkspaceShortcut(key: string): boolean {
     useServicePlanStore.getState().closePlanner()
     return true
   }
+  if (key === "7") {
+    useDashboardWorkspaceStore.getState().setWorkspace("detections")
+    useServicePlanStore.getState().closePlanner()
+    return true
+  }
+  if (key === "8") {
+    useDashboardWorkspaceStore.getState().setWorkspace("scripture-search")
+    useServicePlanStore.getState().closePlanner()
+    return true
+  }
   return false
 }
 

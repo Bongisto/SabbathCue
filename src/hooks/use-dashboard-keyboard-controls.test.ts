@@ -206,6 +206,25 @@ describe("handleDashboardKeyboardEvent", () => {
     expect(useDashboardWorkspaceStore.getState().workspace).toBe("library")
   })
 
+  it("opens the Detections workspace with Ctrl+7 and closes the planner", () => {
+    useServicePlanStore.setState({ plannerOpen: true })
+
+    handleDashboardKeyboardEvent(
+      new KeyboardEvent("keydown", { key: "7", ctrlKey: true })
+    )
+
+    expect(useDashboardWorkspaceStore.getState().workspace).toBe("detections")
+    expect(useServicePlanStore.getState().plannerOpen).toBe(false)
+  })
+
+  it("opens the Scripture & EGW workspace with Ctrl+8", () => {
+    handleDashboardKeyboardEvent(
+      new KeyboardEvent("keydown", { key: "8", ctrlKey: true })
+    )
+
+    expect(useDashboardWorkspaceStore.getState().workspace).toBe("scripture-search")
+  })
+
   it("suspends dashboard shortcuts while the tutorial is running", () => {
     useTutorialStore.setState({ isRunning: true })
 

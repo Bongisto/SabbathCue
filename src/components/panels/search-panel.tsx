@@ -49,6 +49,9 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
     selectedVerse,
   } = useBible()
 
+  const translationLabel =
+    translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
+
   const queueItems = useQueueStore((state) => state.items)
   const queuedVerseKeys = useMemo(() => buildQueuedVerseKeys(queueItems), [queueItems])
 
@@ -310,6 +313,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
           currentChapter={currentChapter}
           effectiveSelectedVerseId={effectiveSelectedVerseId}
           queuedVerseKeys={queuedVerseKeys}
+          translationLabel={translationLabel}
           onChapterChange={handleChapterChange}
           onSelectVerse={handleVerseClick}
         />
@@ -320,6 +324,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
           contextQuery={contextQuery}
           semanticResults={semanticResults}
           activeTranslationId={activeTranslationId}
+          translationLabel={translationLabel}
           queuedVerseKeys={queuedVerseKeys}
         />
       ) : null}

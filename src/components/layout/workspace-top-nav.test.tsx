@@ -29,7 +29,7 @@ describe("WorkspaceTopNav", () => {
     const nav = screen.getByRole("navigation", { name: "Workspaces" })
     expect(nav).toBeTruthy()
     const buttons = screen.getAllByRole("button")
-    expect(buttons).toHaveLength(9)
+    expect(buttons).toHaveLength(11)
     for (const button of buttons) {
       expect(button.getAttribute("aria-label")).toBeTruthy()
     }

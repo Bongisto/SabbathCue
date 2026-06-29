@@ -2,6 +2,8 @@ import { create } from "zustand"
 
 export type DashboardWorkspace =
   | "live"
+  | "detections"
+  | "scripture-search"
   | "queue"
   | "run-service"
   | "service-plans"

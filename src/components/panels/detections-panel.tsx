@@ -34,7 +34,6 @@ import type {
   DetectionResult,
   EgwParagraph,
   HymnDetection,
-  Verse,
 } from "@/types"
 
 const SOURCE_COLORS: Record<
@@ -50,7 +49,7 @@ const SOURCE_COLORS: Record<
   hymn: { bg: "bg-amber-500/15", text: "text-amber-300", label: "Hymn" },
 }
 
-function SourceBadge({ source }: { source: string }) {
+export function SourceBadge({ source }: { source: string }) {
   const style = SOURCE_COLORS[source] ?? {
     bg: "bg-[var(--shell-bg-sunken)]",
     text: "text-muted-foreground",
@@ -82,7 +81,8 @@ function HymnDetectionCard({
 }: {
   detection: DetectionResult & { hymn: HymnDetection }
 }) {
-  const { number, title } = detection.hymn
+  const { title } = detection.hymn
+  const actions = getDetectionActions(detection)
 
   return (
     <div className="queue-item p-3 last:border-0">
@@ -104,41 +104,15 @@ function HymnDetectionCard({
       )}
 
       <div className="mt-2 flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1"
-          onClick={() =>
-            void loadHymnVoiceControl().then((mod) =>
-              mod.previewHymnByNumber(number)
-            )
-          }
-        >
+        <Button size="sm" variant="outline" className="gap-1" onClick={actions.preview}>
           <EyeIcon className="size-3" />
           Preview
         </Button>
-        <Button
-          size="sm"
-          className="gap-1"
-          onClick={() =>
-            void loadHymnVoiceControl().then((mod) =>
-              mod.presentHymnByNumber(number)
-            )
-          }
-        >
+        <Button size="sm" className="gap-1" onClick={actions.present}>
           <PlayIcon className="size-3" />
           Present
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1"
-          onClick={() =>
-            void loadHymnVoiceControl().then((mod) =>
-              mod.queueHymnByNumber(number)
-            )
-          }
-        >
+        <Button variant="outline" size="sm" className="gap-1" onClick={actions.queue}>
           <PlusIcon className="size-3" />
           Queue
         </Button>
@@ -147,31 +121,64 @@ function HymnDetectionCard({
   )
 }
 
+/**
+ * Resolve the preview / live / queue intent for a detection (verse, EGW paragraph,
+ * or hymn). Single source of truth shared by the detection cards and the Live Desk
+ * latest-detection bar.
+ */
+export function getDetectionActions(detection: DetectionResult): {
+  preview: () => void
+  present: () => void
+  queue: () => void
+} {
+  if (isHymnDetection(detection)) {
+    const { number } = detection.hymn
+    return {
+      preview: () =>
+        void loadHymnVoiceControl().then((mod) => mod.previewHymnByNumber(number)),
+      present: () =>
+        void loadHymnVoiceControl().then((mod) => mod.presentHymnByNumber(number)),
+      queue: () =>
+        void loadHymnVoiceControl().then((mod) => mod.queueHymnByNumber(number)),
+    }
+  }
+
+  if (isEgwDetection(detection)) {
+    const egwParagraph = detection.egw_paragraph
+    return {
+      preview: () => previewEgwParagraph(egwParagraph),
+      present: () => presentEgwParagraph(egwParagraph),
+      queue: () =>
+        useQueueStore.getState().addOrFlashItem(
+          createEgwQueueItem(egwParagraph, {
+            confidence: detection.confidence,
+            source: "ai-direct",
+          })
+        ),
+    }
+  }
+
+  const verse = detectionToVerse(detection)
+  return {
+    preview: () => selectPreviewVerse(verse),
+    present: () => presentVerse(verse),
+    queue: () =>
+      useQueueStore.getState().addOrFlashItem(
+        createScriptureQueueItem(verse, {
+          reference: detection.verse_ref,
+          confidence: detection.confidence,
+          source: detection.source === "direct" ? "ai-direct" : "ai-semantic",
+        })
+      ),
+  }
+}
+
 function DetectionCard({ detection }: { detection: DetectionResult }) {
   if (isHymnDetection(detection)) {
     return <HymnDetectionCard detection={detection} />
   }
 
-  const egwParagraph = isEgwDetection(detection)
-    ? detection.egw_paragraph
-    : null
-  const verse: Verse | null = egwParagraph ? null : detectionToVerse(detection)
-
-  const handlePreview = () => {
-    if (egwParagraph) {
-      previewEgwParagraph(egwParagraph)
-    } else if (verse) {
-      selectPreviewVerse(verse)
-    }
-  }
-
-  const handlePresent = () => {
-    if (egwParagraph) {
-      presentEgwParagraph(egwParagraph)
-    } else if (verse) {
-      presentVerse(verse)
-    }
-  }
+  const actions = getDetectionActions(detection)
 
   return (
     <div className="queue-item p-3 last:border-0">
@@ -193,45 +200,15 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       )}
 
       <div className="mt-2 flex gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1"
-          onClick={handlePreview}
-        >
+        <Button size="sm" variant="outline" className="gap-1" onClick={actions.preview}>
           <EyeIcon className="size-3" />
           Preview
         </Button>
-        <Button size="sm" className="gap-1" onClick={handlePresent}>
+        <Button size="sm" className="gap-1" onClick={actions.present}>
           <PlayIcon className="size-3" />
           Present
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1"
-          onClick={() => {
-            if (egwParagraph) {
-              useQueueStore.getState().addOrFlashItem(
-                createEgwQueueItem(egwParagraph, {
-                  confidence: detection.confidence,
-                  source: "ai-direct",
-                })
-              )
-              return
-            }
-            if (verse) {
-              useQueueStore.getState().addOrFlashItem(
-                createScriptureQueueItem(verse, {
-                  reference: detection.verse_ref,
-                  confidence: detection.confidence,
-                  source:
-                    detection.source === "direct" ? "ai-direct" : "ai-semantic",
-                })
-              )
-            }
-          }}
-        >
+        <Button variant="outline" size="sm" className="gap-1" onClick={actions.queue}>
           <PlusIcon className="size-3" />
           Queue
         </Button>

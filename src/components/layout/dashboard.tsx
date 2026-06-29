@@ -6,6 +6,7 @@ import { PreviewPanel } from "@/components/panels/preview-panel"
 import { LiveOutputPanel } from "@/components/panels/live-output-panel"
 import { QueuePanel } from "@/components/panels/queue-panel"
 import { DetectionsPanel } from "@/components/panels/detections-panel"
+import { LatestDetectionBar } from "@/components/panels/latest-detection-bar"
 import { SearchPanel } from "@/components/panels/search-panel"
 import { useDashboardKeyboardControls } from "@/hooks/use-dashboard-keyboard-controls"
 import { cn } from "@/lib/utils"
@@ -77,13 +78,25 @@ function LiveDeskPage() {
       <div className="col-span-12 grid h-fit grid-cols-12 gap-3 xl:col-span-9">
         <PreviewPanel className="col-span-12 h-[440px] lg:col-span-5" />
         <LiveOutputPanel className="col-span-12 h-[440px] lg:col-span-7" />
-        <QueuePanel className="col-span-12 h-[290px] lg:col-span-6" />
-        <DetectionsPanel className="col-span-12 h-[290px] lg:col-span-6" />
+        <LatestDetectionBar className="col-span-12" />
+        <QueuePanel className="col-span-12 h-[290px]" />
       </div>
+    </div>
+  )
+}
 
-      <div className="glass-panel col-span-12 p-4">
-        <SearchPanel embedded />
-      </div>
+function DetectionsPage() {
+  return (
+    <div className="view-pane grid grid-cols-12 gap-3">
+      <DetectionsPanel className="col-span-12 min-h-[calc(100vh-136px)]" />
+    </div>
+  )
+}
+
+function ScriptureSearchPage() {
+  return (
+    <div className="view-pane flex min-h-[calc(100vh-136px)] flex-col">
+      <SearchPanel />
     </div>
   )
 }
@@ -136,6 +149,10 @@ export function Dashboard() {
   const workspaceContent =
     workspace === "live" ? (
       <LiveDeskPage />
+    ) : workspace === "detections" ? (
+      <DetectionsPage />
+    ) : workspace === "scripture-search" ? (
+      <ScriptureSearchPage />
     ) : workspace === "queue" ? (
       <Suspense fallback={<WorkspaceFallback />}>
         <LazyQueueWorkspace />
