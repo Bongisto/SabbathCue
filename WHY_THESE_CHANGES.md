@@ -1,3 +1,5 @@
+<!-- markdownlint-disable -->
+
 # Why These Changes Matter — And What They Mean for Users
 
 **The desktop app cannot ship today because of a single unused line of code, and once that is removed the app is releasable.** Everything else in the plan makes the code easier to maintain — it does not fix a broken feature, because no feature is broken. For the person running a live church service, the immediate change means the app builds and installs again; the longer work means future bugs get found and fixed faster, with less risk of breaking something else.

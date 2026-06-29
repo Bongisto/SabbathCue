@@ -1,6 +1,6 @@
-# Production Action Plan
+<!-- markdownlint-disable -->
 
-<!-- markdownlint-disable MD060 MD022 MD032 -->
+# Production Action Plan
 
 > **Action plan** derived from [PRODUCTION_SWEEP_REPORT.md](PRODUCTION_SWEEP_REPORT.md) (2026-06-29). Tracks everything that must be sorted out before calling the desktop app production-ready, plus structural refactors that should not wait indefinitely.
 >

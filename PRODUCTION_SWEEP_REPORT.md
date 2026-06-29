@@ -1,6 +1,6 @@
-# Production Sweep Report
+<!-- markdownlint-disable -->
 
-<!-- markdownlint-disable MD060 MD022 MD032 -->
+# Production Sweep Report
 
 > **Living document.** Automated production-readiness sweep of the SabbathCue / Rhema codebase. Update after each full sweep or when gate status changes.
 

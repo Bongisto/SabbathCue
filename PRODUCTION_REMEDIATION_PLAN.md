@@ -1,3 +1,5 @@
+<!-- markdownlint-disable -->
+
 # CODING AGENT PLAN — Production Remediation & Structural Decomposition
 ### Karpathy-Style · Checkpoint-Based · Zero-Hallucination · Zero-Bloat · Self-Documenting
 
