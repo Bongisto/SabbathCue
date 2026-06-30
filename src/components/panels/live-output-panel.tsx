@@ -25,9 +25,9 @@ import { useBroadcastVideo } from "@/hooks/use-broadcast-video"
 import {
   getBroadcastLiveStore,
   useBroadcastLiveStore,
-  useLiveItemTheme,
   type BroadcastLiveItem,
 } from "@/stores/broadcast/live-store"
+import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useSermonSlideStore } from "@/stores/sermon-slide-store"
@@ -355,7 +355,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
     () => (isLive ? liveItem : null),
     [isLive, liveItem]
   )
-  const activeTheme = useLiveItemTheme(visibleItem)
+  const activeTheme = useBroadcastStore(selectActiveTheme)
   const canCommitPreview = Boolean(previewItem)
   const setPanelFullscreen = async (fullscreen: boolean) => {
     try {

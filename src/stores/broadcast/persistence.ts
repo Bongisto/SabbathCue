@@ -12,7 +12,6 @@ interface BroadcastHydrationPatchInput {
   customThemes?: BroadcastTheme[] | unknown
   activeId?: string
   altActiveId?: string
-  hymnThemeId?: string
   readingModeAutoLive?: boolean
   mainDisplayMonitorIndex?: number
   altDisplayMonitorIndex?: number
@@ -53,7 +52,6 @@ export function buildBroadcastHydrationPatch({
   customThemes,
   activeId,
   altActiveId,
-  hymnThemeId,
   readingModeAutoLive,
   mainDisplayMonitorIndex,
   altDisplayMonitorIndex,
@@ -68,7 +66,6 @@ export function buildBroadcastHydrationPatch({
   }
   if (activeId) patch.activeThemeId = activeId
   if (altActiveId) patch.altActiveThemeId = altActiveId
-  if (hymnThemeId) patch.hymnThemeId = hymnThemeId
   if (typeof readingModeAutoLive === "boolean") {
     patch.readingModeAutoLive = readingModeAutoLive
   }
@@ -124,7 +121,6 @@ export function hydrateBroadcastThemes(): Promise<void> {
       const altActiveId = (await store.get("altActiveThemeId")) as
         | string
         | undefined
-      const hymnThemeId = (await store.get("hymnThemeId")) as string | undefined
       const readingModeAutoLive = (await store.get("readingModeAutoLive")) as
         | boolean
         | undefined
@@ -151,7 +147,6 @@ export function hydrateBroadcastThemes(): Promise<void> {
         customThemes,
         activeId,
         altActiveId,
-        hymnThemeId,
         readingModeAutoLive,
         mainDisplayMonitorIndex,
         altDisplayMonitorIndex,
@@ -172,7 +167,6 @@ export function hydrateBroadcastThemes(): Promise<void> {
           state.themes !== prevState.themes ||
           state.activeThemeId !== prevState.activeThemeId ||
           state.altActiveThemeId !== prevState.altActiveThemeId ||
-          state.hymnThemeId !== prevState.hymnThemeId ||
           state.readingModeAutoLive !== prevState.readingModeAutoLive ||
           state.mainDisplayMonitorIndex !== prevState.mainDisplayMonitorIndex ||
           state.altDisplayMonitorIndex !== prevState.altDisplayMonitorIndex ||
@@ -224,7 +218,6 @@ async function persistBroadcastThemes(state: BroadcastState): Promise<void> {
     await store.set("customThemes", customThemes)
     await store.set("activeThemeId", state.activeThemeId)
     await store.set("altActiveThemeId", state.altActiveThemeId)
-    await store.set("hymnThemeId", state.hymnThemeId)
     await store.set("readingModeAutoLive", state.readingModeAutoLive)
     await store.set("mainDisplayMonitorIndex", state.mainDisplayMonitorIndex)
     await store.set("altDisplayMonitorIndex", state.altDisplayMonitorIndex)

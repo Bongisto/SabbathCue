@@ -1,13 +1,11 @@
-import type { BroadcastTheme, PresentationRenderData } from "@/types"
+import type { BroadcastTheme } from "@/types"
 import {
   useBroadcastStore,
-  useItemTheme,
   type BroadcastState,
 } from "@/stores/broadcast-store"
 import {
   findThemeById,
   resolveOutputThemeId,
-  resolveThemeIdForItem,
 } from "@/stores/broadcast/theme-slice"
 
 export type BroadcastThemeState = Pick<
@@ -15,7 +13,6 @@ export type BroadcastThemeState = Pick<
   | "themes"
   | "activeThemeId"
   | "altActiveThemeId"
-  | "hymnThemeId"
   | "loadThemes"
   | "saveTheme"
   | "deleteTheme"
@@ -25,7 +22,6 @@ export type BroadcastThemeState = Pick<
   | "togglePinTheme"
   | "setActiveTheme"
   | "setAltActiveTheme"
-  | "setHymnTheme"
 >
 
 type BroadcastThemeHook = {
@@ -40,12 +36,6 @@ export function getBroadcastThemeStore(): BroadcastThemeState {
   return useBroadcastThemeStore.getState()
 }
 
-export function usePresentationItemTheme(
-  item: PresentationRenderData | null
-): BroadcastTheme | null {
-  return useItemTheme(item)
-}
-
 export function selectActiveTheme(
   state: BroadcastThemeState
 ): BroadcastTheme | null {
@@ -58,8 +48,4 @@ export function selectAltActiveTheme(
   return findThemeById(state.themes, state.altActiveThemeId)
 }
 
-export {
-  findThemeById,
-  resolveOutputThemeId,
-  resolveThemeIdForItem,
-}
+export { findThemeById, resolveOutputThemeId }

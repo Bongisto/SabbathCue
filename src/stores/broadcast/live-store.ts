@@ -1,7 +1,5 @@
-import type { BroadcastTheme, PresentationRenderData } from "@/types"
 import {
   useBroadcastStore,
-  useItemTheme,
   type BroadcastState,
 } from "@/stores/broadcast-store"
 
@@ -36,10 +34,4 @@ export const useBroadcastLiveStore =
 
 export function getBroadcastLiveStore(): BroadcastLiveState {
   return useBroadcastLiveStore.getState()
-}
-
-export function useLiveItemTheme(
-  item: PresentationRenderData | null
-): BroadcastTheme | null {
-  return useItemTheme(item)
 }

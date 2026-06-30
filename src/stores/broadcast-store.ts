@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import type { BroadcastTheme, PresentationRenderData } from "@/types"
 import {
   createOutputIssueSlice,
   selectLatestOutputIssue,
@@ -23,7 +22,6 @@ import {
   createThemeSlice,
   findThemeById,
   resolveOutputThemeId,
-  resolveThemeIdForItem,
   type ThemeSlice,
 } from "@/stores/broadcast/theme-slice"
 import {
@@ -47,19 +45,7 @@ export interface BroadcastState
     ThemeSlice,
     LiveSlice {}
 
-export { selectLatestOutputIssue, findThemeById, resolveThemeIdForItem, resolveOutputThemeId }
-
-/** Theme an in-app surface should use to render a specific item. */
-export function useItemTheme(
-  item: PresentationRenderData | null
-): BroadcastTheme | null {
-  return useBroadcastStore((s) =>
-    findThemeById(
-      s.themes,
-      resolveThemeIdForItem(item, s.activeThemeId, s.hymnThemeId)
-    )
-  )
-}
+export { selectLatestOutputIssue, findThemeById, resolveOutputThemeId }
 
 export { decideVideoEndAction }
 export type { VideoEndDecision }

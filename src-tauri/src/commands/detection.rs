@@ -200,7 +200,6 @@ pub fn update_detection_settings(
 #[derive(Serialize)]
 pub struct DetectionControlStatus {
     pub detection_paused: bool,
-    pub explicit_citations_only: bool,
 }
 
 #[tauri::command]
@@ -217,19 +216,6 @@ pub fn set_detection_paused(
 }
 
 #[tauri::command]
-pub fn set_explicit_citations_only(
-    state: State<'_, Mutex<AppState>>,
-    enabled: bool,
-) -> Result<bool, String> {
-    let app_state = state.lock().map_err(|e| e.to_string())?;
-    app_state
-        .explicit_citations_only
-        .store(enabled, std::sync::atomic::Ordering::SeqCst);
-    log::info!("[DET] Explicit citations only set to: {enabled}");
-    Ok(enabled)
-}
-
-#[tauri::command]
 pub fn detection_control_status(
     state: State<'_, Mutex<AppState>>,
 ) -> Result<DetectionControlStatus, String> {
@@ -237,13 +223,7 @@ pub fn detection_control_status(
     let detection_paused = app_state
         .detection_paused
         .load(std::sync::atomic::Ordering::Relaxed);
-    let explicit_citations_only = app_state
-        .explicit_citations_only
-        .load(std::sync::atomic::Ordering::Relaxed);
-    Ok(DetectionControlStatus {
-        detection_paused,
-        explicit_citations_only,
-    })
+    Ok(DetectionControlStatus { detection_paused })
 }
 
 #[cfg(test)]

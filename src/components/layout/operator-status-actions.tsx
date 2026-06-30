@@ -4,8 +4,6 @@ import {
   EyeOffIcon,
   MoreHorizontalIcon,
   PauseCircleIcon,
-  QuoteIcon,
-  SparklesIcon,
   StopCircleIcon,
   Trash2Icon,
   XIcon,
@@ -33,11 +31,9 @@ type OperatorStatusActionsProps = {
   selectedVerse: unknown
   readingModeAutoLive: boolean
   detectionPaused: boolean
-  explicitCitationsOnly: boolean
   isLive: boolean
   isTranscribing: boolean
   onDetectionPausedChange: (paused: boolean) => void
-  onExplicitCitationsOnlyChange: (enabled: boolean) => void
   layout: "inline" | "menu"
 }
 
@@ -47,11 +43,9 @@ export function OperatorStatusActions({
   selectedVerse,
   readingModeAutoLive,
   detectionPaused,
-  explicitCitationsOnly,
   isLive,
   isTranscribing,
   onDetectionPausedChange,
-  onExplicitCitationsOnlyChange,
   layout,
 }: OperatorStatusActionsProps) {
   const toggleDetectionPaused = () => {
@@ -61,19 +55,6 @@ export function OperatorStatusActions({
       .then(() => onDetectionPausedChange(next))
       .catch((e) =>
         console.error("[operator-strip] toggle detection paused failed", e)
-      )
-  }
-
-  const toggleExplicitCitationsOnly = () => {
-    const next = !explicitCitationsOnly
-    detectionActions
-      .setExplicitCitationsOnly(next)
-      .then(() => onExplicitCitationsOnlyChange(next))
-      .catch((e) =>
-        console.error(
-          "[operator-strip] toggle explicit citations only failed",
-          e
-        )
       )
   }
 
@@ -124,14 +105,6 @@ export function OperatorStatusActions({
       enabled: true,
       tone: detectionPaused ? ("emerald" as const) : ("amber" as const),
       onClick: toggleDetectionPaused,
-    },
-    {
-      key: "explicit-citations",
-      label: explicitCitationsOnly ? "Allow paraphrases" : "Citations only",
-      icon: explicitCitationsOnly ? SparklesIcon : QuoteIcon,
-      enabled: true,
-      tone: explicitCitationsOnly ? ("emerald" as const) : ("amber" as const),
-      onClick: toggleExplicitCitationsOnly,
     },
     {
       key: "hide",

@@ -285,37 +285,6 @@ describe("broadcast store sync", () => {
     })
   })
 
-  it("resets hymnThemeId to the default hymn theme when deleting the designated hymn theme", async () => {
-    const { useBroadcastStore } = await import("./broadcast-store")
-    const { DEFAULT_HYMN_THEME_ID } = await import("@/lib/builtin-themes")
-    const builtin = useBroadcastStore.getState().themes[0]
-    const customHymn = {
-      ...builtin,
-      id: "custom-hymn-theme",
-      name: "Custom Hymn",
-      builtin: false,
-    }
-    useBroadcastStore.setState({
-      themes: [...useBroadcastStore.getState().themes, customHymn],
-      hymnThemeId: customHymn.id,
-      liveItem: { reference: "#1", segments: [], kind: "hymn" },
-      isLive: true,
-    })
-
-    emitToMock.mockClear()
-    useBroadcastStore.getState().deleteTheme(customHymn.id)
-
-    expect(useBroadcastStore.getState().hymnThemeId).toBe(DEFAULT_HYMN_THEME_ID)
-    expect(
-      useBroadcastStore.getState().themes.some((t) => t.id === customHymn.id)
-    ).toBe(false)
-    expect(emitToMock).toHaveBeenCalled()
-    const lastPayload = emitToMock.mock.calls.at(-1)?.[2] as {
-      theme: { id: string }
-    }
-    expect(lastPayload.theme.id).toBe(DEFAULT_HYMN_THEME_ID)
-  })
-
   it("hydrates an explicit empty custom theme list as builtin-only themes", async () => {
     const { buildBroadcastHydrationPatch } = await import("./broadcast-store")
 
@@ -775,67 +744,11 @@ describe("broadcast store sync", () => {
 
 })
 
-describe("hymn theme scoping", () => {
-  it("resolveThemeIdForItem picks the hymn theme only for hymn items", async () => {
-    const { resolveThemeIdForItem } = await import("./broadcast-store")
-    const hymn = { reference: "#20", segments: [], kind: "hymn" as const }
-    const scripture = { reference: "John 3:16", segments: [], kind: "scripture" as const }
-    expect(resolveThemeIdForItem(hymn, "base", "hymn-x")).toBe("hymn-x")
-    expect(resolveThemeIdForItem(scripture, "base", "hymn-x")).toBe("base")
-    expect(resolveThemeIdForItem(null, "base", "hymn-x")).toBe("base")
-  })
-
-  it("resolveOutputThemeId returns the hymn theme for a hymn live item", async () => {
+describe("output theme resolution", () => {
+  it("resolveOutputThemeId returns the per-output base theme", async () => {
     const { resolveOutputThemeId } = await import("./broadcast-store")
-    const state = {
-      liveItem: { reference: "#20 O Praise Ye the Lord", segments: [], kind: "hymn" as const },
-      activeThemeId: "active-x",
-      altActiveThemeId: "alt-x",
-      hymnThemeId: "hymn-x",
-    }
-    expect(resolveOutputThemeId(state, "main")).toBe("hymn-x")
-    expect(resolveOutputThemeId(state, "alt")).toBe("hymn-x")
-  })
-
-  it("resolveOutputThemeId keeps the active theme for non-hymn items", async () => {
-    const { resolveOutputThemeId } = await import("./broadcast-store")
-    const state = {
-      liveItem: { reference: "John 3:16", segments: [], kind: "scripture" as const },
-      activeThemeId: "active-x",
-      altActiveThemeId: "alt-x",
-      hymnThemeId: "hymn-x",
-    }
+    const state = { activeThemeId: "active-x", altActiveThemeId: "alt-x" }
     expect(resolveOutputThemeId(state, "main")).toBe("active-x")
     expect(resolveOutputThemeId(state, "alt")).toBe("alt-x")
-  })
-
-  it("syncBroadcastOutput emits the hymn theme when a hymn is live", async () => {
-    const { useBroadcastStore } = await import("./broadcast-store")
-    const hymnTheme = useBroadcastStore
-      .getState()
-      .themes.find((t) => t.id === "builtin-hymnal-classic-teal")
-    expect(hymnTheme).toBeDefined()
-
-    useBroadcastStore.setState({
-      activeThemeId: useBroadcastStore.getState().themes[0].id,
-      hymnThemeId: "builtin-hymnal-classic-teal",
-      isLive: true,
-      liveItem: {
-        reference: "#20 O Praise Ye the Lord - Verse 1",
-        segments: [{ text: "O praise ye the Lord!" }],
-        kind: "hymn",
-      },
-    })
-
-    emitToMock.mockClear()
-    useBroadcastStore.getState().syncBroadcastOutput()
-
-    expect(emitToMock).toHaveBeenCalledWith(
-      "broadcast",
-      "broadcast:verse-update",
-      expect.objectContaining({
-        theme: expect.objectContaining({ id: "builtin-hymnal-classic-teal" }),
-      }),
-    )
   })
 })

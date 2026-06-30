@@ -40,6 +40,20 @@ fn levenshtein(a: &str, b: &str) -> usize {
     prev_row[b_len]
 }
 
+/// Common English words that fall within fuzzy edit distance of a canonical book
+/// name but are never how a speaker names the book (e.g. "like" -> Luke,
+/// "number" -> Numbers). The fuzzy fallback exists to recover non-word typos
+/// (e.g. "Filipians" -> Philippians); real words that merely collide are prose,
+/// not references. Correct and abbreviated forms still match via the Aho-Corasick
+/// canonical path, so genuine "Numbers chapter 1" is unaffected. Audited against
+/// the 66 canonical names; keep sorted.
+const FUZZY_NON_BOOK_WORDS: &[&str] = &[
+    "ants", "arts", "dude", "duke", "game", "games", "hope", "house",
+    "jade", "jobs", "join", "judge", "judged", "june", "kings", "lake", "like",
+    "marks", "much", "name", "names", "noel", "number", "numbers", "romance",
+    "rude", "title", "truth", "woman",
+];
+
 /// Determine the maximum allowed edit distance for a book name.
 /// Short names (≤4 chars like "Mark", "Ruth", "Joel") only allow 1 edit
 /// to prevent false positives like "Mara" → "Mark".
@@ -94,6 +108,14 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
             let span_start = words[wi].0;
             let span_end = words[wi + window_size - 1].1;
             let candidate = &text_lower[span_start..span_end];
+
+            // Skip windows led by a common word that fuzzy-collides with a book
+            // (e.g. "like 5" -> Luke, "number 1" -> Numbers). No canonical book
+            // name begins with these, so genuine references are unaffected.
+            let lead = words[wi].2.trim_matches(|c: char| !c.is_ascii_alphabetic());
+            if FUZZY_NON_BOOK_WORDS.contains(&lead) {
+                continue;
+            }
 
             for book in BOOKS {
                 let book_lower = book.name.to_lowercase();
@@ -190,6 +212,71 @@ mod tests {
         // A totally unrelated word should not match any book
         let matches = fuzzy_find_books("programming is fun");
         assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn common_word_number_does_not_match_numbers_book() {
+        // "number" is edit-distance 1 from the book "Numbers" but is an ordinary
+        // English word — e.g. "who's the number 1" must not fabricate Numbers 1.
+        let matches = fuzzy_find_books("who's the number 1 in the case");
+        assert!(matches.iter().all(|m| m.book_name != "Numbers"));
+    }
+
+    #[test]
+    fn common_words_do_not_fuzzy_match_books() {
+        // Prose words within edit distance of a canonical name must not fabricate
+        // a reference. The collided book is noted for each.
+        for (text, book) in [
+            ("i would like to read five", "Luke"),
+            ("come join us today", "John"),
+            ("the truth will set you free", "Ruth"),
+            ("so many kings have ruled", "1 Kings"),
+            ("we played a fun game", "James"),
+            ("she is a wise woman", "Romans"),
+            ("there is much to learn", "Micah"),
+            ("welcome to the house of the lord", "Hosea"),
+            ("the judge made a ruling", "Judges"),
+            ("we met back in june", "Jude"),
+        ] {
+            let matches = fuzzy_find_books(text);
+            assert!(
+                matches.iter().all(|m| m.book_name != book),
+                "{text:?} must not fuzzy-match {book}"
+            );
+        }
+    }
+
+    #[test]
+    fn stoplist_ignores_trailing_punctuation() {
+        // STT providers (Deepgram/Gladia) can attach punctuation to tokens.
+        let matches = fuzzy_find_books("pick a number, then wait");
+        assert!(matches.iter().all(|m| m.book_name != "Numbers"));
+    }
+
+    #[test]
+    fn genuine_typos_still_recover_book_names() {
+        // The stoplist must not neuter non-word typo recovery.
+        assert!(fuzzy_find_books("in Filipians chapter 4")
+            .iter()
+            .any(|m| m.book_name == "Philippians"));
+        assert!(fuzzy_find_books("read Hebrws 11")
+            .iter()
+            .any(|m| m.book_name == "Hebrews"));
+        assert!(fuzzy_find_books("Revelations 21 verse 1")
+            .iter()
+            .any(|m| m.book_name == "Revelation"));
+    }
+
+    #[test]
+    fn singular_plural_book_variants_still_recover_book_names() {
+        // These are plausible spoken/STT variants of plural book names, not
+        // generic prose stopwords.
+        assert!(fuzzy_find_books("read Hebrew 11")
+            .iter()
+            .any(|m| m.book_name == "Hebrews"));
+        assert!(fuzzy_find_books("turn to Roman 8")
+            .iter()
+            .any(|m| m.book_name == "Romans"));
     }
 
     #[test]

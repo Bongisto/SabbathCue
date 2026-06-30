@@ -309,20 +309,13 @@ pub(crate) fn run_semantic_detection(
     // finals: the single-final direct pass misses them, but the rolling window
     // still holds the whole "Book chapter N paragraph M". Emit the explicit
     // paragraph and skip fuzzy search.
-    // Read the explicit-citations-only flag under the same lock as the EGW
-    // window catch, so the suppressed-semantic path takes a single AppState
-    // lock per job instead of two.
-    let (mut egw_explicit, explicit_citations_only) = {
+    let mut egw_explicit = {
         let app_managed: State<'_, Mutex<AppState>> = app.state();
         let Ok(app_state) = app_managed.lock() else {
             log::error!("[DET-SEMANTIC] AppState lock failed for EGW window catch");
             return;
         };
-        let explicit_citations_only = app_state.explicit_citations_only.load(Ordering::Relaxed);
-        (
-            crate::commands::detection::detect_egw_references(&app_state, transcript),
-            explicit_citations_only,
-        )
+        crate::commands::detection::detect_egw_references(&app_state, transcript)
     };
     if !egw_explicit.is_empty() {
         if seq < latest_seq.load(Ordering::Acquire) {
@@ -338,16 +331,6 @@ pub(crate) fn run_semantic_detection(
             );
         }
         let _ = app.emit("verse_detections", &egw_explicit);
-        return;
-    }
-
-    // Explicit-citations-only mode: the direct path and the explicit EGW catch
-    // above already cover spoken references. Everything below is paraphrase /
-    // thematic matching (FTS5 + vector), which by design surfaces verses that
-    // were never cited — so suppress it entirely when the operator asks for
-    // explicit citations only.
-    if explicit_citations_only {
-        log::info!("[DET-TRACE] seq={seq} skip=semantic reason=explicit_only");
         return;
     }
 
