@@ -9,9 +9,6 @@ pub struct AppState {
     pub audio_active: Arc<AtomicBool>,
     pub stt_active: Arc<AtomicBool>,
     pub detection_paused: Arc<AtomicBool>,
-    /// When true, only explicit spoken citations are emitted (direct references
-    /// and explicit EGW references); semantic/paraphrase matches are suppressed.
-    pub explicit_citations_only: Arc<AtomicBool>,
     stt_task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
 }
 
@@ -23,7 +20,6 @@ impl AppState {
             audio_active: Arc::new(AtomicBool::new(false)),
             stt_active: Arc::new(AtomicBool::new(false)),
             detection_paused: Arc::new(AtomicBool::new(false)),
-            explicit_citations_only: Arc::new(AtomicBool::new(false)),
             stt_task_handles: Vec::new(),
         }
     }

@@ -27,7 +27,6 @@ import {
 import { searchHymns } from "@/services/hymnal/hymnal-repository"
 import { loadHymnVoiceControl } from "@/services/hymnal/hymn-voice-control-loader"
 import { BookOpenIcon, LibraryIcon, Music2Icon, SearchIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { invokeTauri } from "@/lib/tauri-runtime"
 import type { EgwParagraph, Verse } from "@/types"
 import type { LibraryAsset } from "@/types/library"
@@ -310,10 +309,12 @@ export function PreviewQuickSearch() {
 
   return (
     <div className="relative w-full min-w-[13rem] sm:w-72 xl:w-80">
+      {/* The real input renders the typed text; the overlay reuses it as an
+          invisible spacer so only the grey suggestion suffix is drawn after it. */}
       {bibleResult.suggestion && bibleResult.suggestion !== query ? (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center px-8">
           <span className="truncate text-xs">
-            <span className="text-foreground">{query}</span>
+            <span className="invisible">{query}</span>
             <span className="text-muted-foreground">
               {bibleResult.suggestion.slice(query.length)}
             </span>
@@ -329,17 +330,7 @@ export function PreviewQuickSearch() {
         }}
         onKeyDown={handleKeyDown}
         placeholder="Quick preview: John 3:16, hymn 46"
-        className={cn(
-          "h-8 rounded-md border-[var(--border-subtle)] bg-[var(--shell-code-bg)] pr-2 pl-8 text-xs",
-          bibleResult.suggestion && bibleResult.suggestion !== query
-            ? "text-transparent"
-            : ""
-        )}
-        style={
-          bibleResult.suggestion && bibleResult.suggestion !== query
-            ? { caretColor: "var(--foreground)" }
-            : undefined
-        }
+        className="h-8 rounded-md border-[var(--border-subtle)] bg-[var(--shell-code-bg)] pr-2 pl-8 text-xs"
       />
 
       {showDropdown ? (

@@ -473,34 +473,6 @@ mod tests {
             .load(std::sync::atomic::Ordering::Relaxed));
     }
 
-    /// `explicit_citations_only` gates the semantic (paraphrase) emission path.
-    /// It MUST default to false so paraphrase detection stays on unless an
-    /// operator deliberately switches to explicit-citation-only mode.
-    #[test]
-    fn test_explicit_citations_only_state() {
-        let app_state = crate::state::AppState::new();
-        assert!(
-            !app_state
-                .explicit_citations_only
-                .load(std::sync::atomic::Ordering::Relaxed),
-            "explicit_citations_only should default to false"
-        );
-
-        app_state
-            .explicit_citations_only
-            .store(true, std::sync::atomic::Ordering::SeqCst);
-        assert!(app_state
-            .explicit_citations_only
-            .load(std::sync::atomic::Ordering::Relaxed));
-
-        app_state
-            .explicit_citations_only
-            .store(false, std::sync::atomic::Ordering::SeqCst);
-        assert!(!app_state
-            .explicit_citations_only
-            .load(std::sync::atomic::Ordering::Relaxed));
-    }
-
     #[test]
     fn test_finalize_live_semantic_results_dedupes_and_boosts_overlap() {
         let results = vec![

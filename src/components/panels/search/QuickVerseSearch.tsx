@@ -1,5 +1,4 @@
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
 import type { Verse } from "@/types"
 
 export function QuickVerseSearch({
@@ -30,10 +29,12 @@ export function QuickVerseSearch({
 
   return (
     <div className="relative flex-1">
+      {/* The real input renders the typed text; the overlay reuses it as an
+          invisible spacer so only the grey suggestion suffix is drawn after it. */}
       {showGhost ? (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center px-3">
           <span className="text-xs font-normal">
-            <span className="text-foreground">{quickInput}</span>
+            <span className="invisible">{quickInput}</span>
             <span className="text-gray-500 dark:text-gray-400">
               {quickSuggestion.slice(quickInput.length)}
             </span>
@@ -48,11 +49,7 @@ export function QuickVerseSearch({
         onChange={(e) => onQuickInputChange(e.target.value)}
         onKeyDown={onQuickKeyDown}
         placeholder="Type: J → John 3:16"
-        className={cn(
-          "relative h-7 bg-[var(--shell-code-bg)] text-xs",
-          showGhost ? "text-transparent" : "",
-        )}
-        style={showGhost ? { caretColor: "var(--foreground)" } : undefined}
+        className="relative h-7 bg-[var(--shell-code-bg)] text-xs"
       />
 
       {shouldShowVerseDropdown && quickVersesList.length > 0 ? (

@@ -56,7 +56,6 @@ export function OperatorStatusStrip({
   )
 
   const [detectionPaused, setDetectionPaused] = useState(false)
-  const [explicitCitationsOnly, setExplicitCitationsOnly] = useState(false)
 
   const outputIssueLabel =
     latestOutputIssue?.outputId === "alt"
@@ -70,7 +69,6 @@ export function OperatorStatusStrip({
       .getDetectionControlStatus()
       .then((status) => {
         setDetectionPaused(status.detection_paused)
-        setExplicitCitationsOnly(status.explicit_citations_only)
       })
       .catch((e) =>
         console.error("[operator-strip] detection control status failed", e)
@@ -83,11 +81,9 @@ export function OperatorStatusStrip({
     selectedVerse,
     readingModeAutoLive,
     detectionPaused,
-    explicitCitationsOnly,
     isLive,
     isTranscribing,
     onDetectionPausedChange: setDetectionPaused,
-    onExplicitCitationsOnlyChange: setExplicitCitationsOnly,
   }
 
   return (

@@ -14,11 +14,6 @@ const FTS5_RANK0_CONFIDENCE: f64 = 0.68;
 /// Confidence decrease per FTS5 rank position (rank 1 = 0.64, rank 2 = 0.60, etc.).
 const FTS5_CONFIDENCE_DECAY: f64 = 0.04;
 
-/// BM25 score where a live text hit is strong enough to trust above the
-/// operator auto threshold. BM25 is negative; lower is stronger.
-const FTS5_STRONG_MATCH_RANK: f64 = -16.0;
-const FTS5_STRONG_MATCH_CONFIDENCE: f64 = 0.86;
-
 /// Very strong phrase/AND matches should score like a near-verbatim quote.
 const FTS5_EXCELLENT_MATCH_RANK: f64 = -24.0;
 const FTS5_EXCELLENT_MATCH_CONFIDENCE: f64 = 0.92;
@@ -220,16 +215,10 @@ impl DetectionPipeline {
             vector_keys.insert(key);
         }
 
-        let semantic_confidence_threshold = self.merger.semantic_confidence_threshold();
-        semantic_detections.retain(|detection| {
-            detection.verse_id.is_none() || detection.confidence >= semantic_confidence_threshold
-        });
-
-        self.merger
-            .set_semantic_confidence_threshold(FTS5_MIN_CONFIDENCE);
+        // Gate every live candidate — FTS-derived and vector alike — by the
+        // operator's semantic visibility threshold so raising the slider
+        // actually suppresses keyword noise instead of letting FTS hits bypass.
         let mut merged = self.merger.merge(vec![], semantic_detections);
-        self.merger
-            .set_semantic_confidence_threshold(semantic_confidence_threshold);
         merged.truncate(LIVE_SEMANTIC_CAP);
         merged
     }
@@ -245,9 +234,11 @@ fn fts_confidence(rank: usize, bm25_rank: f64) -> f64 {
     let rank_confidence = FTS5_RANK0_CONFIDENCE - (rank as f64 * FTS5_CONFIDENCE_DECAY);
     if bm25_rank <= FTS5_EXCELLENT_MATCH_RANK {
         rank_confidence.max(FTS5_EXCELLENT_MATCH_CONFIDENCE)
-    } else if bm25_rank <= FTS5_STRONG_MATCH_RANK {
-        rank_confidence.max(FTS5_STRONG_MATCH_CONFIDENCE)
     } else {
+        // Keyword-band matches keep their honest rank-derived confidence instead
+        // of being floored up to a fixed "strong" score. Otherwise scattered
+        // common-word hits masquerade as confident detections and flood the live
+        // panel regardless of the operator's semantic threshold.
         rank_confidence
     }
 }
@@ -554,84 +545,61 @@ mod tests {
 
     #[test]
     fn test_pipeline_hybrid_with_fts_confidence_decay() {
-        let mut pipeline = DetectionPipeline::new();
-        let fts_results = vec![
-            Bm25Result {
-                book_number: 43,
-                book_name: "John".to_string(),
-                chapter: 3,
-                verse: 16,
-                rank: -20.0,
-            },
-            Bm25Result {
-                book_number: 45,
-                book_name: "Romans".to_string(),
-                chapter: 5,
-                verse: 8,
-                rank: -15.0,
-            },
-        ];
-
-        let results = pipeline.process_hybrid_with_fts("test text", &fts_results);
-
-        // Rank 0 should have higher confidence than rank 5
-        let rank0 = results
-            .iter()
-            .find(|r| r.detection.verse_ref.book_name == "John");
-        let rank5 = results
-            .iter()
-            .find(|r| r.detection.verse_ref.book_name == "Romans");
-
-        assert!(rank0.is_some());
-        assert!(rank5.is_some());
-        assert!(rank0.unwrap().detection.confidence > rank5.unwrap().detection.confidence);
+        // Earlier FTS ranks carry higher confidence than later ones. (Tested on
+        // the pure function: the live path gates sub-rank-0 keyword hits by the
+        // operator threshold, so they no longer all survive into the merge.)
+        let rank0 = fts_confidence(0, -20.0);
+        let rank3 = fts_confidence(3, -20.0);
+        assert!(rank0 > rank3, "earlier ranks must score higher");
     }
 
     #[test]
     fn test_pipeline_hybrid_with_fts_caps_at_five() {
         let mut pipeline = DetectionPipeline::new();
+        // Near-verbatim (excellent) BM25 ranks so all six clear the operator
+        // threshold and the cap is what truncates the list to five.
         let fts_results = vec![
             Bm25Result {
                 book_number: 43,
                 book_name: "John".to_string(),
                 chapter: 3,
                 verse: 16,
-                rank: -20.0,
+                rank: -28.0,
             },
             Bm25Result {
                 book_number: 45,
                 book_name: "Romans".to_string(),
                 chapter: 8,
                 verse: 28,
-                rank: -19.0,
+                rank: -27.0,
             },
             Bm25Result {
                 book_number: 1,
                 book_name: "Genesis".to_string(),
                 chapter: 1,
                 verse: 1,
-                rank: -18.0,
+                rank: -26.0,
             },
             Bm25Result {
                 book_number: 19,
                 book_name: "Psalms".to_string(),
                 chapter: 23,
                 verse: 1,
-                rank: -17.0,
+                rank: -25.0,
             },
             Bm25Result {
                 book_number: 23,
                 book_name: "Isaiah".to_string(),
                 chapter: 53,
                 verse: 5,
-                rank: -16.0,
+                rank: -24.5,
             },
             Bm25Result {
                 book_number: 40,
                 book_name: "Matthew".to_string(),
                 chapter: 5,
                 verse: 3,
-                rank: -15.0,
+                rank: -24.0,
             },
         ];
 
@@ -714,22 +682,24 @@ mod tests {
     }
 
     #[test]
-    fn live_fts_confidence_uses_bm25_strength_for_quote_matches() {
-        let strong = fts_confidence(0, -16.0);
+    fn live_fts_confidence_floors_only_near_verbatim_quotes() {
         let excellent = fts_confidence(0, -24.0);
-        let weak = fts_confidence(0, -13.0);
+        let keyword_band = fts_confidence(0, -17.0);
 
-        assert!(
-            strong >= FTS5_STRONG_MATCH_CONFIDENCE,
-            "strong verse-text BM25 matches must clear common auto thresholds"
-        );
         assert!(
             excellent >= FTS5_EXCELLENT_MATCH_CONFIDENCE,
             "excellent verse-text BM25 matches should score like near-verbatim quotes"
         );
+        // Keyword-band matches keep their honest rank-derived score rather than
+        // being floored up to a fixed "strong" confidence that masquerades as a
+        // quote and bypasses the operator's semantic threshold.
         assert!(
-            weak < FTS5_STRONG_MATCH_CONFIDENCE,
-            "weak live BM25 matches must not receive quote confidence"
+            keyword_band < excellent,
+            "keyword-band FTS matches must not masquerade as quote-strength"
+        );
+        assert!(
+            (keyword_band - FTS5_RANK0_CONFIDENCE).abs() < f64::EPSILON,
+            "keyword-band rank-0 match scores its honest rank confidence"
         );
     }
 
@@ -761,5 +731,52 @@ mod tests {
         assert!(!results
             .iter()
             .any(|r| r.detection.verse_ref.book_name == "Genesis"));
+    }
+
+    #[test]
+    fn raising_semantic_threshold_suppresses_live_fts_keyword_flood() {
+        // Keyword coincidences on common words land in the BM25 -16..-24 band.
+        // They surface at the default threshold as review hints, but raising the
+        // operator's semantic slider must gate them out — they are no longer
+        // floored to a fixed high confidence that bypasses the threshold.
+        let fts_results = vec![
+            Bm25Result {
+                book_number: 27,
+                book_name: "Daniel".to_string(),
+                chapter: 2,
+                verse: 19,
+                rank: -17.0,
+            },
+            Bm25Result {
+                book_number: 23,
+                book_name: "Isaiah".to_string(),
+                chapter: 29,
+                verse: 12,
+                rank: -16.5,
+            },
+        ];
+
+        let mut at_default = DetectionPipeline::new();
+        let default_hits =
+            at_default.process_hybrid_with_fts("god gives wisdom to the kings", &fts_results);
+        assert!(
+            !default_hits.is_empty(),
+            "keyword-band hits stay visible as hints at the default threshold"
+        );
+        assert!(
+            default_hits
+                .iter()
+                .all(|r| r.detection.confidence < 0.86),
+            "keyword-band hits are no longer floored to a fixed 0.86"
+        );
+
+        let mut strict = DetectionPipeline::new();
+        strict.merger_mut().set_semantic_confidence_threshold(0.80);
+        let strict_hits =
+            strict.process_hybrid_with_fts("god gives wisdom to the kings", &fts_results);
+        assert!(
+            strict_hits.is_empty(),
+            "raising the semantic threshold suppresses the keyword-band FTS flood"
+        );
     }
 }

@@ -48,8 +48,6 @@ vi.mock("@/stores/broadcast-store", () => {
   const useBroadcastStore = (selector: (state: Record<string, unknown>) => unknown) =>
     selector(broadcastState)
   const selectActiveTheme = (state: Record<string, unknown>) => state.activeTheme
-  const useItemTheme = (item: unknown) =>
-    item ? (broadcastState.activeTheme as object | null) : null
   useBroadcastStore.getState = () => ({
     ...broadcastState,
     setLive: setLiveMock,
@@ -58,7 +56,7 @@ vi.mock("@/stores/broadcast-store", () => {
     setLiveTransitionType: setLiveTransitionTypeMock,
     reportOutputIssue: vi.fn(),
   })
-  return { selectActiveTheme, useBroadcastStore, useItemTheme }
+  return { selectActiveTheme, useBroadcastStore }
 })
 
 vi.mock("@/stores/egw-slide-store", () => ({
