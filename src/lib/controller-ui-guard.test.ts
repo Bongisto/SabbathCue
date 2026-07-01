@@ -22,10 +22,16 @@ const TUTORIAL_DATA_TOUR_IDS = [
   "broadcast",
   "theme",
   "settings",
+  "settings-section-audio",
+  "settings-section-speech",
+  "settings-section-bible",
+  "settings-section-display",
   "settings-section-broadcast",
   "settings-section-themes",
-  "settings-section-speech",
+  "settings-section-remote",
+  "settings-section-api-keys",
   "settings-section-account",
+  "settings-section-help",
 ] as const
 
 const TUTORIAL_DATA_SLOTS = [

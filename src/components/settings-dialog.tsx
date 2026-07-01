@@ -79,10 +79,16 @@ const sectionComponents: Record<SettingsSection, ComponentType> = {
 }
 
 const sectionDataTour: Partial<Record<SettingsSection, string>> = {
+  audio: "settings-section-audio",
   speech: "settings-section-speech",
+  bible: "settings-section-bible",
+  display: "settings-section-display",
   broadcast: "settings-section-broadcast",
   themes: "settings-section-themes",
+  remote: "settings-section-remote",
+  "api-keys": "settings-section-api-keys",
   account: "settings-section-account",
+  help: "settings-section-help",
 }
 
 export function SettingsPage() {

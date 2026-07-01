@@ -189,6 +189,18 @@ export const TUTORIAL_STEPS: Step[] = [
   },
   {
     ...STEP_DEFAULTS,
+    target: '[data-tour="settings-section-audio"]',
+    title: "Audio Input",
+    content:
+      "Settings > Audio is where you pick the microphone feed and adjust input gain. The selected device persists across sessions; leave it on System default to follow Windows audio routing. Set gain so speech is clear without clipping.",
+    placement: "left",
+    before: () =>
+      prepareTarget('[data-tour="settings-section-audio"]', {
+        settingsSection: "audio",
+      }),
+  },
+  {
+    ...STEP_DEFAULTS,
     target: '[data-tour="settings-section-speech"]',
     title: "Cloud API keys",
     content:
@@ -201,6 +213,54 @@ export const TUTORIAL_STEPS: Step[] = [
   },
   {
     ...STEP_DEFAULTS,
+    target: '[data-tour="settings-section-bible"]',
+    title: "Bible Translation",
+    content:
+      "Settings > Bible selects the active translation used for detections, search, and the live display. Changing it refreshes the verse currently on the live output.",
+    placement: "left",
+    before: () =>
+      prepareTarget('[data-tour="settings-section-bible"]', {
+        settingsSection: "bible",
+      }),
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-tour="settings-section-display"]',
+    title: "Display Mode",
+    content:
+      "Settings > Display Mode switches between Auto and Manual broadcast. Auto sends the highest-confidence detected verse straight to the live output; Manual waits for you to present. The sliders set the Auto-live and Semantic detection confidence thresholds.",
+    placement: "left",
+    before: () =>
+      prepareTarget('[data-tour="settings-section-display"]', {
+        settingsSection: "display",
+      }),
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-tour="settings-section-remote"]',
+    title: "Remote Control",
+    content:
+      "Settings > Remote Control lets local controllers and scripts drive the app. Start the OSC listener for local lighting/AV integrations, or the HTTP API with its access token for local automation. The command log shows incoming remote commands.",
+    placement: "left",
+    before: () =>
+      prepareTarget('[data-tour="settings-section-remote"]', {
+        settingsSection: "remote",
+      }),
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-tour="settings-section-api-keys"]',
+    title: "API Key Status",
+    content:
+      "Settings > API Keys shows at a glance whether your Deepgram and Gladia keys are configured. Keys are entered and saved in the Speech Recognition section; no key is needed when using local Vosk.",
+    placement: "left",
+    before: () =>
+      prepareTarget('[data-tour="settings-section-api-keys"]', {
+        settingsSection: "api-keys",
+      }),
+  },
+  {
+    ...STEP_DEFAULTS,
     target: '[data-tour="settings-section-account"]',
     title: "Your Account",
     content:
@@ -209,6 +269,18 @@ export const TUTORIAL_STEPS: Step[] = [
     before: () =>
       prepareTarget('[data-tour="settings-section-account"]', {
         settingsSection: "account",
+      }),
+  },
+  {
+    ...STEP_DEFAULTS,
+    target: '[data-tour="settings-section-help"]',
+    title: "Help & Updates",
+    content:
+      "Settings > Help is your home base for support: restart this tutorial anytime, contact the developer, review every keyboard shortcut, and check for app updates.",
+    placement: "left",
+    before: () =>
+      prepareTarget('[data-tour="settings-section-help"]', {
+        settingsSection: "help",
       }),
   },
   {
