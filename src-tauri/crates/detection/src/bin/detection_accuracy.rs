@@ -68,6 +68,11 @@ const CASES: &[Case] = &[
         Some("Jeremiah 29:11"),
     ),
     ("direct", "Ephesians 2:8 reminds us", Some("Ephesians 2:8")),
+    (
+        "direct",
+        "Galatians 2:20, I have been crucified with Christ",
+        Some("Galatians 2:20"),
+    ),
     // --- spoken: number words instead of digits ---
     (
         "spoken",
@@ -169,6 +174,11 @@ const CASES: &[Case] = &[
         "quote",
         "And we know that all things work together for good to them that love God",
         Some("Romans 8:28"),
+    ),
+    (
+        "quote",
+        "I have been crucified with Christ it is no longer I who live but Christ lives in me",
+        Some("Galatians 2:20"),
     ),
     // --- para: paraphrase, same meaning, different words ---
     (
@@ -493,6 +503,16 @@ const CASES: &[Case] = &[
     (
         "noise",
         "let me share a quick story about a missionary i met overseas",
+        None,
+    ),
+    (
+        "noise",
+        "he walked into church wearing leathers and everyone looked over their shoulders",
+        None,
+    ),
+    (
+        "noise",
+        "we missed an opportunity to love him to Jesus because we were putting him in a box",
         None,
     ),
     (
