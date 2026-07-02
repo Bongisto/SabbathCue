@@ -66,6 +66,12 @@ function transcriptScroll(container: HTMLElement) {
   return node as HTMLElement
 }
 
+function transcriptControls(container: HTMLElement) {
+  const node = container.querySelector('[data-slot="transcript-controls"]')
+  expect(node).toBeInstanceOf(HTMLElement)
+  return node as HTMLElement
+}
+
 describe("TranscriptPanel", () => {
   beforeEach(() => {
     startTranscriptionMock.mockReset()
@@ -89,12 +95,11 @@ describe("TranscriptPanel", () => {
 
   it("places the transcription controls before the scroll region", () => {
     const { container } = render(<TranscriptPanel />)
-    const controls = container.querySelector('[data-slot="transcript-controls"]')
+    const controls = transcriptControls(container)
     const scroll = transcriptScroll(container)
 
-    expect(controls).toBeInstanceOf(HTMLElement)
     expect(
-      controls?.compareDocumentPosition(scroll) &
+      controls.compareDocumentPosition(scroll) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
 
