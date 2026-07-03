@@ -33,9 +33,20 @@ jobs:
             exit 1
           }
 
-          $repoInfo = $repoJson | ConvertFrom-Json
-          if (-not $repoInfo.permissions -or $repoInfo.permissions.push -ne $true) {
-            Write-Error "RELEASES_REPO_TOKEN can access $repo but cannot write releases. Give it Contents: Read and write on $repo."
+          $probeOutput = gh api --method POST "repos/$repo/releases" `
+            --raw-field tag_name="" `
+            --raw-field name="SabbathCue release token probe" `
+            2>&1 | Out-String
+          if ($LASTEXITCODE -eq 0) {
+            Write-Error "Release token probe unexpectedly created a release."
+            exit 1
+          }
+          if ($probeOutput -match "HTTP 403|Resource not accessible by personal access token") {
+            Write-Error "RELEASES_REPO_TOKEN cannot create releases in $repo. Give the fine-grained PAT Contents: Read and write on $repo, or replace it with a classic PAT with repo/public_repo access. GitHub CLI output: $probeOutput"
+            exit 1
+          }
+          if ($probeOutput -notmatch "HTTP 422|Validation Failed") {
+            Write-Error "Release token probe returned an unexpected response. GitHub CLI output: $probeOutput"
             exit 1
           }
 
