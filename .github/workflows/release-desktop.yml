@@ -16,6 +16,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify releases repo token
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          $repo = "Bongisto/sabbathcue-releases"
+          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+            Write-Error "Missing repository secret: RELEASES_REPO_TOKEN"
+            exit 1
+          }
+
+          $repoJson = gh api "repos/$repo" 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "RELEASES_REPO_TOKEN cannot access $repo. Use a token scoped to $repo with Contents: Read and write. GitHub CLI output: $repoJson"
+            exit 1
+          }
+
+          $repoInfo = $repoJson | ConvertFrom-Json
+          if (-not $repoInfo.permissions -or $repoInfo.permissions.push -ne $true) {
+            Write-Error "RELEASES_REPO_TOKEN can access $repo but cannot write releases. Give it Contents: Read and write on $repo."
+            exit 1
+          }
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
