@@ -109,4 +109,39 @@ describe("KineticThemesPage", () => {
     expect(useBroadcastStore.getState().isDesignerOpen).toBe(true)
     expect(useBroadcastStore.getState().editingThemeId).toBe(kinetic!.id)
   })
+
+  it("deletes custom kinetic themes from the catalog", () => {
+    const kinetic = initialThemes.find((theme) => theme.kinetic)
+    expect(kinetic).toBeTruthy()
+    const customKinetic = {
+      ...kinetic!,
+      id: "custom-kinetic-theme",
+      name: "Custom Kinetic Theme",
+      builtin: false,
+    }
+    useBroadcastStore.setState({
+      themes: [...initialThemes, customKinetic],
+      activeThemeId: customKinetic.id,
+      editingThemeId: customKinetic.id,
+      draftTheme: customKinetic,
+    })
+
+    render(<KineticThemesPage />)
+
+    expect(
+      screen.queryByRole("button", { name: `Delete ${kinetic!.name}` })
+    ).toBeNull()
+
+    fireEvent.click(
+      screen.getByRole("button", { name: `Delete ${customKinetic.name}` })
+    )
+
+    const state = useBroadcastStore.getState()
+    expect(state.themes.some((theme) => theme.id === customKinetic.id)).toBe(
+      false
+    )
+    expect(state.activeThemeId).not.toBe(customKinetic.id)
+    expect(state.editingThemeId).not.toBe(customKinetic.id)
+    expect(state.draftTheme?.id).not.toBe(customKinetic.id)
+  })
 })

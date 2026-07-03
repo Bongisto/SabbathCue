@@ -53,15 +53,27 @@ export const createThemeSlice: StateCreator<
         : [...s.themes, theme],
     })),
   deleteTheme: (id) => {
+    const target = get().themes.find((t) => t.id === id)
+    if (!target || target.builtin) return
+
     const { activeThemeId, altActiveThemeId } = get()
     set((s) => {
-      const themes = s.themes.filter((t) => t.id !== id || t.builtin)
-      const fallbackId = themes[0]?.id ?? BUILTIN_THEMES[0].id
+      const themes = s.themes.filter((t) => t.id !== id)
+      const fallbackTheme = themes[0] ?? BUILTIN_THEMES[0]
+      const fallbackId = fallbackTheme.id
+      const deletedEditedTheme =
+        s.editingThemeId === id || s.draftTheme?.id === id
       return {
         themes,
         activeThemeId: s.activeThemeId === id ? fallbackId : s.activeThemeId,
         altActiveThemeId:
           s.altActiveThemeId === id ? fallbackId : s.altActiveThemeId,
+        editingThemeId: deletedEditedTheme ? fallbackId : s.editingThemeId,
+        draftTheme: deletedEditedTheme
+          ? { ...fallbackTheme, updatedAt: Date.now() }
+          : s.draftTheme,
+        selectedElement: deletedEditedTheme ? null : s.selectedElement,
+        renamingThemeId: s.renamingThemeId === id ? null : s.renamingThemeId,
       }
     })
     if (activeThemeId === id || altActiveThemeId === id) {

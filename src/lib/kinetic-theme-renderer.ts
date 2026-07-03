@@ -260,28 +260,99 @@ function drawFallingLeaves(
     const swayAmp = 20 + srand(i + 17) * 30
     const fall = (srand(i + 3) * range + t * speed * (0.6 + srand(i + 5) * 0.8)) % range
     const y = fall - 40
-    const x = srand(i) * width + Math.sin(t * 0.0006 + phase) * swayAmp
-    const rot = phase + t * 0.0004 * (srand(i + 7) > 0.5 ? 1 : -1)
-    const s = opts.size * (0.7 + srand(i + 13) * 0.6)
-    const alpha = 0.5 + srand(i + 19) * 0.4
+    const x =
+      srand(i) * width +
+      Math.sin(t * 0.0006 + phase) * swayAmp +
+      Math.sin(t * 0.0014 + phase * 0.7) * swayAmp * 0.22
+    const sizeF = 0.7 + srand(i + 13) * 0.6
+    const s = opts.size * sizeF
+    // Rock around a resting angle instead of spinning like confetti, and
+    // flip about the long axis so leaves periodically turn edge-on.
+    const dir = srand(i + 7) > 0.5 ? 1 : -1
+    const rot =
+      phase + dir * Math.sin(t * 0.0009 + phase * 2) * 0.6 + t * 0.00008 * dir
+    const flip = 0.3 + 0.7 * Math.abs(Math.cos(t * 0.0011 + phase * 3))
+    // Smaller leaves read as farther away: fade them back for depth.
+    const depth = (sizeF - 0.7) / 0.6
+    const alpha = 0.3 + depth * 0.55
+    // Per-leaf shade of the accent so a fall isn't one flat color.
+    const shade = 0.7 + srand(i + 23) * 0.5
+    const lr = Math.min(255, Math.round(r * shade))
+    const lg = Math.min(255, Math.round(g * (0.85 + srand(i + 29) * 0.3)))
+    const lb = Math.min(255, Math.round(b * shade))
+    const darkR = Math.round(lr * 0.48)
+    const darkG = Math.round(lg * 0.48)
+    const darkB = Math.round(lb * 0.48)
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(rot)
+    ctx.scale(flip, 1)
+    const grad = ctx.createLinearGradient(-s * 0.65, -s, s * 0.7, s)
+    grad.addColorStop(
+      0,
+      `rgba(${Math.min(255, Math.round(lr * 1.18))}, ${Math.min(255, Math.round(lg * 1.14))}, ${Math.min(255, Math.round(lb * 1.08))}, ${alpha})`,
+    )
+    grad.addColorStop(0.56, `rgba(${lr}, ${lg}, ${lb}, ${alpha})`)
+    grad.addColorStop(1, `rgba(${darkR}, ${darkG}, ${darkB}, ${alpha})`)
+    ctx.shadowColor = `rgba(0, 0, 0, ${0.12 + depth * 0.08})`
+    ctx.shadowBlur = Math.max(1, s * 0.12)
+    ctx.shadowOffsetY = Math.max(0.5, s * 0.06)
     ctx.beginPath()
     if (opts.petal) {
+      const petalW = s * (0.36 + srand(i + 37) * 0.18)
       ctx.moveTo(0, -s * 0.5)
-      ctx.lineTo(s * 0.5, 0)
-      ctx.lineTo(0, s * 0.5)
-      ctx.lineTo(-s * 0.5, 0)
+      ctx.quadraticCurveTo(petalW, -s * 0.28, petalW * 0.66, s * 0.18)
+      ctx.quadraticCurveTo(petalW * 0.3, s * 0.58, 0, s * 0.5)
+      ctx.quadraticCurveTo(
+        -petalW * 0.72,
+        s * 0.28,
+        -petalW * 0.56,
+        -s * 0.16,
+      )
+      ctx.quadraticCurveTo(-petalW * 0.35, -s * 0.42, 0, -s * 0.5)
     } else {
+      const rightW = s * (0.42 + srand(i + 37) * 0.2)
+      const leftW = s * (0.38 + srand(i + 41) * 0.22)
+      const waist = -s * (0.12 + srand(i + 43) * 0.2)
       ctx.moveTo(0, -s)
-      ctx.lineTo(s * 0.36, 0)
-      ctx.lineTo(0, s)
-      ctx.lineTo(-s * 0.36, 0)
+      ctx.quadraticCurveTo(rightW * 0.95, -s * 0.68, rightW * 0.78, waist)
+      ctx.quadraticCurveTo(rightW * 0.55, s * 0.52, 0, s)
+      ctx.quadraticCurveTo(-leftW * 0.62, s * 0.44, -leftW * 0.78, waist)
+      ctx.quadraticCurveTo(-leftW * 0.9, -s * 0.72, 0, -s)
     }
     ctx.closePath()
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`
+    ctx.fillStyle = grad
     ctx.fill()
+    ctx.shadowColor = "transparent"
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetY = 0
+    if (!opts.petal) {
+      ctx.strokeStyle = `rgba(${darkR}, ${darkG}, ${darkB}, ${alpha * 0.72})`
+      ctx.lineWidth = Math.max(0.7, s * 0.045)
+      ctx.beginPath()
+      ctx.moveTo(0, -s * 0.9)
+      ctx.quadraticCurveTo(s * 0.05, s * 0.08, 0, s * 1.22)
+      ctx.stroke()
+      ctx.lineWidth = Math.max(0.45, s * 0.025)
+      for (let vein = 0; vein < 3; vein++) {
+        const vy = -s * 0.48 + vein * s * 0.42
+        const right = s * (0.3 - vein * 0.045)
+        const left = s * (0.25 - vein * 0.035)
+        ctx.beginPath()
+        ctx.moveTo(0, vy)
+        ctx.lineTo(right, vy - s * (0.16 - vein * 0.025))
+        ctx.moveTo(0, vy + s * 0.1)
+        ctx.lineTo(-left, vy - s * (0.03 - vein * 0.015))
+        ctx.stroke()
+      }
+    } else {
+      ctx.strokeStyle = `rgba(${darkR}, ${darkG}, ${darkB}, ${alpha * 0.32})`
+      ctx.lineWidth = Math.max(0.45, s * 0.035)
+      ctx.beginPath()
+      ctx.moveTo(0, -s * 0.38)
+      ctx.quadraticCurveTo(s * 0.04, 0, 0, s * 0.42)
+      ctx.stroke()
+    }
     ctx.restore()
   }
 }
@@ -296,16 +367,33 @@ function drawRain(
   const [r, g, b] = hexToRgb(k.accentColor)
   const speed = 0.7 * driftSpeed(k)
   const range = height + 40
-  ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.32)`
-  ctx.lineWidth = 1.3
-  for (let i = 0; i < 100; i++) {
-    const x = srand(i) * width
-    const len = 12 + srand(i + 7) * 18
-    const y = (srand(i + 3) * range + t * speed * (0.7 + srand(i + 9) * 0.6)) % range
-    ctx.beginPath()
-    ctx.moveTo(x, y)
-    ctx.lineTo(x - 4, y - len)
-    ctx.stroke()
+  const mist = ctx.createLinearGradient(0, height * 0.64, 0, height)
+  mist.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`)
+  mist.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.13)`)
+  ctx.fillStyle = mist
+  ctx.fillRect(0, height * 0.64, width, height * 0.36)
+
+  for (let layer = 0; layer < 3; layer++) {
+    const count = 48 + layer * 34
+    const alpha = 0.12 + layer * 0.08
+    const slant = 3 + layer * 2.4
+    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`
+    ctx.lineWidth = 0.7 + layer * 0.45
+    for (let i = 0; i < count; i++) {
+      const seed = i + layer * 173
+      const len = 8 + layer * 8 + srand(seed + 7) * (12 + layer * 7)
+      const drift = t * speed * (0.35 + layer * 0.25)
+      const x =
+        (srand(seed) * (width + 80) + drift * 0.22) % (width + 80) - 40
+      const y =
+        (srand(seed + 3) * range +
+          t * speed * (0.55 + layer * 0.32 + srand(seed + 9) * 0.45)) %
+        range
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x - slant, y - len)
+      ctx.stroke()
+    }
   }
 }
 
@@ -322,11 +410,35 @@ function drawSnow(
     const depth = srand(i + 5)
     const radius = 1 + depth * 3
     const y = (srand(i + 3) * range + t * speed * (0.4 + depth)) % range
-    const x = srand(i) * width + Math.sin(t * 0.0008 + srand(i + 11) * TAU) * (4 + depth * 6)
+    const wind = Math.sin(t * 0.00025) * 18 * depth
+    const x =
+      srand(i) * width +
+      wind +
+      Math.sin(t * 0.0008 + srand(i + 11) * TAU) * (4 + depth * 8)
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 2.3)
+    glow.addColorStop(0, `rgba(248, 252, 255, ${0.32 + depth * 0.34})`)
+    glow.addColorStop(1, "rgba(248, 252, 255, 0)")
+    ctx.beginPath()
+    ctx.arc(x, y, radius * 2.3, 0, TAU)
+    ctx.fillStyle = glow
+    ctx.fill()
     ctx.beginPath()
     ctx.arc(x, y, radius, 0, TAU)
-    ctx.fillStyle = `rgba(240, 248, 255, ${0.4 + depth * 0.5})`
+    ctx.fillStyle = `rgba(240, 248, 255, ${0.42 + depth * 0.48})`
     ctx.fill()
+    if (depth > 0.72) {
+      ctx.strokeStyle = `rgba(240, 248, 255, ${0.22 + depth * 0.32})`
+      ctx.lineWidth = Math.max(0.45, radius * 0.18)
+      for (let arm = 0; arm < 3; arm++) {
+        const angle = (arm / 3) * TAU + t * 0.00012
+        const dx = Math.cos(angle) * radius * 2.1
+        const dy = Math.sin(angle) * radius * 2.1
+        ctx.beginPath()
+        ctx.moveTo(x - dx, y - dy)
+        ctx.lineTo(x + dx, y + dy)
+        ctx.stroke()
+      }
+    }
   }
 }
 
@@ -340,24 +452,78 @@ function drawGlowMotes(
   count: number,
 ): void {
   const [r, g, b] = hexToRgb(k.accentColor)
-  const speed = 0.05 * driftSpeed(k)
+  const isMeadow = k.backgroundKind === "meadow"
+  const speed = (isMeadow ? 0.028 : 0.05) * driftSpeed(k)
   const range = height + 40
   for (let i = 0; i < count; i++) {
     const phase = srand(i + 23) * TAU
-    const pulse = 0.5 + 0.5 * Math.sin(t * 0.003 + phase)
-    const raw = (srand(i + 3) * range + t * speed * (0.5 + srand(i + 5))) % range
+    const pulse = isMeadow
+      ? 0.55 + 0.25 * Math.sin(t * 0.0012 + phase)
+      : Math.pow(0.5 + 0.5 * Math.sin(t * 0.003 + phase), 1.8)
+    const raw =
+      (srand(i + 3) * range + t * speed * (0.45 + srand(i + 5) * 0.8)) %
+      range
     const y = height - raw
-    const x = srand(i) * width + Math.sin(t * 0.0009 + phase) * 24
-    const radius = 1.4 + srand(i + 13) * 2
+    const x =
+      srand(i) * width +
+      Math.sin(t * 0.0009 + phase) * (isMeadow ? 36 : 24) +
+      Math.sin(t * 0.0016 + phase * 0.8) * (isMeadow ? 10 : 6)
+    const radius = isMeadow
+      ? 0.8 + srand(i + 13) * 1.7
+      : 1.3 + srand(i + 13) * 2.2
+    const halo = ctx.createRadialGradient(
+      x,
+      y,
+      0,
+      x,
+      y,
+      radius * (isMeadow ? 4.2 : 5.6),
+    )
+    halo.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.2 * pulse})`)
+    halo.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
     ctx.beginPath()
-    ctx.arc(x, y, radius * 2.6, 0, TAU)
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.1 * pulse})`
+    ctx.arc(x, y, radius * (isMeadow ? 4.2 : 5.6), 0, TAU)
+    ctx.fillStyle = halo
     ctx.fill()
     ctx.beginPath()
-    ctx.arc(x, y, radius, 0, TAU)
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.85 * pulse})`
+    if (isMeadow) {
+      ctx.ellipse(x, y, radius * 1.45, radius * 0.72, phase, 0, TAU)
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.34 * pulse})`
+    } else {
+      ctx.arc(x, y, radius, 0, TAU)
+      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.72 + 0.24 * pulse})`
+    }
     ctx.fill()
   }
+}
+
+function drawMeadowGrass(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  k: BroadcastKineticTheme,
+  t: number,
+): void {
+  const [r, g, b] = hexToRgb(k.accentColor)
+  ctx.save()
+  ctx.strokeStyle = `rgba(${Math.round(r * 0.52)}, ${Math.round(g * 0.62)}, ${Math.round(b * 0.36)}, 0.28)`
+  for (let i = 0; i < 42; i++) {
+    const x = srand(i + 101) * width
+    const bladeH = height * (0.035 + srand(i + 103) * 0.06)
+    const bend =
+      (srand(i + 107) - 0.5) * 22 + Math.sin(t * 0.0007 + i) * 4
+    ctx.lineWidth = 0.45 + srand(i + 109) * 1.1
+    ctx.beginPath()
+    ctx.moveTo(x, height + 2)
+    ctx.quadraticCurveTo(
+      x + bend * 0.35,
+      height - bladeH * 0.55,
+      x + bend,
+      height - bladeH,
+    )
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 function drawStars(
@@ -373,11 +539,32 @@ function drawStars(
     const y = srand(i + 3) * height * 0.85
     const phase = srand(i + 7) * TAU
     const twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 0.002 + phase))
-    const radius = 0.6 + srand(i + 11) * 1.4
+    const depth = srand(i + 15)
+    const radius = 0.45 + depth * 1.6
+    if (depth > 0.7) {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 4.2)
+      glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.28 * twinkle})`)
+      glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`)
+      ctx.beginPath()
+      ctx.arc(x, y, radius * 4.2, 0, TAU)
+      ctx.fillStyle = glow
+      ctx.fill()
+    }
     ctx.beginPath()
     ctx.arc(x, y, radius, 0, TAU)
     ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${twinkle})`
     ctx.fill()
+    if (depth > 0.9) {
+      const flare = radius * 3
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.45 * twinkle})`
+      ctx.lineWidth = 0.55
+      ctx.beginPath()
+      ctx.moveTo(x - flare, y)
+      ctx.lineTo(x + flare, y)
+      ctx.moveTo(x, y - flare)
+      ctx.lineTo(x, y + flare)
+      ctx.stroke()
+    }
   }
 }
 
@@ -391,25 +578,59 @@ function drawAurora(
 ): void {
   drawStars(ctx, width, height, k, t)
   const [r, g, b] = hexToRgb(k.accentColor)
-  const bands = 3
-  const steps = 12
+  const bands = 4
+  const steps = 7
+  ctx.save()
+  ctx.globalCompositeOperation = "screen"
   for (let band = 0; band < bands; band++) {
-    const baseY = height * (0.22 + band * 0.16)
-    const amp = 30 + band * 20
+    const baseY = height * (0.18 + band * 0.115)
+    const amp = 34 + band * 18
+    const bandH = height * (0.12 + band * 0.018)
     const phase = band * 1.7
+    const grad = ctx.createLinearGradient(0, baseY - amp, 0, baseY + bandH)
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`)
+    grad.addColorStop(
+      0.38,
+      `rgba(${r}, ${g}, ${b}, ${0.08 + band * 0.018})`,
+    )
+    grad.addColorStop(
+      1,
+      `rgba(${Math.round(r * 0.45)}, ${g}, ${Math.min(255, Math.round(b * 1.2))}, 0)`,
+    )
     ctx.beginPath()
-    ctx.moveTo(0, baseY)
-    for (let s = 0; s <= steps; s++) {
-      const x = (s / steps) * width
+    let px = 0
+    let py = baseY + Math.sin(t * 0.0006 + phase) * amp
+    ctx.moveTo(px, py)
+    for (let step = 1; step <= steps; step++) {
+      const x = (step / steps) * width
       const y = baseY + Math.sin(x * 0.004 + t * 0.0006 + phase) * amp
-      ctx.lineTo(x, y)
+      ctx.quadraticCurveTo((px + x) / 2, py - amp * 0.32, x, y)
+      px = x
+      py = y
     }
-    ctx.lineTo(width, baseY + 130)
-    ctx.lineTo(0, baseY + 130)
+    ctx.lineTo(width, baseY + bandH)
+    ctx.lineTo(0, baseY + bandH * 0.86)
     ctx.closePath()
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.06 + band * 0.02})`
+    ctx.fillStyle = grad
     ctx.fill()
+
+    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.035 + band * 0.012})`
+    ctx.lineWidth = Math.max(0.5, width * 0.001)
+    for (let fold = 0; fold < 5; fold++) {
+      const x = ((fold + 0.35 + srand(fold + band * 13) * 0.3) / 5) * width
+      const top = baseY + Math.sin(x * 0.004 + t * 0.0006 + phase) * amp
+      ctx.beginPath()
+      ctx.moveTo(x, top)
+      ctx.quadraticCurveTo(
+        x + Math.sin(t * 0.0004 + fold) * 18,
+        top + bandH * 0.45,
+        x + Math.cos(t * 0.0005 + fold) * 10,
+        top + bandH,
+      )
+      ctx.stroke()
+    }
   }
+  ctx.restore()
 }
 
 function drawNatureScene(
@@ -443,6 +664,7 @@ function drawNatureScene(
       drawGlowMotes(ctx, width, height, k, t, 44)
       break
     case "meadow":
+      drawMeadowGrass(ctx, width, height, k, t)
       drawGlowMotes(ctx, width, height, k, t, 40)
       break
     case "stars":

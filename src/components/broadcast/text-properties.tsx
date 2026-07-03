@@ -31,6 +31,11 @@ const FONT_WEIGHTS = [
   { value: "900", label: "900 - Black" },
 ]
 
+const FONT_STYLES = [
+  { value: "normal", label: "Normal" },
+  { value: "italic", label: "Italic" },
+] as const
+
 const HORIZONTAL_ALIGN_OPTIONS = [
   { value: "left", label: "Left" },
   { value: "center", label: "Center" },
@@ -120,6 +125,27 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
           </SelectContent>
         </Select>
       </div>
+
+      {prefix === "verseText" && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Font Style</label>
+          <Select
+            value={draftTheme.verseText.fontStyle ?? "normal"}
+            onValueChange={(v) => update("verseText.fontStyle", v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FONT_STYLES.map((style) => (
+                <SelectItem key={style.value} value={style.value}>
+                  {style.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Font Weight */}
       <div className="flex flex-col gap-1.5">

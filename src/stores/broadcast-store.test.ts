@@ -285,6 +285,40 @@ describe("broadcast store sync", () => {
     })
   })
 
+  it("moves the designer draft to a fallback when deleting an edited custom theme", async () => {
+    const { useBroadcastStore } = await import("./broadcast-store")
+    const builtin = useBroadcastStore.getState().themes[0]
+    const kinetic = useBroadcastStore.getState().themes.find((t) => t.kinetic)
+    expect(kinetic).toBeTruthy()
+    const custom = {
+      ...kinetic!,
+      id: "custom-kinetic-theme",
+      name: "Custom Kinetic",
+      builtin: false,
+    }
+    useBroadcastStore.setState({
+      themes: [builtin, custom],
+      activeThemeId: custom.id,
+      altActiveThemeId: builtin.id,
+      editingThemeId: custom.id,
+      draftTheme: custom,
+      selectedElement: "verse",
+      renamingThemeId: custom.id,
+    })
+
+    useBroadcastStore.getState().deleteTheme(custom.id)
+
+    expect(useBroadcastStore.getState()).toMatchObject({
+      themes: [builtin],
+      activeThemeId: builtin.id,
+      altActiveThemeId: builtin.id,
+      editingThemeId: builtin.id,
+      draftTheme: expect.objectContaining({ id: builtin.id }),
+      selectedElement: null,
+      renamingThemeId: null,
+    })
+  })
+
   it("hydrates an explicit empty custom theme list as builtin-only themes", async () => {
     const { buildBroadcastHydrationPatch } = await import("./broadcast-store")
 

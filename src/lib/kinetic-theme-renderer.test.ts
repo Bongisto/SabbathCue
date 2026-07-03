@@ -43,6 +43,7 @@ function createRecorder(): Recorder {
     }),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
     arc: vi.fn((...args: unknown[]) => {
       rec.arcs += 1
       arcArgs.push(args)
@@ -249,24 +250,67 @@ describe("nature scenes", () => {
     const drew = drawKineticBackground(r.ctx, preset("nature-rain"), 0)
     expect(drew).toBe(true)
     expect(r.paths).toBeGreaterThan(0)
+    expect(r.linear.length).toBeGreaterThan(1)
   })
 
   it("draws flake arcs for snow", () => {
     const r = createRecorder()
     drawKineticBackground(r.ctx, preset("nature-snow"), 0)
     expect(r.arcs).toBeGreaterThan(0)
+    expect(r.radial.length).toBeGreaterThan(0)
+    expect(
+      (r.ctx.lineTo as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
   })
 
   it("draws glow arcs for fireflies", () => {
     const r = createRecorder()
     drawKineticBackground(r.ctx, preset("nature-fireflies"), 0)
     expect(r.arcs).toBeGreaterThan(0)
+    expect(r.radial.length).toBeGreaterThan(0)
   })
 
-  it("draws leaf polygons for foliage", () => {
+  it("draws meadow grass and drifting pollen", () => {
+    const r = createRecorder()
+    drawKineticBackground(r.ctx, preset("nature-meadow"), 0)
+    expect(r.radial.length).toBeGreaterThan(0)
+    expect(
+      (r.ctx.quadraticCurveTo as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
+    expect(
+      (r.ctx.ellipse as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
+  })
+
+  it("draws star halos and glints", () => {
+    const r = createRecorder()
+    drawKineticBackground(r.ctx, preset("nature-stars"), 0)
+    expect(r.radial.length).toBeGreaterThan(0)
+    expect(
+      (r.ctx.lineTo as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
+  })
+
+  it("draws curved aurora curtains", () => {
+    const r = createRecorder()
+    drawKineticBackground(r.ctx, preset("nature-aurora"), 0)
+    expect(r.linear.length).toBeGreaterThan(1)
+    expect(
+      (r.ctx.quadraticCurveTo as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
+  })
+
+  it("draws curved leaf blades for foliage", () => {
     const r = createRecorder()
     drawKineticBackground(r.ctx, preset("nature-foliage"), 0)
     expect(r.paths).toBeGreaterThan(0)
+    expect(r.linear.length).toBeGreaterThan(1)
+    expect(
+      (r.ctx.quadraticCurveTo as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
+    expect(
+      (r.ctx.lineTo as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThan(0)
   })
 
   it("is deterministic at a fixed timeMs and animates as time advances", () => {

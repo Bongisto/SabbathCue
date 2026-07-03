@@ -4,6 +4,7 @@ import {
   EditIcon,
   SearchIcon,
   SparklesIcon,
+  Trash2Icon,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,11 +30,13 @@ function KineticThemeCard({
   theme,
   active,
   onApply,
+  onDelete,
   onEdit,
 }: {
   theme: BroadcastTheme
   active: boolean
   onApply: () => void
+  onDelete?: () => void
   onEdit: () => void
 }) {
   const [hovered, setHovered] = useState(false)
@@ -96,6 +99,18 @@ function KineticThemeCard({
         >
           <EditIcon className="size-4" />
         </Button>
+        {onDelete ? (
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="outline"
+            aria-label={`Delete ${theme.name}`}
+            className="text-destructive hover:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2Icon className="size-4" />
+          </Button>
+        ) : null}
       </div>
     </article>
   )
@@ -133,6 +148,10 @@ export function KineticThemesPage() {
     const designer = useBroadcastDesignerStore.getState()
     designer.startEditing(themeId)
     designer.setDesignerOpen(true)
+  }
+
+  const deleteTheme = (themeId: string) => {
+    useBroadcastThemeStore.getState().deleteTheme(themeId)
   }
 
   return (
@@ -189,6 +208,9 @@ export function KineticThemesPage() {
                 active={theme.id === activeThemeId}
                 onApply={() => applyTheme(theme.id)}
                 onEdit={() => editTheme(theme.id)}
+                onDelete={
+                  theme.builtin ? undefined : () => deleteTheme(theme.id)
+                }
               />
             ))}
             {filteredThemes.length === 0 ? (
