@@ -537,7 +537,7 @@ footer a:hover{color:var(--paper)}
     <div class="sec-head reveal">
       <p class="eyebrow">Signal chain</p>
       <h2>From spoken word to live display in <em>one calm workflow.</em></h2>
-      <p>Four stages run while the sermon is live. Local Vosk can run offline with a verse-focused constrained grammar for Bible reference cues; Deepgram or Gladia runs only when you choose a cloud provider and add your own API key.</p>
+      <p>Four stages run while the sermon is live. Local Vosk can run offline with a verse-focused constrained grammar for Bible reference cues; Deepgram, Gladia, or Soniox runs only when you choose a cloud provider and add your own API key.</p>
     </div>
     <div class="pipeline">
       <div class="step reveal">
@@ -549,8 +549,8 @@ footer a:hover{color:var(--paper)}
       <div class="step reveal">
         <div class="step-num">02 · SPEECH</div>
         <h3>Transcribe</h3>
-        <p>Speech becomes text as it is spoken. Run offline with the bundled Vosk model and verse-focused constrained grammar for reference cues, or use Deepgram/Gladia cloud transcription with your own API key and internet connection.</p>
-        <p class="tech">VOSK LOCAL · DEEPGRAM · GLADIA</p>
+        <p>Speech becomes text as it is spoken. Run offline with the bundled Vosk model and verse-focused constrained grammar for reference cues, or use Deepgram, Gladia, or Soniox (real-time Afrikaans) cloud transcription with your own API key and internet connection.</p>
+        <p class="tech">VOSK LOCAL · DEEPGRAM · GLADIA · SONIOX</p>
       </div>
       <div class="step reveal">
         <div class="step-num">03 · DETECTION</div>
@@ -639,6 +639,9 @@ footer a:hover{color:var(--paper)}
       <div class="feat reveal"><span class="ico">⇄</span><h3>344,800 cross-references</h3><p>Every detected verse comes with related passages drawn from openbible.info's cross-reference dataset — ready for the follow-up.</p></div>
       <div class="feat reveal"><span class="ico">▣</span><h3>Stream Deck &amp; remote control</h3><p>The HTTP remote-control API lets you trigger verses, clear the live screen, and switch modes from Stream Deck or your own automation.</p></div>
       <div class="feat reveal"><span class="ico">📖</span><h3>Reading mode</h3><p>When the sermon settles into a chapter, SabbathCue locks on and follows along — “next chapter”, “chapter five” — by voice.</p></div>
+      <div class="feat reveal"><span class="ico">♪</span><h3>SDA Hymnal built in</h3><p>All 695 hymns of the SDA Hymnal, searchable by number, title, or first line — pull a hymn's verses onto the live screen as cleanly as scripture.</p></div>
+      <div class="feat reveal"><span class="ico">✎</span><h3>Ellen G. White writings</h3><p>Browse and present from Steps to Christ, The Desire of Ages, and Patriarchs and Prophets. Spoken references like “Patriarchs and Prophets chapter one paragraph two” are detected live, just like Bible verses.</p></div>
+      <div class="feat reveal"><span class="ico">▤</span><h3>Service planning</h3><p>Build the whole service order ahead of time — scriptures, hymns, and readings — then run it item by item on Sabbath morning with detection still listening in the background.</p></div>
       <div class="feat reveal"><span class="ico">◐</span><h3>Light &amp; dark booth modes</h3><p>Follows your OS theme or your preference — dark for the dim control room, light for the daytime AV desk.</p></div>
       <div class="feat reveal"><span class="ico">⌂</span><h3>Native desktop app</h3><p>A native Windows desktop app. Settings persist across restarts, and a guided interactive tour gets new volunteers running in minutes.</p></div>
     </div>
@@ -668,9 +671,9 @@ footer a:hover{color:var(--paper)}
         <p class="eyebrow">Local-first &amp; private</p>
         <h2>Your local setup stays under your control. <em>Cloud transcription is optional.</em></h2>
         <ul class="free-list">
-          <li><b>Offline mode uses constrained grammar.</b> Local Vosk is tuned for Bible reference cues and command phrases, not full-sermon free dictation. Use Deepgram or Gladia when you need broad cloud transcription quality.</li>
-          <li><b>Runs on your machine when local.</b> Vosk transcription runs on the computer after the model is installed. Deepgram and Gladia require your own API key, internet connection, and provider account.</li>
-          <li><b>Your audio stays in the room with Vosk.</b> Cloud transcription sends audio to the selected provider only when you choose Deepgram or Gladia.</li>
+          <li><b>Offline mode uses constrained grammar.</b> Local Vosk is tuned for Bible reference cues and command phrases, not full-sermon free dictation. Use Deepgram, Gladia, or Soniox when you need broad cloud transcription quality.</li>
+          <li><b>Runs on your machine when local.</b> Vosk transcription runs on the computer after the model is installed. Deepgram, Gladia, and Soniox require your own API key, internet connection, and provider account.</li>
+          <li><b>Your audio stays in the room with Vosk.</b> Cloud transcription sends audio to the selected provider only when you choose Deepgram, Gladia, or Soniox.</li>
           <li><b>Yours to control.</b> Settings, history, and live-screen output live on your device; cloud speech is opt-in through your selected provider.</li>
           <li><b>Bring your own translations.</b> Licensed versions like NIV, ESV, NASB, NKJV, NLT, and AMP are supported when you hold the rights.</li>
         </ul>
@@ -681,6 +684,7 @@ footer a:hover{color:var(--paper)}
         <div class="tr-row"><span class="name">Reina-Valera 1909</span><span class="lang">ESPAÑOL</span></div>
         <div class="tr-row"><span class="name">J.N. Darby 1885</span><span class="lang">FRANÇAIS</span></div>
         <div class="tr-row"><span class="name">Bíblia Livre</span><span class="lang">PORTUGUÊS</span></div>
+        <div class="tr-row"><span class="name">Afrikaanse Bybel 1933/1953</span><span class="lang">AFRIKAANS</span></div>
         <p class="tr-note">Full-text search across all of it — 31,000+ verses indexed and embedded on your machine.</p>
       </div>
     </div>
@@ -730,7 +734,7 @@ footer a:hover{color:var(--paper)}
       <p class="eyebrow" style="justify-content:center">Ready for this Sabbath</p>
       <h2>Give your media team <em>a calmer scripture workflow.</em></h2>
       <div class="hero-ctas">
-        <a class="btn btn-gold" id="download-btn" href="https://pub-f00266e4b83341dea437c0114752f536.r2.dev/SabbathCue_0.1.6_x64-setup%20(12).exe" download="SabbathCue-Setup.exe">Download for Windows — start free trial</a>
+        <a class="btn btn-gold" id="download-btn" href="https://pub-f00266e4b83341dea437c0114752f536.r2.dev/SabbathCue_0.1.7_x64-setup.exe" download="SabbathCue-Setup.exe">Download for Windows — start free trial</a>
         <a class="btn btn-ghost" href="#pricing">See plans</a>
       </div>
       <p class="trial-note" style="text-align:center">14-day free trial · no card required · HDMI/projector output today</p>
