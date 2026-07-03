@@ -478,8 +478,8 @@ export function buildKineticBroadcastTheme(
   }
 
   // Desert Cloth carries the HTML design's own typography: Georgia italic
-  // cream verse text with ink shadow, white non-uppercase title above the
-  // verse, ~900px text column, and the design's 1.6s verse cross-fade.
+  // cream verse text with ink shadow, then quiet bottom metadata so the
+  // app's reference/title does not compete with the portrait.
   if (preset.presetId === "desert-cloth") {
     theme.verseText = {
       ...theme.verseText,
@@ -491,15 +491,15 @@ export function buildKineticBroadcastTheme(
     }
     theme.reference = {
       ...theme.reference,
-      color: "#ffffff",
-      fontSize: 68,
+      color: "#f3e8d2",
+      fontSize: 26,
       fontWeight: 400,
-      textTransform: "none",
-      uppercase: false,
-      letterSpacing: 0,
-      position: "above",
+      textTransform: "uppercase",
+      uppercase: true,
+      letterSpacing: 4,
+      position: "below",
     }
-    theme.layout = { ...theme.layout, textAreaWidth: 47 }
+    theme.layout = { ...theme.layout, textAreaWidth: 47, referenceGap: 40 }
     theme.transition = { ...theme.transition, duration: 1600 }
   }
 
