@@ -18,15 +18,23 @@ pub(crate) fn is_detection_paused(app: &AppHandle) -> bool {
     paused
 }
 
+pub(crate) fn is_semantic_detection_enabled(app: &AppHandle) -> bool {
+    let state: State<'_, Mutex<AppState>> = app.state();
+    let enabled = match state.lock() {
+        Ok(s) => s.semantic_detection_enabled.load(Ordering::Relaxed),
+        Err(_) => false,
+    };
+    enabled
+}
+
 pub(crate) const SEMANTIC_WINDOW_SEGMENTS: usize = 4;
 pub(crate) const FINAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(100);
 pub(crate) const PARTIAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const LIVE_SEMANTIC_CAP: usize = 3;
 pub(crate) const LIVE_SEMANTIC_OVERLAP_BOOST: f64 = 0.10;
-/// Minimum confidence for a live semantic/FTS detection to be emitted. Mirrors
-/// the frontend display floor (`MIN_SEMANTIC_DISPLAY_CONFIDENCE`) so low-confidence
-/// keyword matches never reach the UI or the IPC channel.
+/// Default minimum confidence for live semantic/FTS detections.
+/// The active value is synced from the app settings.
 pub(crate) const LIVE_SEMANTIC_MIN_CONFIDENCE: f64 = 0.70;
 
 /// Maximum trailing words of the rolling transcript window fed to live
@@ -39,8 +47,8 @@ pub(crate) const WINDOW_RESET_GAP: Duration = Duration::from_secs(8);
 #[cfg(test)]
 mod tests {
     use super::{
-        LIVE_SEMANTIC_CAP, PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS,
-        SEMANTIC_WINDOW_SEGMENTS,
+        LIVE_SEMANTIC_CAP, LIVE_SEMANTIC_MIN_CONFIDENCE, PARTIAL_SEMANTIC_DEBOUNCE,
+        PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS,
     };
     use crate::commands::stt::detection_jobs::{
         enqueue_final_semantic_job, enqueue_partial_semantic_job, finalize_live_semantic_results,
@@ -487,7 +495,7 @@ mod tests {
             make_detection_result("Romans 8:28", 45, 8, 28, 0.72),
         ];
 
-        let finalized = finalize_live_semantic_results(results);
+        let finalized = finalize_live_semantic_results(results, LIVE_SEMANTIC_MIN_CONFIDENCE);
 
         assert_eq!(finalized.len(), 2);
         assert_eq!(finalized[0].verse_ref, "John 3:16");
@@ -507,7 +515,7 @@ mod tests {
             make_detection_result("Mark 15:4", 41, 15, 4, 0.64),
         ];
 
-        let finalized = finalize_live_semantic_results(results);
+        let finalized = finalize_live_semantic_results(results, LIVE_SEMANTIC_MIN_CONFIDENCE);
 
         assert_eq!(finalized.len(), 1);
         assert_eq!(finalized[0].verse_ref, "John 3:16");
@@ -525,7 +533,7 @@ mod tests {
             make_detection_result("Matthew 5:3", 40, 5, 3, 0.78),
         ];
 
-        let finalized = finalize_live_semantic_results(results);
+        let finalized = finalize_live_semantic_results(results, LIVE_SEMANTIC_MIN_CONFIDENCE);
 
         assert_eq!(finalized.len(), LIVE_SEMANTIC_CAP);
         assert!(finalized.iter().any(|r| r.verse_ref == "Romans 8:28"));

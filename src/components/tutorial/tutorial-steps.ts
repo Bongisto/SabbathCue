@@ -271,7 +271,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="settings-section-display"]',
     title: "Display Mode",
     content:
-      "Settings > Display Mode switches between Auto and Manual broadcast. Auto sends the highest-confidence detected verse straight to the live output; Manual waits for you to present. The sliders set the Auto-live and Semantic detection confidence thresholds.",
+      "Settings > Display Mode switches between Auto and Manual broadcast. Auto sends the highest-confidence detected verse straight to the live output; Manual waits for you to present. Semantic detection has its own switch and confidence threshold.",
     placement: "left",
     before: () =>
       prepareTarget('[data-tour="settings-section-display"]', {

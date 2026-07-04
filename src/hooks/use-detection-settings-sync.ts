@@ -9,6 +9,8 @@ export function useDetectionSettingsSync() {
 
     let prev = {
       autoMode: useSettingsStore.getState().autoMode,
+      semanticDetectionEnabled:
+        useSettingsStore.getState().semanticDetectionEnabled,
       confidenceThreshold: useSettingsStore.getState().confidenceThreshold,
       semanticConfidenceThreshold:
         useSettingsStore.getState().semanticConfidenceThreshold,
@@ -18,6 +20,7 @@ export function useDetectionSettingsSync() {
     const sync = (next = useSettingsStore.getState()) => {
       void invokeTauri("update_detection_settings", {
         autoMode: next.autoMode,
+        semanticDetectionEnabled: next.semanticDetectionEnabled,
         confidenceThreshold: next.confidenceThreshold,
         semanticConfidenceThreshold: next.semanticConfidenceThreshold,
         cooldownMs: next.cooldownMs,
@@ -37,6 +40,7 @@ export function useDetectionSettingsSync() {
     const unsubscribe = useSettingsStore.subscribe((state) => {
       if (
         state.autoMode === prev.autoMode &&
+        state.semanticDetectionEnabled === prev.semanticDetectionEnabled &&
         state.confidenceThreshold === prev.confidenceThreshold &&
         state.semanticConfidenceThreshold ===
           prev.semanticConfidenceThreshold &&
@@ -47,6 +51,7 @@ export function useDetectionSettingsSync() {
 
       prev = {
         autoMode: state.autoMode,
+        semanticDetectionEnabled: state.semanticDetectionEnabled,
         confidenceThreshold: state.confidenceThreshold,
         semanticConfidenceThreshold: state.semanticConfidenceThreshold,
         cooldownMs: state.cooldownMs,

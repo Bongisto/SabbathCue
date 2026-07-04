@@ -3,6 +3,7 @@
     reason = "Tauri command extractors require pass-by-value"
 )]
 
+use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -48,9 +49,17 @@ pub fn detect_verses(
     text: String,
 ) -> Result<Vec<DetectionResult>, String> {
     bounded_text(&text, "text", MAX_TRANSCRIPT_BYTES)?;
+    let semantic_detection_enabled = {
+        let app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.semantic_detection_enabled.load(Ordering::Relaxed)
+    };
     let merged = {
         let mut pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
-        pipeline.process(&text)
+        if semantic_detection_enabled {
+            pipeline.process(&text)
+        } else {
+            pipeline.process_direct(&text)
+        }
     };
     let app_state = state.lock().map_err(|e| e.to_string())?;
     let mut results: Vec<DetectionResult> =
@@ -62,13 +71,19 @@ pub fn detect_verses(
 /// Check if semantic search is available
 #[tauri::command]
 pub fn detection_status(
+    state: State<'_, Mutex<AppState>>,
     pipeline_state: State<'_, Mutex<DetectionPipeline>>,
 ) -> Result<DetectionStatusResult, String> {
+    let semantic_detection_enabled = {
+        let app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state.semantic_detection_enabled.load(Ordering::Relaxed)
+    };
     let pipeline = pipeline_state.lock().map_err(|e| e.to_string())?;
     Ok(DetectionStatusResult {
         has_direct: true,
         has_semantic: pipeline.has_semantic(),
         paraphrase_enabled: pipeline.use_synonyms(),
+        semantic_detection_enabled,
     })
 }
 
@@ -89,6 +104,7 @@ pub struct DetectionStatusResult {
     pub has_direct: bool,
     pub has_semantic: bool,
     pub paraphrase_enabled: bool,
+    pub semantic_detection_enabled: bool,
 }
 
 #[tauri::command]
@@ -147,9 +163,11 @@ pub fn stop_reading_mode(state: State<'_, Mutex<ReadingMode>>) -> Result<(), Str
 
 #[tauri::command]
 pub fn update_detection_settings(
+    state: State<'_, Mutex<AppState>>,
     merger_state: State<'_, Mutex<rhema_detection::DetectionMerger>>,
     pipeline_state: State<'_, Mutex<DetectionPipeline>>,
     auto_mode: bool,
+    semantic_detection_enabled: Option<bool>,
     confidence_threshold: f64,
     semantic_confidence_threshold: Option<f64>,
     cooldown_ms: u64,
@@ -166,13 +184,22 @@ pub fn update_detection_settings(
     let semantic_threshold = semantic_confidence_threshold
         .unwrap_or(DEFAULT_SEMANTIC_VISIBILITY_THRESHOLD)
         .clamp(0.0, 1.0);
+    let semantic_enabled = semantic_detection_enabled.unwrap_or(true);
     let auto_threshold = auto_mode.then_some(threshold);
+
+    {
+        let app_state = state.lock().map_err(|e| e.to_string())?;
+        app_state
+            .semantic_detection_enabled
+            .store(semantic_enabled, Ordering::SeqCst);
+    }
 
     {
         let mut merger = merger_state.lock().map_err(|e| e.to_string())?;
         apply_detection_settings_to_merger(
             &mut merger,
             auto_threshold,
+            semantic_enabled,
             semantic_threshold,
             cooldown_ms,
         );
@@ -183,13 +210,14 @@ pub fn update_detection_settings(
         apply_detection_settings_to_merger(
             pipeline.merger_mut(),
             auto_threshold,
+            semantic_enabled,
             semantic_threshold,
             cooldown_ms,
         );
     }
 
     log::info!(
-        "[DET] Settings updated: auto_mode={auto_mode}, operator_threshold={OPERATOR_DETECTION_THRESHOLD:.2}, semantic_threshold={semantic_threshold:.2}, auto_threshold={}, cooldown_ms={}",
+        "[DET] Settings updated: auto_mode={auto_mode}, operator_threshold={OPERATOR_DETECTION_THRESHOLD:.2}, semantic_enabled={semantic_enabled}, semantic_threshold={semantic_threshold:.2}, auto_threshold={}, cooldown_ms={}",
         auto_threshold.map_or_else(|| "disabled".to_string(), |value| format!("{value:.2}")),
         cooldown_ms.clamp(250, 60_000)
     );
@@ -353,6 +381,7 @@ mod tests {
         apply_detection_settings_to_merger(
             &mut merger,
             Some(0.80),
+            true,
             DEFAULT_SEMANTIC_VISIBILITY_THRESHOLD,
             2500,
         );
@@ -378,6 +407,7 @@ mod tests {
         apply_detection_settings_to_merger(
             &mut merger,
             None,
+            true,
             DEFAULT_SEMANTIC_VISIBILITY_THRESHOLD,
             2500,
         );
@@ -393,7 +423,7 @@ mod tests {
     fn detection_settings_apply_semantic_visibility_threshold() {
         let mut merger = DetectionMerger::new();
 
-        apply_detection_settings_to_merger(&mut merger, Some(0.85), 0.70, 2500);
+        apply_detection_settings_to_merger(&mut merger, Some(0.85), true, 0.70, 2500);
 
         assert!(
             (merger.confidence_threshold() - OPERATOR_DETECTION_THRESHOLD).abs() < f64::EPSILON
@@ -406,6 +436,18 @@ mod tests {
             merger.merge(vec![], vec![semantic_detection(0.70)]).len(),
             1
         );
+    }
+
+    #[test]
+    fn detection_settings_can_disable_semantic_results() {
+        let mut merger = DetectionMerger::new();
+
+        apply_detection_settings_to_merger(&mut merger, Some(0.85), false, 0.70, 2500);
+
+        assert!(merger.semantic_confidence_threshold().is_infinite());
+        assert!(merger
+            .merge(vec![], vec![semantic_detection(1.0)])
+            .is_empty());
     }
 
     #[test]
@@ -507,6 +549,7 @@ mod tests {
         apply_detection_settings_to_merger(
             &mut merger,
             Some(0.80),
+            true,
             DEFAULT_SEMANTIC_VISIBILITY_THRESHOLD,
             2500,
         );
@@ -525,6 +568,7 @@ mod tests {
         apply_detection_settings_to_merger(
             &mut merger,
             None,
+            true,
             DEFAULT_SEMANTIC_VISIBILITY_THRESHOLD,
             2500,
         );

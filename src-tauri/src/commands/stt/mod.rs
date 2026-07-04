@@ -31,8 +31,9 @@ use rhema_detection::DirectDetector;
 use rhema_stt::TranscriptEvent;
 
 use self::detection::{
-    is_detection_paused, LIVE_DETECTION_WINDOW_WORDS, PARTIAL_SEMANTIC_DEBOUNCE,
-    PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS, WINDOW_RESET_GAP,
+    is_detection_paused, is_semantic_detection_enabled, LIVE_DETECTION_WINDOW_WORDS,
+    PARTIAL_SEMANTIC_DEBOUNCE, PARTIAL_SEMANTIC_MIN_WORDS, SEMANTIC_WINDOW_SEGMENTS,
+    WINDOW_RESET_GAP,
 };
 use self::detection_jobs::{
     enqueue_direct_detection_job, enqueue_final_semantic_job, enqueue_partial_semantic_job,
@@ -42,7 +43,7 @@ use self::detection_logic::clamp_to_recent_words;
 use self::live_session::{check_reading_mode, run_direct_detection, run_semantic_detection};
 use self::provider::build_stt_provider;
 use self::utils::{
-    average_word_confidence, final_semantic_detection_allowed,
+    average_word_confidence, final_semantic_detection_allowed_by_settings,
     partial_semantic_detection_enabled_for_provider, to_word_payloads, transcript_logging_enabled,
     truncate_safe, word_count,
 };
@@ -162,12 +163,6 @@ pub async fn start_transcription(
     };
 
     audio_active.store(true, Ordering::SeqCst);
-
-    log::info!(
-        "[STT] low_power={} partial_semantic={}",
-        low_power.unwrap_or(false),
-        partial_semantic_detection_enabled_for_provider(low_power, provider_name)
-    );
 
     // Prepare channels.
     let (audio_send_tx, audio_send_rx) = crossbeam_channel::bounded::<Vec<i16>>(128);
@@ -480,6 +475,7 @@ pub async fn start_transcription(
                             }
 
                             if partial_semantic_enabled
+                                && is_semantic_detection_enabled(&event_app)
                                 && word_count(&transcript) >= PARTIAL_SEMANTIC_MIN_WORDS
                                 && last_partial_semantic_at.elapsed() >= PARTIAL_SEMANTIC_DEBOUNCE
                             {
@@ -545,7 +541,11 @@ pub async fn start_transcription(
                         // Check for translation commands (cheap, <1ms, stays inline)
                         check_translation_command(&event_app, &transcript);
                         let detection_paused = is_detection_paused(&event_app);
-                        if detection_paused && deepgram_semantic_on_speech_final && speech_final {
+                        let semantic_detection_enabled = is_semantic_detection_enabled(&event_app);
+                        if (!semantic_detection_enabled || detection_paused)
+                            && deepgram_semantic_on_speech_final
+                            && speech_final
+                        {
                             deepgram_semantic_buffer.clear();
                         }
                         if !detection_paused {
@@ -560,14 +560,13 @@ pub async fn start_transcription(
                             // Fire-and-forget: detection runs in background thread pool.
                             // Event consumer proceeds immediately to next transcript.
                             if let Some(detection_text) = route.authoritative_detection {
-                                // Skip semantic work on near-garbage finals: a short fragment
-                                // with a reported (non-zero) confidence below 0.5 is almost
-                                // always STT noise, not a paraphrase worth searching.
-                                let junk_final = confidence > 0.0
-                                    && confidence < 0.5
-                                    && transcript.chars().count() < 12;
-                                let final_semantic_allowed = !junk_final
-                                    && final_semantic_detection_allowed(&provider_log_name, confidence);
+                                let final_semantic_allowed =
+                                    final_semantic_detection_allowed_by_settings(
+                                        semantic_detection_enabled,
+                                        &provider_log_name,
+                                        confidence,
+                                        transcript.chars().count(),
+                                    );
                                 enqueue_direct_detection_job(
                                     &detect_tx,
                                     &latest_accepted_seq,
@@ -581,9 +580,11 @@ pub async fn start_transcription(
                                 // Deepgram waits for speech_final before semantic search.
                                 // Non-Deepgram providers keep the rolling final window.
                                 if !final_semantic_allowed {
-                                    log::debug!(
-                                        "[DET-TRACE] seq={seq} skip=semantic_enqueue reason=low_confidence provider={provider_log_name} confidence={confidence:.2}"
-                                    );
+                                    if semantic_detection_enabled {
+                                        log::debug!(
+                                            "[DET-TRACE] seq={seq} skip=semantic_enqueue reason=low_confidence provider={provider_log_name} confidence={confidence:.2}"
+                                        );
+                                    }
                                 } else if deepgram_semantic_on_speech_final {
                                     if let Some((semantic_seq, semantic_text)) =
                                         deepgram_semantic_buffer.push_final(
@@ -627,7 +628,8 @@ pub async fn start_transcription(
                                         semantic_text,
                                     );
                                 }
-                            } else if deepgram_semantic_on_speech_final
+                            } else if semantic_detection_enabled
+                                && deepgram_semantic_on_speech_final
                                 && speech_final
                                 && !deepgram_semantic_buffer.is_empty()
                             {
@@ -661,7 +663,8 @@ pub async fn start_transcription(
                 }
                 TranscriptEvent::UtteranceEnd => {
                     if deepgram_semantic_on_speech_final {
-                        let pending = deepgram_semantic_buffer.flush();
+                        let pending = deepgram_semantic_buffer
+                            .flush_when_enabled(is_semantic_detection_enabled(&event_app));
                         if !is_detection_paused(&event_app) {
                             if let Some((semantic_seq, semantic_text)) = pending {
                                 enqueue_final_semantic_job(

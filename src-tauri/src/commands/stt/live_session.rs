@@ -8,7 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::state::AppState;
 use rhema_detection::{DetectionMerger, DirectDetector, ReadingMode};
 
-use super::detection::FINAL_SEMANTIC_MIN_WORDS;
+use super::detection::{is_semantic_detection_enabled, FINAL_SEMANTIC_MIN_WORDS};
 use super::detection_jobs::finalize_live_semantic_results;
 use super::detection_logic::{
     choose_reading_candidate, direct_reading_candidates, filter_direct_results_to_scope_if_present,
@@ -294,6 +294,11 @@ pub(crate) fn run_semantic_detection(
     latest_seq: &Arc<AtomicU64>,
     transcript: &str,
 ) {
+    if !is_semantic_detection_enabled(app) {
+        log::debug!("[DET-SEMANTIC] Skipping job seq={seq}; semantic detection disabled");
+        return;
+    }
+
     // Stale detection suppression: if this job's sequence is older than the
     // latest accepted transcript sequence, skip emission.
     if seq < latest_seq.load(Ordering::Acquire) {
@@ -383,7 +388,7 @@ pub(crate) fn run_semantic_detection(
 
     // Use hybrid pipeline: FTS5 + vector search when available.
     // Even with empty FTS5, vector search can catch paraphrases.
-    let (merged, semantic_ready, paraphrase_enabled) = {
+    let (merged, semantic_ready, paraphrase_enabled, semantic_min_confidence) = {
         let pipeline_state: State<'_, Mutex<rhema_detection::DetectionPipeline>> = app.state();
         let Ok(mut pipeline) = pipeline_state.lock() else {
             log::error!("Failed to lock DetectionPipeline");
@@ -391,8 +396,14 @@ pub(crate) fn run_semantic_detection(
         };
         let semantic_ready = pipeline.has_semantic();
         let paraphrase_enabled = pipeline.use_synonyms();
+        let semantic_min_confidence = pipeline.semantic_confidence_threshold();
         let merged = pipeline.process_hybrid_with_fts(&query, &fts);
-        (merged, semantic_ready, paraphrase_enabled)
+        (
+            merged,
+            semantic_ready,
+            paraphrase_enabled,
+            semantic_min_confidence,
+        )
     };
 
     log::info!(
@@ -423,7 +434,7 @@ pub(crate) fn run_semantic_detection(
 
     drop(app_state);
     let results = filter_live_semantic_results_to_reading_scope(app, results);
-    let results = finalize_live_semantic_results(results);
+    let results = finalize_live_semantic_results(results, semantic_min_confidence);
 
     if results.is_empty() {
         log::info!(

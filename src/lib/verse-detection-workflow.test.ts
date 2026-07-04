@@ -131,8 +131,9 @@ describe("verse detection workflow", () => {
     })
     useSettingsStore.setState({
       autoMode: true,
+      semanticDetectionEnabled: true,
       confidenceThreshold: 0.85,
-      semanticConfidenceThreshold: 0.70,
+      semanticConfidenceThreshold: 0.7,
     })
   })
 
@@ -243,6 +244,25 @@ describe("verse detection workflow", () => {
 
     expect(useBibleStore.getState().selectedVerse).toBeNull()
     expect(useBroadcastStore.getState().liveItem).toBeNull()
+    expect(useQueueStore.getState().items).toHaveLength(0)
+  })
+
+  it("ignores semantic detections when semantic detection is disabled", async () => {
+    useSettingsStore.setState({
+      autoMode: false,
+      semanticDetectionEnabled: false,
+    })
+
+    await handleVerseDetections([
+      makeDetection({
+        source: "semantic",
+        confidence: 1,
+        transcript_snippet: "God loved the world and gave his son",
+      }),
+    ])
+
+    expect(useDetectionStore.getState().detections).toHaveLength(0)
+    expect(useBibleStore.getState().selectedVerse).toBeNull()
     expect(useQueueStore.getState().items).toHaveLength(0)
   })
 

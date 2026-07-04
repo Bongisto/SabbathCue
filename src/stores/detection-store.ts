@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { useSettingsStore } from "@/stores/settings-store"
 import type { DetectionResult } from "@/types"
 
 interface DetectionWithMeta {
@@ -24,11 +25,6 @@ export interface HeldReferenceCandidate {
 }
 
 const MAX_RECENT_DETECTIONS = 5
-// Live semantic/FTS search emits low-confidence keyword matches (~63-68%) during
-// ordinary prose. The panel only surfaces semantic hits at or above this floor so
-// that noise can't crowd real detections out of the recent-detections box. Direct
-// and EGW references carry source "direct" and are always shown.
-const MIN_SEMANTIC_DISPLAY_CONFIDENCE = 0.7
 const MAX_RECENCY_BONUS = 0.01
 const RECENCY_BONUS_WINDOW_MS = 30_000
 // Keep matches actionable through a short live-speaking window, then clear old context.
@@ -65,10 +61,15 @@ function sourcePriority(detection: DetectionResultWithMeta): number {
   return detection.source === "direct" ? 1 : 0
 }
 
-function isBelowSemanticFloor(detection: DetectionResult): boolean {
+function isHiddenBySemanticSettings(detection: DetectionResult): boolean {
+  if (detection.source !== "semantic") return false
+
+  const { semanticDetectionEnabled, semanticConfidenceThreshold } =
+    useSettingsStore.getState()
+
   return (
-    detection.source === "semantic" &&
-    detection.confidence < MIN_SEMANTIC_DISPLAY_CONFIDENCE
+    !semanticDetectionEnabled ||
+    detection.confidence < semanticConfidenceThreshold
   )
 }
 
@@ -348,7 +349,7 @@ export const useDetectionStore = create<DetectionState>((set) => ({
 
   addDetection: (detection) =>
     set((state) => {
-      if (isBelowSemanticFloor(detection)) return state
+      if (isHiddenBySemanticSettings(detection)) return state
       const now = Date.now()
       const existingIndex = state.detections.findIndex((d) =>
         detectionsAreEquivalent(d, detection)
@@ -390,7 +391,7 @@ export const useDetectionStore = create<DetectionState>((set) => ({
 
       // Add incoming with received_at
       for (const d of incoming) {
-        if (isBelowSemanticFloor(d)) continue
+        if (isHiddenBySemanticSettings(d)) continue
         const key = findMapEntryKey(map, d) ?? detectionKey(d)
         const existing = map.get(key)
         if (!existing) {

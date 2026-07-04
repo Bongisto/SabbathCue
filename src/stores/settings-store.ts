@@ -7,7 +7,7 @@ export type SttProvider = "deepgram" | "gladia" | "soniox" | "vosk"
 export type SttLanguage = "en" | "af" | "es" | "fr" | "pt"
 
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.85
-const DEFAULT_SEMANTIC_CONFIDENCE_THRESHOLD = 0.70
+const DEFAULT_SEMANTIC_CONFIDENCE_THRESHOLD = 0.7
 const LEGACY_DEFAULT_CONFIDENCE_THRESHOLD = 0.8
 
 interface SettingsState {
@@ -17,6 +17,7 @@ interface SettingsState {
   gain: number
   autoMode: boolean
   autoPreviewDetections: boolean
+  semanticDetectionEnabled: boolean
   confidenceThreshold: number
   semanticConfidenceThreshold: number
   cooldownMs: number
@@ -34,6 +35,7 @@ interface SettingsState {
   setGain: (gain: number) => void
   setAutoMode: (auto: boolean) => void
   setAutoPreviewDetections: (enabled: boolean) => void
+  setSemanticDetectionEnabled: (enabled: boolean) => void
   setConfidenceThreshold: (threshold: number) => void
   setSemanticConfidenceThreshold: (threshold: number) => void
   setCooldownMs: (ms: number) => void
@@ -52,6 +54,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   gain: 1.0,
   autoMode: false,
   autoPreviewDetections: true,
+  semanticDetectionEnabled: true,
   confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
   semanticConfidenceThreshold: DEFAULT_SEMANTIC_CONFIDENCE_THRESHOLD,
   cooldownMs: 2500,
@@ -68,6 +71,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setAutoMode: (autoMode) => set({ autoMode }),
   setAutoPreviewDetections: (autoPreviewDetections) =>
     set({ autoPreviewDetections }),
+  setSemanticDetectionEnabled: (semanticDetectionEnabled) =>
+    set({ semanticDetectionEnabled }),
   setConfidenceThreshold: (confidenceThreshold) => set({ confidenceThreshold }),
   setSemanticConfidenceThreshold: (semanticConfidenceThreshold) =>
     set({ semanticConfidenceThreshold }),
@@ -83,6 +88,7 @@ const PERSISTED_KEYS = [
   "gain",
   "autoMode",
   "autoPreviewDetections",
+  "semanticDetectionEnabled",
   "confidenceThreshold",
   "semanticConfidenceThreshold",
   "cooldownMs",

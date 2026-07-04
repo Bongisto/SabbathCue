@@ -11,10 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::Notify;
 
-use super::detection::{
-    FINAL_SEMANTIC_MIN_WORDS, LIVE_SEMANTIC_CAP, LIVE_SEMANTIC_MIN_CONFIDENCE,
-    LIVE_SEMANTIC_OVERLAP_BOOST,
-};
+use super::detection::{FINAL_SEMANTIC_MIN_WORDS, LIVE_SEMANTIC_CAP, LIVE_SEMANTIC_OVERLAP_BOOST};
 use super::detection_logic::transcript_defers_to_direct;
 
 /// Take the latest pending semantic job from a shared slot, recovering from
@@ -190,6 +187,15 @@ impl DeepgramSemanticBuffer {
         self.flush_with_seq(self.seq)
     }
 
+    pub(crate) fn flush_when_enabled(&mut self, enabled: bool) -> Option<(u64, String)> {
+        if enabled {
+            self.flush()
+        } else {
+            self.clear();
+            None
+        }
+    }
+
     pub(crate) fn flush_with_seq(&mut self, seq: u64) -> Option<(u64, String)> {
         if self.parts.is_empty() || seq == 0 {
             return None;
@@ -226,12 +232,13 @@ fn semantic_result_key(result: &crate::commands::detection::DetectionResult) -> 
 
 pub(crate) fn finalize_live_semantic_results(
     results: Vec<crate::commands::detection::DetectionResult>,
+    min_confidence: f64,
 ) -> Vec<crate::commands::detection::DetectionResult> {
     let mut grouped: HashMap<String, (crate::commands::detection::DetectionResult, usize)> =
         HashMap::new();
 
     for result in results {
-        if result.confidence < LIVE_SEMANTIC_MIN_CONFIDENCE {
+        if result.confidence < min_confidence {
             continue;
         }
         let key = semantic_result_key(&result);

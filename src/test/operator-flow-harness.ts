@@ -81,6 +81,7 @@ declare global {
       }
       settings: {
         setAutoMode: (autoMode: boolean) => void
+        setSemanticDetectionEnabled: (enabled: boolean) => void
         setConfidenceThreshold: (confidenceThreshold: number) => void
         setSemanticConfidenceThreshold: (
           semanticConfidenceThreshold: number
@@ -270,6 +271,8 @@ export function installOperatorFlowHarness(): void {
     settings: {
       setAutoMode: (autoMode) =>
         useSettingsStore.getState().setAutoMode(autoMode),
+      setSemanticDetectionEnabled: (enabled) =>
+        useSettingsStore.getState().setSemanticDetectionEnabled(enabled),
       setConfidenceThreshold: (confidenceThreshold) =>
         useSettingsStore.getState().setConfidenceThreshold(confidenceThreshold),
       setSemanticConfidenceThreshold: (semanticConfidenceThreshold) =>

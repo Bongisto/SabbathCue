@@ -1,5 +1,6 @@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
 import { useSettingsStore } from "@/stores/settings-store"
 
 export function DisplayModeSection() {
@@ -8,6 +9,8 @@ export function DisplayModeSection() {
     setAutoMode,
     confidenceThreshold,
     setConfidenceThreshold,
+    semanticDetectionEnabled,
+    setSemanticDetectionEnabled,
     semanticConfidenceThreshold,
     setSemanticConfidenceThreshold,
   } = useSettingsStore()
@@ -65,12 +68,28 @@ export function DisplayModeSection() {
       </div>
 
       <div className="flex flex-col gap-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Semantic detection
+            </label>
+            <p className="text-[0.625rem] text-muted-foreground">
+              Allow paraphrase and quote-based Bible suggestions.
+            </p>
+          </div>
+          <Switch
+            aria-label="Semantic detection"
+            checked={semanticDetectionEnabled}
+            onCheckedChange={setSemanticDetectionEnabled}
+          />
+        </div>
+
         <div className="flex items-center justify-between">
           <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Semantic detection
+            Semantic confidence
           </label>
           <span className="text-xs text-muted-foreground tabular-nums">
-            {semanticThresholdPercent}%
+            {semanticDetectionEnabled ? `${semanticThresholdPercent}%` : "Off"}
           </span>
         </div>
         <Slider
@@ -78,10 +97,13 @@ export function DisplayModeSection() {
           max={100}
           step={1}
           value={[semanticThresholdPercent]}
+          disabled={!semanticDetectionEnabled}
           onValueChange={([v]) => setSemanticConfidenceThreshold(v / 100)}
         />
         <p className="text-[0.625rem] text-muted-foreground">
-          Semantic verse suggestions below this confidence stay hidden.
+          {semanticDetectionEnabled
+            ? "Semantic verse suggestions below this confidence stay hidden."
+            : "Only direct spoken references will appear in detections."}
         </p>
       </div>
 

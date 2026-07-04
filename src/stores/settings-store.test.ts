@@ -62,6 +62,7 @@ describe("settings store", () => {
       if (key === "gain") return 2.5
       if (key === "sttProvider") return "deepgram"
       if (key === "autoPreviewDetections") return false
+      if (key === "semanticDetectionEnabled") return true
       return null
     })
 
@@ -73,10 +74,11 @@ describe("settings store", () => {
     expect(state.gain).toBe(2.5)
     expect(state.sttProvider).toBe("deepgram")
     expect(state.autoPreviewDetections).toBe(false)
+    expect(state.semanticDetectionEnabled).toBe(true)
     // Defaults remain for keys with null
     expect(state.autoMode).toBe(false)
     expect(state.confidenceThreshold).toBe(0.85)
-    expect(state.semanticConfidenceThreshold).toBe(0.70)
+    expect(state.semanticConfidenceThreshold).toBe(0.7)
   })
 
   it("hydrate with no persisted values falls back to defaults", async () => {
@@ -91,6 +93,7 @@ describe("settings store", () => {
     expect(after.sttProvider).toBe("vosk")
     expect(after.autoMode).toBe(false)
     expect(after.autoPreviewDetections).toBe(true)
+    expect(after.semanticDetectionEnabled).toBe(true)
   })
 
   it("migrates the legacy default confidence threshold to the auto-live default", async () => {

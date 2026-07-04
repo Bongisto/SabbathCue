@@ -165,9 +165,26 @@ function bestDetection(detections: DetectionResult[]): DetectionResult | null {
   return best
 }
 
+interface DetectionSettingsSnapshot {
+  semanticDetectionEnabled: boolean
+  semanticConfidenceThreshold: number
+}
+
+function detectionAllowedBySettings(
+  detection: DetectionResult,
+  settings: DetectionSettingsSnapshot
+): boolean {
+  return (
+    detection.source !== "semantic" ||
+    (settings.semanticDetectionEnabled &&
+      detection.confidence >= settings.semanticConfidenceThreshold)
+  )
+}
+
 function selectPreviewHit(
   detections: DetectionResult[],
   minConfidence: number,
+  semanticDetectionEnabled: boolean,
   semanticMinConfidence: number
 ): DetectionResult | null {
   const directHits = detections.filter(
@@ -179,6 +196,8 @@ function selectPreviewHit(
   )
   const directHit = bestDetection(directHits)
   if (directHit) return directHit
+
+  if (!semanticDetectionEnabled) return null
 
   const semanticAutoLiveThreshold = Math.max(
     minConfidence,
@@ -286,20 +305,27 @@ function reportDetectionBatchError(error: unknown): void {
 }
 
 async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
-  useDetectionStore.getState().addDetections(detections)
-
   const settings = useSettingsStore.getState()
+  const acceptedDetections = detections.filter((detection) =>
+    detectionAllowedBySettings(detection, settings)
+  )
+  useDetectionStore.getState().addDetections(acceptedDetections)
+
   const autoPreview = settings.autoMode
   recordWorkflowTrace("detection.batch", "Detection batch entered workflow", {
-    ...traceDetectionBatchDetails(detections),
+    ...traceDetectionBatchDetails(acceptedDetections),
+    incomingCount: detections.length,
+    suppressedBySettings: detections.length - acceptedDetections.length,
     autoMode: settings.autoMode,
     confidenceThreshold: settings.confidenceThreshold,
+    semanticDetectionEnabled: settings.semanticDetectionEnabled,
     semanticConfidenceThreshold: settings.semanticConfidenceThreshold,
   })
   const previewHit = autoPreview
     ? selectPreviewHit(
-        detections,
+        acceptedDetections,
         settings.confidenceThreshold,
+        settings.semanticDetectionEnabled,
         settings.semanticConfidenceThreshold
       )
     : null
@@ -342,8 +368,9 @@ async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
       "detection.preview.skipped",
       "No trusted hit met preview criteria",
       {
-        count: detections.length,
+        count: acceptedDetections.length,
         confidenceThreshold: settings.confidenceThreshold,
+        semanticDetectionEnabled: settings.semanticDetectionEnabled,
         semanticConfidenceThreshold: settings.semanticConfidenceThreshold,
       }
     )
@@ -357,13 +384,13 @@ async function handleVerseDetectionsInternal(detections: DetectionResult[]) {
       "Auto mode keeps detection queue operator-driven",
       {
         reason: "auto_mode_preview_only",
-        count: detections.length,
+        count: acceptedDetections.length,
       }
     )
     return
   }
 
-  for (const detection of detections) {
+  for (const detection of acceptedDetections) {
     await queueDetectedVerse(detection, resolvedDetections.get(detection))
   }
 }

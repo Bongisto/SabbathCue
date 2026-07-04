@@ -38,6 +38,17 @@ pub(crate) fn final_semantic_detection_allowed(provider: &str, confidence: f64) 
     confidence >= 0.50
 }
 
+pub(crate) fn final_semantic_detection_allowed_by_settings(
+    semantic_enabled: bool,
+    provider: &str,
+    confidence: f64,
+    transcript_chars: usize,
+) -> bool {
+    semantic_enabled
+        && !(confidence > 0.0 && confidence < 0.5 && transcript_chars < 12)
+        && final_semantic_detection_allowed(provider, confidence)
+}
+
 /// Truncate a string to at most `max_bytes`, snapping to a valid UTF-8 char boundary.
 pub(crate) fn truncate_safe(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {

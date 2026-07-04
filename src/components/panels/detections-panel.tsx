@@ -30,11 +30,7 @@ import {
   createEgwQueueItem,
 } from "@/lib/presentation-workflow"
 import { loadHymnVoiceControl } from "@/services/hymnal/hymn-voice-control-loader"
-import type {
-  DetectionResult,
-  EgwParagraph,
-  HymnDetection,
-} from "@/types"
+import type { DetectionResult, EgwParagraph, HymnDetection } from "@/types"
 
 const SOURCE_COLORS: Record<
   string,
@@ -104,7 +100,12 @@ function HymnDetectionCard({
       )}
 
       <div className="mt-2 flex gap-2">
-        <Button size="sm" variant="outline" className="gap-1" onClick={actions.preview}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1"
+          onClick={actions.preview}
+        >
           <EyeIcon className="size-3" />
           Preview
         </Button>
@@ -112,7 +113,12 @@ function HymnDetectionCard({
           <PlayIcon className="size-3" />
           Present
         </Button>
-        <Button variant="outline" size="sm" className="gap-1" onClick={actions.queue}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={actions.queue}
+        >
           <PlusIcon className="size-3" />
           Queue
         </Button>
@@ -135,11 +141,17 @@ export function getDetectionActions(detection: DetectionResult): {
     const { number } = detection.hymn
     return {
       preview: () =>
-        void loadHymnVoiceControl().then((mod) => mod.previewHymnByNumber(number)),
+        void loadHymnVoiceControl().then((mod) =>
+          mod.previewHymnByNumber(number)
+        ),
       present: () =>
-        void loadHymnVoiceControl().then((mod) => mod.presentHymnByNumber(number)),
+        void loadHymnVoiceControl().then((mod) =>
+          mod.presentHymnByNumber(number)
+        ),
       queue: () =>
-        void loadHymnVoiceControl().then((mod) => mod.queueHymnByNumber(number)),
+        void loadHymnVoiceControl().then((mod) =>
+          mod.queueHymnByNumber(number)
+        ),
     }
   }
 
@@ -200,7 +212,12 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
       )}
 
       <div className="mt-2 flex gap-2">
-        <Button size="sm" variant="outline" className="gap-1" onClick={actions.preview}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="gap-1"
+          onClick={actions.preview}
+        >
           <EyeIcon className="size-3" />
           Preview
         </Button>
@@ -208,7 +225,12 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           <PlayIcon className="size-3" />
           Present
         </Button>
-        <Button variant="outline" size="sm" className="gap-1" onClick={actions.queue}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1"
+          onClick={actions.queue}
+        >
           <PlusIcon className="size-3" />
           Queue
         </Button>
@@ -288,12 +310,16 @@ function HeldReferencesPanel({
 export function DetectionsPanel({ className }: { className?: string }) {
   const { detections } = useDetection()
   const confidenceThreshold = useSettingsStore((s) => s.confidenceThreshold)
+  const semanticDetectionEnabled = useSettingsStore(
+    (s) => s.semanticDetectionEnabled
+  )
   const semanticConfidenceThreshold = useSettingsStore(
     (s) => s.semanticConfidenceThreshold
   )
   const [semanticStatus, setSemanticStatus] = useState<{
     has_semantic: boolean
     paraphrase_enabled: boolean
+    semantic_detection_enabled: boolean
   } | null>(null)
 
   useEffect(() => {
@@ -305,6 +331,7 @@ export function DetectionsPanel({ className }: { className?: string }) {
           setSemanticStatus({
             has_semantic: status.has_semantic,
             paraphrase_enabled: status.paraphrase_enabled,
+            semantic_detection_enabled: status.semantic_detection_enabled,
           })
         }
       })
@@ -346,10 +373,15 @@ export function DetectionsPanel({ className }: { className?: string }) {
             title="Semantic detection controls visible suggestions; Auto-live controls automatic output."
           >
             <BrainCircuitIcon className="size-2.5" />
-            {semanticStatus?.has_semantic ? "Semantic" : "Keyword"}
-            {semanticStatus?.paraphrase_enabled
+            {semanticDetectionEnabled && semanticStatus?.has_semantic
+              ? "Semantic"
+              : "Direct"}
+            {semanticDetectionEnabled && semanticStatus?.paraphrase_enabled
               ? " + paraphrase"
-              : ""} semantic {Math.round(semanticConfidenceThreshold * 100)}%
+              : ""}
+            {semanticDetectionEnabled
+              ? ` semantic ${Math.round(semanticConfidenceThreshold * 100)}%`
+              : " semantic off"}
             {" / "}auto {Math.round(confidenceThreshold * 100)}%
           </span>
           <button

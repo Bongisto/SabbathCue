@@ -69,7 +69,7 @@ describe("useDetection manual detection failures", () => {
         outputId: "global",
         kind: "manual-detection",
         title: "Detection failed",
-      }),
+      })
     )
   })
 
@@ -95,6 +95,7 @@ describe("useDetection manual detection failures", () => {
       has_direct: true,
       has_semantic: true,
       paraphrase_enabled: false,
+      semantic_detection_enabled: true,
     })
     const { detectionActions } = await import("./use-detection")
 
@@ -102,6 +103,7 @@ describe("useDetection manual detection failures", () => {
       has_direct: true,
       has_semantic: true,
       paraphrase_enabled: false,
+      semantic_detection_enabled: true,
     })
     expect(invokeMock).toHaveBeenCalledWith("detection_status")
   })

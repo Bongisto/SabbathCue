@@ -85,6 +85,7 @@ vi.mock("@/hooks/use-detection", () => ({
     getDetectionStatus: vi.fn(async () => ({
       has_semantic: true,
       paraphrase_enabled: false,
+      semantic_detection_enabled: true,
     })),
   },
 }))

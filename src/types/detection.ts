@@ -39,6 +39,7 @@ export interface DetectionStatus {
   has_direct: boolean
   has_semantic: boolean
   paraphrase_enabled: boolean
+  semantic_detection_enabled: boolean
 }
 
 export interface SemanticSearchResult {

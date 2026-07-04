@@ -74,6 +74,11 @@ impl DetectionPipeline {
         &mut self.merger
     }
 
+    /// Current semantic visibility threshold used by the merger.
+    pub fn semantic_confidence_threshold(&self) -> f64 {
+        self.merger.semantic_confidence_threshold()
+    }
+
     /// Run the full pipeline (direct + semantic + merge). Used by `detect_verses` command.
     pub fn process(&mut self, text: &str) -> Vec<MergedDetection> {
         let direct_results = self.direct.detect(text);

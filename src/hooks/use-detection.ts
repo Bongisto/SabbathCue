@@ -12,7 +12,9 @@ async function detectVerses(text: string) {
   if (!isTauriRuntime()) return []
 
   try {
-    const results = await invokeTauri<DetectionResult[]>("detect_verses", { text })
+    const results = await invokeTauri<DetectionResult[]>("detect_verses", {
+      text,
+    })
     if (results.length > 0) {
       useDetectionStore.getState().addDetections(results)
     }
@@ -35,6 +37,7 @@ async function getDetectionStatus() {
       has_direct: false,
       has_semantic: false,
       paraphrase_enabled: false,
+      semantic_detection_enabled: false,
     }
   }
 
@@ -42,9 +45,8 @@ async function getDetectionStatus() {
     has_direct: boolean
     has_semantic: boolean
     paraphrase_enabled: boolean
-  }>(
-    "detection_status"
-  )
+    semantic_detection_enabled: boolean
+  }>("detection_status")
 }
 
 async function setDetectionPaused(paused: boolean) {

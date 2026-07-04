@@ -4,6 +4,7 @@ import {
   buildHeldReferenceCandidates,
   useDetectionStore,
 } from "./detection-store"
+import { useSettingsStore } from "./settings-store"
 import type { DetectionResult } from "@/types"
 
 function makeDetection(
@@ -33,6 +34,10 @@ describe("detection store", () => {
     vi.spyOn(Date, "now").mockImplementation(() => now)
     useDetectionStore.setState({
       detections: [],
+    })
+    useSettingsStore.setState({
+      semanticDetectionEnabled: true,
+      semanticConfidenceThreshold: 0.7,
     })
   })
 
@@ -474,9 +479,7 @@ describe("detection store", () => {
       }),
     ])
 
-    const refs = useDetectionStore
-      .getState()
-      .detections.map((d) => d.verse_ref)
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
     expect(refs).toEqual(["Revelation 20:12"])
   })
 
@@ -506,9 +509,7 @@ describe("detection store", () => {
       })
     )
 
-    const refs = useDetectionStore
-      .getState()
-      .detections.map((d) => d.verse_ref)
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
     expect(refs).toEqual(["Revelation 20:12"])
   })
 
@@ -538,9 +539,7 @@ describe("detection store", () => {
       }),
     ])
 
-    const refs = useDetectionStore
-      .getState()
-      .detections.map((d) => d.verse_ref)
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
     expect(refs).toEqual(["Revelation 20:12"])
   })
 
@@ -567,9 +566,7 @@ describe("detection store", () => {
       }),
     ])
 
-    const refs = useDetectionStore
-      .getState()
-      .detections.map((d) => d.verse_ref)
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
     expect(refs).toContain("Genesis 3:1")
     expect(refs).toContain("Revelation 20:12")
   })
@@ -688,7 +685,7 @@ describe("detection store", () => {
     expect(detections[0].confidence).toBe(0.99)
   })
 
-  it("hides sub-70% semantic hits but keeps direct and EGW below the floor", () => {
+  it("hides semantic hits below the app threshold but keeps direct and EGW below the floor", () => {
     const store = useDetectionStore.getState()
 
     store.addDetection(
@@ -720,7 +717,7 @@ describe("detection store", () => {
     expect(refs).toContain("Steps to Christ 1:2")
   })
 
-  it("keeps semantic hits at exactly the 70% floor", () => {
+  it("keeps semantic hits at exactly the app threshold", () => {
     const store = useDetectionStore.getState()
 
     store.addDetection(
@@ -734,7 +731,7 @@ describe("detection store", () => {
     expect(useDetectionStore.getState().detections).toHaveLength(1)
   })
 
-  it("drops sub-70% semantic noise from a batch without evicting real hits", () => {
+  it("drops semantic noise below the app threshold from a batch without evicting real hits", () => {
     const store = useDetectionStore.getState()
 
     store.addDetections([
@@ -747,6 +744,27 @@ describe("detection store", () => {
         verse_ref: "Daniel 7:9",
         source: "direct",
         confidence: 1,
+      }),
+    ])
+
+    const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
+    expect(refs).toEqual(["Daniel 7:9"])
+  })
+
+  it("hides all semantic detections when semantic detection is disabled", () => {
+    useSettingsStore.setState({ semanticDetectionEnabled: false })
+    const store = useDetectionStore.getState()
+
+    store.addDetections([
+      makeDetection({
+        verse_ref: "Romans 8:28",
+        source: "semantic",
+        confidence: 1,
+      }),
+      makeDetection({
+        verse_ref: "Daniel 7:9",
+        source: "direct",
+        confidence: 0.8,
       }),
     ])
 

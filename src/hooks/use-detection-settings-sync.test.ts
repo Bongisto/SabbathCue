@@ -47,6 +47,7 @@ describe("useDetectionSettingsSync", () => {
     const { useSettingsStore } = await import("@/stores/settings-store")
     const { useDetectionSettingsSync } =
       await import("./use-detection-settings-sync")
+    useSettingsStore.getState().setSemanticDetectionEnabled(false)
 
     function Probe() {
       useDetectionSettingsSync()
@@ -61,6 +62,8 @@ describe("useDetectionSettingsSync", () => {
 
     expect(invokeMock).toHaveBeenCalledWith("update_detection_settings", {
       autoMode: useSettingsStore.getState().autoMode,
+      semanticDetectionEnabled:
+        useSettingsStore.getState().semanticDetectionEnabled,
       confidenceThreshold: useSettingsStore.getState().confidenceThreshold,
       semanticConfidenceThreshold:
         useSettingsStore.getState().semanticConfidenceThreshold,
@@ -98,8 +101,43 @@ describe("useDetectionSettingsSync", () => {
 
     expect(invokeMock).toHaveBeenCalledWith("update_detection_settings", {
       autoMode: useSettingsStore.getState().autoMode,
+      semanticDetectionEnabled:
+        useSettingsStore.getState().semanticDetectionEnabled,
       confidenceThreshold: useSettingsStore.getState().confidenceThreshold,
       semanticConfidenceThreshold: 0.72,
+      cooldownMs: useSettingsStore.getState().cooldownMs,
+    })
+  })
+
+  it("syncs semantic detection enablement changes to the backend", async () => {
+    const { useSettingsStore } = await import("@/stores/settings-store")
+    const { useDetectionSettingsSync } =
+      await import("./use-detection-settings-sync")
+    useSettingsStore.getState().setSemanticDetectionEnabled(false)
+
+    function Probe() {
+      useDetectionSettingsSync()
+      return null
+    }
+
+    await act(async () => {
+      root.render(React.createElement(Probe))
+      await Promise.resolve()
+    })
+
+    invokeMock.mockClear()
+
+    await act(async () => {
+      useSettingsStore.getState().setSemanticDetectionEnabled(true)
+      await Promise.resolve()
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith("update_detection_settings", {
+      autoMode: useSettingsStore.getState().autoMode,
+      semanticDetectionEnabled: true,
+      confidenceThreshold: useSettingsStore.getState().confidenceThreshold,
+      semanticConfidenceThreshold:
+        useSettingsStore.getState().semanticConfidenceThreshold,
       cooldownMs: useSettingsStore.getState().cooldownMs,
     })
   })
