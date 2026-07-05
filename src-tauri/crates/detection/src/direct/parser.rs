@@ -776,62 +776,13 @@ pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Contin
     }
 
     // Pattern 1: "chapter N [... verse M]"
-    for i in 0..tokens.len() {
-        if let Token::Word(w) = &tokens[i] {
-            if is_chapter_keyword(w) {
-                if let Some((chapter, next_idx)) = consume_number(&tokens, i + 1) {
-                    if chapter <= 0 {
-                        continue;
-                    }
-                    // Scan forward for "verse" keyword (up to 15 tokens)
-                    let scan_limit = (next_idx + 15).min(tokens.len());
-                    for j in next_idx..scan_limit {
-                        if let Some((verse, verse_next)) = consume_colon_damaged_verse(&tokens, j) {
-                            if verse > 0 && verse <= 176 {
-                                return Some(Continuation::ChapterAndVerse(
-                                    chapter,
-                                    verse,
-                                    scan_verse_end(&tokens, verse_next),
-                                ));
-                            }
-                        }
-                        if let Token::Word(vw) = &tokens[j] {
-                            if is_verse_keyword(vw) {
-                                if let Some((verse, verse_next)) =
-                                    corrected_number_after(&tokens, j + 1)
-                                {
-                                    if verse > 0 && verse <= 176 {
-                                        return Some(Continuation::ChapterAndVerse(
-                                            chapter,
-                                            verse,
-                                            scan_verse_end(&tokens, verse_next),
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // No verse found — chapter only
-                    return Some(Continuation::ChapterOnly(chapter));
-                }
-            }
-        }
+    if let Some(continuation) = find_chapter_keyword_pattern(&tokens) {
+        return Some(continuation);
     }
 
     // Pattern 2: "verse N" / "verses N" anywhere in text
-    for i in preferred_verse_indices(&tokens) {
-        if let Token::Word(w) = &tokens[i] {
-            if is_verse_keyword(w) {
-                if let Some((verse, verse_next)) = corrected_number_after(&tokens, i + 1) {
-                    if verse > 0 && verse <= 176 {
-                        return Some(Continuation::VerseOnly(
-                            verse,
-                            scan_verse_end(&tokens, verse_next),
-                        ));
-                    }
-                }
-            }
-        }
+    if let Some(continuation) = find_verse_keyword_pattern(&tokens) {
+        return Some(continuation);
     }
 
     // Pattern 3: Bare number at start
@@ -847,6 +798,92 @@ pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Contin
     }
 
     None
+}
+
+/// Scan for "chapter N [... verse M]" anywhere in the tokens.
+fn find_chapter_keyword_pattern(tokens: &[Token]) -> Option<Continuation> {
+    for i in 0..tokens.len() {
+        if let Token::Word(w) = &tokens[i] {
+            if is_chapter_keyword(w) {
+                if let Some((chapter, next_idx)) = consume_number(tokens, i + 1) {
+                    if chapter <= 0 {
+                        continue;
+                    }
+                    // Scan forward for "verse" keyword (up to 15 tokens)
+                    let scan_limit = (next_idx + 15).min(tokens.len());
+                    for j in next_idx..scan_limit {
+                        if let Some((verse, verse_next)) = consume_colon_damaged_verse(tokens, j) {
+                            if verse > 0 && verse <= 176 {
+                                return Some(Continuation::ChapterAndVerse(
+                                    chapter,
+                                    verse,
+                                    scan_verse_end(tokens, verse_next),
+                                ));
+                            }
+                        }
+                        if let Token::Word(vw) = &tokens[j] {
+                            if is_verse_keyword(vw) {
+                                if let Some((verse, verse_next)) =
+                                    corrected_number_after(tokens, j + 1)
+                                {
+                                    if verse > 0 && verse <= 176 {
+                                        return Some(Continuation::ChapterAndVerse(
+                                            chapter,
+                                            verse,
+                                            scan_verse_end(tokens, verse_next),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // No verse found — chapter only
+                    return Some(Continuation::ChapterOnly(chapter));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Scan for "verse N" / "verses N" anywhere in the tokens.
+fn find_verse_keyword_pattern(tokens: &[Token]) -> Option<Continuation> {
+    for i in preferred_verse_indices(tokens) {
+        if let Token::Word(w) = &tokens[i] {
+            if is_verse_keyword(w) {
+                if let Some((verse, verse_next)) = corrected_number_after(tokens, i + 1) {
+                    if verse > 0 && verse <= 176 {
+                        return Some(Continuation::VerseOnly(
+                            verse,
+                            scan_verse_end(tokens, verse_next),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Extract an explicit "chapter N [verse M]" / "verse N" reference from text
+/// that contains no book name at all (e.g. "Chapter 2, verse 37, the Bible
+/// says…" or "Read verse 2" long after the book was last spoken).
+///
+/// Unlike `try_extract_continuation`, bare numbers do NOT count: with no
+/// pending book reference, the spoken keyword is the only evidence that the
+/// numbers are a citation rather than ordinary prose ("this is around 605,
+/// 606 BC" must stay silent).
+pub fn try_extract_standalone_reference(text: &str) -> Option<Continuation> {
+    let lower = text.to_lowercase();
+    let tokens = tokenize(lower.trim());
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if let Some(continuation) = find_chapter_keyword_pattern(&tokens) {
+        return Some(continuation);
+    }
+    find_verse_keyword_pattern(&tokens)
 }
 
 fn preferred_verse_indices(tokens: &[Token]) -> Vec<usize> {

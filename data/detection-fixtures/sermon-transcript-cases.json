@@ -40,5 +40,169 @@
     "mode": "hint",
     "text": "Allow Christ to live in you and work through you and you will fulfill the law of Christ.",
     "expected": "Galatians 6:2"
+  },
+
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "It's good to be home, and I must say that every Sabbath, around 5 in the morning at 4, you go and see what's happening at Tester, and it's such a blessing to see you face to face."
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "And for those who did the Comrades and have resurrected, we thank God. And some of us are free from that slavery. We've been delivered. Never again."
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "Just to remind you where we are today, and we'll be saying much in the afternoon on One Voice 27, I want us to come together and focus on what we want to look at."
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-hint",
+    "mode": "hint",
+    "text": "As I 46 verse 10, you just throw it there if you can, my purpose will stand, and I will do all that I please. This is God speaking.",
+    "expected": "Isaiah 46:10"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-direct",
+    "mode": "fire",
+    "text": "Deuteronomy 30 verse 19, I've said before you, life and death, now choose life. God is not going to make a choice for us. Choose life.",
+    "expected": "Deuteronomy 30:19"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-hint",
+    "mode": "hint",
+    "text": "Because the Bible says, for every sin that repents, there is joy in heaven. He has accepted Christ. There is joy in heaven.",
+    "expectedAny": ["Luke 15:7", "Luke 15:10"]
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-quote",
+    "mode": "hint",
+    "text": "And we read, they shall wet you with dew of heaven, and seven times shall pass over you, till you acknowledge that the most high rules in the kingdom of man, and gives it to whomever he chooses.",
+    "expectedAny": ["Daniel 4:25", "Daniel 4:32", "Daniel 4:17"]
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-direct",
+    "mode": "fire",
+    "text": "In Daniel chapter one, by the way, now I want us to look at this text. Can you just throw this text on the screen, if you don't mind?",
+    "expected": "Daniel 1:1"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-quote",
+    "mode": "fire",
+    "text": "In the third year of the reign of Joachim, king of Judah came Nebuchadnezzar, king of Babylon, unto Jerusalem, and besieged it.",
+    "expected": "Daniel 1:1"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "This is around 605, 606 BC, and so the record says, and they came and besieged it. So what's the next thing after you've besieged a city?"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-contextual",
+    "mode": "fire",
+    "text": "Read verse 2. So you've seen human responsibility, what men could do, their choices. Listen to verse 2. And the Lord gave Joachim, king of Judah, into his hand.",
+    "expected": "Daniel 1:2"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-direct",
+    "mode": "fire",
+    "text": "I read, there's a text here, I've written, I think it's Jeremiah 27 verse 6. God says through Jeremiah, and now I have given all these lands into the hand of Nebuchadnezzar, the King of Babylon, my servant.",
+    "expected": "Jeremiah 27:6"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-contextual",
+    "mode": "fire",
+    "text": "Chapter 2, verse 37, the Bible says, you O king are the king of kings. Remember the statue? It says, for the God of heaven has given you a kingdom, power, strength and glory.",
+    "expected": "Daniel 2:37",
+    "forbidden": ["Jeremiah 2:37"]
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-direct",
+    "mode": "fire",
+    "text": "Now, Daniel 3. 15, can you read that one? Daniel 3.15 says, now if you are ready, at what time you hear the sound of the cornet, flute, harp, all those instruments, you fall down and worship the image which I have made.",
+    "expected": "Daniel 3:15"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "Trump is not. No king, no governor, no one is. God is in control. Do you know, once you can just accept, just a fraction, not the whole truth, just a fraction, you will sleep at night."
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-hint",
+    "mode": "hint",
+    "text": "He prepares the table before me in the absence of my enemies. I eat in the presence. Some of you can't eat in the presence of your enemies because they even control your appetite.",
+    "expected": "Psalms 23:5"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-quote",
+    "mode": "fire",
+    "text": "I know that because the devil seeks to kill and steal and destroy, steal, kill and destroy. But I've come that they might have life. God wants to give us life.",
+    "expected": "John 10:10"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-contextual",
+    "mode": "fire",
+    "text": "Verse 27. Remember we read it? Verse 27. Therefore, O king, let my counsel be acceptable unto thee. Break off your sins by righteousness and thy iniquities by showing mercy to the poor. It may be a lengthening of your tranquility.",
+    "expected": "Daniel 4:27",
+    "forbidden": ["Daniel 3:27"]
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-contextual",
+    "mode": "fire",
+    "text": "It's in verse 36. Yeah, verse 36. Do you have it there? At the same time, my reason returned unto me for the glory of my kingdom. Mine honor and brightness returned unto me. My counselors and my lords sought unto me, and I was established in my kingdom.",
+    "expected": "Daniel 4:36"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-quote",
+    "mode": "hint",
+    "text": "You, his son, Belshazzar, you have not humbled your heart, even though you knew all that. The God in whose hand are your life breath and all your ways you have not glorified.",
+    "expectedAny": ["Daniel 5:22", "Daniel 5:23"]
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-hint",
+    "mode": "hint",
+    "text": "He says young people, do everything you want to do. Take it all in. But remember that you must give an account to God for everything you do.",
+    "expected": "Ecclesiastes 11:9"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-hint",
+    "mode": "hint",
+    "text": "I write this to you, my children, that you do not sin. But if anyone sin, but that is only possible to those who have aligned their will.",
+    "expected": "1 John 2:1"
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "You know the story. So the guy was driving with a person in the car. So he buys something in the drive-thru. He buys and they give him too much change, too much money."
+  },
+  {
+    "language": "en",
+    "category": "sovereignty-noise",
+    "mode": "silent",
+    "text": "It's Father's Day tomorrow. These fathers have made choices. The kids were here this morning giving them presents. Thanking them for their presents."
   }
 ]

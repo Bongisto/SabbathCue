@@ -621,11 +621,17 @@ fn main() {
     let mut by_cat: HashMap<String, (usize, usize)> = HashMap::new(); // cat -> (hits, total)
 
     println!("Per-case outcome at threshold {:.0}%:\n", threshold * 100.0);
+    let mut current_language: Option<String> = None;
     for case in &cases {
         // Mirror the live auto-live path: direct parsing on the fragment, plus
         // hybrid FTS5 + vector search (the explicit-reference and quote/paraphrase
-        // strategies the real STT pipeline runs).
-        pipeline.direct_mut().set_stt_language(&case.language);
+        // strategies the real STT pipeline runs). The live session sets the STT
+        // language once per session, not per fragment — switching it resets the
+        // detector's pending-reference state, so only switch on actual change.
+        if current_language.as_deref() != Some(case.language.as_str()) {
+            pipeline.direct_mut().set_stt_language(&case.language);
+            current_language = Some(case.language.clone());
+        }
         let mut detections = pipeline.process_direct(&case.text);
         let fts = db.search_verses_bm25(&case.text, 10).unwrap_or_default();
         detections.extend(pipeline.process_hybrid_with_fts(&case.text, &fts));
@@ -659,8 +665,11 @@ fn main() {
         entry.1 += 1;
 
         let (case_correct, outcome) = match case.mode {
+            // In fire mode, `forbidden` means "must not go live". A forbidden
+            // ref sitting in the held candidate list next to a correctly fired
+            // verse is acceptable operator-panel behavior, not a failure.
             CaseMode::Fire => match (&case.expected_refs.first(), &fired_ref, forbidden_hit) {
-                (Some(exp), Some(got), None) if ref_eq(exp, got) => {
+                (Some(exp), Some(got), _) if ref_eq(exp, got) => {
                     tp += 1;
                     (true, format!("OK  fired {} ({:.0}%)", got, fired_conf.unwrap() * 100.0))
                 }
@@ -686,12 +695,15 @@ fn main() {
                         fp += 1;
                         (false, format!("FALSE-FIRE {} ({:.0}%)", got, fired_conf.unwrap() * 100.0))
                     }
-                    (None, Some(expected), None) => {
+                    // As in fire mode, a forbidden ref in the held candidate
+                    // list next to the expected hint is acceptable
+                    // operator-panel behavior — the expected hint wins.
+                    (None, Some(expected), _) => {
                         tn += 1;
                         hint_hits += 1;
                         (true, format!("OK  hint {expected} held for review"))
                     }
-                    (None, _, Some(forbidden)) => {
+                    (None, None, Some(forbidden)) => {
                         tn += 1;
                         (false, format!("FORBIDDEN-HINT {forbidden}"))
                     }

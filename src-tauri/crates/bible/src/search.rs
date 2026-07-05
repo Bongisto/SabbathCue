@@ -17,6 +17,8 @@ pub struct Bm25Result {
     pub chapter: i32,
     pub verse: i32,
     pub is_broad_match: bool,
+    /// The matched verse's text, for downstream quote-overlap verification.
+    pub text: String,
 }
 
 // ── Stop words ──────────────────────────────────────────────────────
@@ -45,6 +47,33 @@ fn is_stop_word(word: &str) -> bool {
     STOP_WORD_SET.contains(word.to_lowercase().as_str())
 }
 
+/// Reference-mechanics tokens from spoken citations ("Verse 27", "chapter 2")
+/// that (almost) never occur in verse text: digits and the verse/chapter
+/// keywords across the supported STT languages. Left in the query they poison
+/// AND tiers outright (no verse text contains "27") and waste OR-tier term
+/// slots that the quoted verse content needs.
+fn is_reference_noise_token(word: &str) -> bool {
+    if word.chars().all(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    matches!(
+        word.to_lowercase().as_str(),
+        "verse"
+            | "verses"
+            | "vers"
+            | "verset"
+            | "versets"
+            | "versiculo"
+            | "versículo"
+            | "chapter"
+            | "chapters"
+            | "hoofstuk"
+            | "capitulo"
+            | "capítulo"
+            | "chapitre"
+    )
+}
+
 // ── FTS5 query builders ─────────────────────────────────────────────
 
 /// Split input into FTS-safe alphanumeric terms.
@@ -69,8 +98,10 @@ pub(crate) fn build_phrase_query(input: &str) -> String {
 /// `"be doers of the word"` → `doers word` (finds James 1:22).
 /// Capped at 12 terms to prevent expensive queries on long text.
 pub(crate) fn build_and_query(input: &str) -> String {
+    let mut seen = HashSet::new();
     let tokens: Vec<String> = query_terms(input)
-        .filter(|w| w.len() >= 2 && !is_stop_word(w))
+        .filter(|w| w.len() >= 2 && !is_stop_word(w) && !is_reference_noise_token(w))
+        .filter(|w| seen.insert(w.to_lowercase()))
         .take(12)
         .map(ToOwned::to_owned)
         .collect();
@@ -84,8 +115,10 @@ pub(crate) fn build_and_query(input: &str) -> String {
 /// `"It's a new creature Old things passed away"` → `"creature" OR "things" OR "passed" OR "away"`.
 /// Capped at 10 terms to prevent expensive queries.
 pub(crate) fn build_or_query(input: &str) -> String {
+    let mut seen = HashSet::new();
     let tokens: Vec<String> = query_terms(input)
-        .filter(|w| w.len() >= 3 && !is_stop_word(w))
+        .filter(|w| w.len() >= 3 && !is_stop_word(w) && !is_reference_noise_token(w))
+        .filter(|w| seen.insert(w.to_lowercase()))
         .take(10)
         .map(|w| format!("\"{w}\""))
         .collect();
@@ -112,7 +145,7 @@ fn run_fts_query(
         return Ok(vec![]);
     }
     let mut stmt = conn.prepare(
-        "SELECT bm25(verses_fts) as rank, v.book_number, v.book_name, v.chapter, v.verse \
+        "SELECT bm25(verses_fts) as rank, v.book_number, v.book_name, v.chapter, v.verse, v.text \
          FROM verses_fts fts \
          JOIN verses v ON v.rowid = fts.rowid \
          JOIN translations t ON t.id = v.translation_id \
@@ -130,6 +163,7 @@ fn run_fts_query(
                 chapter: row.get(3)?,
                 verse: row.get(4)?,
                 is_broad_match,
+                text: row.get(5)?,
             })
         },
     )?;
@@ -357,6 +391,7 @@ mod tests {
             chapter,
             verse,
             is_broad_match,
+            text: String::new(),
         }
     }
 
@@ -502,10 +537,62 @@ mod tests {
 
     #[test]
     fn query_builders_strip_apostrophes_for_fts5_safety() {
-        assert_eq!(build_and_query("chapter one don't"), "chapter one don");
+        assert_eq!(build_and_query("praise ye don't"), "praise ye don");
         assert_eq!(
-            build_or_query("chapter one don't"),
-            "\"chapter\" OR \"one\" OR \"don\""
+            build_or_query("praise the lord don't"),
+            "\"praise\" OR \"lord\" OR \"don\""
+        );
+    }
+
+    #[test]
+    fn and_query_drops_reference_noise_tokens() {
+        // Spoken citations wrap quotes in reference mechanics ("Verse 27.
+        // Remember we read it? Verse 27. Therefore, O king…"). Digits never
+        // appear in verse text and "verse"/"chapter" almost never do, so they
+        // must not poison the AND query or eat the term cap.
+        let query = build_and_query(
+            "Verse 27 remember we read it verse 27 therefore O king let my counsel be acceptable unto thee break off your sins",
+        );
+        assert!(!query.contains("27"), "digits must be filtered: {query}");
+        assert!(
+            !query.to_lowercase().split_whitespace().any(|t| t == "verse"),
+            "'verse' keyword must be filtered: {query}"
+        );
+        assert!(query.contains("counsel"), "content words must survive: {query}");
+        assert!(query.contains("acceptable"), "content words must survive: {query}");
+    }
+
+    #[test]
+    fn or_query_drops_reference_noise_tokens_and_duplicates() {
+        let query = build_or_query(
+            "Chapter 2 verse 37 the Bible says you O king are the king of kings for the God of heaven has given you a kingdom power strength and glory",
+        );
+        assert!(!query.contains("\"37\""), "digits must be filtered: {query}");
+        assert!(!query.contains("\"verse\""), "'verse' must be filtered: {query}");
+        assert!(!query.contains("\"chapter\""), "'chapter' must be filtered: {query}");
+        assert_eq!(
+            query.matches("\"king\"").count(),
+            1,
+            "duplicate terms must not eat the term cap: {query}"
+        );
+        // With noise and duplicates gone, the 10-term cap reaches deep into
+        // the quote instead of stalling on "chapter 2 verse 37 … verse verse".
+        assert!(query.contains("\"kingdom\""), "content words must survive: {query}");
+        assert!(query.contains("\"strength\""), "content words must survive: {query}");
+    }
+
+    #[test]
+    fn bm25_results_carry_verse_text_for_quote_verification() {
+        let db = fixture_db();
+
+        let results = db
+            .search_verses_bm25("Judges and officers shalt thou make thee", 10)
+            .unwrap();
+
+        assert!(!results.is_empty());
+        assert_eq!(
+            results[0].text,
+            "Judges and officers shalt thou make thee in all thy gates."
         );
     }
 

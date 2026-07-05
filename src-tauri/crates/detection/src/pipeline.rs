@@ -35,6 +35,18 @@ const OVERLAP_CONFIDENCE_BOOST: f64 = 0.10;
 
 const LIVE_SEMANTIC_CAP: usize = 5;
 
+/// Quote-overlap verification: how much of a candidate verse's content
+/// vocabulary must appear in the spoken fragment before the overlap counts as
+/// quote evidence. Guards (minimum matched words, minimum verse vocabulary)
+/// keep short verses and scattered keyword coincidences from qualifying.
+const QUOTE_OVERLAP_MIN_FRACTION: f64 = 0.28;
+const QUOTE_OVERLAP_MIN_MATCHED: usize = 4;
+const QUOTE_OVERLAP_MIN_VERSE_WORDS: usize = 6;
+const QUOTE_OVERLAP_MAX_CONFIDENCE: f64 = 0.92;
+/// Words shorter than this are too common (the, and, thy, God) to count as
+/// quote evidence either way.
+const QUOTE_OVERLAP_MIN_WORD_LEN: usize = 4;
+
 /// The main detection pipeline that runs on each transcript segment.
 ///
 /// Orchestrates direct reference detection, semantic search, and merging
@@ -164,19 +176,28 @@ impl DetectionPipeline {
             .collect();
 
         for (rank, fts) in fts_results.iter().enumerate() {
-            let confidence = fts_confidence(rank, fts.rank, fts.is_broad_match);
+            // Quote-overlap verification: a candidate whose verse text is
+            // substantially present in the fragment is a spoken quote, no
+            // matter which FTS tier surfaced it or how BM25 ranked it.
+            // Garbled STT breaks phrase/AND tiers, so genuine near-verbatim
+            // quotes routinely arrive as keyword-band OR hits.
+            let overlap_confidence = quote_overlap_confidence(text, &fts.text);
+            let rank_confidence = fts_confidence(rank, fts.rank, fts.is_broad_match);
+            let confidence = overlap_confidence
+                .map_or(rank_confidence, |overlap| overlap.max(rank_confidence));
             log::debug!(
-                "[DET-SEMANTIC] FTS5 candidate idx={rank} bm25={:.3} {} {}:{} conf={:.0}%",
+                "[DET-SEMANTIC] FTS5 candidate idx={rank} bm25={:.3} {} {}:{} conf={:.0}% overlap={:?}",
                 fts.rank,
                 fts.book_name,
                 fts.chapter,
                 fts.verse,
-                confidence * 100.0
+                confidence * 100.0,
+                overlap_confidence
             );
             if confidence < FTS5_MIN_CONFIDENCE {
-                break;
+                continue;
             }
-            if fts.rank > FTS5_LIVE_RANK_FLOOR {
+            if fts.rank > FTS5_LIVE_RANK_FLOOR && overlap_confidence.is_none() {
                 continue;
             }
             let key = (fts.book_number, fts.chapter, fts.verse);
@@ -185,7 +206,9 @@ impl DetectionPipeline {
                     .iter_mut()
                     .find(|detection| detection_verse_key(detection) == key)
                 {
-                    existing.confidence = (existing.confidence + OVERLAP_CONFIDENCE_BOOST).min(1.0);
+                    existing.confidence = (existing.confidence + OVERLAP_CONFIDENCE_BOOST)
+                        .min(1.0)
+                        .max(overlap_confidence.unwrap_or(0.0));
                     if let DetectionSource::Semantic { similarity } = &mut existing.source {
                         *similarity = existing.confidence;
                     }
@@ -232,6 +255,46 @@ impl DetectionPipeline {
     pub fn semantic_search(&mut self, query: &str, k: usize) -> Vec<(i64, f64)> {
         self.semantic.search_query(query, k)
     }
+}
+
+/// Confidence earned by quote overlap: the fraction of the candidate verse's
+/// content vocabulary present in the spoken fragment, mapped onto
+/// hint-to-quote confidence. `None` when the evidence is too thin to count
+/// (short verse, few matched words, low fraction).
+///
+/// Word matching is exact on lowercased tokens of at least
+/// `QUOTE_OVERLAP_MIN_WORD_LEN` letters, so archaic/garbled inflections
+/// (shewing/showing) count against the fraction — a candidate only reaches
+/// fire strength when most of the verse really was spoken.
+#[expect(clippy::cast_precision_loss, reason = "verse word counts are tiny")]
+fn quote_overlap_confidence(fragment: &str, verse_text: &str) -> Option<f64> {
+    if verse_text.is_empty() {
+        return None;
+    }
+    let fragment_words: HashSet<String> = content_words(fragment).collect();
+    let verse_words: HashSet<String> = content_words(verse_text).collect();
+    if verse_words.len() < QUOTE_OVERLAP_MIN_VERSE_WORDS {
+        return None;
+    }
+    let matched = verse_words
+        .iter()
+        .filter(|word| fragment_words.contains(*word))
+        .count();
+    if matched < QUOTE_OVERLAP_MIN_MATCHED {
+        return None;
+    }
+    let fraction = matched as f64 / verse_words.len() as f64;
+    if fraction < QUOTE_OVERLAP_MIN_FRACTION {
+        return None;
+    }
+    // 0.28 → ~0.71 (barely-visible hint), 0.56 → ~0.90 (fire), capped 0.92.
+    Some((0.52 + 0.68 * fraction).min(QUOTE_OVERLAP_MAX_CONFIDENCE))
+}
+
+fn content_words(text: &str) -> impl Iterator<Item = String> + '_ {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| word.len() >= QUOTE_OVERLAP_MIN_WORD_LEN)
+        .map(str::to_lowercase)
 }
 
 #[expect(clippy::cast_precision_loss, reason = "rank index is small")]
@@ -489,6 +552,7 @@ mod tests {
                 verse: 16,
                 rank: -24.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 45,
@@ -497,6 +561,7 @@ mod tests {
                 verse: 8,
                 rank: -24.0,
                 is_broad_match: false,
+                text: String::new(),
             },
         ];
 
@@ -540,6 +605,7 @@ mod tests {
             verse: 1,
             rank: -24.0,
             is_broad_match: false,
+            text: String::new(),
         }];
 
         let results = pipeline
@@ -574,6 +640,7 @@ mod tests {
                 verse: 16,
                 rank: -28.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 45,
@@ -582,6 +649,7 @@ mod tests {
                 verse: 28,
                 rank: -27.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 1,
@@ -590,6 +658,7 @@ mod tests {
                 verse: 1,
                 rank: -26.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 19,
@@ -598,6 +667,7 @@ mod tests {
                 verse: 1,
                 rank: -25.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 23,
@@ -606,6 +676,7 @@ mod tests {
                 verse: 5,
                 rank: -24.5,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 40,
@@ -614,6 +685,7 @@ mod tests {
                 verse: 3,
                 rank: -24.0,
                 is_broad_match: false,
+                text: String::new(),
             },
         ];
 
@@ -635,6 +707,7 @@ mod tests {
             verse: 16,
             rank: -24.0,
             is_broad_match: false,
+            text: String::new(),
         }];
 
         let results = pipeline.process_hybrid_with_fts("John three sixteen", &fts_results);
@@ -671,6 +744,7 @@ mod tests {
                 verse: 16,
                 rank: -24.0, // near-verbatim genuine match
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 23,
@@ -679,6 +753,7 @@ mod tests {
                 verse: 27,
                 rank: -11.5, // keyword noise
                 is_broad_match: false,
+                text: String::new(),
             },
         ];
 
@@ -736,6 +811,7 @@ mod tests {
                 verse: 16,
                 rank: -24.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 1,
@@ -744,6 +820,7 @@ mod tests {
                 verse: 1,
                 rank: -11.0,
                 is_broad_match: false,
+                text: String::new(),
             },
         ];
 
@@ -755,6 +832,120 @@ mod tests {
         assert!(!results
             .iter()
             .any(|r| r.detection.verse_ref.book_name == "Genesis"));
+    }
+
+    const DANIEL_4_27_KJV: &str = "Wherefore, O king, let my counsel be acceptable unto thee, and break off thy sins by righteousness, and thine iniquities by shewing mercy to the poor; if it may be a lengthening of thy tranquillity.";
+
+    #[test]
+    fn overlap_verified_quote_fires_despite_keyword_band_rank() {
+        // Real sermon utterance: "Verse 27 …" framing + near-verbatim KJV
+        // Daniel 4:27 with STT drift (Therefore/Wherefore, your/thy,
+        // showing/shewing). The whole-fragment phrase/AND tiers miss, so the
+        // hit arrives via the OR tier with a keyword-band rank — but almost
+        // every word of the verse is present in the fragment, and that
+        // evidence must carry it to quote-strength confidence.
+        let mut pipeline = DetectionPipeline::new();
+        let fts_results = vec![Bm25Result {
+            book_number: 27,
+            book_name: "Daniel".to_string(),
+            chapter: 4,
+            verse: 27,
+            rank: -11.0,
+            is_broad_match: true,
+            text: DANIEL_4_27_KJV.to_string(),
+        }];
+
+        let results = pipeline.process_hybrid_with_fts(
+            "Verse 27. Remember we read it? Verse 27. Therefore, O king, let my counsel be acceptable unto thee. Break off your sins by righteousness and thy iniquities by showing mercy to the poor. It may be a lengthening of your tranquility.",
+            &fts_results,
+        );
+
+        assert_eq!(results.len(), 1, "overlap-verified quote must survive");
+        assert!(
+            results[0].detection.confidence >= 0.92,
+            "near-verbatim quote must reach fire confidence (got {:.2})",
+            results[0].detection.confidence
+        );
+    }
+
+    #[test]
+    fn partial_quote_surfaces_as_hint_below_fire_threshold() {
+        // Psalm 23:5 half-quoted and garbled ("absence of my enemies"):
+        // enough overlap to show the operator a candidate, not enough to air.
+        let mut pipeline = DetectionPipeline::new();
+        let fts_results = vec![Bm25Result {
+            book_number: 19,
+            book_name: "Psalms".to_string(),
+            chapter: 23,
+            verse: 5,
+            rank: -9.0,
+            is_broad_match: true,
+            text: "Thou preparest a table before me in the presence of mine enemies: thou anointest my head with oil; my cup runneth over.".to_string(),
+        }];
+
+        let results = pipeline.process_hybrid_with_fts(
+            "He prepares the table before me in the absence of my enemies. I eat in the presence.",
+            &fts_results,
+        );
+
+        assert_eq!(results.len(), 1, "partial quote must surface as a candidate");
+        let confidence = results[0].detection.confidence;
+        assert!(
+            (0.70..0.90).contains(&confidence),
+            "partial quote is a hint, not a live fire (got {confidence:.2})"
+        );
+    }
+
+    #[test]
+    fn scattered_keyword_hit_is_not_boosted_by_overlap() {
+        // Theme-laden sermon speech sharing a few words with a verse must not
+        // gain quote-strength confidence.
+        let mut pipeline = DetectionPipeline::new();
+        let fts_results = vec![Bm25Result {
+            book_number: 43,
+            book_name: "John".to_string(),
+            chapter: 3,
+            verse: 16,
+            rank: -11.0,
+            is_broad_match: true,
+            text: "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.".to_string(),
+        }];
+
+        let results = pipeline.process_hybrid_with_fts(
+            "god has been so good to our church family this whole year and we love this world",
+            &fts_results,
+        );
+
+        assert!(
+            results.is_empty(),
+            "scattered keyword overlap must stay suppressed: {results:?}"
+        );
+    }
+
+    #[test]
+    fn short_verse_mention_is_not_boosted_by_overlap() {
+        // Very short verses ("Jesus wept") reach high overlap fractions from
+        // a single common word — they must not be quote-boosted.
+        let mut pipeline = DetectionPipeline::new();
+        let fts_results = vec![Bm25Result {
+            book_number: 43,
+            book_name: "John".to_string(),
+            chapter: 11,
+            verse: 35,
+            rank: -11.0,
+            is_broad_match: true,
+            text: "Jesus wept.".to_string(),
+        }];
+
+        let results = pipeline.process_hybrid_with_fts(
+            "and jesus was there with the disciples that day",
+            &fts_results,
+        );
+
+        assert!(
+            results.is_empty(),
+            "short-verse keyword mention must stay suppressed: {results:?}"
+        );
     }
 
     #[test]
@@ -770,6 +961,7 @@ mod tests {
                 verse: 19,
                 rank: -17.0,
                 is_broad_match: false,
+                text: String::new(),
             },
             Bm25Result {
                 book_number: 23,
@@ -778,6 +970,7 @@ mod tests {
                 verse: 12,
                 rank: -16.5,
                 is_broad_match: false,
+                text: String::new(),
             },
         ];
 

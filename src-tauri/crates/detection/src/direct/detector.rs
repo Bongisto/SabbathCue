@@ -655,6 +655,17 @@ fn is_word_boundary(text: &str, idx: usize) -> bool {
 /// Preachers often pause between book name and chapter/verse.
 const INCOMPLETE_REF_TIMEOUT_MS: u128 = 15_000;
 
+/// Confidence for an explicitly spoken chapter-only citation ("Daniel chapter
+/// one"): a direct citation that should go live, sitting just above the 0.90
+/// auto-fire threshold but below full chapter:verse references.
+const CHAPTER_ONLY_CONFIDENCE: f64 = 0.92;
+
+/// Confidence for a "verse N" / "chapter N verse M" reference whose book was
+/// filled in from recent context rather than spoken. Held below the auto-fire
+/// threshold: the operator sees the candidate, but an inferred book never airs
+/// on its own.
+const CONTEXT_RESOLVED_CONFIDENCE: f64 = 0.85;
+
 /// An incomplete reference waiting for verse completion.
 #[derive(Debug, Clone)]
 struct IncompleteRef {
@@ -1019,7 +1030,7 @@ impl DirectDetector {
                         detections.push(Detection {
                             verse_ref: chapter_start.clone(),
                             verse_id: None,
-                            confidence: 0.88,
+                            confidence: CHAPTER_ONLY_CONFIDENCE,
                             source: DetectionSource::DirectReference,
                             transcript_snippet: snippet,
                             detected_at: now,
@@ -1061,6 +1072,15 @@ impl DirectDetector {
                 detections.push(detection);
                 self.context.update(&resolved);
                 self.save_context_if_requested(&lower_text, &resolved);
+            }
+        }
+
+        // Fallback: an explicit "verse N" / "chapter N verse M" citation with
+        // no (usable) book name in the fragment — resolve the book from recent
+        // context as a conservative operator-visible candidate.
+        if detections.is_empty() && self.incomplete.is_none() {
+            if let Some(context_detection) = self.try_context_resolved_reference(text) {
+                detections.push(context_detection);
             }
         }
 
@@ -1186,6 +1206,55 @@ impl DirectDetector {
         clippy::unused_self,
         reason = "method kept on self for future extensibility"
     )]
+    /// Resolve an explicit spoken "verse N" / "chapter N verse M" that carries
+    /// no book name using the recent reference context (60s window). Preachers
+    /// routinely cite this way minutes after last naming the book — long past
+    /// the incomplete-reference window. The book (and chapter, for verse-only)
+    /// were inferred rather than spoken, so the candidate surfaces at a
+    /// conservative confidence below the auto-fire threshold: visible to the
+    /// operator, never live on its own.
+    fn try_context_resolved_reference(&mut self, text: &str) -> Option<Detection> {
+        let continuation = parser::try_extract_standalone_reference(text)?;
+        let partial = match continuation {
+            parser::Continuation::ChapterAndVerse(chapter, verse, verse_end) => VerseRef {
+                book_number: 0,
+                book_name: String::new(),
+                chapter,
+                verse_start: verse,
+                verse_end,
+            },
+            parser::Continuation::VerseOnly(verse, verse_end) => VerseRef {
+                book_number: 0,
+                book_name: String::new(),
+                chapter: 0,
+                verse_start: verse,
+                verse_end,
+            },
+            // A keyword-less chapter switch is reading-mode navigation, not a
+            // citation — leave it to the reading-mode tracker.
+            parser::Continuation::ChapterOnly(_) => return None,
+        };
+
+        let resolved = self.context.resolve(&partial);
+        if resolved.book_number == 0 || resolved.chapter == 0 || resolved.verse_start == 0 {
+            return None;
+        }
+        if !is_valid_reference(resolved.book_number, resolved.chapter) {
+            return None;
+        }
+
+        let detection = self.make_direct_detection(
+            &resolved,
+            CONTEXT_RESOLVED_CONFIDENCE,
+            text,
+            0,
+            text.len(),
+        );
+        self.push_recent(&resolved);
+        self.context.update(&resolved);
+        Some(detection)
+    }
+
     fn make_direct_detection(
         &self,
         verse_ref: &VerseRef,

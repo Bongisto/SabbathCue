@@ -4,6 +4,31 @@
 /// of 1 to `max_sentences` consecutive sentences.  Short windows (fewer
 /// than `min_words` words) are discarded so the embedder is not asked to
 /// process fragments that carry no semantic signal.
+/// Citation meta-speech that preachers prepend to a quote ("the Bible says,
+/// …"). It is not verse content: embedded together with the quote it dilutes
+/// cosine similarity enough to push genuine paraphrases below the operator
+/// threshold, so it is stripped from the front of each sentence.
+const CITATION_LEAD_INS: &[&str] = &[
+    "the bible says",
+    "bible says",
+    "the scripture says",
+    "scripture says",
+    "the scriptures say",
+    "the word of god says",
+    "the word says",
+    "the bible tells us",
+    "the lord says",
+    "god says",
+    "jesus says",
+    "jesus said",
+    "he says",
+    "he said",
+    "it says",
+];
+
+/// Connectives that may precede a citation lead-in ("Because the Bible says").
+const LEAD_CONJUNCTIONS: &[&str] = &["and", "but", "because", "for", "so", "now", "remember"];
+
 pub struct Chunker {
     /// Minimum number of words a window must contain to be emitted.
     min_words: usize,
@@ -81,7 +106,7 @@ impl Chunker {
 
         for ch in normalized.chars() {
             if ch == '.' || ch == '!' || ch == '?' {
-                let trimmed = current.trim().to_string();
+                let trimmed = strip_citation_lead_in(current.trim()).to_string();
                 if !trimmed.is_empty() {
                     sentences.push(trimmed);
                 }
@@ -92,13 +117,55 @@ impl Chunker {
         }
 
         // Remaining text after the last boundary
-        let trimmed = current.trim().to_string();
+        let trimmed = strip_citation_lead_in(current.trim()).to_string();
         if !trimmed.is_empty() {
             sentences.push(trimmed);
         }
 
         sentences
     }
+}
+
+/// Strip leading connectives plus one citation lead-in ("Because the Bible
+/// says, …" → "…"). Returns the sentence unchanged when no lead-in matches.
+fn strip_citation_lead_in(sentence: &str) -> &str {
+    let mut rest = sentence;
+
+    // Optional connectives before the lead-in.
+    loop {
+        let stripped = LEAD_CONJUNCTIONS
+            .iter()
+            .find_map(|conj| strip_prefix_word_ci(rest, conj));
+        match stripped {
+            Some(after) => rest = after,
+            None => break,
+        }
+    }
+
+    for lead_in in CITATION_LEAD_INS {
+        if let Some(after) = strip_prefix_word_ci(rest, lead_in) {
+            return after.trim_start_matches([',', ':', ' ']).trim_start();
+        }
+    }
+
+    sentence
+}
+
+/// Case-insensitively strip `prefix` from the start of `text` when it ends at
+/// a word boundary; returns the remainder (leading separators trimmed).
+fn strip_prefix_word_ci<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+    if text.len() < prefix.len() || !text.is_char_boundary(prefix.len()) {
+        return None;
+    }
+    let (head, tail) = text.split_at(prefix.len());
+    if !head.eq_ignore_ascii_case(prefix) {
+        return None;
+    }
+    // Word boundary: end of text or a non-alphanumeric separator.
+    if tail.chars().next().is_some_and(char::is_alphanumeric) {
+        return None;
+    }
+    Some(tail.trim_start_matches([',', ':', ' ']).trim_start())
 }
 
 #[cfg(test)]
@@ -167,6 +234,45 @@ mod tests {
     fn test_empty_text() {
         let chunker = Chunker::new();
         assert!(chunker.chunk("").is_empty());
+    }
+
+    #[test]
+    fn citation_lead_in_is_stripped_before_embedding() {
+        // "Because the Bible says," is meta-speech: embedding it alongside the
+        // quote dilutes similarity enough to drop a genuine paraphrase below
+        // the operator threshold (real sermon: Luke 15:7).
+        let chunker = Chunker::new();
+        let chunks = chunker
+            .chunk("Because the Bible says, for every sin that repents, there is joy in heaven.");
+
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c == "for every sin that repents, there is joy in heaven"),
+            "citation lead-in must be stripped: {chunks:?}"
+        );
+        assert!(
+            !chunks.iter().any(|c| c.to_lowercase().contains("bible says")),
+            "meta-speech must not reach the embedder: {chunks:?}"
+        );
+    }
+
+    #[test]
+    fn sentences_without_lead_ins_are_unchanged() {
+        let chunker = Chunker::new();
+        let chunks = chunker.chunk("The Lord is my shepherd I shall not want.");
+
+        assert_eq!(chunks, vec!["The Lord is my shepherd I shall not want"]);
+    }
+
+    #[test]
+    fn lead_in_only_sentence_is_not_emptied() {
+        // A sentence that is nothing but meta-speech must not become an empty
+        // chunk; the min-words filter should drop it entirely.
+        let chunker = Chunker::new();
+        let chunks = chunker.chunk("The Bible says.");
+
+        assert!(chunks.is_empty(), "meta-only sentence must be dropped: {chunks:?}");
     }
 
     #[test]

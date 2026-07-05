@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::cache::EmbeddingCache;
@@ -19,6 +19,11 @@ const MAX_SEMANTIC_DETECTIONS: usize = 5;
 /// Bonus added to displayed confidence per extra strategy that agreed on a
 /// result (capped at two extra), rewarding cross-strategy corroboration.
 const AGREEMENT_BONUS: f64 = 0.02;
+
+/// Cap on sentence chunks searched per utterance in ensemble mode (each chunk
+/// costs ~3 embed calls). Utterances are 1-4 sentences, so this only trims
+/// pathological run-on fragments.
+const MAX_ENSEMBLE_CHUNKS: usize = 6;
 
 /// Orchestrator that combines text chunking, embedding, vector search,
 /// and caching to detect Bible verses from transcript text using
@@ -93,41 +98,78 @@ impl SemanticDetector {
         let mut detections = Vec::new();
 
         if self.use_synonyms {
-            // Ensemble search: 3 strategies (original + synonym + concept)
-            // More expensive (~3 embed calls) but much better accuracy for paraphrases.
-            match self.ensemble.search(
-                text,
-                self.embedder.as_ref(),
-                self.index.as_ref(),
-                SEMANTIC_SEARCH_K,
-            ) {
-                Ok(results) => {
-                    // `results` is already ranked by ensemble score; keep that
-                    // order but display the raw match strength (best similarity)
-                    // plus a small bonus when strategies agree, so the shown
-                    // confidence reflects how strong the match actually is.
-                    let now = Self::timestamp_ms();
-                    for result in results {
-                        if result.score >= self.confidence_threshold {
-                            let agreement_bonus = match result.sources.len() {
-                                0 | 1 => 0.0,
-                                2 => AGREEMENT_BONUS,
-                                _ => AGREEMENT_BONUS * 2.0,
-                            };
-                            let confidence = (result.best_similarity + agreement_bonus).min(1.0);
-                            detections.push(Self::make_detection(
-                                result.verse_id,
-                                confidence,
-                                text,
-                                now,
-                            ));
+            // Ensemble search: 3 strategies (original + synonym + concept),
+            // run per sentence chunk so a quote wrapped in commentary is
+            // embedded on its own ("Because the Bible says, <quote>. He has
+            // accepted Christ." — the whole utterance dilutes similarity
+            // below the operator threshold). ~3 embed calls per chunk, capped,
+            // and this path runs on speech_final in a background task.
+            let now = Self::timestamp_ms();
+            let chunks = self.chunker.chunk(text);
+            let search_chunks = if chunks.is_empty() {
+                vec![text.to_string()]
+            } else {
+                chunks
+            };
+
+            let mut best_by_verse: HashMap<i64, Detection> = HashMap::new();
+            for chunk in search_chunks.iter().take(MAX_ENSEMBLE_CHUNKS) {
+                match self.ensemble.search(
+                    chunk,
+                    self.embedder.as_ref(),
+                    self.index.as_ref(),
+                    SEMANTIC_SEARCH_K,
+                ) {
+                    Ok(results) => {
+                        // Results are ranked by ensemble score; display the raw
+                        // match strength (best similarity) plus a small bonus
+                        // when strategies agree, so the shown confidence
+                        // reflects how strong the match actually is.
+                        for result in results {
+                            if result.score >= self.confidence_threshold {
+                                let agreement_bonus = match result.sources.len() {
+                                    0 | 1 => 0.0,
+                                    2 => AGREEMENT_BONUS,
+                                    _ => AGREEMENT_BONUS * 2.0,
+                                };
+                                let confidence =
+                                    (result.best_similarity + agreement_bonus).min(1.0);
+                                let entry = best_by_verse.entry(result.verse_id);
+                                match entry {
+                                    std::collections::hash_map::Entry::Occupied(mut existing)
+                                        if existing.get().confidence < confidence =>
+                                    {
+                                        existing.insert(Self::make_detection(
+                                            result.verse_id,
+                                            confidence,
+                                            chunk,
+                                            now,
+                                        ));
+                                    }
+                                    std::collections::hash_map::Entry::Vacant(vacant) => {
+                                        vacant.insert(Self::make_detection(
+                                            result.verse_id,
+                                            confidence,
+                                            chunk,
+                                            now,
+                                        ));
+                                    }
+                                    std::collections::hash_map::Entry::Occupied(_) => {}
+                                }
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    log::warn!("[SEMANTIC] Ensemble search failed: {e}");
+                    Err(e) => {
+                        log::warn!("[SEMANTIC] Ensemble search failed: {e}");
+                    }
                 }
             }
+            detections.extend(best_by_verse.into_values());
+            detections.sort_by(|a, b| {
+                b.confidence
+                    .partial_cmp(&a.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
         } else {
             let now = Self::timestamp_ms();
             let mut seen_verse_ids = HashSet::new();
@@ -330,6 +372,58 @@ mod tests {
             "displayed confidence should reflect raw best similarity, not the compressed ensemble score"
         );
         assert!(detections[0].confidence <= 1.0);
+    }
+
+    /// Embedder that records every text it is asked to embed.
+    struct RecordingEmbedder {
+        inner: StubEmbedder,
+        queries: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    impl crate::semantic::embedder::TextEmbedder for RecordingEmbedder {
+        fn embed(&self, text: &str) -> Result<Vec<f32>, DetectionError> {
+            self.queries.lock().unwrap().push(text.to_string());
+            self.inner.embed(text)
+        }
+
+        fn dimension(&self) -> usize {
+            self.inner.dimension()
+        }
+    }
+
+    #[test]
+    fn ensemble_path_embeds_stripped_sentence_chunks() {
+        // Live detection runs with synonyms (ensemble) enabled. A quote
+        // wrapped in commentary must reach the embedder as its own stripped
+        // sentence chunk — embedding only the full utterance dilutes cosine
+        // similarity below the operator threshold (real sermon: Luke 15:7
+        // inside "Because the Bible says, … He has accepted Christ.").
+        let queries = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut detector = SemanticDetector::new(
+            Box::new(RecordingEmbedder {
+                inner: StubEmbedder::new(128),
+                queries: queries.clone(),
+            }),
+            Box::new(FakeIndex {
+                results: vec![SearchResult {
+                    verse_id: 1001,
+                    similarity: 0.85,
+                }],
+            }),
+        );
+        detector.set_use_synonyms(true);
+
+        detector.detect(
+            "Because the Bible says, for every sin that repents, there is joy in heaven. He has accepted Christ, so there is joy over him.",
+        );
+
+        let recorded = queries.lock().unwrap();
+        assert!(
+            recorded
+                .iter()
+                .any(|q| q == "for every sin that repents, there is joy in heaven"),
+            "the stripped quote clause must be embedded on its own: {recorded:?}"
+        );
     }
 
     #[test]
