@@ -129,7 +129,7 @@ export function OperatorStatusStrip({
           className={cn(
             "h-5 shrink-0 rounded-md font-mono text-[0.5rem] uppercase",
             isLive &&
-              "border-red-500/30 bg-red-500/15 text-red-300 hover:bg-red-500/15"
+              "border-red-500/30 bg-red-500/15 text-red-700 hover:bg-red-500/15 dark:text-red-300"
           )}
         >
           {isLive ? "On air" : "Hidden"}
@@ -151,7 +151,7 @@ export function OperatorStatusStrip({
                   .getState()
                   .clearOutputIssue(latestOutputIssue.id)
               }
-              className="flex max-w-[180px] shrink-0 items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-300"
+              className="flex max-w-[180px] shrink-0 items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-700 dark:text-red-300"
             >
               <AlertTriangleIcon className="size-3 shrink-0" />
               <span className="truncate font-mono">

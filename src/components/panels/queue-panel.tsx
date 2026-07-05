@@ -56,7 +56,7 @@ function QueueItemRow({
 
   const sourceBadge =
     item.source === "service-plan" ? (
-      <Badge className="shrink-0 bg-violet-500/15 text-[0.5rem] text-violet-300 hover:bg-violet-500/15">
+      <Badge className="shrink-0 bg-violet-500/15 text-[0.5rem] text-violet-700 hover:bg-violet-500/15 dark:text-violet-300">
         Plan
       </Badge>
     ) : item.source === "manual" ? (
@@ -64,11 +64,11 @@ function QueueItemRow({
         Manual
       </Badge>
     ) : item.source === "hymn" ? (
-      <Badge className="shrink-0 bg-amber-500/15 text-[0.5rem] text-amber-300 hover:bg-amber-500/15">
+      <Badge className="shrink-0 bg-amber-500/15 text-[0.5rem] text-amber-700 hover:bg-amber-500/15 dark:text-amber-300">
         Hymn
       </Badge>
     ) : item.source === "ai-semantic" ? (
-      <Badge className="shrink-0 bg-indigo-500/15 text-[0.5rem] text-indigo-300 hover:bg-indigo-500/15">
+      <Badge className="shrink-0 bg-indigo-500/15 text-[0.5rem] text-indigo-700 hover:bg-indigo-500/15 dark:text-indigo-300">
         Semantic
       </Badge>
     ) : (

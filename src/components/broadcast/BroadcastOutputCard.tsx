@@ -61,7 +61,7 @@ function OutputTypeSelector({
             "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
             settingsLocked && "cursor-not-allowed opacity-50",
             model.outputType === "display"
-              ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
+              ? "border-lime-500/50 bg-lime-500/15 text-lime-700 dark:text-lime-400"
               : "border-[var(--border-subtle)] bg-[var(--shell-code-bg)] text-muted-foreground hover:text-foreground",
           )}
         >
@@ -76,7 +76,7 @@ function OutputTypeSelector({
             "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all",
             "cursor-not-allowed opacity-50",
             model.outputType === "ndi"
-              ? "border-lime-500/50 bg-lime-500/15 text-lime-400"
+              ? "border-lime-500/50 bg-lime-500/15 text-lime-700 dark:text-lime-400"
               : "border-[var(--border-subtle)] bg-[var(--shell-code-bg)] text-muted-foreground hover:text-foreground",
           )}
         >
@@ -203,11 +203,11 @@ function NdiOutputSettings({
           <Badge variant="secondary" className="text-[0.625rem]">
             Coming soon
           </Badge>
-          <p className="text-xs font-medium text-amber-50">
+          <p className="text-xs font-medium text-amber-900 dark:text-amber-50">
             {NDI_COMING_SOON_MESSAGE}
           </p>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-amber-100/80">
+        <p className="mt-2 text-xs leading-relaxed text-amber-800/90 dark:text-amber-100/80">
           {NDI_COMING_SOON_DESCRIPTION}
         </p>
       </div>
@@ -216,7 +216,7 @@ function NdiOutputSettings({
         <Button
           variant="outline"
           size="sm"
-          className="w-full gap-1.5 border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-400"
+          className="w-full gap-1.5 border-emerald-500/50 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-400"
           onClick={model.handleToggleNdi}
           disabled={model.ndiPending}
         >
@@ -273,7 +273,7 @@ export function BroadcastOutputCard({
       </div>
 
       {blockedReason && !model.enabled ? (
-        <p className="rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+        <p className="rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-100/90">
           {blockedReason}
         </p>
       ) : null}

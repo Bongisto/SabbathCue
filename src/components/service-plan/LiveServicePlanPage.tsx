@@ -92,11 +92,11 @@ function OutputStatusPanel({
         </div>
         {latestOutputIssue ? (
           <div className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3">
-            <div className="flex items-center gap-2 text-[0.625rem] font-medium text-amber-100/90 uppercase">
+            <div className="flex items-center gap-2 text-[0.625rem] font-medium text-amber-800 uppercase dark:text-amber-100/90">
               <AlertTriangleIcon className="size-3.5" />
               {latestOutputIssue.title}
             </div>
-            <p className="mt-1 line-clamp-3 text-xs text-amber-100/75">
+            <p className="mt-1 line-clamp-3 text-xs text-amber-800/90 dark:text-amber-100/75">
               {latestOutputIssue.description}
             </p>
           </div>

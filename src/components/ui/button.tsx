@@ -20,7 +20,7 @@ const buttonVariants = cva(
         chrome:
           "border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] text-muted-foreground hover:border-[var(--accent-border)] hover:bg-[var(--accent-glow)] hover:text-[var(--accent)]",
         destructive:
-          "border border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/25",
+          "border border-red-500/20 bg-red-500/10 text-red-700 hover:bg-red-500/25 dark:text-red-300",
         link: "text-[var(--accent)] underline-offset-4 hover:underline",
       },
       size: {

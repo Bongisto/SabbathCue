@@ -39,10 +39,14 @@ const SOURCE_COLORS: Record<
   direct: { bg: "bg-green-500/15", text: "text-green-600", label: "Direct" },
   semantic: {
     bg: "bg-indigo-500/15",
-    text: "text-indigo-300",
+    text: "text-indigo-700 dark:text-indigo-300",
     label: "Semantic",
   },
-  hymn: { bg: "bg-amber-500/15", text: "text-amber-300", label: "Hymn" },
+  hymn: {
+    bg: "bg-amber-500/15",
+    text: "text-amber-700 dark:text-amber-300",
+    label: "Hymn",
+  },
 }
 
 export function SourceBadge({ source }: { source: string }) {
@@ -297,7 +301,7 @@ function HeldReferencesPanel({
       </div>
       {candidates.map(({ detection, reason }, index) => (
         <div key={`${detection.verse_ref}-${index}`}>
-          <div className="mx-3 rounded-t border border-b-0 border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[0.5625rem] font-medium text-amber-300 uppercase">
+          <div className="mx-3 rounded-t border border-b-0 border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[0.5625rem] font-medium text-amber-700 uppercase dark:text-amber-300">
             {reason}
           </div>
           <DetectionCard detection={detection} />

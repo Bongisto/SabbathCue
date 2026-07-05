@@ -44,7 +44,7 @@ export function VideoOverlayControls({
         type="button"
         size="icon-xs"
         variant="outline"
-        className="bg-black/60"
+        className="bg-black/60 text-white"
         title={paused ? "Play video" : "Pause video"}
         onClick={onTogglePlay}
       >
@@ -54,7 +54,7 @@ export function VideoOverlayControls({
         type="button"
         size="icon-xs"
         variant="outline"
-        className="bg-black/60"
+        className="bg-black/60 text-white"
         title={isFullscreen ? "Exit fullscreen" : "Fullscreen video"}
         onClick={toggleFullscreen}
       >

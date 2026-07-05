@@ -225,7 +225,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
             <BookOpenIcon
               className={cn(
                 "size-3.5",
-                activeTab === "book" ? "text-lime-400" : "text-muted-foreground",
+                activeTab === "book" ? "text-lime-700 dark:text-lime-400" : "text-muted-foreground",
               )}
             />
             Book search
@@ -246,7 +246,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
             <SparklesIcon
               className={cn(
                 "size-3.5",
-                activeTab === "context" ? "text-lime-400" : "text-muted-foreground",
+                activeTab === "context" ? "text-lime-700 dark:text-lime-400" : "text-muted-foreground",
               )}
             />
             Context search
@@ -263,7 +263,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
             <BookOpenIcon
               className={cn(
                 "size-3.5",
-                activeTab === "egw" ? "text-lime-400" : "text-muted-foreground",
+                activeTab === "egw" ? "text-lime-700 dark:text-lime-400" : "text-muted-foreground",
               )}
             />
             EGW

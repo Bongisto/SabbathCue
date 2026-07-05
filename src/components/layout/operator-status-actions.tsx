@@ -66,10 +66,10 @@ export function OperatorStatusActions({
       "btn-action flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] tracking-wider uppercase transition-colors",
       enabled
         ? tone === "emerald"
-          ? "text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400"
+          ? "text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
           : tone === "red"
-            ? "text-red-500 hover:bg-red-500/15 hover:text-red-400"
-            : "text-amber-500 hover:bg-amber-500/15 hover:text-amber-400"
+            ? "text-red-600 hover:bg-red-500/15 hover:text-red-700 dark:text-red-500 dark:hover:text-red-400"
+            : "text-amber-600 hover:bg-amber-500/15 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400"
         : "cursor-not-allowed text-muted-foreground/30"
     )
 

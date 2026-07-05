@@ -80,10 +80,10 @@ export function HelpLegalPage() {
         </div>
 
         <div
-          className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90"
+          className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-100/90"
           role="note"
         >
-          <p className="font-medium text-amber-50">Important — please read</p>
+          <p className="font-medium text-amber-900 dark:text-amber-50">Important — please read</p>
           <p className="mt-1 leading-relaxed">{HELP_LEGAL_AGREEMENT_NOTICE}</p>
         </div>
       </div>

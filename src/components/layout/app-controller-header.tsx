@@ -47,11 +47,11 @@ function HeaderStatusChip({
       className={cn(
         "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 font-mono text-[10px] font-semibold tracking-wide uppercase",
         tone === "live"
-          ? "border-red-500/35 bg-red-500/12 text-red-300"
+          ? "border-red-500/35 bg-red-500/12 text-red-700 dark:text-red-300"
           : tone === "ready"
-            ? "border-teal-400/30 bg-teal-400/10 text-teal-200"
+            ? "border-teal-400/30 bg-teal-400/10 text-teal-700 dark:text-teal-200"
             : tone === "warn"
-              ? "border-amber-400/35 bg-amber-400/12 text-amber-300"
+              ? "border-amber-400/35 bg-amber-400/12 text-amber-700 dark:text-amber-300"
               : "border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] text-muted-foreground"
       )}
     >
@@ -92,7 +92,7 @@ export function AppControllerHeader() {
               Automated Presentation Space
             </span>
           </div>
-          <span className="ml-2 rounded-md border border-yellow-400/20 bg-yellow-400/10 px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wider text-yellow-400 uppercase">
+          <span className="ml-2 rounded-md border border-yellow-400/20 bg-yellow-400/10 px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wider text-yellow-700 uppercase dark:text-yellow-400">
             {versionLabel}
           </span>
         </div>

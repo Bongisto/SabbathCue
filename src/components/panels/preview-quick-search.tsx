@@ -351,7 +351,7 @@ export function PreviewQuickSearch() {
               }
               className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
             >
-              <BookOpenIcon className="size-3.5 text-lime-400" />
+              <BookOpenIcon className="size-3.5 text-lime-700 dark:text-lime-400" />
               <span className="min-w-0 flex-1 truncate">
                 Preview {bibleResult.matchedBook.name} {bibleResult.chapter}:
                 {bibleResult.verse}
@@ -365,7 +365,7 @@ export function PreviewQuickSearch() {
               onClick={() => previewVerseMatch(verse)}
               className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
             >
-              <BookOpenIcon className="size-3.5 text-lime-400" />
+              <BookOpenIcon className="size-3.5 text-lime-700 dark:text-lime-400" />
               <span className="shrink-0">
                 {verse.book_name} {verse.chapter}:{verse.verse}
               </span>
@@ -381,7 +381,7 @@ export function PreviewQuickSearch() {
               onClick={() => void previewHymn(hymn.number)}
               className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
             >
-              <Music2Icon className="size-3.5 text-amber-300" />
+              <Music2Icon className="size-3.5 text-amber-700 dark:text-amber-300" />
               <span className="min-w-0 flex-1 truncate">
                 #{hymn.number} {hymn.title}
               </span>
@@ -394,7 +394,7 @@ export function PreviewQuickSearch() {
               onClick={() => previewAsset(asset)}
               className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
             >
-              <LibraryIcon className="size-3.5 text-sky-300" />
+              <LibraryIcon className="size-3.5 text-sky-700 dark:text-sky-300" />
               <span className="min-w-0 flex-1 truncate">{asset.name}</span>
               <span className="shrink-0 text-[0.625rem] text-muted-foreground">
                 {quickAssetLabel(asset)}
@@ -408,7 +408,7 @@ export function PreviewQuickSearch() {
               onClick={() => previewEgw(paragraph)}
               className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-accent hover:text-accent-foreground"
             >
-              <BookOpenIcon className="size-3.5 text-violet-300" />
+              <BookOpenIcon className="size-3.5 text-violet-700 dark:text-violet-300" />
               <span className="min-w-0 flex-1 truncate">
                 {egwReference(paragraph)}
               </span>

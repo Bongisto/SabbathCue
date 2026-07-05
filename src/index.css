@@ -420,10 +420,6 @@
 }
 
 .light #bodyThemeContainer {
-  --accent: #2da7a3;
-  --accent-glow: rgba(45, 167, 163, 0.16);
-  --accent-border: rgba(45, 167, 163, 0.36);
-  --accent-dark: #1f7774;
   --broadcast-accent: #d99522;
   --broadcast-accent-glow: rgba(217, 149, 34, 0.16);
   /* Light: a warm sunrise copper wash over cream, gentler grain, near-white matte panels. */
@@ -431,6 +427,42 @@
   --gradient-cool: color-mix(in srgb, var(--accent) 16%, transparent);
   --grain-opacity: 0.4;
   --panel-surface-matte: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+}
+
+/* Light-mode accent tuning: darker accents so they stay readable on cream. */
+.light #bodyThemeContainer.theme-teal {
+  --accent: #1f8c88;
+  --accent-glow: rgba(31, 140, 136, 0.18);
+  --accent-border: rgba(31, 140, 136, 0.4);
+  --accent-dark: #175f5c;
+}
+
+.light #bodyThemeContainer.theme-gold {
+  --accent: #b45309;
+  --accent-glow: rgba(180, 83, 9, 0.16);
+  --accent-border: rgba(180, 83, 9, 0.4);
+  --accent-dark: #92400e;
+}
+
+.light #bodyThemeContainer.theme-emerald {
+  --accent: #059669;
+  --accent-glow: rgba(5, 150, 105, 0.16);
+  --accent-border: rgba(5, 150, 105, 0.4);
+  --accent-dark: #047857;
+}
+
+.light #bodyThemeContainer.theme-purple {
+  --accent: #7c3aed;
+  --accent-glow: rgba(124, 58, 237, 0.16);
+  --accent-border: rgba(124, 58, 237, 0.4);
+  --accent-dark: #5b21b6;
+}
+
+.light #bodyThemeContainer.theme-aurora {
+  --accent: #0284c7;
+  --accent-glow: rgba(2, 132, 199, 0.16);
+  --accent-border: rgba(2, 132, 199, 0.4);
+  --accent-dark: #075985;
 }
 
 #bodyThemeContainer::before {

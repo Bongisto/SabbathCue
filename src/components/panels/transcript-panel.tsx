@@ -217,15 +217,15 @@ export function TranscriptPanel({ className }: { className?: string }) {
           {lastIssue ? (
             <div
               aria-live="polite"
-              className="rounded-md border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-100"
+              className="rounded-md border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-900 dark:text-red-100"
             >
               <div className="flex items-start gap-2">
-                <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-red-300" />
+                <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-red-700 dark:text-red-300" />
                 <div className="min-w-0 flex-1">
                   <p className="leading-snug font-semibold">
                     {lastIssue.title}
                   </p>
-                  <p className="mt-1 text-xs leading-relaxed text-red-100/80">
+                  <p className="mt-1 text-xs leading-relaxed text-red-900/80 dark:text-red-100/80">
                     {lastIssue.description}
                   </p>
                   {lastIssue.actionLabel ? (

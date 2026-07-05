@@ -91,8 +91,8 @@ export function ResultCard({
           className={cn(
             "rounded px-1.5 py-0.5 text-[0.5625rem] font-medium tracking-wider uppercase",
             badgeTone === "egw"
-              ? "bg-amber-500/15 text-amber-300"
-              : "bg-lime-500/15 text-lime-300"
+              ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              : "bg-lime-500/15 text-lime-700 dark:text-lime-300"
           )}
         >
           {badgeLabel}
