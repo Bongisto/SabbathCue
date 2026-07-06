@@ -26,7 +26,7 @@ bun run build:vosk-sidecar
 bun run download:model
 bun run export:verses
 bun run precompute:embeddings
-bun run tauri build
+bun run tauri:build:release
 ```
 
 This creates an installer that includes only public-domain Bible translations
@@ -54,8 +54,9 @@ Local builds create an unsigned NSIS installer; official release CI uses
 - **Verse queue** with drag-and-drop ordering (`@dnd-kit/react`) and duplicate prevention (flash-highlight on duplicates)
 - **Quick navigation** — keyboard-driven verse entry with autocomplete (e.g., type "J" → Joshua, Tab through book → chapter → verse)
 - **Fuzzy contextual search** (Fuse.js client-side)
+- **Guided Projector Setup** — one-tap "go live on the projector" that remembers last week's display, hot-plug detection (no manual Refresh), on-screen **Identify screens**, and plain-language Duplicate-vs-Extend guidance; reachable from a header status chip
 - **Audio level metering** and on-air indicator
-- **Interactive onboarding tutorial** — 11-step guided tour covering all panels, auto-launches on first startup
+- **Interactive onboarding tutorial** — guided tour covering all panels and Projector Setup, auto-launches on first startup
 - **Light/dark mode** with system theme detection (light, dark, or follow OS)
 - **Settings persistence** — all preferences auto-saved to disk across restarts
 - **Cross-platform** — Windows, macOS, and Linux
@@ -240,7 +241,7 @@ bun run tauri dev
 ### Build for production
 
 ```bash
-bun run tauri build
+bun run tauri:build:release
 ```
 
 ## Project Structure
@@ -308,7 +309,6 @@ sabbathcue/
 | `precompute:embeddings`                         | Precompute embeddings via Rust ONNX binary (recommended)                                     |
 | `precompute:embeddings-onnx`                    | Precompute embeddings via Python ONNX Runtime                                                |
 | `precompute:embeddings-py`                      | Precompute embeddings via Python sentence-transformers (GPU path)                            |
-| `quantize:model`                                | Quantize ONNX model to INT8 for ARM64                                                        |
 | `download:vosk`                                 | Download the English Vosk model for local STT                                                |
 | `build:vosk-sidecar`                            | Build the self-contained Vosk worker executable bundled in public installers                 |
 | `download:ndi-sdk`                              | Download NDI 6 SDK headers and platform libraries                                            |

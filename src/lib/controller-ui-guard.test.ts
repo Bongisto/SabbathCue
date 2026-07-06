@@ -30,6 +30,7 @@ const TUTORIAL_DATA_TOUR_IDS = [
   "settings-section-bible",
   "settings-section-display",
   "settings-section-broadcast",
+  "projector-setup",
   "settings-section-themes",
   "settings-section-remote",
   "settings-section-api-keys",
@@ -145,14 +146,24 @@ describe("controller UI guard — tutorial targets", () => {
     expect(content).toContain("Vosk is local")
   })
 
-  it("includes the HDMI projector setup in the guided tour", () => {
+  it("includes guided projector setup in the tour", () => {
+    const step = TUTORIAL_STEPS.find((item) => item.title === "Projector Setup")
+    const content = String(step?.content ?? "")
+
+    expect(step?.target).toBe('[data-tour="projector-setup"]')
+    expect(content).toContain("goes live in one tap")
+    expect(content).toContain("Win+P")
+    expect(content).toContain("Extend")
+  })
+
+  it("includes the advanced HDMI broadcast settings step in the guided tour", () => {
     const step = TUTORIAL_STEPS.find(
       (item) => item.title === "HDMI Projector Setup"
     )
     const content = String(step?.content ?? "")
 
     expect(step?.target).toBe('[data-tour="settings-section-broadcast"]')
-    expect(content).toContain("Connect the projector or TV by HDMI")
+    expect(content).toContain("Projector Setup in the top bar")
     expect(content).toContain("Windows display mode to Extend")
     expect(content).toContain("Refresh displays")
     expect(content).toContain("fullscreen projector output")
