@@ -95,6 +95,7 @@ describe("maintainability guard — extracted module presence", () => {
     "src/hooks/use-context-verse-search.ts",
     "src-tauri/src/commands/stt/utils.rs",
     "src-tauri/src/commands/stt/detection.rs",
+    "src-tauri/src/commands/stt/tasks.rs",
   ]
 
   it("keeps maintainability split artifacts on disk", () => {

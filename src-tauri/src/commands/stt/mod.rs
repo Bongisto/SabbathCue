@@ -8,16 +8,15 @@ mod detection_jobs;
 mod detection_logic;
 mod live_session;
 mod provider;
+mod tasks;
 mod utils;
 mod voice;
 
 use std::collections::VecDeque;
-use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use futures_util::FutureExt;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Notify;
 
@@ -26,7 +25,7 @@ use crate::events::{
     EVENT_AUDIO_SOURCE_RECOVERED, EVENT_TRANSCRIPT_FINAL, EVENT_TRANSCRIPT_PARTIAL,
 };
 use crate::state::AppState;
-use rhema_audio::{new_gain_handle, set_gain, AudioConfig, AudioFrame, GainHandle};
+use rhema_audio::{set_gain, AudioConfig, AudioFrame};
 use rhema_detection::DirectDetector;
 use rhema_stt::TranscriptEvent;
 
@@ -37,13 +36,14 @@ use self::detection::{
 };
 use self::detection_jobs::{
     enqueue_direct_detection_job, enqueue_final_semantic_job, enqueue_partial_semantic_job,
-    take_semantic_job, DeepgramSemanticBuffer,
+    DeepgramSemanticBuffer,
 };
 use self::detection_logic::{
     clamp_to_recent_words, trim_to_sentence_start, SENTENCE_TRIM_MIN_WORDS,
 };
-use self::live_session::{check_reading_mode, run_direct_detection, run_semantic_detection};
+use self::live_session::{check_reading_mode, run_direct_detection};
 use self::provider::build_stt_provider;
+use self::tasks::{live_input_gain, spawn_latest_wins_semantic_worker, spawn_stt_task};
 use self::utils::{
     average_word_confidence, final_semantic_detection_allowed_by_settings,
     partial_semantic_detection_enabled_for_provider, to_word_payloads, transcript_logging_enabled,
@@ -53,57 +53,6 @@ use self::voice::{check_stt_voice_command, check_translation_command};
 use crate::commands::transcript_router::{
     TranscriptEventKind, TranscriptRouteInput, TranscriptRouter,
 };
-
-static LIVE_INPUT_GAIN: OnceLock<GainHandle> = OnceLock::new();
-
-fn live_input_gain() -> GainHandle {
-    LIVE_INPUT_GAIN.get_or_init(|| new_gain_handle(1.0)).clone()
-}
-
-fn spawn_stt_task<F>(name: &'static str, future: F) -> tauri::async_runtime::JoinHandle<()>
-where
-    F: std::future::Future<Output = ()> + Send + 'static,
-{
-    tauri::async_runtime::spawn(async move {
-        if AssertUnwindSafe(future).catch_unwind().await.is_err() {
-            log::error!("[STT] Task {name} panicked");
-        } else {
-            log::debug!("[STT] Task {name} exited");
-        }
-    })
-}
-
-fn spawn_latest_wins_semantic_worker(
-    task_name: &'static str,
-    job_label: &'static str,
-    app: AppHandle,
-    latest_seq: Arc<AtomicU64>,
-    job_slot: Arc<Mutex<Option<(u64, String)>>>,
-    notify: Arc<Notify>,
-) -> tauri::async_runtime::JoinHandle<()> {
-    spawn_stt_task(task_name, async move {
-        loop {
-            notify.notified().await;
-
-            while let Some((seq, text)) = take_semantic_job(&job_slot, job_label) {
-                let check_seq = latest_seq.load(Ordering::Acquire);
-                if seq < check_seq {
-                    log::debug!(
-                        "[DET-SEMANTIC] Skipping stale {job_label} job seq={seq} latest={check_seq}",
-                    );
-                    continue;
-                }
-
-                let app_clone = app.clone();
-                let latest_seq = latest_seq.clone();
-                let _ = tokio::task::spawn_blocking(move || {
-                    run_semantic_detection(&app_clone, seq, &latest_seq, &text);
-                })
-                .await;
-            }
-        }
-    })
-}
 
 /// Start the audio-capture-to-transcription pipeline: mic capture, STT provider,
 /// transcript events, and background detection workers.
