@@ -39,7 +39,9 @@ use self::detection_jobs::{
     enqueue_direct_detection_job, enqueue_final_semantic_job, enqueue_partial_semantic_job,
     take_semantic_job, DeepgramSemanticBuffer,
 };
-use self::detection_logic::clamp_to_recent_words;
+use self::detection_logic::{
+    clamp_to_recent_words, trim_to_sentence_start, SENTENCE_TRIM_MIN_WORDS,
+};
 use self::live_session::{check_reading_mode, run_direct_detection, run_semantic_detection};
 use self::provider::build_stt_provider;
 use self::utils::{
@@ -482,9 +484,12 @@ pub async fn start_transcription(
                                 last_partial_semantic_at = Instant::now();
                                 let mut parts = semantic_window.iter().cloned().collect::<Vec<_>>();
                                 parts.push(transcript.clone());
-                                let semantic_text = clamp_to_recent_words(
-                                    &parts.join(" "),
-                                    LIVE_DETECTION_WINDOW_WORDS,
+                                let semantic_text = trim_to_sentence_start(
+                                    &clamp_to_recent_words(
+                                        &parts.join(" "),
+                                        LIVE_DETECTION_WINDOW_WORDS,
+                                    ),
+                                    SENTENCE_TRIM_MIN_WORDS,
                                 );
                                 enqueue_partial_semantic_job(
                                     &partial_semantic_job_evt,
@@ -611,13 +616,16 @@ pub async fn start_transcription(
                                     while semantic_window.len() > SEMANTIC_WINDOW_SEGMENTS {
                                         semantic_window.pop_front();
                                     }
-                                    let semantic_text = clamp_to_recent_words(
-                                        &semantic_window
-                                            .iter()
-                                            .cloned()
-                                            .collect::<Vec<_>>()
-                                            .join(" "),
-                                        LIVE_DETECTION_WINDOW_WORDS,
+                                    let semantic_text = trim_to_sentence_start(
+                                        &clamp_to_recent_words(
+                                            &semantic_window
+                                                .iter()
+                                                .cloned()
+                                                .collect::<Vec<_>>()
+                                                .join(" "),
+                                            LIVE_DETECTION_WINDOW_WORDS,
+                                        ),
+                                        SENTENCE_TRIM_MIN_WORDS,
                                     );
                                     enqueue_final_semantic_job(
                                         &final_semantic_job_evt,

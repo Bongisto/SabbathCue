@@ -22,6 +22,32 @@ pub(crate) fn clamp_to_recent_words(text: &str, max_words: usize) -> String {
     words[start..].join(" ")
 }
 
+/// Minimum words that must remain for `trim_to_sentence_start` to drop a
+/// leading partial sentence. Below this, the mixed window is still a better
+/// query than a fragment.
+pub(crate) const SENTENCE_TRIM_MIN_WORDS: usize = 6;
+
+/// Drop leading partial sentences from a rolling transcript window so the
+/// semantic query starts at a sentence boundary.
+///
+/// The fixed-width window usually straddles two spoken sentences (the tail of
+/// the previous verse plus the head of the current one), which dilutes BM25
+/// and the embedding enough that neither verse surfaces. Trimming to the last
+/// sentence start turns "One, two, testing. The Lord is my shepherd; I shall
+/// not want" into a clean verse query. Keeps the mixed window when fewer than
+/// `min_words` would remain.
+pub(crate) fn trim_to_sentence_start(text: &str, min_words: usize) -> String {
+    let mut current = text.trim();
+    while let Some(idx) = current.find(['.', '?', '!']) {
+        let rest = current[idx + 1..].trim_start();
+        if rest.split_whitespace().count() < min_words {
+            break;
+        }
+        current = rest;
+    }
+    current.to_string()
+}
+
 /// Strip reference-navigation scaffolding ("chapter", "verse", "it says", and
 /// bare numbers) from a transcript window before it is used to build FTS5 /
 /// vector search queries.
@@ -174,11 +200,27 @@ pub(crate) fn should_release_stale_reading_scope(
     seconds_since_last_verse_match: u64,
 ) -> bool {
     seconds_since_last_verse_match >= READING_SCOPE_STALE_SECS
-        && results.iter().any(|result| {
+        && strong_out_of_scope_bible_book(results, scope_book_number).is_some()
+}
+
+/// Consecutive strong out-of-book hits on the same book needed to release the
+/// reading scope before the staleness clock. One echo pass is noise; a repeat
+/// on the same book means the speaker has moved to that book.
+pub(crate) const READING_SCOPE_RELEASE_STREAK: u32 = 2;
+
+/// Book number of a strong out-of-book semantic Bible hit, if any.
+pub(crate) fn strong_out_of_scope_bible_book(
+    results: &[crate::commands::detection::DetectionResult],
+    scope_book_number: i32,
+) -> Option<i32> {
+    results
+        .iter()
+        .find(|result| {
             result.content_type == "bible"
                 && result.book_number != scope_book_number
                 && result.confidence >= READING_SCOPE_RELEASE_MIN_CONFIDENCE
         })
+        .map(|result| result.book_number)
 }
 
 pub(crate) fn filter_semantic_results_to_reading_scope(

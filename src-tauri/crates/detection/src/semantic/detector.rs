@@ -126,7 +126,13 @@ impl SemanticDetector {
                         // when strategies agree, so the shown confidence
                         // reflects how strong the match actually is.
                         for result in results {
-                            if result.score >= self.confidence_threshold {
+                            // Gate on the actual match strength, not the
+                            // weighted ensemble score: a verse found only by
+                            // the original strategy caps at 0.7 * similarity,
+                            // so even a verbatim quote (cosine ~1.0) could
+                            // never cross a 0.75 operator threshold. The
+                            // weighted score still drives ranking upstream.
+                            if result.best_similarity >= self.confidence_threshold {
                                 let agreement_bonus = match result.sources.len() {
                                     0 | 1 => 0.0,
                                     2 => AGREEMENT_BONUS,

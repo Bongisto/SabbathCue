@@ -436,6 +436,50 @@ mod tests {
     }
 
     #[test]
+    fn trim_to_sentence_start_drops_leading_partial_sentence() {
+        assert_eq!(
+            detection_logic::trim_to_sentence_start(
+                "One, two, testing. The Lord is my shepherd; I shall not want",
+                6
+            ),
+            "The Lord is my shepherd; I shall not want"
+        );
+    }
+
+    #[test]
+    fn trim_to_sentence_start_drops_multiple_stale_sentences() {
+        assert_eq!(
+            detection_logic::trim_to_sentence_start(
+                "pastures. He restores my soul. He leads me beside the still waters today",
+                6
+            ),
+            "He leads me beside the still waters today"
+        );
+    }
+
+    #[test]
+    fn trim_to_sentence_start_keeps_mixed_window_when_tail_is_too_short() {
+        assert_eq!(
+            detection_logic::trim_to_sentence_start(
+                "not want He maketh me lie down green pastures. The Lord is",
+                6
+            ),
+            "not want He maketh me lie down green pastures. The Lord is"
+        );
+    }
+
+    #[test]
+    fn trim_to_sentence_start_ignores_semicolons_and_no_punctuation() {
+        assert_eq!(
+            detection_logic::trim_to_sentence_start(
+                "The Lord is my shepherd; I shall not want",
+                6
+            ),
+            "The Lord is my shepherd; I shall not want"
+        );
+    }
+
+    #[test]
     fn strip_reference_scaffolding_removes_afrikaans_reference_words() {
         assert_eq!(
             strip_reference_scaffolding("Deuteronomium 16 vers 18 Regters en opsigters"),
@@ -576,6 +620,24 @@ mod tests {
         assert!(!detection_logic::should_release_stale_reading_scope(
             &results, 43, 5
         ));
+    }
+
+    #[test]
+    fn strong_out_of_scope_bible_book_ignores_weak_and_same_book_hits() {
+        let results = vec![
+            make_detection_result("Job 23:2", 18, 23, 2, 0.72),
+            make_detection_result("John 5:8", 43, 5, 8, 0.97),
+        ];
+        assert_eq!(
+            detection_logic::strong_out_of_scope_bible_book(&results, 43),
+            None
+        );
+
+        let results = vec![make_detection_result("Psalm 23:2", 19, 23, 2, 0.92)];
+        assert_eq!(
+            detection_logic::strong_out_of_scope_bible_book(&results, 43),
+            Some(19)
+        );
     }
 
     #[test]

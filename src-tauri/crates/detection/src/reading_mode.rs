@@ -83,6 +83,10 @@ pub struct ReadingMode {
     accumulated_text: String,
     /// Context for interpreting the next bare number
     bare_number_context: BareNumberContext,
+    /// Book of the current run of consecutive strong out-of-scope semantic hits.
+    out_of_scope_streak_book: i32,
+    /// Length of that run; reset whenever a verse in scope matches.
+    out_of_scope_streak: u32,
 }
 
 impl ReadingMode {
@@ -98,7 +102,27 @@ impl ReadingMode {
             last_match_time: Instant::now(),
             accumulated_text: String::new(),
             bare_number_context: BareNumberContext::None,
+            out_of_scope_streak_book: 0,
+            out_of_scope_streak: 0,
         }
+    }
+
+    /// Record a strong out-of-scope semantic hit and return the streak length.
+    /// Consecutive hits on the same book grow the streak; a hit on a different
+    /// book restarts it. Any in-scope verse match resets it to zero.
+    pub fn note_out_of_scope_hit(&mut self, book_number: i32) -> u32 {
+        if self.out_of_scope_streak_book == book_number {
+            self.out_of_scope_streak += 1;
+        } else {
+            self.out_of_scope_streak_book = book_number;
+            self.out_of_scope_streak = 1;
+        }
+        self.out_of_scope_streak
+    }
+
+    fn reset_out_of_scope_streak(&mut self) {
+        self.out_of_scope_streak_book = 0;
+        self.out_of_scope_streak = 0;
     }
 
     /// Activate reading mode starting from the given verse.
@@ -152,6 +176,7 @@ impl ReadingMode {
         self.verses = loaded;
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
+        self.reset_out_of_scope_streak();
     }
 
     /// Check if reading mode is currently active.
@@ -169,6 +194,7 @@ impl ReadingMode {
         if !self.verses.is_empty() {
             self.active = true;
             self.last_match_time = Instant::now();
+            self.reset_out_of_scope_streak();
             let verse = self
                 .verses
                 .get(self.current_index)
@@ -493,6 +519,7 @@ impl ReadingMode {
                 // never read.
                 self.last_match_time = Instant::now();
                 self.accumulated_text.clear();
+                self.reset_out_of_scope_streak();
                 return None;
             }
         }
@@ -593,6 +620,7 @@ impl ReadingMode {
         self.current_index = index;
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
+        self.reset_out_of_scope_streak();
 
         let reference = format!("{} {}:{verse_number}", self.book_name, self.chapter);
         log::info!("[READING] Advanced to: {reference}");
@@ -1004,6 +1032,37 @@ mod tests {
         // it must not combine with the pre-pause "one two three" to advance.
         assert!(rm.check_transcript("four five").is_none());
         assert_eq!(rm.current_verse(), Some(1));
+    }
+
+    #[test]
+    fn out_of_scope_streak_counts_same_book_and_restarts_on_book_change() {
+        let mut rm = ReadingMode::new();
+        rm.start(44, "Acts", 15, 28, sample_verses());
+
+        assert_eq!(rm.note_out_of_scope_hit(19), 1);
+        assert_eq!(rm.note_out_of_scope_hit(19), 2);
+        assert_eq!(rm.note_out_of_scope_hit(19), 3);
+        // A hit on a different book restarts the run.
+        assert_eq!(rm.note_out_of_scope_hit(23), 1);
+    }
+
+    #[test]
+    fn out_of_scope_streak_resets_when_a_scoped_verse_matches() {
+        let mut rm = ReadingMode::new();
+        let verses = vec![
+            (1, "for it seemed good to the holy ghost and to us".to_string()),
+            (2, "one two three four five six seven eight nine ten".to_string()),
+        ];
+        rm.start(44, "Acts", 15, 1, verses);
+
+        assert_eq!(rm.note_out_of_scope_hit(19), 1);
+        assert_eq!(rm.note_out_of_scope_hit(19), 2);
+
+        // Speaker is still reading the anchored chapter — verse 1 matches.
+        rm.check_transcript("for it seemed good to the holy ghost and to us");
+
+        // Echo streak starts over.
+        assert_eq!(rm.note_out_of_scope_hit(19), 1);
     }
 
     #[test]

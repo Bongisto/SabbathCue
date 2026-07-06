@@ -134,31 +134,29 @@ export function AppControllerHeader() {
             <MoonIcon className="size-4" />
           )}
         </button>
-        {colorMode === "dark" ? (
-          <div
-            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-1"
-            data-tour="theme"
-          >
-            <span className="hidden px-2 font-mono text-[10px] font-bold text-muted-foreground uppercase sm:inline">
-              Theme:
-            </span>
-            {ACCENT_SWATCHES.map((swatch) => (
-              <button
-                key={swatch.id}
-                type="button"
-                title={swatch.title}
-                aria-label={swatch.title}
-                aria-pressed={theme === swatch.id}
-                onClick={() => setTheme(swatch.id)}
-                className={cn(
-                  "btn-action size-[18px] rounded-md border border-[var(--border-subtle)] transition-all hover:scale-125",
-                  swatch.className,
-                  theme === swatch.id && "ring-2 ring-[var(--accent-border)]"
-                )}
-              />
-            ))}
-          </div>
-        ) : null}
+        <div
+          className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-1"
+          data-tour="theme"
+        >
+          <span className="hidden px-2 font-mono text-[10px] font-bold text-muted-foreground uppercase sm:inline">
+            Theme:
+          </span>
+          {ACCENT_SWATCHES.map((swatch) => (
+            <button
+              key={swatch.id}
+              type="button"
+              title={swatch.title}
+              aria-label={swatch.title}
+              aria-pressed={theme === swatch.id}
+              onClick={() => setTheme(swatch.id)}
+              className={cn(
+                "btn-action size-[18px] rounded-md border border-[var(--border-subtle)] transition-all hover:scale-125",
+                swatch.className,
+                theme === swatch.id && "ring-2 ring-[var(--accent-border)]"
+              )}
+            />
+          ))}
+        </div>
       </div>
     </header>
   )

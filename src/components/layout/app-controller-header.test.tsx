@@ -39,7 +39,7 @@ describe("AppControllerHeader color mode controls", () => {
     ).toBeTruthy()
   })
 
-  it("shows accent swatches only in dark mode", () => {
+  it("shows accent swatches in both dark and light mode", () => {
     renderHeader()
 
     expect(screen.getByText("Theme:")).toBeTruthy()
@@ -47,7 +47,7 @@ describe("AppControllerHeader color mode controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Switch to light mode" }))
 
-    expect(screen.queryByText("Theme:")).toBeNull()
-    expect(screen.queryByRole("button", { name: "Soft Teal" })).toBeNull()
+    expect(screen.getByText("Theme:")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Soft Teal" })).toBeTruthy()
   })
 })

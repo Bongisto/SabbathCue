@@ -13,6 +13,7 @@ use super::detection_jobs::finalize_live_semantic_results;
 use super::detection_logic::{
     choose_reading_candidate, direct_reading_candidates, filter_direct_results_to_scope_if_present,
     filter_semantic_results_to_reading_scope, should_release_stale_reading_scope,
+    strong_out_of_scope_bible_book, READING_SCOPE_RELEASE_STREAK,
     should_restart_reading, strip_reference_scaffolding,
     DirectReadingCandidate,
 };
@@ -49,6 +50,15 @@ fn pause_stale_reading_scope(app: &AppHandle) {
     };
 }
 
+fn note_out_of_scope_hit(app: &AppHandle, book_number: i32) -> u32 {
+    let reading_mode_state: State<'_, Mutex<ReadingMode>> = app.state();
+    let streak = match reading_mode_state.lock() {
+        Ok(mut reading_mode) => reading_mode.note_out_of_scope_hit(book_number),
+        Err(_) => 0,
+    };
+    streak
+}
+
 fn filter_live_semantic_results_to_reading_scope(
     app: &AppHandle,
     results: Vec<crate::commands::detection::DetectionResult>,
@@ -65,6 +75,22 @@ fn filter_live_semantic_results_to_reading_scope(
         );
         pause_stale_reading_scope(app);
         return results;
+    }
+
+    // Faster path than the staleness clock: several consecutive strong hits on
+    // the same out-of-book passage mean the speaker has moved on. Any in-scope
+    // verse match resets the streak, so echoes during real reading still get
+    // suppressed.
+    if let Some(hit_book) = strong_out_of_scope_bible_book(&results, book_number) {
+        let streak = note_out_of_scope_hit(app, hit_book);
+        if streak >= READING_SCOPE_RELEASE_STREAK {
+            log::info!(
+                "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
+                 ({streak} consecutive strong hits on book {hit_book})"
+            );
+            pause_stale_reading_scope(app);
+            return results;
+        }
     }
 
     let before = results.len();
