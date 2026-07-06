@@ -161,12 +161,13 @@ export function referenceForPresentation(
   theme: BroadcastTheme,
   data: VerseRenderData | PresentationRenderData
 ): string {
+  const hymnTitle = "hymnTitle" in data ? data.hymnTitle : undefined
   if (
     theme.hymnPresentation?.titleOnly &&
     presentationKind(data) === "hymn" &&
-    data.hymnTitle
+    hymnTitle
   ) {
-    return data.hymnTitle
+    return hymnTitle
   }
   return data.reference
 }

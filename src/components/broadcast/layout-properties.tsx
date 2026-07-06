@@ -31,7 +31,8 @@ export function LayoutProperties() {
 
   if (!draftTheme) return null
 
-  const layout = draftTheme.layout
+  const theme = draftTheme
+  const layout = theme.layout
   const resolution = draftTheme.resolution
   const referenceGap = layout.referenceGap ?? Math.max(16, Math.round(draftTheme.reference.fontSize * 0.5))
 
@@ -54,8 +55,8 @@ export function LayoutProperties() {
 
   function applyQuickFont(fontFamily: string) {
     updateDraft({
-      verseText: { ...draftTheme.verseText, fontFamily },
-      reference: { ...draftTheme.reference, fontFamily },
+      verseText: { ...theme.verseText, fontFamily },
+      reference: { ...theme.reference, fontFamily },
     })
   }
 
@@ -65,13 +66,13 @@ export function LayoutProperties() {
       hymnPresentation: PURE_CLASSIC_HYMN.hymnPresentation,
       layout: { ...PURE_CLASSIC_HYMN.layout },
       reference: {
-        ...draftTheme.reference,
+        ...theme.reference,
         position: PURE_CLASSIC_HYMN.reference.position,
         horizontalAlign: PURE_CLASSIC_HYMN.reference.horizontalAlign,
         verticalAlign: PURE_CLASSIC_HYMN.reference.verticalAlign,
       },
       verseNumbers: {
-        ...draftTheme.verseNumbers,
+        ...theme.verseNumbers,
         visible: PURE_CLASSIC_HYMN.verseNumbers.visible,
       },
     })
