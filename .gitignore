@@ -68,6 +68,10 @@ ghs.json
 # GSD planning artifacts
 .planning/
 
+# Agent-skill scratch logs (per-session, see .agents/skills/)
+DEBUG_LOG.md
+RESEARCH_LOG.md
+
 # Playwright
 test-results/
 playwright-report/
