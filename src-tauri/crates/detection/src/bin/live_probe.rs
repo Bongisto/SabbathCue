@@ -42,9 +42,13 @@ fn main() {
     let index = HnswVectorIndex::load(&PathBuf::from(&embeddings), &PathBuf::from(&ids), dim)
         .expect("load embeddings index");
 
+    let threshold = arg(&args, "--threshold")
+        .and_then(|t| t.parse::<f64>().ok())
+        .unwrap_or(0.75); // semantic_threshold from live settings
+
     let mut detector = SemanticDetector::new(Box::new(embedder), Box::new(index));
     detector.set_use_synonyms(true); // paraphrase=true, as in the live log
-    detector.set_confidence_threshold(0.75); // semantic_threshold from live settings
+    detector.set_confidence_threshold(threshold);
 
     let text = std::fs::read_to_string(&input).expect("read --input file");
     for line in text.lines().map(str::trim).filter(|l| !l.is_empty()) {

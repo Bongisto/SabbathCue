@@ -230,31 +230,19 @@ pub fn run() {
 
             let model_path = asset_paths::onnx_model_path(app.handle());
             let tokenizer_path = asset_paths::tokenizer_path(app.handle());
-            let embeddings_path = asset_paths::embeddings_path(app.handle());
-            let ids_path = asset_paths::embedding_ids_path(app.handle());
+            let embedding_candidates = asset_paths::semantic_embedding_candidates(app.handle());
 
             log::info!("Resolved ONNX model path: {}", model_path.display());
             log::info!("Resolved tokenizer path: {}", tokenizer_path.display());
-            log::info!("Resolved embeddings path: {}", embeddings_path.display());
-            log::info!("Resolved embedding ids path: {}", ids_path.display());
+            for (embeddings, ids) in &embedding_candidates {
+                log::info!(
+                    "Embeddings candidate: {} (ids={})",
+                    embeddings.display(),
+                    ids.display()
+                );
+            }
 
             if model_path.exists() && tokenizer_path.exists() {
-                if !asset_paths::semantic_assets_are_compatible(
-                    &model_path,
-                    &tokenizer_path,
-                    &embeddings_path,
-                    &ids_path,
-                ) {
-                    log::warn!(
-                        "Semantic search disabled: model/tokenizer/embedding assets are from different families (model={}, tokenizer={}, embeddings={}, ids={})",
-                        model_path.display(),
-                        tokenizer_path.display(),
-                        embeddings_path.display(),
-                        ids_path.display()
-                    );
-                    return Ok(());
-                }
-
                 match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
                     Ok(embedder) => {
                         log::info!("ONNX embedding model loaded");
@@ -263,51 +251,79 @@ pub fn run() {
                             .lock()
                             .map_err(|_| poisoned_lock_error("Detection pipeline"))?;
 
-                        // If pre-computed embeddings exist, load the vector index
-                        if embeddings_path.exists() && ids_path.exists() {
-                            let dim = embedder.dimension();
-                            match rhema_detection::HnswVectorIndex::load(&embeddings_path, &ids_path, dim) {
-                                Ok(index) => {
-                                    match semantic_index_sanity_check(&embedder, &index) {
-                                        Ok(similarity) => {
-                                            log::info!(
-                                                "Semantic index sanity check passed (self-similarity {similarity:.3})"
-                                            );
-                                        }
-                                        Err(reason) => {
-                                            log::error!(
-                                                "SEMANTIC VECTOR SEARCH DISABLED — index failed sanity check: {reason} \
-                                                 (embeddings={})",
-                                                embeddings_path.display()
-                                            );
-                                            return Ok(());
-                                        }
+                        if embedding_candidates.is_empty() {
+                            log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                        }
+
+                        // Walk the candidates in resolution order; the first
+                        // pair that loads AND passes the sanity check wins. A
+                        // stale app-data file must not disable vector search
+                        // while a healthy bundled/dev copy exists.
+                        let dim = embedder.dimension();
+                        let mut healthy_index = None;
+                        for (embeddings_path, ids_path) in &embedding_candidates {
+                            if !asset_paths::semantic_assets_are_compatible(
+                                &model_path,
+                                &tokenizer_path,
+                                embeddings_path,
+                                ids_path,
+                            ) {
+                                log::warn!(
+                                    "Skipping embeddings candidate from a different model family: {}",
+                                    embeddings_path.display()
+                                );
+                                continue;
+                            }
+                            match rhema_detection::HnswVectorIndex::load(embeddings_path, ids_path, dim) {
+                                Ok(index) => match semantic_index_sanity_check(&embedder, &index) {
+                                    Ok(similarity) => {
+                                        log::info!(
+                                            "Resolved embeddings path: {} (sanity check passed, self-similarity {similarity:.3})",
+                                            embeddings_path.display()
+                                        );
+                                        healthy_index = Some((index, embeddings_path.clone()));
+                                        break;
                                     }
-                                    let semantic_corpus = if embeddings_path
-                                        .file_name()
-                                        .and_then(|name| name.to_str())
-                                        == Some(asset_paths::PREFERRED_EMBEDDINGS_FILENAME)
-                                    {
-                                        "KJV/NKJV/NLT canonical blend"
-                                    } else {
-                                        "KJV canonical legacy"
-                                    };
-                                    log::info!(
-                                        "Verse embeddings loaded ({} vectors, corpus={semantic_corpus}; semantic hits resolve to active translation)",
-                                        index.len(),
-                                    );
-                                    let semantic = rhema_detection::SemanticDetector::new(
-                                        Box::new(embedder),
-                                        Box::new(index),
-                                    );
-                                    pipeline.set_semantic(semantic);
-                                }
+                                    Err(reason) => {
+                                        log::error!(
+                                            "Embeddings candidate failed sanity check, trying next: {reason} (embeddings={})",
+                                            embeddings_path.display()
+                                        );
+                                    }
+                                },
                                 Err(e) => {
-                                    log::warn!("Failed to load verse embeddings: {e}");
+                                    log::warn!(
+                                        "Failed to load verse embeddings from {}: {e}",
+                                        embeddings_path.display()
+                                    );
                                 }
                             }
-                        } else {
-                            log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+                        }
+
+                        if let Some((index, embeddings_path)) = healthy_index {
+                            let semantic_corpus = if embeddings_path
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                == Some(asset_paths::PREFERRED_EMBEDDINGS_FILENAME)
+                            {
+                                "KJV/NKJV/NLT canonical blend"
+                            } else {
+                                "KJV canonical legacy"
+                            };
+                            log::info!(
+                                "Verse embeddings loaded ({} vectors, corpus={semantic_corpus}; semantic hits resolve to active translation)",
+                                index.len(),
+                            );
+                            let semantic = rhema_detection::SemanticDetector::new(
+                                Box::new(embedder),
+                                Box::new(index),
+                            );
+                            pipeline.set_semantic(semantic);
+                        } else if !embedding_candidates.is_empty() {
+                            log::error!(
+                                "SEMANTIC VECTOR SEARCH DISABLED — no embeddings candidate passed the sanity check; \
+                                 regenerate with `bun run precompute:embeddings`"
+                            );
                         }
                     }
                     Err(e) => {

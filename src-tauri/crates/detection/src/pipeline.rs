@@ -421,6 +421,45 @@ mod tests {
     }
 
     #[test]
+    fn niv_worded_jeremiah_quote_surfaces_via_fts_quote_overlap() {
+        // 2026-07-07 incident: the speaker quoted Jeremiah 29:11 in NIV
+        // wording. The redistributable embeddings corpus is KJV-family, so the
+        // vector leg cannot catch NIV phrasing — the FTS quote-overlap path
+        // over the full translation table is the designed catcher and must
+        // produce a live candidate for it.
+        let mut pipeline = DetectionPipeline::new();
+
+        let spoken = "so the plans that i have for you are not to harm you but to prosper you";
+        let fts = vec![Bm25Result {
+            rank: -6.0, // keyword-band OR hit, not a phrase-tier match
+            book_number: 24,
+            book_name: "Jeremiah".to_string(),
+            chapter: 29,
+            verse: 11,
+            is_broad_match: true,
+            text: "\"For I know the plans I have for you,\" declares the LORD, \
+                   \"plans to prosper you and not to harm you, plans to give you hope and a future.\""
+                .to_string(),
+        }];
+
+        let results = pipeline.process_hybrid_with_fts(spoken, &fts);
+
+        let jeremiah = results
+            .iter()
+            .find(|r| {
+                r.detection.verse_ref.book_number == 24
+                    && r.detection.verse_ref.chapter == 29
+                    && r.detection.verse_ref.verse_start == 11
+            })
+            .expect("NIV-worded Jeremiah 29:11 quote must surface as a live candidate");
+        assert!(
+            jeremiah.detection.confidence >= 0.75,
+            "quote-overlap confidence should clear the live threshold, got {}",
+            jeremiah.detection.confidence
+        );
+    }
+
+    #[test]
     fn test_pipeline_no_match() {
         let mut pipeline = DetectionPipeline::new();
         let results = pipeline.process("The weather is nice today");
