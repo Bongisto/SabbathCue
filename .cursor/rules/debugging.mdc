@@ -1,0 +1,17 @@
+---
+description: Reproduce-first, root-cause-only debugging protocol. Apply whenever investigating a bug, error, crash, wrong output, hang, or flaky test, or after any failed fix attempt.
+alwaysApply: false
+---
+
+Before debugging anything, read and follow `.agents/skills/debugging/SKILL.md` in full,
+plus its reference files:
+
+- `.agents/skills/debugging/references/evidence-log.md` — copy this to a `DEBUG_LOG.md`
+  scratch file at the start of the session and fill it in append-only as you work.
+- `.agents/skills/debugging/references/toolkit.md` — bisection, differential debugging,
+  bug-class checklist, flaky-bug protocol.
+
+Non-negotiable core: no fix before the failure is reproduced on demand and the root cause
+is confirmed with pasted evidence; one variable per experiment; a regression test that
+fails before the fix and passes after; the minimal change that removes the cause — never
+a symptom patch (swallowed error, blind retry, bumped timeout, loosened assertion).

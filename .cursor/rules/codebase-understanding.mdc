@@ -1,0 +1,20 @@
+---
+description: Codebase mapping protocol. Apply when working in an unfamiliar codebase or area, when asked to explain/document/audit the codebase, before designing any non-trivial change, and after changes that alter architecture, data flow, interfaces, or config.
+alwaysApply: false
+---
+
+Before working in an unmapped area or designing a non-trivial change, read and follow
+`.agents/skills/codebase-understanding/SKILL.md` in full, plus its reference files:
+
+- `.agents/skills/codebase-understanding/references/map-template.md` — the structure of
+  the living map at `docs/CODEBASE.md`, and its maintenance rules (same-commit updates,
+  STALE marking).
+- `.agents/skills/codebase-understanding/references/exploration-toolkit.md` — commands
+  for finding the center of gravity, entry points, tracing tactics, data/config mapping.
+
+Non-negotiable core: docs and comments are hypotheses, code is truth; every claim in the
+map carries a receipt (file:line or executed command output); a flow counts as understood
+only when traced end-to-end through the actual files; unknowns go in Open Questions,
+never guessed; structural changes and their map updates ship in the same commit — a
+section that can't be updated now is marked STALE with a date. Read the map before
+changing code; if the affected area isn't mapped, map it first.

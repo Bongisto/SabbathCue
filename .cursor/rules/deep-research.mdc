@@ -1,0 +1,20 @@
+---
+description: Verification-first deep research protocol. Apply whenever researching, looking up, verifying, or comparing information, scraping/extracting data from the web or files, or hunting for hard-to-find information.
+alwaysApply: false
+---
+
+Before researching anything, read and follow `.agents/skills/deep-research/SKILL.md` in
+full, plus its reference files:
+
+- `.agents/skills/deep-research/references/dossier-template.md` — copy Part A to a
+  `RESEARCH_LOG.md` scratch file before the first search; every claim goes in the ledger
+  with source, date, and grade. The final deliverable uses Part B's dossier structure.
+- `.agents/skills/deep-research/references/source-quality.md` — source hierarchy
+  (primary → radioactive), per-source checks, independence test, the four grades.
+- `.agents/skills/deep-research/references/deep-tactics.md` — operators, archives,
+  code/issue-tracker mining, pivot searching, scraping discipline.
+
+Non-negotiable core: no claim without a source opened this session; load-bearing claims
+need two independent sources traced to their origin; everything is dated; conflicts are
+reported, not silently resolved; gaps are documented, never filled with plausible
+invention; FACT, INFERENCE, and SPECULATION are always labeled and never blended.
