@@ -49,10 +49,10 @@ fn pause_stale_reading_scope(app: &AppHandle) {
     };
 }
 
-fn note_out_of_scope_hit(app: &AppHandle, book_number: i32) -> u32 {
+fn note_out_of_scope_hit(app: &AppHandle, book_number: i32, chapter: i32) -> u32 {
     let reading_mode_state: State<'_, Mutex<ReadingMode>> = app.state();
     let streak = match reading_mode_state.lock() {
-        Ok(mut reading_mode) => reading_mode.note_out_of_scope_hit(book_number),
+        Ok(mut reading_mode) => reading_mode.note_out_of_scope_hit(book_number, chapter),
         Err(_) => 0,
     };
     streak
@@ -61,31 +61,40 @@ fn note_out_of_scope_hit(app: &AppHandle, book_number: i32) -> u32 {
 fn filter_live_semantic_results_to_reading_scope(
     app: &AppHandle,
     results: Vec<crate::commands::detection::DetectionResult>,
+    semantic_min_confidence: f64,
 ) -> Vec<crate::commands::detection::DetectionResult> {
     let Some((book_number, chapter, book_name, stale_secs)) = active_reading_bible_scope(app)
     else {
         return results;
     };
 
-    if should_release_stale_reading_scope(&results, book_number, stale_secs) {
+    if should_release_stale_reading_scope(
+        &results,
+        book_number,
+        chapter,
+        stale_secs,
+        semantic_min_confidence,
+    ) {
         log::info!(
             "[DET-SEMANTIC] Releasing stale reading scope {book_name} {chapter} \
-             ({stale_secs}s since last verse match; strong out-of-book hit)"
+             ({stale_secs}s since last verse match; strong out-of-scope hit)"
         );
         pause_stale_reading_scope(app);
         return results;
     }
 
     // Faster path than the staleness clock: several consecutive strong hits on
-    // the same out-of-book passage mean the speaker has moved on. Any in-scope
+    // the same out-of-scope passage mean the speaker has moved on. Any in-scope
     // verse match resets the streak, so echoes during real reading still get
     // suppressed.
-    if let Some(hit_book) = strong_out_of_scope_bible_book(&results, book_number) {
-        let streak = note_out_of_scope_hit(app, hit_book);
+    if let Some((hit_book, hit_chapter)) =
+        strong_out_of_scope_bible_book(&results, book_number, chapter)
+    {
+        let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
         if streak >= READING_SCOPE_RELEASE_STREAK {
             log::info!(
                 "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
-                 ({streak} consecutive strong hits on book {hit_book})"
+                 ({streak} consecutive strong hits on {hit_book}:{hit_chapter})"
             );
             pause_stale_reading_scope(app);
             return results;
@@ -477,7 +486,8 @@ pub(crate) fn run_semantic_detection(
         .collect();
 
     drop(app_state);
-    let results = filter_live_semantic_results_to_reading_scope(app, results);
+    let results =
+        filter_live_semantic_results_to_reading_scope(app, results, semantic_min_confidence);
     let results = finalize_live_semantic_results(results, semantic_min_confidence);
 
     if results.is_empty() {

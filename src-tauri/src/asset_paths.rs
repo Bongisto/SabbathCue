@@ -345,6 +345,43 @@ pub fn egw_embedding_ids_path(app: &AppHandle) -> PathBuf {
         .join(EGW_EMBEDDING_IDS_FILENAME)
 }
 
+/// All existing embeddings/ids file pairs, in resolution order (app data,
+/// bundled resources, dev tree; preferred filename before legacy).
+///
+/// Each pair comes from the same root so a stale file in one location can
+/// never be combined with ids from another. Startup walks these in order and
+/// uses the first pair that passes the semantic sanity check, so a corrupt or
+/// outdated app-data file cannot silently disable vector search while a
+/// healthy bundled copy exists.
+pub fn semantic_embedding_candidates(app: &AppHandle) -> Vec<(PathBuf, PathBuf)> {
+    let roots: Vec<PathBuf> = [
+        app_data_dir(app).ok(),
+        app.path().resource_dir().ok(),
+        Some(dev_root()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    let pairs = [
+        (PREFERRED_EMBEDDINGS_FILENAME, PREFERRED_EMBEDDING_IDS_FILENAME),
+        (LEGACY_EMBEDDINGS_FILENAME, LEGACY_EMBEDDING_IDS_FILENAME),
+    ];
+
+    pairs
+        .iter()
+        .flat_map(|(embeddings_name, ids_name)| {
+            roots.iter().map(move |root| {
+                (
+                    root.join("embeddings").join(embeddings_name),
+                    root.join("embeddings").join(ids_name),
+                )
+            })
+        })
+        .filter(|(embeddings, ids)| embeddings.exists() && ids.exists())
+        .collect()
+}
+
 pub fn embeddings_path(app: &AppHandle) -> PathBuf {
     let roots: Vec<PathBuf> = [
         app_data_dir(app).ok(),

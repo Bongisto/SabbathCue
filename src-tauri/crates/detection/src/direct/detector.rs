@@ -447,8 +447,15 @@ const REFERENCE_CORRECTIONS: &[(&str, &str)] = &[
 /// Performs simple case-insensitive removal of each phrase in [`FILLER_PHRASES`],
 /// plus a special pattern for "look at" when followed by what looks like a book name
 /// (starts with an uppercase letter).
-fn clean_transcript(text: &str) -> String {
-    let mut result = text.to_string();
+fn clean_transcript(text: &str, strip_english_fillers: bool) -> String {
+    let mut result = if strip_english_fillers {
+        // English hesitation fillers ("um", "uh") collide with spoken numbers
+        // in other language profiles (pt "um" = 1) and can complete pending
+        // book-only references into phantom Book 1:1 detections.
+        parser::strip_english_filler_words(text)
+    } else {
+        text.to_string()
+    };
 
     for (from, to) in REFERENCE_CORRECTIONS {
         result = replace_case_insensitive_phrase(&result, from, to);
@@ -709,6 +716,10 @@ fn same_book_chapter(a: &VerseRef, b: &VerseRef) -> bool {
 
 pub struct DirectDetector {
     matcher: BookMatcher,
+    /// Active STT language code (e.g. "en", "pt"); controls English filler
+    /// stripping, which must stay off for languages where those tokens are
+    /// real number words.
+    stt_language: String,
     context: ReferenceContext,
     /// Pending incomplete reference waiting for verse completion.
     incomplete: Option<IncompleteRef>,
@@ -725,6 +736,7 @@ impl DirectDetector {
     pub fn for_stt_language(language: &str) -> Self {
         DirectDetector {
             matcher: BookMatcher::for_stt_language(language),
+            stt_language: language.to_string(),
             context: ReferenceContext::new(),
             incomplete: None,
             recent_detections: VecDeque::with_capacity(5),
@@ -735,6 +747,7 @@ impl DirectDetector {
     /// Rebuild the book matcher when STT language changes.
     pub fn set_stt_language(&mut self, language: &str) {
         self.matcher = BookMatcher::for_stt_language(language);
+        self.stt_language = language.to_string();
         self.incomplete = None;
         self.saved_contexts.clear();
     }
@@ -838,7 +851,7 @@ impl DirectDetector {
         }
 
         // Step 0: Clean filler phrases from the transcript
-        let cleaned = clean_transcript(text);
+        let cleaned = clean_transcript(text, self.stt_language == "en");
         let text = &cleaned;
         let lower_text = text.to_lowercase();
 

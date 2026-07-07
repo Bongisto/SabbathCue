@@ -604,7 +604,46 @@ mod tests {
         let results = vec![make_detection_result("Psalm 23:1", 19, 23, 1, 0.93)];
 
         assert!(detection_logic::should_release_stale_reading_scope(
-            &results, 43, 20
+            &results, 43, 5, 20, 0.75
+        ));
+    }
+
+    #[test]
+    fn stale_reading_scope_releases_on_strong_same_book_out_of_chapter_hit() {
+        // 2026-07-07 incident: scope anchored on Jeremiah 1 while the speaker
+        // quotes Jeremiah 29:11. Same book, different chapter — the strong hit
+        // must release the stale scope instead of being suppressed for the
+        // full reading-mode timeout.
+        let results = vec![make_detection_result("Jeremiah 29:11", 24, 29, 11, 0.92)];
+
+        assert!(detection_logic::should_release_stale_reading_scope(
+            &results, 24, 1, 20, 0.75
+        ));
+        assert_eq!(
+            detection_logic::strong_out_of_scope_bible_book(&results, 24, 1),
+            Some((24, 29))
+        );
+    }
+
+    #[test]
+    fn stale_reading_scope_releases_on_operator_threshold_hit() {
+        // 2026-07-07 second incident: "Matthew 1:2" spoken as a bare citation
+        // anchored reading mode, the speaker never read Matthew 1, and every
+        // Jeremiah quote-overlap hit (~0.79) sat below the old hardcoded 0.85
+        // release bar — suppressed for the full 3-minute timeout. Once the
+        // scope is stale, any hit worth SHOWING (>= the operator's semantic
+        // threshold) must release it.
+        let results = vec![make_detection_result("Jeremiah 29:11", 24, 29, 11, 0.79)];
+
+        assert!(detection_logic::should_release_stale_reading_scope(
+            &results, 40, 1, 25, 0.75
+        ));
+
+        // A hit below the operator threshold would never be emitted, so it
+        // must not release the scope either.
+        let weak = vec![make_detection_result("Job 23:2", 18, 23, 2, 0.70)];
+        assert!(!detection_logic::should_release_stale_reading_scope(
+            &weak, 40, 1, 25, 0.75
         ));
     }
 
@@ -615,38 +654,38 @@ mod tests {
         let results = vec![make_detection_result("Mark 2:9", 41, 2, 9, 0.95)];
 
         assert!(!detection_logic::should_release_stale_reading_scope(
-            &results, 43, 5
+            &results, 43, 5, 5, 0.75
         ));
     }
 
     #[test]
-    fn strong_out_of_scope_bible_book_ignores_weak_and_same_book_hits() {
+    fn strong_out_of_scope_bible_book_ignores_weak_and_in_scope_hits() {
         let results = vec![
             make_detection_result("Job 23:2", 18, 23, 2, 0.72),
             make_detection_result("John 5:8", 43, 5, 8, 0.97),
         ];
         assert_eq!(
-            detection_logic::strong_out_of_scope_bible_book(&results, 43),
+            detection_logic::strong_out_of_scope_bible_book(&results, 43, 5),
             None
         );
 
         let results = vec![make_detection_result("Psalm 23:2", 19, 23, 2, 0.92)];
         assert_eq!(
-            detection_logic::strong_out_of_scope_bible_book(&results, 43),
-            Some(19)
+            detection_logic::strong_out_of_scope_bible_book(&results, 43, 5),
+            Some((19, 23))
         );
     }
 
     #[test]
-    fn stale_reading_scope_holds_without_a_strong_out_of_book_hit() {
-        // Weak out-of-book noise and same-book hits never release the scope.
+    fn stale_reading_scope_holds_without_a_strong_out_of_scope_hit() {
+        // Weak out-of-book noise and in-scope hits never release the scope.
         let results = vec![
             make_detection_result("Job 23:2", 18, 23, 2, 0.72),
             make_detection_result("John 5:8", 43, 5, 8, 0.97),
         ];
 
         assert!(!detection_logic::should_release_stale_reading_scope(
-            &results, 43, 60
+            &results, 43, 5, 60, 0.75
         ));
     }
 

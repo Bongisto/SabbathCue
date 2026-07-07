@@ -184,43 +184,77 @@ pub(crate) fn should_restart_reading(
 /// likely moved on; the scope may be released by a strong out-of-book hit.
 pub(crate) const READING_SCOPE_STALE_SECS: u64 = 20;
 
-/// Minimum confidence for an out-of-book semantic hit to release a stale
-/// reading scope. Kept well above `LIVE_SEMANTIC_MIN_CONFIDENCE` so keyword
-/// noise never unlocks the scope.
+/// Minimum confidence for an out-of-scope semantic hit to release the reading
+/// scope via the fast consecutive-hit streak (before the scope is stale).
+/// Kept well above `LIVE_SEMANTIC_MIN_CONFIDENCE` so keyword noise never
+/// unlocks the scope mid-reading. The stale-release path uses the operator's
+/// live semantic threshold instead.
 pub(crate) const READING_SCOPE_RELEASE_MIN_CONFIDENCE: f64 = 0.85;
 
-/// While reading mode is advancing, out-of-book semantic hits are
+/// While reading mode is advancing, out-of-scope semantic hits are
 /// parallel-passage echoes and stay suppressed. Once the scope is stale (no
-/// verse matched for `READING_SCOPE_STALE_SECS`), a strong semantic hit in a
-/// *different book* means the speaker has moved on and the scope should be
-/// released instead of blanket-suppressing until the reading-mode timeout.
+/// verse matched for `READING_SCOPE_STALE_SECS` — including never, when a bare
+/// citation anchored the scope but the speaker moved on without reading), a
+/// semantic hit outside the anchored chapter — a different book, or another
+/// chapter of the same book — means the speaker has moved on and the scope
+/// should be released instead of blanket-suppressing until the reading-mode
+/// timeout.
+///
+/// `min_confidence` is the operator's live semantic threshold: any hit that
+/// clears it would be SHOWN were the scope not active, so it is strong enough
+/// evidence to release a scope that is already stale. (A fixed 0.85 bar here
+/// left real quote-overlap hits at ~0.79 suppressed for the full timeout.)
 pub(crate) fn should_release_stale_reading_scope(
     results: &[crate::commands::detection::DetectionResult],
     scope_book_number: i32,
+    scope_chapter: i32,
     seconds_since_last_verse_match: u64,
+    min_confidence: f64,
 ) -> bool {
     seconds_since_last_verse_match >= READING_SCOPE_STALE_SECS
-        && strong_out_of_scope_bible_book(results, scope_book_number).is_some()
+        && out_of_scope_bible_book(results, scope_book_number, scope_chapter, min_confidence)
+            .is_some()
 }
 
-/// Consecutive strong out-of-book hits on the same book needed to release the
-/// reading scope before the staleness clock. One echo pass is noise; a repeat
-/// on the same book means the speaker has moved to that book.
+/// Consecutive strong out-of-scope hits on the same book+chapter needed to
+/// release the reading scope before the staleness clock. One echo pass is
+/// noise; a repeat on the same passage means the speaker has moved there.
 pub(crate) const READING_SCOPE_RELEASE_STREAK: u32 = 2;
 
-/// Book number of a strong out-of-book semantic Bible hit, if any.
-pub(crate) fn strong_out_of_scope_bible_book(
+/// Book+chapter of a semantic Bible hit outside the anchored book+chapter
+/// scope at or above `min_confidence`, if any. Same-book hits in a *different
+/// chapter* count: reading a chapter aloud does not strongly match its
+/// sibling chapters, so such a hit is real navigation, not an echo.
+pub(crate) fn out_of_scope_bible_book(
     results: &[crate::commands::detection::DetectionResult],
     scope_book_number: i32,
-) -> Option<i32> {
+    scope_chapter: i32,
+    min_confidence: f64,
+) -> Option<(i32, i32)> {
     results
         .iter()
         .find(|result| {
             result.content_type == "bible"
-                && result.book_number != scope_book_number
-                && result.confidence >= READING_SCOPE_RELEASE_MIN_CONFIDENCE
+                && (result.book_number != scope_book_number || result.chapter != scope_chapter)
+                && result.confidence >= min_confidence
         })
-        .map(|result| result.book_number)
+        .map(|result| (result.book_number, result.chapter))
+}
+
+/// Strong out-of-scope hit for the fast streak release, which fires while the
+/// scope is NOT yet stale — the high bar keeps parallel-passage echoes from
+/// unlocking suppression during genuine reading.
+pub(crate) fn strong_out_of_scope_bible_book(
+    results: &[crate::commands::detection::DetectionResult],
+    scope_book_number: i32,
+    scope_chapter: i32,
+) -> Option<(i32, i32)> {
+    out_of_scope_bible_book(
+        results,
+        scope_book_number,
+        scope_chapter,
+        READING_SCOPE_RELEASE_MIN_CONFIDENCE,
+    )
 }
 
 pub(crate) fn filter_semantic_results_to_reading_scope(

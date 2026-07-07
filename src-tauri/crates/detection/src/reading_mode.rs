@@ -83,8 +83,8 @@ pub struct ReadingMode {
     accumulated_text: String,
     /// Context for interpreting the next bare number
     bare_number_context: BareNumberContext,
-    /// Book of the current run of consecutive strong out-of-scope semantic hits.
-    out_of_scope_streak_book: i32,
+    /// Book+chapter of the current run of consecutive strong out-of-scope semantic hits.
+    out_of_scope_streak_scope: Option<(i32, i32)>,
     /// Length of that run; reset whenever a verse in scope matches.
     out_of_scope_streak: u32,
 }
@@ -102,26 +102,28 @@ impl ReadingMode {
             last_match_time: Instant::now(),
             accumulated_text: String::new(),
             bare_number_context: BareNumberContext::None,
-            out_of_scope_streak_book: 0,
+            out_of_scope_streak_scope: None,
             out_of_scope_streak: 0,
         }
     }
 
     /// Record a strong out-of-scope semantic hit and return the streak length.
-    /// Consecutive hits on the same book grow the streak; a hit on a different
-    /// book restarts it. Any in-scope verse match resets it to zero.
-    pub fn note_out_of_scope_hit(&mut self, book_number: i32) -> u32 {
-        if self.out_of_scope_streak_book == book_number {
+    /// Consecutive hits on the same book+chapter grow the streak; a hit on a
+    /// different out-of-scope chapter restarts it. Any in-scope verse match
+    /// resets it to zero.
+    pub fn note_out_of_scope_hit(&mut self, book_number: i32, chapter: i32) -> u32 {
+        let scope = (book_number, chapter);
+        if self.out_of_scope_streak_scope == Some(scope) {
             self.out_of_scope_streak += 1;
         } else {
-            self.out_of_scope_streak_book = book_number;
+            self.out_of_scope_streak_scope = Some(scope);
             self.out_of_scope_streak = 1;
         }
         self.out_of_scope_streak
     }
 
     fn reset_out_of_scope_streak(&mut self) {
-        self.out_of_scope_streak_book = 0;
+        self.out_of_scope_streak_scope = None;
         self.out_of_scope_streak = 0;
     }
 
@@ -286,7 +288,10 @@ impl ReadingMode {
             return None;
         }
 
-        let lower = text.to_lowercase();
+        // The command grammar here is English-only, so English hesitation
+        // fillers are always noise — and "um" would otherwise parse as the
+        // number 1 (Portuguese) and fake chapter/verse navigation.
+        let lower = crate::direct::parser::strip_english_filler_words(&text.to_lowercase());
         let trimmed = lower.trim();
 
         // Check if text contains "chapter" keyword without a number following it
@@ -553,7 +558,10 @@ impl ReadingMode {
     /// - "previous verse" / "go back" / "let's go to the previous verse" → go back by 1
     /// - Bare numbers when context is `ExpectingVerse`
     fn check_verse_number_reference(&mut self, text: &str) -> Option<ReadingAdvance> {
-        let normalized = normalize_command_text(text);
+        // Strip English fillers first: a stray "um." would otherwise parse as
+        // the bare number 1 and jump the reading cursor back to verse 1.
+        let normalized =
+            crate::direct::parser::strip_english_filler_words(&normalize_command_text(text));
         let trimmed = normalized.as_str();
 
         // If we're expecting a verse number and this is a bare number, interpret it as verse
@@ -1035,15 +1043,17 @@ mod tests {
     }
 
     #[test]
-    fn out_of_scope_streak_counts_same_book_and_restarts_on_book_change() {
+    fn out_of_scope_streak_counts_same_chapter_and_restarts_on_scope_change() {
         let mut rm = ReadingMode::new();
         rm.start(44, "Acts", 15, 28, sample_verses());
 
-        assert_eq!(rm.note_out_of_scope_hit(19), 1);
-        assert_eq!(rm.note_out_of_scope_hit(19), 2);
-        assert_eq!(rm.note_out_of_scope_hit(19), 3);
-        // A hit on a different book restarts the run.
-        assert_eq!(rm.note_out_of_scope_hit(23), 1);
+        assert_eq!(rm.note_out_of_scope_hit(19, 23), 1);
+        assert_eq!(rm.note_out_of_scope_hit(19, 23), 2);
+        assert_eq!(rm.note_out_of_scope_hit(19, 23), 3);
+        // A hit on the same book but a different chapter restarts the run.
+        assert_eq!(rm.note_out_of_scope_hit(19, 24), 1);
+        // A hit on a different book also restarts the run.
+        assert_eq!(rm.note_out_of_scope_hit(23, 53), 1);
     }
 
     #[test]
@@ -1061,14 +1071,14 @@ mod tests {
         ];
         rm.start(44, "Acts", 15, 1, verses);
 
-        assert_eq!(rm.note_out_of_scope_hit(19), 1);
-        assert_eq!(rm.note_out_of_scope_hit(19), 2);
+        assert_eq!(rm.note_out_of_scope_hit(19, 23), 1);
+        assert_eq!(rm.note_out_of_scope_hit(19, 23), 2);
 
         // Speaker is still reading the anchored chapter — verse 1 matches.
         rm.check_transcript("for it seemed good to the holy ghost and to us");
 
         // Echo streak starts over.
-        assert_eq!(rm.note_out_of_scope_hit(19), 1);
+        assert_eq!(rm.note_out_of_scope_hit(19, 23), 1);
     }
 
     #[test]
@@ -1127,6 +1137,35 @@ mod tests {
             extract_verse_number("3 books a third book was opened"),
             None
         );
+    }
+
+    #[test]
+    fn bare_um_filler_does_not_jump_to_verse_one() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
+        rm.start(24, "Jeremiah", 29, 7, verses);
+
+        // A lone hesitation must not parse as the bare number 1.
+        assert!(rm.check_transcript("um.").is_none());
+        assert_eq!(rm.current_verse(), Some(7));
+
+        // Nor may it satisfy an ExpectingChapter/ExpectingVerse context.
+        let _ = rm.check_chapter_command("chapter");
+        assert_eq!(rm.check_chapter_command("um"), None);
+    }
+
+    #[test]
+    fn verse_command_with_um_filler_still_navigates() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> =
+            (1..=10).map(|i| (i, format!("Verse {i} text."))).collect();
+        rm.start(24, "Jeremiah", 29, 7, verses);
+
+        let advance = rm
+            .check_transcript("verse um nine")
+            .expect("filler inside verse command should still navigate");
+        assert_eq!(advance.verse, 9);
     }
 
     #[test]

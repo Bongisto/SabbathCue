@@ -710,6 +710,35 @@ fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
     None
 }
 
+/// English hesitation fillers that collide with spoken numbers in other STT
+/// language profiles ("um"/"uma" is Portuguese for one, "un"/"una" Spanish and
+/// French). In English speech these are noise; left in place they complete
+/// pending book-only references into phantom `Book 1:1` detections (the
+/// 2026-07-07 "in the book of Jeremiah" incident).
+const ENGLISH_FILLER_WORDS: &[&str] = &["um", "uhm", "umm", "uh", "erm", "hmm", "mhm"];
+
+/// Whether a token (already stripped to alphabetic characters) is an English
+/// hesitation filler.
+pub fn is_english_filler_word(word: &str) -> bool {
+    ENGLISH_FILLER_WORDS.contains(&word.to_ascii_lowercase().as_str())
+}
+
+/// Remove standalone English hesitation fillers ("um", "uh", ...) from a
+/// transcript. Only whole tokens are removed (a token's alphabetic core must
+/// equal a filler word), so words like "number" or "drum" are untouched.
+pub fn strip_english_filler_words(text: &str) -> String {
+    text.split_whitespace()
+        .filter(|token| {
+            let core: String = token
+                .chars()
+                .filter(|c| c.is_alphabetic())
+                .collect();
+            !is_english_filler_word(&core)
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Convert a spoken number word to an integer.
 /// Supports common spoken number words used by the STT language profiles.
 pub fn parse_spoken_number(word: &str) -> Option<i32> {
