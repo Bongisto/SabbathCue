@@ -9,6 +9,11 @@ reading its SKILL.md (and the reference files it links) before starting the matc
   a bug, error, crash, wrong output, hang, or flaky test, or when a fix attempt has
   already failed once. Do not change code to "see if it helps" — follow the skill's
   reproduce-first, root-cause-only protocol and keep its evidence log.
+- **codebase-understanding** — `.agents/skills/codebase-understanding/SKILL.md`. Use when
+  starting work in an unmapped/unfamiliar area, before designing any non-trivial change,
+  and after any change that alters architecture, flows, schema, interfaces, or config.
+  Maintains the living map at `docs/CODEBASE.md` — read it before changing code, update
+  it in the same commit as structural changes.
 - **deep-research** — `.agents/skills/deep-research/SKILL.md`. MANDATORY whenever you
   research, look up, verify, compare, or scrape/extract information from the web, docs,
   or files. Never present a claim without an opened source; keep the claims ledger and
