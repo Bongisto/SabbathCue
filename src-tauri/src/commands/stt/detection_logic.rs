@@ -181,8 +181,13 @@ pub(crate) fn should_restart_reading(
 }
 
 /// No verse match in the reading chapter for this long means the speaker has
-/// likely moved on; the scope may be released by a strong out-of-book hit.
+/// likely moved on; the scope may be released by an out-of-scope semantic hit.
 pub(crate) const READING_SCOPE_STALE_SECS: u64 = 20;
+
+/// Short live-speech pause before repeated out-of-scope semantic hits may
+/// release reading scope at the operator's threshold. Single hits still wait
+/// for `READING_SCOPE_STALE_SECS`.
+pub(crate) const READING_SCOPE_LIVE_PAUSE_SECS: u64 = 8;
 
 /// Minimum confidence for an out-of-scope semantic hit to release the reading
 /// scope via the fast consecutive-hit streak (before the scope is stale).
@@ -214,6 +219,22 @@ pub(crate) fn should_release_stale_reading_scope(
     seconds_since_last_verse_match >= READING_SCOPE_STALE_SECS
         && out_of_scope_bible_book(results, scope_book_number, scope_chapter, min_confidence)
             .is_some()
+}
+
+/// Book+chapter eligible for a repeated-hit live-pause release. The caller must
+/// still require the same out-of-scope scope to repeat before releasing.
+pub(crate) fn live_pause_out_of_scope_bible_book(
+    results: &[crate::commands::detection::DetectionResult],
+    scope_book_number: i32,
+    scope_chapter: i32,
+    seconds_since_last_verse_match: u64,
+    min_confidence: f64,
+) -> Option<(i32, i32)> {
+    if seconds_since_last_verse_match < READING_SCOPE_LIVE_PAUSE_SECS {
+        return None;
+    }
+
+    out_of_scope_bible_book(results, scope_book_number, scope_chapter, min_confidence)
 }
 
 /// Consecutive strong out-of-scope hits on the same book+chapter needed to

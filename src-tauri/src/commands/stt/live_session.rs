@@ -12,9 +12,9 @@ use super::detection::{is_semantic_detection_enabled, FINAL_SEMANTIC_MIN_WORDS};
 use super::detection_jobs::finalize_live_semantic_results;
 use super::detection_logic::{
     choose_reading_candidate, direct_reading_candidates, filter_direct_results_to_scope_if_present,
-    filter_semantic_results_to_reading_scope, should_release_stale_reading_scope,
-    should_restart_reading, strip_reference_scaffolding, strong_out_of_scope_bible_book,
-    DirectReadingCandidate, READING_SCOPE_RELEASE_STREAK,
+    filter_semantic_results_to_reading_scope, live_pause_out_of_scope_bible_book,
+    should_release_stale_reading_scope, should_restart_reading, strip_reference_scaffolding,
+    strong_out_of_scope_bible_book, DirectReadingCandidate, READING_SCOPE_RELEASE_STREAK,
 };
 use super::utils::{transcript_logging_enabled, truncate_safe};
 fn active_reading_bible_scope(app: &AppHandle) -> Option<(i32, i32, String, u64)> {
@@ -77,19 +77,38 @@ fn filter_live_semantic_results_to_reading_scope(
     ) {
         log::info!(
             "[DET-SEMANTIC] Releasing stale reading scope {book_name} {chapter} \
-             ({stale_secs}s since last verse match; strong out-of-scope hit)"
+             ({stale_secs}s since last verse match; out-of-scope semantic hit)"
         );
         pause_stale_reading_scope(app);
         return results;
     }
 
-    // Faster path than the staleness clock: several consecutive strong hits on
-    // the same out-of-scope passage mean the speaker has moved on. Any in-scope
-    // verse match resets the streak, so echoes during real reading still get
-    // suppressed.
-    if let Some((hit_book, hit_chapter)) =
+    // Live speech often pivots passages after a phrase-length pause. Once the
+    // active chapter has been quiet for that short pause, require two repeated
+    // operator-threshold hits on the same out-of-scope passage before releasing.
+    if let Some((hit_book, hit_chapter)) = live_pause_out_of_scope_bible_book(
+        &results,
+        book_number,
+        chapter,
+        stale_secs,
+        semantic_min_confidence,
+    ) {
+        let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
+        if streak >= READING_SCOPE_RELEASE_STREAK {
+            log::info!(
+                "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
+                 ({stale_secs}s since last verse match; {streak} repeated out-of-scope hits on {hit_book}:{hit_chapter})"
+            );
+            pause_stale_reading_scope(app);
+            return results;
+        }
+    } else if let Some((hit_book, hit_chapter)) =
         strong_out_of_scope_bible_book(&results, book_number, chapter)
     {
+        // Faster path than the staleness clock: several consecutive strong hits
+        // on the same out-of-scope passage mean the speaker has moved on. Any
+        // in-scope verse match resets the streak, so echoes during real reading
+        // still get suppressed.
         let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
         if streak >= READING_SCOPE_RELEASE_STREAK {
             log::info!(
