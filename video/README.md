@@ -26,6 +26,7 @@ npm run dev        # opens Remotion Studio; pick LaunchFilm or SocialCut
 ```bash
 npm run render        # -> out/launch-16x9.mp4
 npm run render:social # -> out/social-9x16.mp4
+npm run render:tutorial # -> out/operator-tutorial-16x9.mp4
 npm run render:all    # both
 ```
 
@@ -38,6 +39,7 @@ With no file present, the video renders silently — no code change needed.
 
 ## Editing
 
+- **Operator tutorial** - `src/TutorialVideo.tsx`.
 - **CTA URL** — `src/scenes/CTA.tsx`, the `SITE_URL` constant.
 - **Brand colors / fonts** — `src/theme.ts`.
 - **Scene order / durations** — `src/Film.tsx` (`LANDSCAPE` / `PORTRAIT` arrays).

@@ -1,10 +1,11 @@
-import { Composition } from "remotion";
-import { Film } from "./Film";
-import { Carousel, CAROUSEL_SLIDES } from "./Carousel";
-import { CarouselAfr, CAROUSEL_AFR_SLIDES } from "./CarouselAfr";
-import { CarouselKinetic, CAROUSEL_KINETIC_SLIDES } from "./CarouselKinetic";
+import { Composition } from "remotion"
+import { Film } from "./Film"
+import { Carousel, CAROUSEL_SLIDES } from "./Carousel"
+import { CarouselAfr, CAROUSEL_AFR_SLIDES } from "./CarouselAfr"
+import { CarouselKinetic, CAROUSEL_KINETIC_SLIDES } from "./CarouselKinetic"
+import { TutorialVideo, TUTORIAL_DURATION_FRAMES } from "./TutorialVideo"
 
-const FPS = 30;
+const FPS = 30
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -51,6 +52,14 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
       />
+      <Composition
+        id="OperatorTutorial"
+        component={TutorialVideo}
+        durationInFrames={TUTORIAL_DURATION_FRAMES}
+        fps={FPS}
+        width={1920}
+        height={1080}
+      />
     </>
-  );
-};
+  )
+}

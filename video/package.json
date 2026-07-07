@@ -7,11 +7,13 @@
     "dev": "remotion studio",
     "render": "remotion render LaunchFilm out/launch-16x9.mp4",
     "render:social": "remotion render SocialCut out/social-9x16.mp4",
+    "render:tutorial": "remotion render OperatorTutorial out/operator-tutorial-16x9.mp4",
     "render:all": "npm run render && npm run render:social",
     "render:carousel": "node scripts/render-carousel.mjs",
     "render:carousel:afr": "node scripts/render-carousel-afr.mjs",
     "render:carousel:kinetic": "node scripts/render-carousel-kinetic.mjs",
-    "still": "remotion still LaunchFilm out/frame-hook.png --frame=120"
+    "still": "remotion still LaunchFilm out/frame-hook.png --frame=120",
+    "still:tutorial": "remotion still OperatorTutorial out/operator-tutorial-frame.png --frame=900"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",
