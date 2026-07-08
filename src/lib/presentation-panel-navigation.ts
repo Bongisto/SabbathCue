@@ -200,15 +200,15 @@ function findAdjacentEgwParagraph(
     (paragraph) =>
       paragraph.id === current.id ||
       (paragraph.book_number === current.book_number &&
-        paragraph.chapter === current.chapter &&
-        paragraph.paragraph === current.paragraph)
+        paragraph.page === current.page &&
+        paragraph.page_paragraph === current.page_paragraph)
   )
   if (currentIndex < 0) return null
   const next = paragraphs[currentIndex + delta]
   if (!next) return null
   if (
     next.book_number !== current.book_number ||
-    next.chapter !== current.chapter
+    next.page !== current.page
   ) {
     return null
   }
@@ -228,13 +228,13 @@ async function advanceEgwParagraph(
     .currentParagraphs.filter(
       (paragraph) =>
         paragraph.book_number === current.book_number &&
-        paragraph.chapter === current.chapter
+        paragraph.page === current.page
     )
 
   if (paragraphs.length === 0) {
-    paragraphs = await egwActions.loadChapter(
+    paragraphs = await egwActions.loadPage(
       current.book_number,
-      current.chapter
+      current.page
     )
   }
 

@@ -384,7 +384,7 @@ pub(crate) fn run_semantic_detection(
     //
     // Catch Ellen White references that endpointing fragmented across several
     // finals: the single-final direct pass misses them, but the rolling window
-    // still holds the whole "Book chapter N paragraph M". Emit the explicit
+    // still holds the whole "Book page N paragraph M". Emit the explicit
     // paragraph and skip fuzzy search.
     let mut egw_explicit = {
         let app_managed: State<'_, Mutex<AppState>> = app.state();

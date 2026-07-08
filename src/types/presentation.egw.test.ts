@@ -13,9 +13,11 @@ describe("EGW presentation render data", () => {
         chapter: 1,
         chapter_title: "Why Was Sin Permitted?",
         paragraph: 3,
+        page: 34,
+        page_paragraph: 2,
         text: "God is love.",
       },
-      reference: "Patriarchs and Prophets 1:3",
+      reference: "Patriarchs and Prophets p.34 par.2",
       slideId: "egw-1-0",
       slideIndex: 0,
       slideCount: 1,
@@ -23,7 +25,7 @@ describe("EGW presentation render data", () => {
     }
     const render = getPresentationRenderData(item)
     expect(render.kind).toBe("egw")
-    expect(render.reference).toBe("Patriarchs and Prophets 1:3")
+    expect(render.reference).toBe("Patriarchs and Prophets p.34 par.2")
     expect(render.segments).toEqual([{ text: "God is love." }])
   })
 

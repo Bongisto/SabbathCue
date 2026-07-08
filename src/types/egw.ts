@@ -12,6 +12,11 @@ export interface EgwChapterInfo {
   paragraph_count: number
 }
 
+export interface EgwPageInfo {
+  page: number
+  paragraph_count: number
+}
+
 export interface EgwSemanticStatus {
   ready: boolean
   building: boolean
@@ -32,5 +37,7 @@ export interface EgwParagraph {
   chapter: number
   chapter_title: string
   paragraph: number
+  page: number
+  page_paragraph: number
   text: string
 }

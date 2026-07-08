@@ -690,11 +690,11 @@ describe("verse detection workflow", () => {
     await handleVerseDetections([
       makeDetection({
         content_type: "egw",
-        verse_ref: "Patriarchs and Prophets 1:2",
+        verse_ref: "Patriarchs and Prophets p.29 par.2",
         verse_text: "The history of the great conflict.",
         book_name: "Patriarchs and Prophets",
         book_number: 1,
-        chapter: 1,
+        chapter: 29,
         verse: 2,
         auto_queued: false,
         egw_paragraph: {
@@ -704,6 +704,8 @@ describe("verse detection workflow", () => {
           chapter: 1,
           chapter_title: "Why Was Sin Permitted?",
           paragraph: 2,
+          page: 29,
+          page_paragraph: 2,
           text: "The history of the great conflict.",
         },
       }),
@@ -712,11 +714,11 @@ describe("verse detection workflow", () => {
     expect(useBibleStore.getState().selectedVerse).toBeNull()
     expect(useEgwSlideStore.getState().deck[0]).toMatchObject({
       kind: "egw",
-      reference: "Patriarchs and Prophets 1:2",
+      reference: "Patriarchs and Prophets p.29 par.2",
     })
     expect(useBroadcastStore.getState().previewItem).toMatchObject({
       kind: "egw",
-      reference: "Patriarchs and Prophets 1:2",
+      reference: "Patriarchs and Prophets p.29 par.2",
     })
   })
 
@@ -724,11 +726,11 @@ describe("verse detection workflow", () => {
     await handleVerseDetections([
       makeDetection({
         content_type: "egw",
-        verse_ref: "Patriarchs and Prophets 1:2",
+        verse_ref: "Patriarchs and Prophets p.29 par.2",
         verse_text: "The history of the great conflict.",
         book_name: "Patriarchs and Prophets",
         book_number: 1,
-        chapter: 1,
+        chapter: 29,
         verse: 2,
         auto_queued: true,
         egw_paragraph: {
@@ -738,6 +740,8 @@ describe("verse detection workflow", () => {
           chapter: 1,
           chapter_title: "Why Was Sin Permitted?",
           paragraph: 2,
+          page: 29,
+          page_paragraph: 2,
           text: "The history of the great conflict.",
         },
       }),
@@ -747,7 +751,7 @@ describe("verse detection workflow", () => {
     expect(useBroadcastStore.getState().isLive).toBe(true)
     expect(useBroadcastStore.getState().liveItem).toMatchObject({
       kind: "egw",
-      reference: "Patriarchs and Prophets 1:2",
+      reference: "Patriarchs and Prophets p.29 par.2",
     })
     expect(emitToMock).toHaveBeenCalledWith(
       "broadcast",
@@ -755,7 +759,7 @@ describe("verse detection workflow", () => {
       expect.objectContaining({
         item: expect.objectContaining({
           kind: "egw",
-          reference: "Patriarchs and Prophets 1:2",
+          reference: "Patriarchs and Prophets p.29 par.2",
         }),
       })
     )

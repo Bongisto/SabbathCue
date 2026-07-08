@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS embedding_status (
     UNIQUE(translation_id, model_name)
 );
 
--- Ellen G. White books, addressed by chapter + paragraph (not verse).
+-- Ellen G. White books, addressed by printed page + paragraph (not verse).
 CREATE TABLE IF NOT EXISTS egw_books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book_number INTEGER NOT NULL UNIQUE,
@@ -75,9 +75,13 @@ CREATE TABLE IF NOT EXISTS egw_paragraphs (
     chapter INTEGER NOT NULL,
     chapter_title TEXT NOT NULL,
     paragraph INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    page_paragraph INTEGER NOT NULL,
     text TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_egw_lookup ON egw_paragraphs(book_number, chapter, paragraph);
 CREATE INDEX IF NOT EXISTS idx_egw_chapter ON egw_paragraphs(book_number, chapter);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_egw_unique ON egw_paragraphs(book_number, chapter, paragraph);
+CREATE INDEX IF NOT EXISTS idx_egw_page ON egw_paragraphs(book_number, page);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_egw_page_unique ON egw_paragraphs(book_number, page, page_paragraph);

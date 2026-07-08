@@ -1,6 +1,6 @@
 /**
  * Populates the egw_books / egw_paragraphs tables inside rhema.db from
- * Ellen G. White source JSON (chapter + paragraph addressing).
+ * Ellen G. White source JSON (printed page + paragraph addressing).
  *
  * Run: bun run build:egw
  * Prereq: bun run build:bible (creates rhema.db + empty egw_* tables).
@@ -28,7 +28,12 @@ interface EgwSource {
   chapters: Array<{
     chapter: number
     title: string
-    paragraphs: Array<{ paragraph: number; text: string }>
+    paragraphs: Array<{
+      paragraph: number
+      page: number
+      page_paragraph: number
+      text: string
+    }>
   }>
 }
 
@@ -55,18 +60,22 @@ function main() {
   db.exec(
     "CREATE TABLE IF NOT EXISTS egw_books (id INTEGER PRIMARY KEY AUTOINCREMENT, book_number INTEGER NOT NULL UNIQUE, title TEXT NOT NULL, abbreviation TEXT NOT NULL, chapter_count INTEGER NOT NULL DEFAULT 0);"
   )
+  db.exec("DROP TABLE IF EXISTS egw_paragraphs_fts;")
+  db.exec("DROP TABLE IF EXISTS egw_paragraphs;")
   db.exec(
-    "CREATE TABLE IF NOT EXISTS egw_paragraphs (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL REFERENCES egw_books(id), book_number INTEGER NOT NULL, book_title TEXT NOT NULL, chapter INTEGER NOT NULL, chapter_title TEXT NOT NULL, paragraph INTEGER NOT NULL, text TEXT NOT NULL);"
+    "CREATE TABLE egw_paragraphs (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL REFERENCES egw_books(id), book_number INTEGER NOT NULL, book_title TEXT NOT NULL, chapter INTEGER NOT NULL, chapter_title TEXT NOT NULL, paragraph INTEGER NOT NULL, page INTEGER NOT NULL, page_paragraph INTEGER NOT NULL, text TEXT NOT NULL);"
   )
   db.exec("CREATE INDEX IF NOT EXISTS idx_egw_lookup ON egw_paragraphs(book_number, chapter, paragraph);")
   db.exec("CREATE INDEX IF NOT EXISTS idx_egw_chapter ON egw_paragraphs(book_number, chapter);")
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_egw_unique ON egw_paragraphs(book_number, chapter, paragraph);")
+  db.exec("CREATE INDEX IF NOT EXISTS idx_egw_page ON egw_paragraphs(book_number, page);")
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_egw_page_unique ON egw_paragraphs(book_number, page, page_paragraph);")
 
   const insertBook = db.prepare(
     "INSERT OR REPLACE INTO egw_books (book_number, title, abbreviation, chapter_count) VALUES (?, ?, ?, ?)"
   )
   const insertPara = db.prepare(
-    "INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, text) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   )
 
   let totalParagraphs = 0
@@ -101,6 +110,8 @@ function main() {
             ch.chapter,
             ch.title,
             p.paragraph,
+            p.page,
+            p.page_paragraph,
             p.text
           )
           totalParagraphs++

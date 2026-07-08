@@ -1,13 +1,13 @@
 import { create } from "zustand"
-import type { EgwBook, EgwChapterInfo, EgwParagraph, EgwSemanticStatus } from "@/types"
+import type { EgwBook, EgwPageInfo, EgwParagraph, EgwSemanticStatus } from "@/types"
 
 export type EgwSearchMode = "keyword" | "context"
 
 interface EgwState {
   books: EgwBook[]
   selectedBookNumber: number | null
-  chapters: EgwChapterInfo[]
-  selectedChapter: number
+  pages: EgwPageInfo[]
+  selectedPage: number
   currentParagraphs: EgwParagraph[]
   searchResults: EgwParagraph[]
   selectedParagraphId: number | null
@@ -17,8 +17,8 @@ interface EgwState {
 
   setBooks: (books: EgwBook[]) => void
   setSelectedBookNumber: (n: number | null) => void
-  setChapters: (chapters: EgwChapterInfo[]) => void
-  setSelectedChapter: (chapter: number) => void
+  setPages: (pages: EgwPageInfo[]) => void
+  setSelectedPage: (page: number) => void
   setCurrentParagraphs: (paragraphs: EgwParagraph[]) => void
   setSearchResults: (results: EgwParagraph[]) => void
   setSelectedParagraphId: (id: number | null) => void
@@ -30,8 +30,8 @@ interface EgwState {
 export const useEgwStore = create<EgwState>((set) => ({
   books: [],
   selectedBookNumber: null,
-  chapters: [],
-  selectedChapter: 1,
+  pages: [],
+  selectedPage: 1,
   currentParagraphs: [],
   searchResults: [],
   selectedParagraphId: null,
@@ -43,13 +43,13 @@ export const useEgwStore = create<EgwState>((set) => ({
   setSelectedBookNumber: (selectedBookNumber) =>
     set({
       selectedBookNumber,
-      selectedChapter: 1,
-      chapters: [],
+      selectedPage: 1,
+      pages: [],
       currentParagraphs: [],
       selectedParagraphId: null,
     }),
-  setChapters: (chapters) => set({ chapters }),
-  setSelectedChapter: (selectedChapter) => set({ selectedChapter }),
+  setPages: (pages) => set({ pages }),
+  setSelectedPage: (selectedPage) => set({ selectedPage }),
   setCurrentParagraphs: (currentParagraphs) => set({ currentParagraphs }),
   setSearchResults: (searchResults) => set({ searchResults }),
   setSelectedParagraphId: (selectedParagraphId) => set({ selectedParagraphId }),

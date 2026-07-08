@@ -165,16 +165,16 @@ describe("DetectionsPanel", () => {
   it("renders an Ellen White detection card in the box", () => {
     const egwDetection: DetectionResult = {
       content_type: "egw",
-      verse_ref: "Steps to Christ 1:2",
+      verse_ref: "Steps to Christ p.9 par.2",
       verse_text: "Nature and revelation alike testify of God's love.",
       book_name: "Steps to Christ",
       book_number: 2,
-      chapter: 1,
+      chapter: 9,
       verse: 2,
       confidence: 0.94,
       source: "direct",
       auto_queued: false,
-      transcript_snippet: "steps to christ chapter one paragraph two",
+      transcript_snippet: "steps to christ page nine paragraph two",
       is_chapter_only: false,
       egw_paragraph: {
         id: 1,
@@ -183,13 +183,15 @@ describe("DetectionsPanel", () => {
         chapter: 1,
         chapter_title: "God's Love for Man",
         paragraph: 2,
+        page: 9,
+        page_paragraph: 2,
         text: "Nature and revelation alike testify of God's love.",
       },
     }
     detectionsRef.current = [egwDetection]
     render(<DetectionsPanel />)
 
-    expect(screen.getByText("Steps to Christ 1:2")).toBeTruthy()
+    expect(screen.getByText("Steps to Christ p.9 par.2")).toBeTruthy()
     expect(
       screen.getByText("Nature and revelation alike testify of God's love.")
     ).toBeTruthy()

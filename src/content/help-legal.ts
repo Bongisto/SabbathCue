@@ -85,7 +85,7 @@ export const HELP_GUIDE_SECTIONS = [
     items: [
       "Do enable Auto mode only when you are comfortable with high-confidence matches going to live output.",
       "Do keep the Auto-live threshold near the default 85% unless your room needs a stricter or looser setting.",
-      "Do say Ellen White references as book, chapter, and paragraph, for example 'Patriarchs and Prophets chapter one paragraph two'.",
+      "Do say Ellen White references as book, page, and paragraph, for example 'Patriarchs and Prophets page twenty nine paragraph two'.",
       "Do use Manual mode for important services where every slide must be reviewed before display.",
       "Don't expect semantic suggestions to appear when Semantic detection is off; when it is on, suggestions above the Semantic confidence threshold stay visible for review.",
       "Don't leave stale suggestions in the box during a new topic; Recent detections auto-clear after 10 seconds and can be cleared manually.",

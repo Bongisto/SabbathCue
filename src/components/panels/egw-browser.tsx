@@ -47,7 +47,7 @@ type EgwView = "browse" | "search"
 interface EgwBrowserBodyProps {
   view: EgwView
   books: EgwBook[]
-  currentChapterTitle: string
+  currentPageLabel: string
   currentParagraphs: EgwParagraph[]
   searchMode: "keyword" | "context"
   semanticStatus: EgwSemanticStatus | null
@@ -76,7 +76,7 @@ function CenteredEmptyState({
 function EgwBrowserBody({
   view,
   books,
-  currentChapterTitle,
+  currentPageLabel,
   currentParagraphs,
   searchMode,
   semanticStatus,
@@ -98,9 +98,9 @@ function EgwBrowserBody({
 
     return (
       <div className="flex flex-col gap-0 p-2">
-        {currentChapterTitle ? (
+        {currentPageLabel ? (
           <h3 className="px-1 py-2 text-sm font-semibold text-foreground">
-            {currentChapterTitle}
+            {currentPageLabel}
           </h3>
         ) : null}
         {currentParagraphs.map((p) => renderRow(p))}
@@ -179,8 +179,8 @@ export function EgwBrowser() {
   const {
     books,
     selectedBookNumber,
-    chapters,
-    selectedChapter,
+    pages,
+    selectedPage,
     currentParagraphs,
     searchResults,
     selectedParagraphId,
@@ -208,13 +208,13 @@ export function EgwBrowser() {
 
   useEffect(() => {
     if (selectedBookNumber == null) return
-    egwActions.loadChapters(selectedBookNumber).catch(console.error)
+    egwActions.loadPages(selectedBookNumber).catch(console.error)
   }, [selectedBookNumber])
 
   useEffect(() => {
     if (selectedBookNumber == null) return
-    egwActions.loadChapter(selectedBookNumber, selectedChapter).catch(console.error)
-  }, [selectedBookNumber, selectedChapter])
+    egwActions.loadPage(selectedBookNumber, selectedPage).catch(console.error)
+  }, [selectedBookNumber, selectedPage])
 
   useEffect(() => {
     return () => {
@@ -222,10 +222,16 @@ export function EgwBrowser() {
     }
   }, [])
 
-  const chapterCount = useMemo(() => chapters.length, [chapters])
-  const currentChapterTitle = useMemo(
-    () => chapters.find((c) => c.chapter === selectedChapter)?.title ?? "",
-    [chapters, selectedChapter]
+  const currentPageIndex = useMemo(
+    () => pages.findIndex((p) => p.page === selectedPage),
+    [pages, selectedPage]
+  )
+  const currentPageLabel = useMemo(
+    () =>
+      pages.some((p) => p.page === selectedPage)
+        ? `Page ${selectedPage}`
+        : "",
+    [pages, selectedPage]
   )
 
   const runSearch = useCallback((value: string) => {
@@ -290,12 +296,13 @@ export function EgwBrowser() {
     previewEgwParagraph(p)
   }, [])
 
-  const goToChapter = useCallback(
-    (chapter: number) => {
-      if (chapter < 1 || (chapterCount > 0 && chapter > chapterCount)) return
-      useEgwStore.getState().setSelectedChapter(chapter)
+  const goToPageIndex = useCallback(
+    (pageIndex: number) => {
+      const next = pages[pageIndex]
+      if (!next) return
+      useEgwStore.getState().setSelectedPage(next.page)
     },
-    [chapterCount],
+    [pages],
   )
 
   const moveParagraphSelection = useCallback(
@@ -325,19 +332,19 @@ export function EgwBrowser() {
         return
       }
 
-      const isChapterKey =
+      const isPageKey =
         event.key === "ArrowLeft" ||
         event.key === "ArrowRight" ||
         event.key === "PageUp" ||
         event.key === "PageDown"
 
-      if (isChapterKey && view === "browse") {
+      if (isPageKey && view === "browse") {
         event.preventDefault()
         event.stopPropagation()
         if (event.key === "ArrowLeft" || event.key === "PageUp") {
-          goToChapter(selectedChapter - 1)
+          goToPageIndex(currentPageIndex - 1)
         } else {
-          goToChapter(selectedChapter + 1)
+          goToPageIndex(currentPageIndex + 1)
         }
         return
       }
@@ -348,13 +355,13 @@ export function EgwBrowser() {
         moveParagraphSelection(event.key === "ArrowUp" ? -1 : 1)
       }
     },
-    [goToChapter, moveParagraphSelection, selectedChapter, view],
+    [currentPageIndex, goToPageIndex, moveParagraphSelection, view],
   )
 
   useEffect(() => {
     if (view !== "browse") return
     panelRef.current?.focus({ preventScroll: true })
-  }, [view, selectedBookNumber, selectedChapter])
+  }, [view, selectedBookNumber, selectedPage])
 
   const focusPanel = useCallback(() => {
     panelRef.current?.focus({ preventScroll: true })
@@ -430,19 +437,21 @@ export function EgwBrowser() {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                disabled={selectedChapter <= 1}
-                onClick={() => goToChapter(selectedChapter - 1)}
+                disabled={currentPageIndex <= 0}
+                onClick={() => goToPageIndex(currentPageIndex - 1)}
               >
                 <ArrowLeftIcon className="size-3" />
               </Button>
               <span className="min-w-12 text-center text-xs font-medium">
-                Ch {selectedChapter}
+                p. {selectedPage}
               </span>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                disabled={chapterCount === 0 || selectedChapter >= chapterCount}
-                onClick={() => goToChapter(selectedChapter + 1)}
+                disabled={
+                  currentPageIndex < 0 || currentPageIndex >= pages.length - 1
+                }
+                onClick={() => goToPageIndex(currentPageIndex + 1)}
               >
                 <ArrowRightIcon className="size-3" />
               </Button>
@@ -482,7 +491,7 @@ export function EgwBrowser() {
         <EgwBrowserBody
           view={view}
           books={books}
-          currentChapterTitle={currentChapterTitle}
+          currentPageLabel={currentPageLabel}
           currentParagraphs={currentParagraphs}
           searchMode={searchMode}
           semanticStatus={semanticStatus}

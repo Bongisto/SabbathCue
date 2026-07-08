@@ -222,7 +222,7 @@ export async function refreshLiveTranslation(): Promise<void> {
 }
 
 export function egwReference(p: EgwParagraph): string {
-  return `${p.book_title} ${p.chapter}:${p.paragraph}`
+  return `${p.book_title} p.${p.page} par.${p.page_paragraph}`
 }
 
 function splitEgwTextForSlides(text: string): { text: string }[] {

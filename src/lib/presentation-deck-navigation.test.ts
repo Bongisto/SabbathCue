@@ -39,9 +39,11 @@ function egwSlide(index: number, count = 2): EgwPresentationItemData {
       chapter: 1,
       chapter_title: "Chapter",
       paragraph: 1,
+      page: 29,
+      page_paragraph: 1,
       text: "Sample text.",
     },
-    reference: `Test Book 1:1 (${index + 1}/${count})`,
+    reference: `Test Book p.29 par.1 (${index + 1}/${count})`,
     slideId: `egw-1-${index}`,
     slideIndex: index,
     slideCount: count,
@@ -96,7 +98,7 @@ describe("presentation deck navigation", () => {
     expect(
       presentationDeckKind({
         kind: "egw",
-        reference: "Test 1:1 (1/2)",
+        reference: "Test p.29 par.1 (1/2)",
         segments: [],
         hymnSlide: { screenId: "egw-1-0", slideIndex: 0, slideCount: 2 },
       }),

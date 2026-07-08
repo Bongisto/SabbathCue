@@ -49,7 +49,7 @@ describe("textForPresentation", () => {
   it("keeps EGW slide segments on separate lines", () => {
     const egw = {
       kind: "egw",
-      reference: "Steps to Christ 1:1",
+      reference: "Steps to Christ p.9 par.1",
       segments: [{ text: "Nature and revelation alike testify" }],
     } as unknown as PresentationRenderData
 

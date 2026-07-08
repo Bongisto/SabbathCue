@@ -343,7 +343,7 @@ mod tests {
              CREATE TABLE books (id INTEGER PRIMARY KEY, translation_id INTEGER, book_number INTEGER, name TEXT, abbreviation TEXT, testament TEXT);
              CREATE TABLE verses (id INTEGER PRIMARY KEY, translation_id INTEGER, book_number INTEGER, book_name TEXT, book_abbreviation TEXT, chapter INTEGER, verse INTEGER, text TEXT);
              CREATE TABLE egw_books (id INTEGER PRIMARY KEY AUTOINCREMENT, book_number INTEGER NOT NULL UNIQUE, title TEXT NOT NULL, abbreviation TEXT NOT NULL, chapter_count INTEGER NOT NULL DEFAULT 0);
-             CREATE TABLE egw_paragraphs (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL, book_number INTEGER NOT NULL, book_title TEXT NOT NULL, chapter INTEGER NOT NULL, chapter_title TEXT NOT NULL, paragraph INTEGER NOT NULL, text TEXT NOT NULL);
+             CREATE TABLE egw_paragraphs (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL, book_number INTEGER NOT NULL, book_title TEXT NOT NULL, chapter INTEGER NOT NULL, chapter_title TEXT NOT NULL, paragraph INTEGER NOT NULL, page INTEGER NOT NULL, page_paragraph INTEGER NOT NULL, text TEXT NOT NULL);
              INSERT INTO translations VALUES
                (1, 'KJV', 'King James', 'en', 0, 1),
                (2, 'NKJV', 'New King James', 'en', 1, 1),
@@ -366,9 +366,9 @@ mod tests {
              INSERT INTO egw_books (book_number, title, abbreviation, chapter_count) VALUES
                (1, 'Patriarchs and Prophets', 'PP', 2),
                (2, 'The Desire of Ages', 'DA', 1);
-             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, text) VALUES
-               (1, 1, 'Patriarchs and Prophets', 1, 'Why Was Sin Permitted?', 2, 'The history of the great conflict.'),
-               (2, 2, 'The Desire of Ages', 14, 'We Have Found the Messias', 3, 'Jesus had bidden Peter and his companions follow Him.');
+             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text) VALUES
+               (1, 1, 'Patriarchs and Prophets', 1, 'Why Was Sin Permitted?', 2, 29, 2, 'The history of the great conflict.'),
+               (2, 2, 'The Desire of Ages', 14, 'We Have Found the Messias', 3, 73, 3, 'Jesus had bidden Peter and his companions follow Him.');
              CREATE VIRTUAL TABLE egw_paragraphs_fts USING fts5(text, content='egw_paragraphs', content_rowid='id', tokenize='unicode61');
              INSERT INTO egw_paragraphs_fts(rowid, text) SELECT id, text FROM egw_paragraphs;",
         )
@@ -529,17 +529,17 @@ mod tests {
     }
 
     #[test]
-    fn detect_egw_references_finds_title_chapter_paragraph() {
+    fn detect_egw_references_finds_title_page_paragraph() {
         let fixture = fixture_state(1);
 
         let results = detect_egw_references(
             &fixture.state,
-            "please read Patriarchs and Prophets chapter one paragraph two",
+            "please read Patriarchs and Prophets page twenty nine paragraph two",
         );
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content_type, "egw");
-        assert_eq!(results[0].verse_ref, "Patriarchs and Prophets 1:2");
+        assert_eq!(results[0].verse_ref, "Patriarchs and Prophets p.29 par.2");
         assert_eq!(
             results[0].egw_paragraph.as_ref().map(|p| p.text.as_str()),
             Some("The history of the great conflict.")
@@ -551,7 +551,7 @@ mod tests {
         let fixture = fixture_state(1);
         let mut results = detect_egw_references(
             &fixture.state,
-            "please read Patriarchs and Prophets chapter one paragraph two",
+            "please read Patriarchs and Prophets page twenty nine paragraph two",
         );
         let mut merger = DetectionMerger::new();
         apply_detection_settings_to_merger(
@@ -571,7 +571,10 @@ mod tests {
     #[test]
     fn egw_direct_results_do_not_auto_queue_in_manual_mode() {
         let fixture = fixture_state(1);
-        let mut results = detect_egw_references(&fixture.state, "PP 1:2");
+        let mut results = detect_egw_references(
+            &fixture.state,
+            "Patriarchs and Prophets page twenty nine paragraph two",
+        );
         let mut merger = DetectionMerger::new();
         apply_detection_settings_to_merger(
             &mut merger,
@@ -596,11 +599,11 @@ mod tests {
 
         let results = detect_egw_references(
             &fixture.state,
-            "testing one two the desire of ages chapter fourteen paragraph three and then we continue",
+            "testing one two the desire of ages page seventy three paragraph three and then we continue",
         );
 
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].verse_ref, "The Desire of Ages 14:3");
+        assert_eq!(results[0].verse_ref, "The Desire of Ages p.73 par.3");
         assert_eq!(results[0].source, "direct");
     }
 
@@ -610,26 +613,27 @@ mod tests {
 
         let results = detect_egw_references(
             &fixture.state,
-            "um can we go to patriarchs and prophets chapter one paragraph two please",
+            "um can we go to patriarchs and prophets page twenty nine paragraph two please",
         );
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content_type, "egw");
-        assert_eq!(results[0].verse_ref, "Patriarchs and Prophets 1:2");
+        assert_eq!(results[0].verse_ref, "Patriarchs and Prophets p.29 par.2");
         assert_eq!(results[0].source, "direct");
     }
 
     #[test]
-    fn detect_egw_references_finds_abbreviation_colon_style_reference() {
+    fn detect_egw_references_ignores_shorthand_references() {
         let fixture = fixture_state(1);
 
-        let results = detect_egw_references(&fixture.state, "DA 14:3");
+        let results = detect_egw_references(&fixture.state, "DA 73.3");
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].content_type, "egw");
-        assert_eq!(results[0].verse_ref, "The Desire of Ages 14:3");
-        assert_eq!(results[0].chapter, 14);
-        assert_eq!(results[0].verse, 3);
+        assert!(results.is_empty());
+
+        let results =
+            detect_egw_references(&fixture.state, "DA page seventy three paragraph three");
+
+        assert!(results.is_empty());
     }
 
     #[test]
@@ -654,7 +658,10 @@ mod tests {
     fn detect_egw_references_requires_existing_paragraph() {
         let fixture = fixture_state(1);
 
-        let results = detect_egw_references(&fixture.state, "PP 1:99");
+        let results = detect_egw_references(
+            &fixture.state,
+            "Patriarchs and Prophets page twenty nine paragraph ninety nine",
+        );
 
         assert!(results.is_empty());
     }

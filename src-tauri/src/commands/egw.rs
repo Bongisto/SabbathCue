@@ -8,7 +8,7 @@ use tauri::State;
 
 use super::validation::{bounded_limit, bounded_text, MAX_QUERY_BYTES};
 use crate::state::AppState;
-use rhema_bible::{BibleDb, BibleError, EgwBook, EgwChapterInfo, EgwParagraph};
+use rhema_bible::{BibleDb, BibleError, EgwBook, EgwChapterInfo, EgwPageInfo, EgwParagraph};
 
 const EGW_DB_NOT_LOADED: &str = "Bible database not loaded";
 
@@ -38,12 +38,29 @@ pub fn egw_list_chapters(
 }
 
 #[tauri::command]
+pub fn egw_list_pages(
+    state: State<'_, Mutex<AppState>>,
+    book_number: i32,
+) -> Result<Vec<EgwPageInfo>, String> {
+    with_db(&state, |db| db.list_egw_pages(book_number))
+}
+
+#[tauri::command]
 pub fn egw_get_chapter(
     state: State<'_, Mutex<AppState>>,
     book_number: i32,
     chapter: i32,
 ) -> Result<Vec<EgwParagraph>, String> {
     with_db(&state, |db| db.get_egw_chapter(book_number, chapter))
+}
+
+#[tauri::command]
+pub fn egw_get_page(
+    state: State<'_, Mutex<AppState>>,
+    book_number: i32,
+    page: i32,
+) -> Result<Vec<EgwParagraph>, String> {
+    with_db(&state, |db| db.get_egw_page(book_number, page))
 }
 
 #[tauri::command]

@@ -128,12 +128,10 @@ fn is_reference_filler(token: &str) -> bool {
         "book"
             | "of"
             | "the"
-            | "chapter"
-            | "chapters"
+            | "page"
+            | "pages"
             | "paragraph"
             | "paragraphs"
-            | "para"
-            | "par"
             | "number"
             | "no"
             | "ellen"
@@ -171,26 +169,15 @@ fn parse_number_after_label(tokens: &[&str], labels: &[&str]) -> Option<ParsedNu
     None
 }
 
-fn parse_egw_chapter_paragraph(tail: &str) -> Option<(i32, i32)> {
+fn parse_egw_page_paragraph(tail: &str) -> Option<(i32, i32)> {
     let tokens: Vec<&str> = tail.split_whitespace().collect();
     if tokens.is_empty() {
         return None;
     }
 
-    let chapter = parse_number_after_label(&tokens, &["chapter", "chapters"]);
-    let paragraph = parse_number_after_label(&tokens, &["paragraph", "paragraphs", "para", "par"]);
-    if let (Some(chapter), Some(paragraph)) = (chapter, paragraph) {
-        return Some((chapter.value, paragraph.value));
-    }
-
-    if let Some(chapter) = chapter {
-        let paragraph = parse_next_number(&tokens, chapter.next_index)?;
-        return Some((chapter.value, paragraph.value));
-    }
-
-    let chapter = parse_next_number(&tokens, 0)?;
-    let paragraph = parse_next_number(&tokens, chapter.next_index)?;
-    Some((chapter.value, paragraph.value))
+    let page = parse_number_after_label(&tokens, &["page", "pages"])?;
+    let paragraph = parse_number_after_label(&tokens, &["paragraph", "paragraphs"])?;
+    Some((page.value, paragraph.value))
 }
 
 fn alias_match_end(text: &str, alias: &str) -> Option<usize> {
@@ -210,13 +197,11 @@ fn alias_match_end(text: &str, alias: &str) -> Option<usize> {
 
 fn egw_aliases(book: &EgwBook) -> Vec<String> {
     let mut aliases = Vec::new();
-    for value in [&book.title, &book.abbreviation] {
-        let alias = normalize_reference_text(value);
-        if !alias.is_empty() && !aliases.contains(&alias) {
-            aliases.push(alias.clone());
-        }
+    let alias = normalize_reference_text(&book.title);
+    if !alias.is_empty() {
+        aliases.push(alias.clone());
         if let Some(without_the) = alias.strip_prefix("the ") {
-            if !without_the.is_empty() && !aliases.iter().any(|item| item == without_the) {
+            if !without_the.is_empty() {
                 aliases.push(without_the.to_string());
             }
         }
@@ -279,8 +264,8 @@ pub(crate) fn detect_egw_fts(state: &AppState, text: &str) -> Vec<DetectionResul
     }
 }
 
-/// Detect explicit Ellen G. White paragraph references like `PP 1:2` or
-/// `Patriarchs and Prophets chapter one paragraph two`.
+/// Detect explicit Ellen G. White paragraph references like
+/// `Patriarchs and Prophets page twenty nine paragraph two`.
 pub(crate) fn detect_egw_references(state: &AppState, text: &str) -> Vec<DetectionResult> {
     let Some(db) = state.bible_db.as_ref() else {
         return Vec::new();
@@ -306,26 +291,26 @@ pub(crate) fn detect_egw_references(state: &AppState, text: &str) -> Vec<Detecti
     let mut results = Vec::new();
     for (book, alias_end, _) in best_egw_alias_match(&normalized, &books) {
         let tail = normalized.get(alias_end..).unwrap_or_default().trim();
-        let Some((chapter, paragraph_number)) = parse_egw_chapter_paragraph(tail) else {
+        let Some((page, paragraph_number)) = parse_egw_page_paragraph(tail) else {
             continue;
         };
-        if chapter <= 0 || paragraph_number <= 0 {
+        if page <= 0 || paragraph_number <= 0 {
             continue;
         }
-        if !seen.insert((book.book_number, chapter, paragraph_number)) {
+        if !seen.insert((book.book_number, page, paragraph_number)) {
             continue;
         }
 
-        match db.get_egw_paragraph(book.book_number, chapter, paragraph_number) {
+        match db.get_egw_paragraph_by_page(book.book_number, page, paragraph_number) {
             Ok(Some(paragraph)) => {
                 results.push(egw_to_result(paragraph, 0.94, text));
             }
             Ok(None) => {}
             Err(error) => {
                 log::warn!(
-                    "[DET-EGW] Failed to resolve {} {}:{}: {error}",
+                    "[DET-EGW] Failed to resolve {} p.{} par.{}: {error}",
                     book.title,
-                    chapter,
+                    page,
                     paragraph_number
                 );
             }
