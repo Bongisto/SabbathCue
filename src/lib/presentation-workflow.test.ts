@@ -37,6 +37,8 @@ const sampleEgwParagraph: EgwParagraph = {
   chapter: 2,
   chapter_title: "The Creation",
   paragraph: 5,
+  page: 34,
+  page_paragraph: 2,
   text: "God is love.",
 }
 
@@ -348,9 +350,9 @@ describe("presentation workflow", () => {
 
     expect(useBroadcastStore.getState().liveItem).toMatchObject({
       kind: "egw",
-      reference: "Patriarchs and Prophets 2:5",
+      reference: "Patriarchs and Prophets p.34 par.2",
       segments: [{ text: "God is love." }],
     })
-    expectBroadcastOutputsFor("Patriarchs and Prophets 2:5")
+    expectBroadcastOutputsFor("Patriarchs and Prophets p.34 par.2")
   })
 })

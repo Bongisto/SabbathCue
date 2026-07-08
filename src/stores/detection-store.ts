@@ -253,7 +253,7 @@ function verseRefMatches(
 function detectionKey(detection: DetectionResult): string {
   if (detection.content_type === "egw" && detection.egw_paragraph) {
     const paragraph = detection.egw_paragraph
-    return `egw:${paragraph.book_number}:${paragraph.chapter}:${paragraph.paragraph}`
+    return `egw:${paragraph.book_number}:${paragraph.page}:${paragraph.page_paragraph}`
   }
 
   const normalizedRef = normalizeVerseRef(detection.verse_ref)

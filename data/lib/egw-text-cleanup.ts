@@ -1,5 +1,8 @@
 export interface EgwParagraphSource {
   paragraph: number
+  page?: number
+  page_paragraph?: number
+  continued_pages?: number[]
   text: string
 }
 
@@ -9,6 +12,8 @@ export interface CleanEgwParagraphsOptions {
 }
 
 interface CleanedParagraph {
+  page?: number
+  continued_pages?: number[]
   text: string
   hadPageArtifact: boolean
 }
@@ -185,6 +190,13 @@ function shouldMergeParagraphs(
   previous: CleanedParagraph,
   next: CleanedParagraph,
 ): boolean {
+  if (
+    previous.page != null &&
+    next.page != null &&
+    previous.page !== next.page
+  ) {
+    return false
+  }
   if (!previous.hadPageArtifact && !next.hadPageArtifact) return false
   if (!hasTerminalPunctuation(previous.text)) return true
   return startsAsContinuation(next.text)
@@ -270,9 +282,17 @@ function mergeReadableContinuations(
     if (
       previous &&
       startsAsContinuation(paragraph.text) &&
-      (previous.hadPageArtifact || paragraph.hadPageArtifact)
+      (previous.hadPageArtifact || paragraph.hadPageArtifact) &&
+      (previous.page == null ||
+        paragraph.page == null ||
+        previous.page === paragraph.page)
     ) {
       previous.text = joinFragments(previous.text, paragraph.text)
+      previous.page = previous.page ?? paragraph.page
+      previous.continued_pages = [
+        ...(previous.continued_pages ?? []),
+        ...(paragraph.continued_pages ?? []),
+      ]
       previous.hadPageArtifact =
         previous.hadPageArtifact || paragraph.hadPageArtifact
       continue
@@ -288,7 +308,11 @@ export function cleanEgwParagraphs(
   options: CleanEgwParagraphsOptions,
 ): EgwParagraphSource[] {
   const cleaned = paragraphs
-    .map((paragraph) => stripPageArtifacts(paragraph.text, options))
+    .map((paragraph) => ({
+      ...stripPageArtifacts(paragraph.text, options),
+      page: paragraph.page,
+      continued_pages: paragraph.continued_pages,
+    }))
     .filter((paragraph) => paragraph.text.length > 0)
 
   const merged: CleanedParagraph[] = []
@@ -297,6 +321,11 @@ export function cleanEgwParagraphs(
     const previous = merged.at(-1)
     if (previous && shouldMergeParagraphs(previous, paragraph)) {
       previous.text = joinFragments(previous.text, paragraph.text)
+      previous.page = previous.page ?? paragraph.page
+      previous.continued_pages = [
+        ...(previous.continued_pages ?? []),
+        ...(paragraph.continued_pages ?? []),
+      ]
       previous.hadPageArtifact =
         previous.hadPageArtifact || paragraph.hadPageArtifact
       continue
@@ -307,6 +336,8 @@ export function cleanEgwParagraphs(
   const healed = merged.map((paragraph) => {
     const cleanedAgain = stripPageArtifacts(paragraph.text, options)
     return {
+      page: paragraph.page,
+      continued_pages: paragraph.continued_pages,
       text: restoreKnownLegacyDropouts(cleanedAgain.text, options),
       hadPageArtifact: paragraph.hadPageArtifact || cleanedAgain.hadPageArtifact,
     }
@@ -315,7 +346,10 @@ export function cleanEgwParagraphs(
   const readable = mergeReadableContinuations(
     healed.flatMap((paragraph) =>
       paragraph.hadPageArtifact
-        ? splitReadableParagraph(paragraph.text).map((text) => ({
+        ? splitReadableParagraph(paragraph.text).map((text, index, pieces) => ({
+            page: paragraph.page,
+            continued_pages:
+              index === pieces.length - 1 ? paragraph.continued_pages : undefined,
             text,
             hadPageArtifact: true,
           }))
@@ -325,6 +359,8 @@ export function cleanEgwParagraphs(
 
   return readable.map((paragraph, index) => ({
     paragraph: index + 1,
+    page: paragraph.page,
+    continued_pages: paragraph.continued_pages,
     text: paragraph.text,
   }))
 }

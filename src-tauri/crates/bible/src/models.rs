@@ -59,7 +59,7 @@ pub struct EgwBook {
     pub chapter_count: i32,
 }
 
-/// A single paragraph within an EGW book, addressed by chapter + paragraph.
+/// A single paragraph within an EGW book, addressed by printed page + paragraph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EgwParagraph {
     pub id: i64,
@@ -68,13 +68,22 @@ pub struct EgwParagraph {
     pub chapter: i32,
     pub chapter_title: String,
     pub paragraph: i32,
+    pub page: i32,
+    pub page_paragraph: i32,
     pub text: String,
 }
 
-/// Chapter metadata for an EGW book (for chapter navigation).
+/// Chapter metadata for legacy EGW chapter navigation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EgwChapterInfo {
     pub chapter: i32,
     pub title: String,
+    pub paragraph_count: i32,
+}
+
+/// Printed-page metadata for page-oriented EGW browsing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EgwPageInfo {
+    pub page: i32,
     pub paragraph_count: i32,
 }

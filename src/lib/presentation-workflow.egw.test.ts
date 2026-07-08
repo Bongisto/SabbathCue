@@ -13,18 +13,20 @@ const para: EgwParagraph = {
   chapter: 2,
   chapter_title: "The Creation",
   paragraph: 5,
+  page: 34,
+  page_paragraph: 2,
   text: "God is love.",
 }
 
 describe("EGW presentation helpers", () => {
-  it("formats the reference as title chapter:paragraph", () => {
-    expect(egwReference(para)).toBe("Patriarchs and Prophets 2:5")
+  it("formats the reference as title page paragraph", () => {
+    expect(egwReference(para)).toBe("Patriarchs and Prophets p.34 par.2")
   })
 
   it("builds an egw presentation item with readable segments", () => {
     const item = createEgwPresentationItem(para)
     expect(item.kind).toBe("egw")
-    expect(item.reference).toBe("Patriarchs and Prophets 2:5")
+    expect(item.reference).toBe("Patriarchs and Prophets p.34 par.2")
     expect(item.segments).toEqual([{ text: "God is love." }])
     expect(item.slideIndex).toBe(0)
     expect(item.slideCount).toBe(1)

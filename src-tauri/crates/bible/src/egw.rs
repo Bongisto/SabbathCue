@@ -1,6 +1,6 @@
 use crate::db::BibleDb;
 use crate::error::BibleError;
-use crate::models::{EgwBook, EgwChapterInfo, EgwParagraph};
+use crate::models::{EgwBook, EgwChapterInfo, EgwPageInfo, EgwParagraph};
 
 impl BibleDb {
     /// List all EGW books, ordered by book number.
@@ -9,7 +9,14 @@ impl BibleDb {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT id, book_number, title, abbreviation, chapter_count \
-             FROM egw_books ORDER BY book_number",
+             FROM egw_books b \
+             WHERE EXISTS ( \
+               SELECT 1 FROM egw_paragraphs p \
+               WHERE p.book_number = b.book_number \
+                 AND p.page > 0 \
+                 AND p.page_paragraph > 0 \
+             ) \
+             ORDER BY book_number",
         )?;
         let rows = stmt.query_map([], |row: &rusqlite::Row| {
             Ok(EgwBook {
@@ -24,12 +31,13 @@ impl BibleDb {
     }
 
     /// List chapters (with titles and paragraph counts) for one EGW book.
+    /// Legacy callers only receive paragraphs that can resolve to printed pages.
     pub fn list_egw_chapters(&self, book_number: i32) -> Result<Vec<EgwChapterInfo>, BibleError> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT chapter, chapter_title, COUNT(*) AS paragraph_count \
              FROM egw_paragraphs \
-             WHERE book_number = ?1 \
+             WHERE book_number = ?1 AND page > 0 AND page_paragraph > 0 \
              GROUP BY chapter, chapter_title \
              ORDER BY chapter",
         )?;
@@ -43,7 +51,27 @@ impl BibleDb {
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
+    /// List printed pages (with paragraph counts) for one EGW book.
+    pub fn list_egw_pages(&self, book_number: i32) -> Result<Vec<EgwPageInfo>, BibleError> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT page, COUNT(*) AS paragraph_count \
+             FROM egw_paragraphs \
+             WHERE book_number = ?1 AND page > 0 AND page_paragraph > 0 \
+             GROUP BY page \
+             ORDER BY page",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![book_number], |row: &rusqlite::Row| {
+            Ok(EgwPageInfo {
+                page: row.get(0)?,
+                paragraph_count: row.get(1)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
     /// Get every paragraph in a chapter, ordered by paragraph number.
+    /// Legacy callers only receive paragraphs that can resolve to printed pages.
     pub fn get_egw_chapter(
         &self,
         book_number: i32,
@@ -51,16 +79,34 @@ impl BibleDb {
     ) -> Result<Vec<EgwParagraph>, BibleError> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, text \
+            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text \
              FROM egw_paragraphs \
-             WHERE book_number = ?1 AND chapter = ?2 \
+             WHERE book_number = ?1 AND chapter = ?2 AND page > 0 AND page_paragraph > 0 \
              ORDER BY paragraph",
         )?;
         let rows = stmt.query_map(rusqlite::params![book_number, chapter], map_egw_paragraph)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
+    /// Get every paragraph on a printed page, ordered by page paragraph number.
+    pub fn get_egw_page(
+        &self,
+        book_number: i32,
+        page: i32,
+    ) -> Result<Vec<EgwParagraph>, BibleError> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text \
+             FROM egw_paragraphs \
+             WHERE book_number = ?1 AND page = ?2 AND page > 0 AND page_paragraph > 0 \
+             ORDER BY page_paragraph",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![book_number, page], map_egw_paragraph)?;
+        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
     /// Get a single paragraph by (book, chapter, paragraph).
+    /// Legacy callers only receive paragraphs that can resolve to printed pages.
     pub fn get_egw_paragraph(
         &self,
         book_number: i32,
@@ -69,12 +115,35 @@ impl BibleDb {
     ) -> Result<Option<EgwParagraph>, BibleError> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, text \
+            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text \
              FROM egw_paragraphs \
-             WHERE book_number = ?1 AND chapter = ?2 AND paragraph = ?3",
+             WHERE book_number = ?1 AND chapter = ?2 AND paragraph = ?3 AND page > 0 AND page_paragraph > 0",
         )?;
         let mut rows = stmt.query_map(
             rusqlite::params![book_number, chapter, paragraph],
+            map_egw_paragraph,
+        )?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Get a single paragraph by (book, printed page, page paragraph).
+    pub fn get_egw_paragraph_by_page(
+        &self,
+        book_number: i32,
+        page: i32,
+        page_paragraph: i32,
+    ) -> Result<Option<EgwParagraph>, BibleError> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text \
+             FROM egw_paragraphs \
+             WHERE book_number = ?1 AND page = ?2 AND page_paragraph = ?3 AND page > 0",
+        )?;
+        let mut rows = stmt.query_map(
+            rusqlite::params![book_number, page, page_paragraph],
             map_egw_paragraph,
         )?;
         match rows.next() {
@@ -97,7 +166,11 @@ impl BibleDb {
         if !table_exists {
             return Ok(vec![]);
         }
-        let mut stmt = conn.prepare("SELECT id, text FROM egw_paragraphs ORDER BY id")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, text FROM egw_paragraphs \
+             WHERE page > 0 AND page_paragraph > 0 \
+             ORDER BY id",
+        )?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
@@ -106,8 +179,8 @@ impl BibleDb {
     pub fn get_egw_paragraph_by_id(&self, id: i64) -> Result<Option<EgwParagraph>, BibleError> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, text \
-             FROM egw_paragraphs WHERE id = ?1",
+            "SELECT id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text \
+             FROM egw_paragraphs WHERE id = ?1 AND page > 0 AND page_paragraph > 0",
         )?;
         let mut rows = stmt.query_map(rusqlite::params![id], map_egw_paragraph)?;
         match rows.next() {
@@ -150,10 +223,10 @@ impl BibleDb {
         let limit_i64 = limit as i64;
 
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.book_number, p.book_title, p.chapter, p.chapter_title, p.paragraph, p.text \
+            "SELECT p.id, p.book_number, p.book_title, p.chapter, p.chapter_title, p.paragraph, p.page, p.page_paragraph, p.text \
              FROM egw_paragraphs_fts fts \
              JOIN egw_paragraphs p ON p.id = fts.rowid \
-             WHERE fts.text MATCH ?1 \
+             WHERE fts.text MATCH ?1 AND p.page > 0 AND p.page_paragraph > 0 \
              ORDER BY bm25(egw_paragraphs_fts) \
              LIMIT ?2",
         )?;
@@ -201,10 +274,10 @@ impl BibleDb {
                 continue;
             }
             let mut stmt = conn.prepare(
-                "SELECT p.id, p.book_number, p.book_title, p.chapter, p.chapter_title, p.paragraph, p.text \
+                "SELECT p.id, p.book_number, p.book_title, p.chapter, p.chapter_title, p.paragraph, p.page, p.page_paragraph, p.text \
                  FROM egw_paragraphs_fts fts \
                  JOIN egw_paragraphs p ON p.id = fts.rowid \
-                 WHERE fts.text MATCH ?1 \
+                 WHERE fts.text MATCH ?1 AND p.page > 0 AND p.page_paragraph > 0 \
                  ORDER BY bm25(egw_paragraphs_fts) \
                  LIMIT ?2",
             )?;
@@ -231,7 +304,9 @@ fn map_egw_paragraph(row: &rusqlite::Row) -> rusqlite::Result<EgwParagraph> {
         chapter: row.get(3)?,
         chapter_title: row.get(4)?,
         paragraph: row.get(5)?,
-        text: row.get(6)?,
+        page: row.get(6)?,
+        page_paragraph: row.get(7)?,
+        text: row.get(8)?,
     })
 }
 
@@ -245,10 +320,12 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "CREATE TABLE egw_books (id INTEGER PRIMARY KEY AUTOINCREMENT, book_number INTEGER NOT NULL UNIQUE, title TEXT NOT NULL, abbreviation TEXT NOT NULL, chapter_count INTEGER NOT NULL DEFAULT 0);\
-             CREATE TABLE egw_paragraphs (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL, book_number INTEGER NOT NULL, book_title TEXT NOT NULL, chapter INTEGER NOT NULL, chapter_title TEXT NOT NULL, paragraph INTEGER NOT NULL, text TEXT NOT NULL);\
+             CREATE TABLE egw_paragraphs (id INTEGER PRIMARY KEY AUTOINCREMENT, book_id INTEGER NOT NULL, book_number INTEGER NOT NULL, book_title TEXT NOT NULL, chapter INTEGER NOT NULL, chapter_title TEXT NOT NULL, paragraph INTEGER NOT NULL, page INTEGER NOT NULL, page_paragraph INTEGER NOT NULL, text TEXT NOT NULL);\
              INSERT INTO egw_books (book_number, title, abbreviation, chapter_count) VALUES (1, 'Patriarchs and Prophets', 'PP', 1);\
-             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, text) VALUES (1, 1, 'Patriarchs and Prophets', 1, 'Why Was Sin Permitted?', 1, 'God is love.');\
-             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, text) VALUES (1, 1, 'Patriarchs and Prophets', 1, 'Why Was Sin Permitted?', 2, 'The history of the great conflict.');\
+             INSERT INTO egw_books (book_number, title, abbreviation, chapter_count) VALUES (2, 'Hidden Legacy Book', 'HLB', 1);\
+             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text) VALUES (1, 1, 'Patriarchs and Prophets', 1, 'Why Was Sin Permitted?', 1, 29, 1, 'God is love.');\
+             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text) VALUES (1, 1, 'Patriarchs and Prophets', 1, 'Why Was Sin Permitted?', 2, 29, 2, 'The history of the great conflict.');\
+             INSERT INTO egw_paragraphs (book_id, book_number, book_title, chapter, chapter_title, paragraph, page, page_paragraph, text) VALUES (2, 2, 'Hidden Legacy Book', 1, 'Legacy', 1, 0, 0, 'This unresolved EGW paragraph should stay hidden.');\
              CREATE VIRTUAL TABLE egw_paragraphs_fts USING fts5(text, content='egw_paragraphs', content_rowid='id', tokenize='unicode61');\
              INSERT INTO egw_paragraphs_fts(rowid, text) SELECT id, text FROM egw_paragraphs;",
         )
@@ -267,6 +344,15 @@ mod tests {
     }
 
     #[test]
+    fn hides_books_without_page_resolved_paragraphs() {
+        let db = test_db();
+        let books = db.list_egw_books().unwrap();
+        assert!(books.iter().all(|book| book.title != "Hidden Legacy Book"));
+        assert!(db.search_egw("unresolved hidden", 10).unwrap().is_empty());
+        assert!(db.get_egw_paragraph_by_id(3).unwrap().is_none());
+    }
+
+    #[test]
     fn gets_chapter_paragraphs() {
         let db = test_db();
         let paras = db.get_egw_chapter(1, 1).unwrap();
@@ -280,6 +366,14 @@ mod tests {
         let hits = db.search_egw("conflict", 10).unwrap();
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].paragraph, 2);
+    }
+
+    #[test]
+    fn gets_page_paragraphs() {
+        let db = test_db();
+        let paras = db.get_egw_page(1, 29).unwrap();
+        assert_eq!(paras.len(), 2);
+        assert_eq!(paras[1].page_paragraph, 2);
     }
 
     #[test]
@@ -317,11 +411,28 @@ mod tests {
     }
 
     #[test]
+    fn lists_pages_with_counts() {
+        let db = test_db();
+        let pages = db.list_egw_pages(1).unwrap();
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].page, 29);
+        assert_eq!(pages[0].paragraph_count, 2);
+    }
+
+    #[test]
     fn gets_single_paragraph_or_none() {
         let db = test_db();
         let p = db.get_egw_paragraph(1, 1, 2).unwrap();
         assert_eq!(p.unwrap().text, "The history of the great conflict.");
         assert!(db.get_egw_paragraph(1, 1, 99).unwrap().is_none());
+    }
+
+    #[test]
+    fn gets_single_page_paragraph_or_none() {
+        let db = test_db();
+        let p = db.get_egw_paragraph_by_page(1, 29, 2).unwrap();
+        assert_eq!(p.unwrap().text, "The history of the great conflict.");
+        assert!(db.get_egw_paragraph_by_page(1, 29, 99).unwrap().is_none());
     }
 
     #[test]

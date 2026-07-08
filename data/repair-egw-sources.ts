@@ -9,7 +9,12 @@ interface EgwSource {
   chapters: Array<{
     chapter: number
     title: string
-    paragraphs: Array<{ paragraph: number; text: string }>
+    paragraphs: Array<{
+      paragraph: number
+      page?: number
+      page_paragraph?: number
+      text: string
+    }>
   }>
 }
 
@@ -19,7 +24,25 @@ const FILES = [
   "patriarchs-and-prophets.json",
   "steps-to-christ.json",
   "the-desire-of-ages.json",
+  "education.json",
+  "the-great-controversy.json",
 ] as const
+
+function assignPageParagraphs(source: EgwSource): EgwSource {
+  const countsByPage = new Map<number, number>()
+  return {
+    ...source,
+    chapters: source.chapters.map((chapter) => ({
+      ...chapter,
+      paragraphs: chapter.paragraphs.map((paragraph) => {
+        if (paragraph.page == null) return paragraph
+        const pageParagraph = (countsByPage.get(paragraph.page) ?? 0) + 1
+        countsByPage.set(paragraph.page, pageParagraph)
+        return { ...paragraph, page_paragraph: pageParagraph }
+      }),
+    })),
+  }
+}
 
 function repairSource(path: string): void {
   const source = JSON.parse(readFileSync(path, "utf8")) as EgwSource
@@ -35,15 +58,16 @@ function repairSource(path: string): void {
       chapterTitle: chapter.title,
     }),
   }))
+  const repaired = assignPageParagraphs(source)
 
-  const after = source.chapters.reduce(
+  const after = repaired.chapters.reduce(
     (sum, chapter) => sum + chapter.paragraphs.length,
     0,
   )
 
-  writeFileSync(path, `${JSON.stringify(source, null, 2)}\n`)
+  writeFileSync(path, `${JSON.stringify(repaired, null, 2)}\n`)
   console.log(
-    `${source.abbreviation}: ${before.toLocaleString()} -> ${after.toLocaleString()} paragraphs`,
+    `${repaired.abbreviation}: ${before.toLocaleString()} -> ${after.toLocaleString()} paragraphs`,
   )
 }
 

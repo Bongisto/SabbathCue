@@ -2,15 +2,15 @@ import { useEgwStore } from "@/stores/egw-store"
 import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 import type {
   EgwBook,
-  EgwChapterInfo,
+  EgwPageInfo,
   EgwParagraph,
   EgwSemanticResult,
   EgwSemanticStatus,
 } from "@/types"
 
-let chapterRequestId = 0
+let pageRequestId = 0
 let searchRequestId = 0
-let chaptersRequestId = 0
+let pagesRequestId = 0
 
 async function loadBooks() {
   if (!isTauriRuntime()) return []
@@ -19,25 +19,29 @@ async function loadBooks() {
   return books
 }
 
-async function loadChapters(bookNumber: number) {
+async function loadPages(bookNumber: number) {
   if (!isTauriRuntime()) return []
-  const reqId = ++chaptersRequestId
-  const chapters = await invokeTauri<EgwChapterInfo[]>("egw_list_chapters", {
+  const reqId = ++pagesRequestId
+  const pages = await invokeTauri<EgwPageInfo[]>("egw_list_pages", {
     bookNumber,
   })
-  if (reqId !== chaptersRequestId) return chapters
-  useEgwStore.getState().setChapters(chapters)
-  return chapters
+  if (reqId !== pagesRequestId) return pages
+  const store = useEgwStore.getState()
+  store.setPages(pages)
+  if (pages.length > 0 && !pages.some((p) => p.page === store.selectedPage)) {
+    store.setSelectedPage(pages[0]!.page)
+  }
+  return pages
 }
 
-async function loadChapter(bookNumber: number, chapter: number) {
+async function loadPage(bookNumber: number, page: number) {
   if (!isTauriRuntime()) return []
-  const reqId = ++chapterRequestId
-  const paragraphs = await invokeTauri<EgwParagraph[]>("egw_get_chapter", {
+  const reqId = ++pageRequestId
+  const paragraphs = await invokeTauri<EgwParagraph[]>("egw_get_page", {
     bookNumber,
-    chapter,
+    page,
   })
-  if (reqId !== chapterRequestId) return paragraphs
+  if (reqId !== pageRequestId) return paragraphs
   useEgwStore.getState().setCurrentParagraphs(paragraphs)
   return paragraphs
 }
@@ -82,8 +86,8 @@ async function buildSemanticIndex() {
 
 export const egwActions = {
   loadBooks,
-  loadChapters,
-  loadChapter,
+  loadPages,
+  loadPage,
   search,
   contextSearch,
   loadSemanticStatus,
@@ -93,8 +97,8 @@ export const egwActions = {
 export function useEgw() {
   const books = useEgwStore((s) => s.books)
   const selectedBookNumber = useEgwStore((s) => s.selectedBookNumber)
-  const chapters = useEgwStore((s) => s.chapters)
-  const selectedChapter = useEgwStore((s) => s.selectedChapter)
+  const pages = useEgwStore((s) => s.pages)
+  const selectedPage = useEgwStore((s) => s.selectedPage)
   const currentParagraphs = useEgwStore((s) => s.currentParagraphs)
   const searchResults = useEgwStore((s) => s.searchResults)
   const selectedParagraphId = useEgwStore((s) => s.selectedParagraphId)
@@ -105,8 +109,8 @@ export function useEgw() {
   return {
     books,
     selectedBookNumber,
-    chapters,
-    selectedChapter,
+    pages,
+    selectedPage,
     currentParagraphs,
     searchResults,
     selectedParagraphId,

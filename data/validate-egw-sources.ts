@@ -8,7 +8,12 @@ interface EgwSource {
   chapters: Array<{
     chapter: number
     title: string
-    paragraphs: Array<{ paragraph: number; text: string }>
+    paragraphs: Array<{
+      paragraph: number
+      page: number
+      page_paragraph: number
+      text: string
+    }>
   }>
 }
 
@@ -38,6 +43,16 @@ const EXPECTED = [
     chapters: 87,
     file: "the-desire-of-ages.json",
   },
+  {
+    abbreviation: "Ed",
+    chapters: 35,
+    file: "education.json",
+  },
+  {
+    abbreviation: "GC",
+    chapters: 42,
+    file: "the-great-controversy.json",
+  },
 ] as const
 
 function escapeRegExp(value: string): string {
@@ -51,6 +66,7 @@ function titlePattern(title: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .map(escapeRegExp)
+    .map((part) => part.replace(/["']/g, `["']?`))
     .join("\\s+")
 }
 
@@ -58,9 +74,12 @@ function looksLikePageNumberArtifact(
   text: string,
   bookTitle: string,
   chapterTitle: string,
+  printedPage: number,
 ): boolean {
   const trimmed = text.trim()
   const pageNumber = "\\d{1,4}"
+  const leadingNumber = trimmed.match(/^(\d{1,4})\s+/)
+  const trailingNumber = trimmed.match(/\s+(\d{1,4})$/)
   const chapterPattern = titlePattern(chapterTitle)
   const bookPattern = titlePattern(bookTitle)
   const titleHeaderPatterns = [chapterPattern, bookPattern]
@@ -68,14 +87,10 @@ function looksLikePageNumberArtifact(
     .map((pattern) => new RegExp(`\\b${pattern}\\s+${pageNumber}\\b`, "i"))
 
   return (
-    /^\d{2,4}\s+/.test(trimmed) ||
-    /\s+\d{1,4}$/.test(trimmed) ||
+    (leadingNumber != null && Number(leadingNumber[1]) === printedPage) ||
+    (trailingNumber != null && Number(trailingNumber[1]) === printedPage) ||
     titleHeaderPatterns.some((pattern) => pattern.test(trimmed))
   )
-}
-
-function startsLikeContinuation(text: string): boolean {
-  return /^[a-z]/.test(text.trim())
 }
 
 function main() {
@@ -92,6 +107,7 @@ function main() {
       )
     }
 
+    const pageParagraphs = new Set<string>()
     for (let i = 0; i < source.chapters.length; i += 1) {
       const chapter = source.chapters[i]
       if (chapter.chapter !== i + 1) {
@@ -109,6 +125,26 @@ function main() {
             `${book.abbreviation} ${chapter.chapter}: paragraph sequence broken at ${j + 1}`,
           )
         }
+        if (!Number.isInteger(paragraph.page) || paragraph.page <= 0) {
+          throw new Error(
+            `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} is missing a printed page`,
+          )
+        }
+        if (
+          !Number.isInteger(paragraph.page_paragraph) ||
+          paragraph.page_paragraph <= 0
+        ) {
+          throw new Error(
+            `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} is missing a printed page paragraph`,
+          )
+        }
+        const pageParagraphKey = `${paragraph.page}:${paragraph.page_paragraph}`
+        if (pageParagraphs.has(pageParagraphKey)) {
+          throw new Error(
+            `${book.abbreviation} p.${paragraph.page} par.${paragraph.page_paragraph} is duplicated`,
+          )
+        }
+        pageParagraphs.add(pageParagraphKey)
         if (!paragraph.text.trim()) {
           throw new Error(
             `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} is empty`,
@@ -119,15 +155,11 @@ function main() {
             paragraph.text,
             source.title,
             chapter.title,
+            paragraph.page,
           )
         ) {
           throw new Error(
             `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} appears to contain a PDF page number artifact`,
-          )
-        }
-        if (startsLikeContinuation(paragraph.text)) {
-          throw new Error(
-            `${book.abbreviation} ${chapter.chapter}:${paragraph.paragraph} starts like a page-break continuation`,
           )
         }
         for (const forbidden of FORBIDDEN_TEXT) {

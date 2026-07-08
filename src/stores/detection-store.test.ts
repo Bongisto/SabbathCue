@@ -114,11 +114,11 @@ describe("detection store", () => {
     store.addDetection(
       makeDetection({
         content_type: "egw",
-        verse_ref: "Steps to Christ 1:2",
+        verse_ref: "Steps to Christ p.9 par.2",
         verse_text: "Nature and revelation testify of God's love.",
         book_name: "Steps to Christ",
         book_number: 2,
-        chapter: 1,
+        chapter: 9,
         verse: 2,
         confidence: 0.94,
         egw_paragraph: {
@@ -128,6 +128,8 @@ describe("detection store", () => {
           chapter: 1,
           chapter_title: "God's Love for Man",
           paragraph: 2,
+          page: 9,
+          page_paragraph: 2,
           text: "Nature and revelation testify of God's love.",
         },
       })
@@ -650,14 +652,14 @@ describe("detection store", () => {
     ])
   })
 
-  it("deduplicates EGW detections by book chapter and paragraph", () => {
+  it("deduplicates EGW detections by book page and page paragraph", () => {
     const store = useDetectionStore.getState()
     const egwDetection = makeDetection({
       content_type: "egw",
-      verse_ref: "Patriarchs and Prophets 1:2",
+      verse_ref: "Patriarchs and Prophets p.29 par.2",
       book_name: "Patriarchs and Prophets",
       book_number: 1,
-      chapter: 1,
+      chapter: 29,
       verse: 2,
       verse_text: "The history of the great conflict.",
       egw_paragraph: {
@@ -667,6 +669,8 @@ describe("detection store", () => {
         chapter: 1,
         chapter_title: "Why Was Sin Permitted?",
         paragraph: 2,
+        page: 29,
+        page_paragraph: 2,
         text: "The history of the great conflict.",
       },
     })
@@ -675,7 +679,7 @@ describe("detection store", () => {
     now = new Date("2026-05-19T00:00:01Z").getTime()
     store.addDetection({
       ...egwDetection,
-      verse_ref: "PP 1:2",
+      verse_ref: "Patriarchs and Prophets page 29 paragraph 2",
       confidence: 0.99,
     })
 
@@ -705,7 +709,7 @@ describe("detection store", () => {
     store.addDetection(
       makeDetection({
         content_type: "egw",
-        verse_ref: "Steps to Christ 1:2",
+        verse_ref: "Steps to Christ p.9 par.2",
         source: "direct",
         confidence: 0.6,
       })
@@ -714,7 +718,7 @@ describe("detection store", () => {
     const refs = useDetectionStore.getState().detections.map((d) => d.verse_ref)
     expect(refs).not.toContain("Job 23:2")
     expect(refs).toContain("Matthew 7:2")
-    expect(refs).toContain("Steps to Christ 1:2")
+    expect(refs).toContain("Steps to Christ p.9 par.2")
   })
 
   it("keeps semantic hits at exactly the app threshold", () => {

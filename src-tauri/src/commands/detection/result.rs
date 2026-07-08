@@ -99,8 +99,8 @@ pub(super) fn egw_to_result(
     transcript_snippet: &str,
 ) -> DetectionResult {
     let reference = format!(
-        "{} {}:{}",
-        paragraph.book_title, paragraph.chapter, paragraph.paragraph
+        "{} p.{} par.{}",
+        paragraph.book_title, paragraph.page, paragraph.page_paragraph
     );
 
     DetectionResult {
@@ -109,8 +109,8 @@ pub(super) fn egw_to_result(
         verse_text: paragraph.text.clone(),
         book_name: paragraph.book_title.clone(),
         book_number: paragraph.book_number,
-        chapter: paragraph.chapter,
-        verse: paragraph.paragraph,
+        chapter: paragraph.page,
+        verse: paragraph.page_paragraph,
         confidence,
         source: "direct".to_string(),
         auto_queued: false,

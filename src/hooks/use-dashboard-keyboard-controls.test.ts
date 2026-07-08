@@ -65,6 +65,8 @@ function makeEgwParagraph(paragraph: number): EgwParagraph {
     chapter: 1,
     chapter_title: "Chapter",
     paragraph,
+    page: 29,
+    page_paragraph: paragraph,
     text: `Sample paragraph ${paragraph} text.`,
   }
 }
@@ -76,7 +78,7 @@ function makeEgwSlide(
   return {
     kind: "egw",
     paragraph,
-    reference: `Test Book 1:${paragraph.paragraph} (${index + 1}/2)`,
+    reference: `Test Book p.29 par.${paragraph.page_paragraph} (${index + 1}/2)`,
     slideId: `egw-${paragraph.id}-${index}`,
     slideIndex: index,
     slideCount: 2,
