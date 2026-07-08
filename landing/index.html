@@ -86,6 +86,7 @@ nav{
   display:flex;align-items:center;justify-content:space-between;
   padding:18px clamp(20px,5vw,56px);
   background:linear-gradient(to bottom, var(--nav-fade-1), var(--nav-fade-2));
+  -webkit-backdrop-filter:blur(2px);
   backdrop-filter:blur(2px);
 }
 .logo{display:flex;align-items:center;gap:11px;text-decoration:none;font-family:var(--display);font-size:1.25rem;font-weight:500;letter-spacing:.01em}
@@ -242,7 +243,7 @@ h1 em{font-style:italic;font-weight:400;color:var(--gold)}
   transform:translateY(130%);transition:transform .8s cubic-bezier(.16,.84,.3,1);
   background:linear-gradient(180deg, rgba(13,17,26,.92), rgba(10,13,19,.96));
   border:1px solid rgba(227,176,91,.35);border-left:3px solid var(--gold);
-  border-radius:10px;padding:18px 22px;backdrop-filter:blur(6px);
+  border-radius:10px;padding:18px 22px;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   box-shadow:0 18px 40px -12px rgba(0,0,0,.7);
 }
 .lower-third.live{transform:translateY(0)}
@@ -280,9 +281,11 @@ h1 em{font-style:italic;font-weight:400;color:var(--gold)}
 /* ---------- sections ---------- */
 section{padding:clamp(70px,10vw,130px) clamp(20px,5vw,56px);max-width:1280px;margin:0 auto}
 .sec-head{max-width:680px;margin-bottom:clamp(40px,6vw,70px)}
+.sec-head.centered{margin:0 auto;text-align:center}
 h2{font-family:var(--display);font-weight:300;font-size:clamp(1.9rem,3.6vw,2.9rem);line-height:1.12;letter-spacing:-.01em}
 h2 em{font-style:italic;color:var(--gold);font-weight:400}
 .sec-head p{margin-top:18px;color:var(--slate);font-size:1.02rem;max-width:54ch}
+.paper-strong{color:var(--paper);font-weight:500}
 
 /* reveal on scroll */
 .reveal{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1)}
@@ -377,6 +380,7 @@ footer a:hover{color:var(--paper)}
 .tb-text b{color:var(--gold);font-weight:600}
 .tb-arrow{color:var(--gold);font-size:1.2rem;line-height:1}
 .trial-note{margin-top:16px;font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;color:var(--slate-dim);text-transform:uppercase}
+.trial-note.centered{text-align:center}
 
 /* ---------- pricing ---------- */
 .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:44px}
@@ -527,8 +531,8 @@ footer a:hover{color:var(--paper)}
     <div class="sec-head reveal">
       <p class="eyebrow">Honest expectations</p>
       <h2>It won't catch every verse. <em>It will change how your service looks.</em></h2>
-      <p>SabbathCue is AI, and AI isn't perfect — now and then it'll miss a reference or ask your operator for a quick confirm. But across a whole service it puts the right verse on screen faster and more often than someone scrambling alone. Your team ends up ahead: fewer missed references, less frantic searching, a cleaner stream. <b style="color:var(--paper);font-weight:500">Better, not flawless — and a real step up from doing it all by hand.</b></p>
-      <p>In our own 106-case benchmark — spoken references, verbatim quotes, paraphrases, and ordinary announcements run through the live detection path — at the recommended 90% threshold SabbathCue <b style="color:var(--paper);font-weight:500">caught 100% of clearly-spoken references, made the right call ~86% of the time overall, and the verse it put on screen was correct ~94% of the time.</b> Every announcement and bit of small talk was correctly ignored. Loose paraphrases it's unsure about are surfaced for your operator rather than auto-fired. Measured on an authored test set, not live services.</p>
+      <p>SabbathCue is AI, and AI isn't perfect — now and then it'll miss a reference or ask your operator for a quick confirm. But across a whole service it puts the right verse on screen faster and more often than someone scrambling alone. Your team ends up ahead: fewer missed references, less frantic searching, a cleaner stream. <b class="paper-strong">Better, not flawless — and a real step up from doing it all by hand.</b></p>
+      <p>In our own 106-case benchmark — spoken references, verbatim quotes, paraphrases, and ordinary announcements run through the live detection path — at the recommended 90% threshold SabbathCue <b class="paper-strong">caught 100% of clearly-spoken references, made the right call ~86% of the time overall, and the verse it put on screen was correct ~94% of the time.</b> Every announcement and bit of small talk was correctly ignored. Loose paraphrases it's unsure about are surfaced for your operator rather than auto-fired. Measured on an authored test set, not live services.</p>
     </div>
   </section>
 
@@ -582,7 +586,7 @@ footer a:hover{color:var(--paper)}
         </div>
         <span class="onair"><span class="lamp"></span>DEMO</span>
       </div>
-      <video controls preload="metadata" playsinline
+      <video controls preload="metadata"
              aria-label="Screen recording of SabbathCue detecting a verse and sending it to the live screen">
         <source src="assets/sabbathcue-demo.mp4" type="video/mp4">
         Your browser doesn't support embedded video.
@@ -595,19 +599,19 @@ footer a:hover{color:var(--paper)}
   <section id="afrikaans-live">
     <div class="sec-head reveal">
       <p class="eyebrow">Now in Afrikaans</p>
-      <h2>Afrikaanse verse, <em>live opgespoor.</em></h2>
-      <p>A real live test in Afrikaans — spoken Afrikaans references are detected and the verse lands on the screen, exactly like English.</p>
+      <h2 lang="af">Afrikaanse verse, <em>live opgespoor.</em></h2>
+      <p>A recorded live test shows Afrikaans Bible references being detected and sent to the screen. For live services, Afrikaans recognition uses Soniox cloud transcription with your own API key, then displays the bundled Afrikaanse Bybel 1933/1953 text.</p>
     </div>
     <div class="demo-player reveal">
       <div class="console-bar">
         <div class="left">
           <span class="dots"><i></i><i></i><i></i></span>
-          <span>Live test · Afrikaans detection</span>
+          <span>Recorded test · Afrikaans detection</span>
         </div>
-        <span class="onair"><span class="lamp"></span>LIVE</span>
+        <span class="onair"><span class="lamp"></span>TEST</span>
       </div>
-      <video controls preload="metadata" playsinline
-             aria-label="Live test of SabbathCue detecting Afrikaans Bible references and sending the verse to the live screen">
+      <video controls preload="metadata"
+             aria-label="Recorded live test of SabbathCue detecting Afrikaans Bible references and sending the verse to the live screen">
         <source src="assets/afrikaans-live-test.mp4" type="video/mp4">
         Your browser doesn't support embedded video.
         <a href="assets/afrikaans-live-test.mp4">Download the Afrikaans live test</a> instead.
@@ -717,8 +721,8 @@ footer a:hover{color:var(--paper)}
 
   <!-- ================= HELP / SUPPORT ================= -->
   <section id="help">
-    <div class="sec-head reveal" style="text-align:center;margin:0 auto">
-      <p class="eyebrow" style="justify-content:center">Help &amp; support</p>
+    <div class="sec-head centered reveal">
+      <p class="eyebrow">Help &amp; support</p>
       <h2>Talk to a human.</h2>
     </div>
     <div class="help-card reveal">
@@ -731,13 +735,13 @@ footer a:hover{color:var(--paper)}
   <!-- ================= FINAL CTA ================= -->
   <section class="final" id="download">
     <div class="reveal">
-      <p class="eyebrow" style="justify-content:center">Ready for this Sabbath</p>
+      <p class="eyebrow">Ready for this Sabbath</p>
       <h2>Give your media team <em>a calmer scripture workflow.</em></h2>
       <div class="hero-ctas">
-        <a class="btn btn-gold" id="download-btn" href="https://pub-f00266e4b83341dea437c0114752f536.r2.dev/SabbathCue_0.1.7_x64-setup.exe" download="SabbathCue-Setup.exe">Download for Windows — start free trial</a>
+        <a class="btn btn-gold" id="download-btn" href="https://pub-f00266e4b83341dea437c0114752f536.r2.dev/SabbathCue_0.1.7_x64-setup%20(8).exe" download="SabbathCue-Setup.exe">Download for Windows — start free trial</a>
         <a class="btn btn-ghost" href="#pricing">See plans</a>
       </div>
-      <p class="trial-note" style="text-align:center">14-day free trial · no card required · HDMI/projector output today</p>
+      <p class="trial-note centered">Latest Windows installer: v0.1.7, updated July 8, 2026 · 14-day free trial · no card required · HDMI/projector output today</p>
       <p class="os-row">Available for Windows only</p>
     </div>
   </section>
@@ -790,6 +794,10 @@ footer a:hover{color:var(--paper)}
     }
   });
 })();
+
+document.querySelectorAll('video').forEach(video=>{
+  if('playsInline' in video) video.playsInline = true;
+});
 
 /* ====== reduced motion flag ====== */
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
