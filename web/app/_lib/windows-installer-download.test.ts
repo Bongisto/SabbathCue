@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildR2PublicUrl,
@@ -24,6 +25,16 @@ describe("windows-installer-download", () => {
     expect(config.objectKey).toBe("SabbathCue_0.1.7_x64-setup.exe");
     expect(config.url).toContain("pub-f00266e4b83341dea437c0114752f536.r2.dev");
     expect(config.url).toContain("0.1.7");
+  });
+
+  it("keeps the static landing page download href in sync with the shared installer config", () => {
+    const landingHtml = readFileSync(
+      new URL("../../../landing/index.html", import.meta.url),
+      "utf8"
+    );
+    const hrefMatch = landingHtml.match(/id="download-btn"[^>]*href="([^"]+)"/);
+
+    expect(hrefMatch?.[1]).toBe(getWindowsInstallerDownloadConfig().url);
   });
 
   it("uses a clean save-as filename (not the R2 duplicate suffix)", () => {
