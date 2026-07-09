@@ -62,7 +62,7 @@ pub fn start(
     let host = cpal::default_host();
 
     // Select the device
-    log::info!("[AUDIO] Requested device_id: {:?}", &config.device_id);
+    log::info!("[AUDIO] Requested device_id: {:?}", config.device_id);
 
     let device = match &config.device_id {
         Some(id) if !id.is_empty() => {
@@ -93,7 +93,7 @@ pub fn start(
                 .default_input_device()
                 .ok_or(AudioError::NoInputDevices)?;
             let default_device_name = device_name(&d).unwrap_or_default();
-            log::info!("[AUDIO] Using default device: '{}'", &default_device_name);
+            log::info!("[AUDIO] Using default device: '{default_device_name}'");
             d
         }
     };
