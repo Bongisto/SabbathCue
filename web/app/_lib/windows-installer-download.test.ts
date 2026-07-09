@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildR2PublicUrl,
@@ -13,7 +14,7 @@ const RUN_NETWORK_TESTS = process.env.RUN_NETWORK_TESTS === "1";
 describe("windows-installer-download", () => {
   it("builds the encoded Cloudflare R2 URL for the current object key", () => {
     expect(buildR2PublicUrl(WINDOWS_INSTALLER_R2_OBJECT_KEY)).toBe(
-      "https://pub-f00266e4b83341dea437c0114752f536.r2.dev/SabbathCue_0.1.7_x64-setup%20(8).exe"
+      "https://pub-f00266e4b83341dea437c0114752f536.r2.dev/SabbathCue_0.1.7_x64-setup.exe"
     );
   });
 
@@ -21,9 +22,19 @@ describe("windows-installer-download", () => {
     const config = getWindowsInstallerDownloadConfig();
     expect(config.version).toBe("0.1.7");
     expect(config.saveAsFilename).toBe("SabbathCue-Setup.exe");
-    expect(config.objectKey).toBe("SabbathCue_0.1.7_x64-setup (8).exe");
+    expect(config.objectKey).toBe("SabbathCue_0.1.7_x64-setup.exe");
     expect(config.url).toContain("pub-f00266e4b83341dea437c0114752f536.r2.dev");
     expect(config.url).toContain("0.1.7");
+  });
+
+  it("keeps the static landing page download href in sync with the shared installer config", () => {
+    const landingHtml = readFileSync(
+      new URL("../../../landing/index.html", import.meta.url),
+      "utf8"
+    );
+    const hrefMatch = landingHtml.match(/id="download-btn"[^>]*href="([^"]+)"/);
+
+    expect(hrefMatch?.[1]).toBe(getWindowsInstallerDownloadConfig().url);
   });
 
   it("uses a clean save-as filename (not the R2 duplicate suffix)", () => {
