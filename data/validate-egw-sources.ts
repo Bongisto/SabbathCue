@@ -32,28 +32,84 @@ const EXPECTED = [
     abbreviation: "PP",
     chapters: 73,
     file: "patriarchs-and-prophets.json",
+    minParasPerPage: 1.8,
   },
   {
     abbreviation: "SC",
     chapters: 13,
     file: "steps-to-christ.json",
+    minParasPerPage: 1.5,
   },
   {
     abbreviation: "DA",
     chapters: 87,
     file: "the-desire-of-ages.json",
+    minParasPerPage: 1.8,
   },
   {
     abbreviation: "Ed",
     chapters: 35,
     file: "education.json",
+    minParasPerPage: 1.8,
   },
   {
     abbreviation: "GC",
     chapters: 42,
     file: "the-great-controversy.json",
+    minParasPerPage: 1.8,
   },
 ] as const
+
+interface ParagraphStats {
+  count: number
+  parasPerPage: number
+  median: number
+  p90: number
+  max: number
+}
+
+function paragraphStats(src: EgwSource): ParagraphStats {
+  const lengths: number[] = []
+  const perPage = new Map<number, number>()
+  for (const chapter of src.chapters) {
+    for (const paragraph of chapter.paragraphs) {
+      lengths.push(paragraph.text.length)
+      perPage.set(paragraph.page, (perPage.get(paragraph.page) ?? 0) + 1)
+    }
+  }
+  lengths.sort((a, b) => a - b)
+  const at = (q: number) => lengths[Math.min(lengths.length - 1, Math.floor(lengths.length * q))] ?? 0
+  const totalPages = perPage.size
+  return {
+    count: lengths.length,
+    parasPerPage: totalPages === 0 ? 0 : lengths.length / totalPages,
+    median: at(0.5),
+    p90: at(0.9),
+    max: lengths[lengths.length - 1] ?? 0,
+  }
+}
+
+const P90_MAX_CHARS = 1200
+const HARD_MAX_CHARS = 2000
+
+function assertParagraphQuality(
+  abbreviation: string,
+  stats: ParagraphStats,
+  minParasPerPage: number,
+  errors: string[],
+): void {
+  if (stats.parasPerPage < minParasPerPage) {
+    errors.push(
+      `${abbreviation}: ${stats.parasPerPage.toFixed(2)} paragraphs/page < required ${minParasPerPage} — paragraphs are still merged`,
+    )
+  }
+  if (stats.p90 > P90_MAX_CHARS) {
+    errors.push(`${abbreviation}: p90 paragraph length ${stats.p90} > ${P90_MAX_CHARS} chars`)
+  }
+  if (stats.max > HARD_MAX_CHARS) {
+    errors.push(`${abbreviation}: max paragraph length ${stats.max} > ${HARD_MAX_CHARS} chars`)
+  }
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -94,6 +150,8 @@ function looksLikePageNumberArtifact(
 }
 
 function main() {
+  const qualityErrors: string[] = []
+  const statsTable: Record<string, ParagraphStats> = {}
   for (const book of EXPECTED) {
     const path = join(import.meta.dir, "sources", "egw", book.file)
     const source = JSON.parse(readFileSync(path, "utf8")) as EgwSource
@@ -172,7 +230,24 @@ function main() {
       }
     }
 
+    const stats = paragraphStats(source)
+    statsTable[book.abbreviation] = stats
+    assertParagraphQuality(
+      book.abbreviation,
+      stats,
+      book.minParasPerPage,
+      qualityErrors,
+    )
+
     console.log(`${book.abbreviation}=${source.chapters.length}`)
+  }
+
+  console.table(statsTable)
+
+  if (qualityErrors.length > 0) {
+    throw new Error(
+      `Paragraph-quality gates failed:\n${qualityErrors.map((e) => `  - ${e}`).join("\n")}`,
+    )
   }
 }
 
