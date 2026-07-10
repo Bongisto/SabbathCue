@@ -20,14 +20,14 @@ vi.mock("@/components/ui/canvas-verse", () => ({
     React.createElement("div", { "data-testid": "canvas-presentation" }),
 }))
 
-function queuedSlide(): QueueItem {
+function queuedSlide(id = "queued-slide-1"): QueueItem {
   return {
-    id: "queued-slide-1",
+    id,
     presentation: {
       kind: "slideDeck",
       deckId: "deck-1",
       deckTitle: "Sermon",
-      slideId: "slide-1",
+      slideId: `slide-${id}`,
       slideIndex: 1,
       slideCount: 3,
       slidePath: "data:image/png;base64,slide",
@@ -38,6 +38,15 @@ function queuedSlide(): QueueItem {
     source: "manual",
     added_at: 1,
   }
+}
+
+function seedQueue(items: QueueItem[]): void {
+  useQueueStore.setState({
+    items,
+    activeIndex: 0,
+    highlightedId: null,
+    highlightedIds: [],
+  })
 }
 
 function imageAsset(): LibraryAsset {
@@ -92,5 +101,35 @@ describe("QueueWorkspace", () => {
     })
 
     expect(useEmergencySlideStore.getState().selectedAssetId).toBe("asset-1")
+  })
+
+  it("selects a range with shift-click and bulk-deletes with the toolbar", () => {
+    const itemA = queuedSlide("item-a")
+    const itemB = queuedSlide("item-b")
+    const itemC = queuedSlide("item-c")
+    seedQueue([itemA, itemB, itemC])
+    render(<QueueWorkspace />)
+
+    fireEvent.click(screen.getByTestId(`queue-card-${itemA.id}`))
+    fireEvent.click(screen.getByTestId(`queue-card-${itemC.id}`), {
+      shiftKey: true,
+    })
+
+    expect(screen.getByText("3 selected")).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: /delete/i }))
+
+    expect(useQueueStore.getState().items).toHaveLength(0)
+  })
+
+  it("double-click presents the item and marks it live", () => {
+    const itemA = queuedSlide("item-a")
+    const itemB = queuedSlide("item-b")
+    seedQueue([itemA, itemB])
+    render(<QueueWorkspace />)
+
+    fireEvent.dblClick(screen.getByTestId(`queue-card-${itemB.id}`))
+
+    expect(useQueueStore.getState().activeIndex).toBe(1)
   })
 })

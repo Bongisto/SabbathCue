@@ -1,238 +1,35 @@
-import { useMemo } from "react"
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  EyeIcon,
-  ListOrderedIcon,
-  PlayIcon,
-  Rows3Icon,
-  SirenIcon,
-  Trash2Icon,
-  VideoIcon,
-} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { DragDropProvider } from "@dnd-kit/react"
+import { ListOrderedIcon, Rows3Icon, SirenIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CanvasPresentation } from "@/components/ui/canvas-verse"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { EmergencyLiveButton } from "@/components/queue/EmergencyLiveButton"
 import {
+  PresentationThumbnail,
+  QueueSorterCard,
+} from "@/components/queue/QueueSorterCard"
+import { QueueSelectionToolbar } from "@/components/queue/QueueSelectionToolbar"
+import {
   isPresentableLibraryAsset,
   libraryAssetToFirstPresentation,
 } from "@/lib/library/library-presentation"
-import { presentQueuedItem, previewQueuedItem } from "@/lib/queue-presentation"
-import { cn } from "@/lib/utils"
-import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import { isPresentationNavigationEditableTarget } from "@/lib/presentation-panel-navigation"
+import {
+  applySelectionClick,
+  computeDrop,
+  emptySelection,
+} from "@/lib/queue-selection"
 import { useEmergencySlideStore } from "@/stores/emergency-slide-store"
 import { useLibraryStore } from "@/stores/library-store"
 import { useQueueStore } from "@/stores/queue-store"
-import {
-  getPresentationRenderData,
-  getReferenceFromItem,
-  type PresentationItem,
-  type PresentationRenderData,
-  type QueueItem,
-} from "@/types"
+import { type PresentationRenderData } from "@/types"
 import type { LibraryAsset } from "@/types/library"
 
-function kindLabel(kind: PresentationItem["kind"]): string {
-  if (kind === "slideDeck") return "Slide"
-  if (kind === "egw") return "Ellen White"
-  return kind
-}
-
-function slideLabel(item: PresentationItem): string | null {
-  if (
-    item.kind === "hymn" ||
-    item.kind === "slideDeck" ||
-    item.kind === "egw"
-  ) {
-    return `Slide ${item.slideIndex + 1}/${item.slideCount}`
-  }
-  return null
-}
-
-function sourceLabel(source: QueueItem["source"]): string {
-  if (source === "service-plan") return "Plan"
-  if (source === "ai-direct") return "Direct"
-  if (source === "ai-semantic") return "Semantic"
-  if (source === "ai-cloud") return "Cloud"
-  return source
-}
-
-function PresentationThumbnail({
-  renderData,
-  className,
-}: {
-  renderData: PresentationRenderData | null
-  className?: string
-}) {
-  const activeTheme = useBroadcastStore(selectActiveTheme)
-
-  if (renderData?.kind === "video") {
-    return (
-      <div
-        className={cn(
-          "flex h-full w-full items-center justify-center overflow-hidden bg-black",
-          className
-        )}
-      >
-        {renderData.video?.poster ? (
-          <img
-            src={renderData.video.poster}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <VideoIcon className="size-8 text-muted-foreground" />
-        )}
-      </div>
-    )
-  }
-
-  if (renderData?.kind === "slideDeck" && renderData.slideImageUrl) {
-    return (
-      <img
-        src={renderData.slideImageUrl}
-        alt=""
-        className={cn("h-full w-full object-contain", className)}
-        loading="lazy"
-      />
-    )
-  }
-
-  if (activeTheme && renderData) {
-    return (
-      <CanvasPresentation
-        theme={activeTheme}
-        item={renderData}
-        className={cn("[&_canvas]:rounded-sm", className)}
-      />
-    )
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex h-full w-full items-center justify-center text-xs text-muted-foreground",
-        className
-      )}
-    >
-      Preview
-    </div>
-  )
-}
-
-function QueueDetailCard({
-  item,
-  index,
-  isActive,
-  canMoveUp,
-  canMoveDown,
-}: {
-  item: QueueItem
-  index: number
-  isActive: boolean
-  canMoveUp: boolean
-  canMoveDown: boolean
-}) {
-  const renderData = useMemo(
-    () => getPresentationRenderData(item.presentation),
-    [item.presentation]
-  )
-  const label = slideLabel(item.presentation)
-
-  const preview = () => {
-    useQueueStore.getState().setActive(index)
-    previewQueuedItem(item)
-  }
-  const present = () => {
-    useQueueStore.getState().setActive(index)
-    presentQueuedItem(item)
-  }
-
-  return (
-    <article
-      className={cn(
-        "grid gap-3 border-b border-[var(--border-subtle)] p-3 md:grid-cols-[8rem_minmax(0,1fr)_auto]",
-        isActive && "bg-[var(--accent-glow)]"
-      )}
-    >
-      <div className="aspect-video overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)]">
-        <PresentationThumbnail renderData={renderData} />
-      </div>
-
-      <div className="min-w-0 space-y-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={isActive ? "default" : "outline"}>
-            {String(index + 1).padStart(2, "0")}
-          </Badge>
-          <Badge variant="outline">{kindLabel(item.presentation.kind)}</Badge>
-          <Badge variant="outline">{sourceLabel(item.source)}</Badge>
-          {label ? <Badge variant="outline">{label}</Badge> : null}
-        </div>
-        <p className="truncate text-sm font-semibold text-foreground">
-          {getReferenceFromItem(item)}
-        </p>
-        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-          {renderData.segments.map((segment) => segment.text).join(" ")}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-1 md:flex-col md:justify-center">
-        <Button
-          type="button"
-          size="icon-xs"
-          variant="outline"
-          title="Preview"
-          onClick={preview}
-        >
-          <EyeIcon className="size-3" />
-        </Button>
-        <Button
-          type="button"
-          size="icon-xs"
-          title="Send live"
-          onClick={present}
-        >
-          <PlayIcon className="size-3" />
-        </Button>
-        <Button
-          type="button"
-          size="icon-xs"
-          variant="ghost"
-          title="Move up"
-          disabled={!canMoveUp}
-          onClick={() => useQueueStore.getState().reorderItems(index, index - 1)}
-        >
-          <ArrowUpIcon className="size-3" />
-        </Button>
-        <Button
-          type="button"
-          size="icon-xs"
-          variant="ghost"
-          title="Move down"
-          disabled={!canMoveDown}
-          onClick={() => useQueueStore.getState().reorderItems(index, index + 1)}
-        >
-          <ArrowDownIcon className="size-3" />
-        </Button>
-        <Button
-          type="button"
-          size="icon-xs"
-          variant="ghost"
-          title="Remove"
-          onClick={() => useQueueStore.getState().removeItem(item.id)}
-        >
-          <Trash2Icon className="size-3" />
-        </Button>
-      </div>
-    </article>
-  )
-}
-
-function selectedAssetRenderData(asset: LibraryAsset | null): PresentationRenderData | null {
+function selectedAssetRenderData(
+  asset: LibraryAsset | null
+): PresentationRenderData | null {
   if (!asset) return null
   return libraryAssetToFirstPresentation(asset)?.renderData ?? null
 }
@@ -304,26 +101,95 @@ function EmergencySlidePanel() {
 export function QueueWorkspace() {
   const items = useQueueStore((s) => s.items)
   const activeIndex = useQueueStore((s) => s.activeIndex)
+  const [selection, setSelection] = useState(emptySelection())
+
+  const orderedIds = useMemo(() => items.map((item) => item.id), [items])
+  const selectedSet = useMemo(() => new Set(selection.ids), [selection.ids])
+
+  // Prune selection when items change (e.g. removed elsewhere).
+  useEffect(() => {
+    setSelection((current) => {
+      const present = new Set(orderedIds)
+      const ids = current.ids.filter((id) => present.has(id))
+      if (ids.length === current.ids.length) return current
+      const anchorId =
+        current.anchorId && present.has(current.anchorId)
+          ? current.anchorId
+          : null
+      return { anchorId, ids }
+    })
+  }, [orderedIds])
+
+  const handleSelectClick = (
+    id: string,
+    mods: { ctrl: boolean; shift: boolean }
+  ) => {
+    setSelection((current) => applySelectionClick(current, orderedIds, id, mods))
+  }
+
+  const clearSelection = () => setSelection(emptySelection())
+
+  const deleteSelection = () => {
+    if (selection.ids.length === 0) return
+    useQueueStore.getState().removeItems(selection.ids)
+    setSelection(emptySelection())
+  }
+
+  const handleDragEnd = (event: {
+    operation: { source?: { id?: unknown } | null; target?: { id?: unknown } | null }
+    canceled: boolean
+  }) => {
+    if (event.canceled) return
+    const sourceId = event.operation.source?.id
+    const targetId = event.operation.target?.id
+    if (typeof sourceId !== "string" || typeof targetId !== "string") return
+    const drop = computeDrop(orderedIds, selection.ids, sourceId, targetId)
+    if (!drop) return
+    useQueueStore.getState().moveItems(drop.movingIds, drop.insertAt)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isPresentationNavigationEditableTarget(event.target)) return
+    if (event.key === "Delete" || event.key === "Backspace") {
+      if (selection.ids.length === 0) return
+      event.preventDefault()
+      deleteSelection()
+    } else if (event.key === "Escape") {
+      clearSelection()
+    }
+  }
 
   return (
     <div className="view-pane grid grid-cols-12 gap-3">
       <section className="glass-panel col-span-12 flex min-h-[calc(100vh-136px)] flex-col overflow-hidden xl:col-span-8">
         <PanelHeader title="Queue" icon={<ListOrderedIcon className="size-3" />}>
           <div className="flex items-center gap-2">
+            <QueueSelectionToolbar
+              count={selection.ids.length}
+              onDelete={deleteSelection}
+              onClear={clearSelection}
+            />
             <Badge variant="outline">{items.length}</Badge>
             <Button
               type="button"
               size="xs"
               variant="ghost"
               disabled={items.length === 0}
-              onClick={() => useQueueStore.getState().clearQueue()}
+              onClick={() => {
+                useQueueStore.getState().clearQueue()
+                clearSelection()
+              }}
             >
               Clear all
             </Button>
           </div>
         </PanelHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto outline-none"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+        >
           {items.length === 0 ? (
             <div className="flex h-full min-h-80 items-center justify-center">
               <PanelEmptyState
@@ -333,16 +199,20 @@ export function QueueWorkspace() {
               />
             </div>
           ) : (
-            items.map((item, index) => (
-              <QueueDetailCard
-                key={item.id}
-                item={item}
-                index={index}
-                isActive={index === activeIndex}
-                canMoveUp={index > 0}
-                canMoveDown={index < items.length - 1}
-              />
-            ))
+            <DragDropProvider onDragEnd={handleDragEnd}>
+              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 xl:grid-cols-4">
+                {items.map((item, index) => (
+                  <QueueSorterCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    isActive={index === activeIndex}
+                    isSelected={selectedSet.has(item.id)}
+                    onSelectClick={handleSelectClick}
+                  />
+                ))}
+              </div>
+            </DragDropProvider>
           )}
         </div>
       </section>
