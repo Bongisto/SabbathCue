@@ -217,6 +217,21 @@ describe("queue-store", () => {
       expect(persisted.state.highlightedIds).toBeUndefined()
     })
 
+    it("queue actions still update state when storage quota is exceeded", () => {
+      seed([itemA, makeItem("b", 17)])
+      const setItemSpy = vi
+        .spyOn(Storage.prototype, "setItem")
+        .mockImplementation(() => {
+          throw new DOMException("quota exceeded", "QuotaExceededError")
+        })
+      try {
+        expect(() => useQueueStore.getState().setActive(1)).not.toThrow()
+        expect(useQueueStore.getState().activeIndex).toBe(1)
+      } finally {
+        setItemSpy.mockRestore()
+      }
+    })
+
     it("drops malformed persisted items instead of crashing", async () => {
       localStorage.setItem(
         "sabbathcue-queue-v1",
