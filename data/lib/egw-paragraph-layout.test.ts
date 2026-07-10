@@ -57,6 +57,19 @@ describe("reconstructPageParagraphs", () => {
     expect(fresh.continuesFromPreviousPage).toBe(false)
   })
 
+  test("does not flag heading-first pages as continuations", () => {
+    const page = reconstructPageParagraphs(
+      [
+        item("Chapter 2 - The Sinner's Need of Christ", 120, 720, 17),
+        item("Man was originally endowed", 68, 700, 10),
+        item("with noble powers.", 50, 686, 10),
+      ],
+      { headingHeightRatio: 1.1 },
+    )
+
+    expect(page.continuesFromPreviousPage).toBe(false)
+  })
+
   test("keeps standalone page-number lines as their own line without breaking paragraphs", () => {
     const items = [
       item("21", 300, 720), // centered folio

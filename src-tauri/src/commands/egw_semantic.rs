@@ -62,6 +62,8 @@ struct EgwIndexMeta {
     count: i64,
     #[serde(rename = "idSum")]
     id_sum: i64,
+    #[serde(rename = "textHash")]
+    text_hash: u64,
 }
 
 /// Fingerprint of the currently imported EGW corpus, or `None` if the database
@@ -69,8 +71,12 @@ struct EgwIndexMeta {
 fn current_egw_meta(app: &AppHandle) -> Option<EgwIndexMeta> {
     let app_state = app.state::<Mutex<AppState>>();
     let state = app_state.lock().ok()?;
-    let (count, id_sum) = state.bible_db.as_ref()?.egw_content_fingerprint().ok()?;
-    Some(EgwIndexMeta { count, id_sum })
+    let (count, id_sum, text_hash) = state.bible_db.as_ref()?.egw_content_fingerprint().ok()?;
+    Some(EgwIndexMeta {
+        count,
+        id_sum,
+        text_hash,
+    })
 }
 
 /// Fingerprint recorded when the on-disk index was last built, or `None` if the

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { DragDropProvider } from "@dnd-kit/react"
 import { ListOrderedIcon, Rows3Icon, SirenIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -52,7 +52,10 @@ function EmergencySlidePanel() {
 
   return (
     <section className="glass-panel flex min-h-0 flex-col overflow-hidden">
-      <PanelHeader title="Emergency Slide" icon={<SirenIcon className="size-3" />}>
+      <PanelHeader
+        title="Emergency Slide"
+        icon={<SirenIcon className="size-3" />}
+      >
         <EmergencyLiveButton size="xs" />
       </PanelHeader>
 
@@ -104,46 +107,54 @@ export function QueueWorkspace() {
   const [selection, setSelection] = useState(emptySelection())
 
   const orderedIds = useMemo(() => items.map((item) => item.id), [items])
-  const selectedSet = useMemo(() => new Set(selection.ids), [selection.ids])
-
-  // Prune selection when items change (e.g. removed elsewhere).
-  useEffect(() => {
-    setSelection((current) => {
-      const present = new Set(orderedIds)
-      const ids = current.ids.filter((id) => present.has(id))
-      if (ids.length === current.ids.length) return current
-      const anchorId =
-        current.anchorId && present.has(current.anchorId)
-          ? current.anchorId
-          : null
-      return { anchorId, ids }
-    })
-  }, [orderedIds])
+  const visibleSelection = useMemo(() => {
+    const present = new Set(orderedIds)
+    const ids = selection.ids.filter((id) => present.has(id))
+    const anchorId =
+      selection.anchorId && present.has(selection.anchorId)
+        ? selection.anchorId
+        : null
+    return { anchorId, ids }
+  }, [orderedIds, selection])
+  const selectedSet = useMemo(
+    () => new Set(visibleSelection.ids),
+    [visibleSelection.ids]
+  )
 
   const handleSelectClick = (
     id: string,
     mods: { ctrl: boolean; shift: boolean }
   ) => {
-    setSelection((current) => applySelectionClick(current, orderedIds, id, mods))
+    setSelection((current) =>
+      applySelectionClick(current, orderedIds, id, mods)
+    )
   }
 
   const clearSelection = () => setSelection(emptySelection())
 
   const deleteSelection = () => {
-    if (selection.ids.length === 0) return
-    useQueueStore.getState().removeItems(selection.ids)
+    if (visibleSelection.ids.length === 0) return
+    useQueueStore.getState().removeItems(visibleSelection.ids)
     setSelection(emptySelection())
   }
 
   const handleDragEnd = (event: {
-    operation: { source?: { id?: unknown } | null; target?: { id?: unknown } | null }
+    operation: {
+      source?: { id?: unknown } | null
+      target?: { id?: unknown } | null
+    }
     canceled: boolean
   }) => {
     if (event.canceled) return
     const sourceId = event.operation.source?.id
     const targetId = event.operation.target?.id
     if (typeof sourceId !== "string" || typeof targetId !== "string") return
-    const drop = computeDrop(orderedIds, selection.ids, sourceId, targetId)
+    const drop = computeDrop(
+      orderedIds,
+      visibleSelection.ids,
+      sourceId,
+      targetId
+    )
     if (!drop) return
     useQueueStore.getState().moveItems(drop.movingIds, drop.insertAt)
   }
@@ -151,7 +162,7 @@ export function QueueWorkspace() {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isPresentationNavigationEditableTarget(event.target)) return
     if (event.key === "Delete" || event.key === "Backspace") {
-      if (selection.ids.length === 0) return
+      if (visibleSelection.ids.length === 0) return
       event.preventDefault()
       deleteSelection()
     } else if (event.key === "Escape") {
@@ -162,10 +173,13 @@ export function QueueWorkspace() {
   return (
     <div className="view-pane grid grid-cols-12 gap-3">
       <section className="glass-panel col-span-12 flex min-h-[calc(100vh-136px)] flex-col overflow-hidden xl:col-span-8">
-        <PanelHeader title="Queue" icon={<ListOrderedIcon className="size-3" />}>
+        <PanelHeader
+          title="Queue"
+          icon={<ListOrderedIcon className="size-3" />}
+        >
           <div className="flex items-center gap-2">
             <QueueSelectionToolbar
-              count={selection.ids.length}
+              count={visibleSelection.ids.length}
               onDelete={deleteSelection}
               onClear={clearSelection}
             />

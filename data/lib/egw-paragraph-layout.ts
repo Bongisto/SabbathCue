@@ -181,7 +181,8 @@ export function reconstructPageParagraphs(
 
     if (!firstBodyLineSeen) {
       firstBodyLineSeen = true
-      firstBodyLineIndented = indented
+      // Heading-first pages start new sections, not previous-page continuations.
+      firstBodyLineIndented = indented || isHeadingLine
     } else if (indented || gapBreak) {
       if (current.length > 0) chunks.push(current)
       current = []
