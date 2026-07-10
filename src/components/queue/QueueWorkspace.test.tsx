@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import React from "react"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QueueWorkspace } from "./QueueWorkspace"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
@@ -91,6 +97,9 @@ describe("QueueWorkspace", () => {
     expect(screen.getByText("01")).toBeTruthy()
     expect(screen.getByText("Slide 2/3")).toBeTruthy()
     expect(screen.getByText("Sermon - Slide 2")).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "Drag Sermon - Slide 2" })
+    ).toBeTruthy()
   })
 
   it("edits the configured emergency slide asset", () => {
@@ -131,5 +140,35 @@ describe("QueueWorkspace", () => {
     fireEvent.dblClick(screen.getByTestId(`queue-card-${itemB.id}`))
 
     expect(useQueueStore.getState().activeIndex).toBe(1)
+  })
+
+  it("keeps queue card preview and live actions separate from dragging", () => {
+    const itemA = queuedSlide("item-a")
+    const itemB = queuedSlide("item-b")
+    seedQueue([itemA, itemB])
+    useBroadcastStore.setState({
+      isLive: false,
+      liveItem: null,
+      previewItem: null,
+    })
+    render(<QueueWorkspace />)
+    const itemBCard = within(screen.getByTestId(`queue-card-${itemB.id}`))
+
+    fireEvent.click(
+      itemBCard.getByRole("button", { name: "Preview Sermon - Slide 2" })
+    )
+    expect(useQueueStore.getState().activeIndex).toBe(1)
+    expect(useBroadcastStore.getState().previewItem).toMatchObject({
+      reference: "Sermon - Slide 2",
+    })
+
+    fireEvent.click(
+      itemBCard.getByRole("button", { name: "Go live Sermon - Slide 2" })
+    )
+    expect(useQueueStore.getState().activeIndex).toBe(1)
+    expect(useBroadcastStore.getState()).toMatchObject({
+      isLive: true,
+      liveItem: expect.objectContaining({ reference: "Sermon - Slide 2" }),
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { createJSONStorage, persist } from "zustand/middleware"
 import {
   getVerseFromItem,
   type QueueItem,
@@ -39,6 +39,24 @@ interface QueueState {
   findDuplicate: (bookNumber: number, chapter: number, verse: number) => number
   /** Update a chapter-only queue item in place when the verse is refined. */
   updateEarlyRef: (bookNumber: number, chapter: number, verse: number, reference: string, verseText: string) => boolean
+}
+
+// Queue items can carry multi-megabyte slide-image data URLs, so a persist
+// write can exceed the localStorage quota. That must degrade to "queue not
+// persisted" instead of throwing out of every queue action that writes state
+// (e.g. the preview/present buttons calling setActive).
+const quotaSafeQueueStorage = {
+  getItem: (name: string) => window.localStorage.getItem(name),
+  setItem: (name: string, value: string) => {
+    try {
+      window.localStorage.setItem(name, value)
+    } catch {
+      console.warn(
+        "[queue] Skipped persisting queue state: storage quota exceeded"
+      )
+    }
+  },
+  removeItem: (name: string) => window.localStorage.removeItem(name),
 }
 
 const flashTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -310,6 +328,7 @@ export const useQueueStore = create<QueueState>()(
     {
       name: "sabbathcue-queue-v1",
       version: 1,
+      storage: createJSONStorage(() => quotaSafeQueueStorage),
       partialize: (state) => ({
         items: state.items,
         activeIndex: state.activeIndex,

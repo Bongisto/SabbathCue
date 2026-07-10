@@ -1,6 +1,12 @@
 import { useMemo } from "react"
 import { useSortable } from "@dnd-kit/react/sortable"
-import { EyeIcon, PlayIcon, Trash2Icon, VideoIcon } from "lucide-react"
+import {
+  EyeIcon,
+  GripVerticalIcon,
+  PlayIcon,
+  Trash2Icon,
+  VideoIcon,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CanvasPresentation } from "@/components/ui/canvas-verse"
@@ -114,13 +120,15 @@ export function QueueSorterCard({
   isSelected: boolean
   onSelectClick: (id: string, mods: { ctrl: boolean; shift: boolean }) => void
 }) {
-  const { ref, isDragging } = useSortable({ id: item.id, index })
+  const { ref, handleRef, isDragging } = useSortable({ id: item.id, index })
 
   const renderData = useMemo(
     () => getPresentationRenderData(item.presentation),
     [item.presentation]
   )
   const label = slideLabel(item.presentation)
+  const reference = getReferenceFromItem(item)
+  const orderLabel = String(index + 1).padStart(2, "0")
 
   const preview = () => {
     useQueueStore.getState().setActive(index)
@@ -153,12 +161,26 @@ export function QueueSorterCard({
       <div className="relative aspect-video overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)]">
         <PresentationThumbnail renderData={renderData} />
 
-        <Badge
-          variant={isActive ? "default" : "secondary"}
-          className="absolute left-1 top-1 min-w-6 justify-center px-1.5 text-xs font-bold tabular-nums"
-        >
-          {String(index + 1).padStart(2, "0")}
-        </Badge>
+        <div className="absolute left-1 top-1 flex items-center gap-1">
+          <Button
+            ref={handleRef}
+            type="button"
+            variant="outline"
+            size="icon-xs"
+            aria-label={`Drag ${reference}`}
+            title="Drag to reorder"
+            className="size-5 cursor-grab rounded-md active:cursor-grabbing"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <GripVerticalIcon className="size-3" />
+          </Button>
+          <Badge
+            variant={isActive ? "default" : "secondary"}
+            className="min-w-6 justify-center px-1.5 text-xs font-bold tabular-nums"
+          >
+            {orderLabel}
+          </Badge>
+        </div>
 
         {isActive ? (
           <Badge
@@ -169,11 +191,17 @@ export function QueueSorterCard({
           </Badge>
         ) : null}
 
-        <div className="absolute inset-x-1 bottom-1 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div
+          className="absolute inset-x-1 bottom-1 flex justify-end gap-1"
+          onPointerDown={(event) => event.stopPropagation()}
+          onDragStart={(event) => event.stopPropagation()}
+        >
           <Button
             type="button"
             size="icon-xs"
             variant="outline"
+            draggable={false}
+            aria-label={`Preview ${reference}`}
             title="Preview"
             onClick={(event) => {
               event.stopPropagation()
@@ -185,6 +213,8 @@ export function QueueSorterCard({
           <Button
             type="button"
             size="icon-xs"
+            draggable={false}
+            aria-label={`Go live ${reference}`}
             title="Go live"
             onClick={(event) => {
               event.stopPropagation()
@@ -197,6 +227,8 @@ export function QueueSorterCard({
             type="button"
             size="icon-xs"
             variant="ghost"
+            draggable={false}
+            aria-label={`Remove ${reference}`}
             title="Remove"
             onClick={(event) => {
               event.stopPropagation()
@@ -215,7 +247,7 @@ export function QueueSorterCard({
           {label ? <Badge variant="outline">{label}</Badge> : null}
         </div>
         <p className="truncate text-sm font-semibold text-foreground">
-          {getReferenceFromItem(item)}
+          {reference}
         </p>
       </div>
     </article>
