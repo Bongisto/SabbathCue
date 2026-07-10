@@ -10,11 +10,16 @@ import type {
   PresentationRenderData,
   ScripturePresentationItemData,
   EgwParagraph,
-  EgwPresentationItemData,
 } from "@/types"
 import { getPresentationRenderData, getScriptureVerse } from "@/types"
-import { splitTextForReadableSlides } from "@/lib/text-slide-chunking"
+import {
+  createEgwDeckItems,
+  createEgwPresentationItem,
+  egwReference,
+} from "@/lib/egw-deck"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
+
+export { createEgwDeckItems, createEgwPresentationItem, egwReference }
 import {
   recordWorkflowTrace,
   tracePresentationDetails,
@@ -219,41 +224,6 @@ export async function refreshLiveTranslation(): Promise<void> {
   if (refreshed) {
     commitVerseToLive(refreshed, { makeLive: false })
   }
-}
-
-export function egwReference(p: EgwParagraph): string {
-  return `${p.book_title} p.${p.page} par.${p.page_paragraph}`
-}
-
-function splitEgwTextForSlides(text: string): { text: string }[] {
-  return splitTextForReadableSlides(text, {
-    maxChars: 150,
-    softChars: 125,
-  }).map((chunk) => ({ text: chunk }))
-}
-
-export function createEgwDeckItems(p: EgwParagraph): EgwPresentationItemData[] {
-  const segments = splitEgwTextForSlides(p.text)
-  const baseReference = egwReference(p)
-
-  return segments.map((segment, index) => ({
-    kind: "egw" as const,
-    paragraph: p,
-    reference:
-      segments.length > 1
-        ? `${baseReference} (${index + 1}/${segments.length})`
-        : baseReference,
-    segments: [segment],
-    slideId: `egw-${p.id}-${index}`,
-    slideIndex: index,
-    slideCount: segments.length,
-  }))
-}
-
-export function createEgwPresentationItem(
-  p: EgwParagraph
-): EgwPresentationItemData {
-  return createEgwDeckItems(p)[0]!
 }
 
 function loadEgwDeck(p: EgwParagraph, activeIndex = 0) {
