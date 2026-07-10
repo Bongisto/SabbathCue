@@ -13,6 +13,14 @@ export interface ParagraphLayoutOptions {
   indentEm?: number
   /** A vertical gap larger than gapFactor × modal line gap starts a paragraph. */
   gapFactor?: number
+  /**
+   * Lines whose font height is at least this multiple of the modal body height
+   * are treated as heading/title lines: they never start a new paragraph, so a
+   * chapter title that wraps onto a second (often centered) line stays in one
+   * chunk instead of being split — which would otherwise break anchor matching.
+   * Undefined disables the check (default), preserving prior behavior.
+   */
+  headingHeightRatio?: number
 }
 
 export interface PageParagraphText {
@@ -20,7 +28,7 @@ export interface PageParagraphText {
   continuesFromPreviousPage: boolean
 }
 
-const DEFAULTS: Required<ParagraphLayoutOptions> = {
+const DEFAULTS: Required<Omit<ParagraphLayoutOptions, "headingHeightRatio">> = {
   yTolerance: 2.5,
   indentEm: 0.9,
   gapFactor: 1.7,
@@ -35,6 +43,25 @@ interface Line {
 
 function isStandaloneNumberLine(text: string): boolean {
   return /^\[?[ivxlcdm\d]{1,8}\]?$/i.test(text.trim())
+}
+
+/** A bracketed printed-page marker such as "[287]" that pdf.js emits as its
+ * own token, typically in the far-left margin. */
+function isPageMarkerToken(text: string): boolean {
+  return /^\[[ivxlcdm\d]{1,8}\]$/i.test(text.trim())
+}
+
+/**
+ * Left edge of a line's *body* text, ignoring a leading page-marker token that
+ * sits in the margin. Without this, an inline "[287]" printed on the first line
+ * of a new paragraph drags the line's x into the margin and hides the first-line
+ * indent, silently merging that paragraph into the previous one.
+ */
+function lineLeftX(line: Line): number {
+  for (const part of line.parts) {
+    if (!isPageMarkerToken(part.str)) return part.x
+  }
+  return line.x
 }
 
 function median(values: number[]): number {
@@ -106,12 +133,13 @@ export function reconstructPageParagraphs(
   options: ParagraphLayoutOptions = {},
 ): PageParagraphText {
   const { yTolerance, indentEm, gapFactor } = { ...DEFAULTS, ...options }
+  const { headingHeightRatio } = options
   const lines = buildLines(items, yTolerance)
   if (lines.length === 0) return { text: "", continuesFromPreviousPage: false }
 
   const bodyLines = lines.filter((line) => !isStandaloneNumberLine(lineText(line)))
   const statsLines = bodyLines.length > 0 ? bodyLines : lines
-  const baseX = modal(statsLines.map((line) => line.x))
+  const baseX = modal(statsLines.map((line) => lineLeftX(line)))
   const em = median(statsLines.map((line) => line.height)) || 10
   const indentThreshold = indentEm * em
   const gaps: number[] = []
@@ -140,9 +168,16 @@ export function reconstructPageParagraphs(
       continue
     }
 
-    const indented = line.x - baseX >= indentThreshold
+    // A heading/title line (font notably taller than the body) is never a
+    // paragraph start; keeping it with the preceding line holds wrapped,
+    // often-centered chapter titles together for anchor matching.
+    const isHeadingLine =
+      headingHeightRatio != null && line.height >= headingHeightRatio * em
+    const indented = !isHeadingLine && lineLeftX(line) - baseX >= indentThreshold
     const gapBreak =
-      previousBodyY !== null && previousBodyY - line.y >= gapFactor * modalGap
+      !isHeadingLine &&
+      previousBodyY !== null &&
+      previousBodyY - line.y >= gapFactor * modalGap
 
     if (!firstBodyLineSeen) {
       firstBodyLineSeen = true

@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs"
 import { cleanEgwParagraphs } from "./egw-text-cleanup"
-import { reconstructPageParagraphs, type PdfTextItemLike } from "./egw-paragraph-layout"
+import {
+  reconstructPageParagraphs,
+  type ParagraphLayoutOptions,
+  type PdfTextItemLike,
+} from "./egw-paragraph-layout"
 
 export interface EgwChapterConfig {
   chapter: number
@@ -20,6 +24,8 @@ export interface EgwBookConfig {
   debugSlug: string
   requiredTokens: string[]
   appendixMarker?: string
+  /** Per-book overrides for layout-aware paragraph reconstruction. */
+  layout?: ParagraphLayoutOptions
   chapters: readonly EgwChapterConfig[]
 }
 
@@ -308,6 +314,7 @@ function assignPageParagraphNumbers(chapters: DraftChapter[]): OutputChapter[] {
 
 async function extractPages(
   pdfPath: string,
+  layout?: ParagraphLayoutOptions,
 ): Promise<Array<{ page: number; text: string; continuesFromPreviousPage: boolean }>> {
   const loadingTask = getDocument(pdfPath)
   const pdf = await loadingTask.promise
@@ -320,6 +327,7 @@ async function extractPages(
 
     const reconstructed = reconstructPageParagraphs(
       items.filter((item): item is typeof item & PdfTextItemLike => "str" in item),
+      layout,
     )
     const text = preserveStandalonePrintedPageMarker(
       normalizePageText(reconstructed.text),
@@ -348,7 +356,7 @@ export async function importEgwPdf(config: EgwBookConfig): Promise<void> {
   mkdirSync(debugDir, { recursive: true })
   mkdirSync(dirname(config.outputJsonPath), { recursive: true })
 
-  const pages = await extractPages(config.pdfPath)
+  const pages = await extractPages(config.pdfPath, config.layout)
   writeFileSync(debugPagesJson, `${JSON.stringify(pages, null, 2)}\n`)
 
   let rawFullText = ""

@@ -108,6 +108,12 @@ const config: EgwBookConfig = {
     "the-desire-of-ages.json",
   ),
   debugSlug: "the-desire-of-ages",
+  // Chapter titles render in a ~17pt display font over ~14pt body text. A long
+  // title (e.g. ch. 75 "Before Annas and the Court of / Caiaphas") wraps to a
+  // centered second line whose large indent would otherwise be read as a new
+  // paragraph, splitting the title and breaking anchor matching. Treating tall
+  // heading-font lines as non-breaking keeps wrapped titles intact.
+  layout: { headingHeightRatio: 1.1 },
   requiredTokens: [
     "Contents",
     'Chapter 1-"God With Us"',
