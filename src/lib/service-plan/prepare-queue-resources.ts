@@ -136,7 +136,8 @@ export async function enqueuePreparedResourcesForItem(
         selectedSectionIds: defaultSelectedSectionIds(hymn),
       })
       const groupItems = createGroupedHymnQueueItems(screens)
-      for (const queueItem of [...groupItems].reverse()) {
+      // addItem appends, so enqueue in natural order (no reverse compensation).
+      for (const queueItem of groupItems) {
         queuePreparedItem(
           queueItem.presentation,
           queueItem.hymnGroup,
