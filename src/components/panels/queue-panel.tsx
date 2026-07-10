@@ -40,6 +40,9 @@ function QueueItemRow({
   onDragEnd: () => void
   onDrop: (index: number) => void
 }) {
+  const reference = getReferenceFromItem(item)
+  const orderLabel = String(index + 1).padStart(2, "0")
+
   const handlePreview = () => {
     useQueueStore.getState().setActive(index)
     previewQueuedItem(item)
@@ -80,12 +83,6 @@ function QueueItemRow({
   return (
     <div
       data-queue-idx={index}
-      draggable
-      onDragStart={(event) => {
-        event.dataTransfer.effectAllowed = "move"
-        event.dataTransfer.setData("text/plain", String(index))
-        onDragStart(index)
-      }}
       onDragEnter={(event) => {
         event.preventDefault()
         onDragEnter(index)
@@ -100,7 +97,7 @@ function QueueItemRow({
         onDrop(index)
       }}
       className={cn(
-        "queue-item group flex w-full cursor-grab items-center justify-between p-3 text-left active:cursor-grabbing",
+        "queue-item group flex w-full items-center justify-between p-3 text-left",
         isDragging && "opacity-50",
         isDropTarget && "ring-1 ring-primary/60",
         isHighlighted
@@ -110,41 +107,86 @@ function QueueItemRow({
             : "hover:bg-[var(--shell-bg-sunken)]"
       )}
     >
-      <GripVerticalIcon
-        aria-hidden
-        className="size-3 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100"
-      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        draggable
+        aria-label={`Drag ${reference}`}
+        title="Drag to reorder"
+        className="cursor-grab active:cursor-grabbing"
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move"
+          event.dataTransfer.setData("text/plain", String(index))
+          onDragStart(index)
+        }}
+      >
+        <GripVerticalIcon
+          aria-hidden
+          className="size-3 text-muted-foreground/70"
+        />
+      </Button>
+
+      <Badge
+        variant={isActive ? "default" : "outline"}
+        className="min-w-6 shrink-0 justify-center px-1.5 text-[0.625rem] font-bold tabular-nums"
+        aria-label={`Queue item ${orderLabel}`}
+      >
+        {orderLabel}
+      </Badge>
 
       <span className="flex-1 truncate text-sm font-medium text-foreground">
         {item.presentation.kind === "video" ? (
           <VideoIcon className="mr-1 inline size-3 text-muted-foreground" />
         ) : null}
-        {getReferenceFromItem(item)}
+        {reference}
       </span>
 
       {sourceBadge}
 
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <div
+        className="flex shrink-0 items-center gap-0.5"
+        onPointerDown={(event) => event.stopPropagation()}
+        onDragStart={(event) => event.stopPropagation()}
+      >
         <Button
+          type="button"
           variant="ghost"
           size="icon-xs"
-          onClick={handlePreview}
+          draggable={false}
+          aria-label={`Preview ${reference}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            handlePreview()
+          }}
           title="Preview"
         >
           <EyeIcon className="size-2.5" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="icon-xs"
-          onClick={handlePresent}
+          draggable={false}
+          aria-label={`Present live ${reference}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            handlePresent()
+          }}
           title="Present live"
         >
           <PlayIcon className="size-2.5" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="icon-xs"
-          onClick={handleRemove}
+          draggable={false}
+          aria-label={`Remove ${reference}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            handleRemove()
+          }}
           title="Remove"
         >
           <XIcon className="size-2.5" />
