@@ -18,7 +18,12 @@ import { sortLibraryAssetsByImportOrder } from "@/lib/library/library-order"
 import {
   isPresentableLibraryAsset,
   queueLibraryAssetsInImportOrder,
+  queueLibraryAssetsInPickOrder,
 } from "@/lib/library/library-presentation"
+import {
+  pruneOrderedSelection,
+  toggleOrderedSelection,
+} from "@/lib/library/ordered-selection"
 import { useLibraryStore } from "@/stores/library-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
 
@@ -29,6 +34,28 @@ export function LibraryWorkspace() {
   const [filter, setFilter] = useState<LibraryFilter>("all")
   const [query, setQuery] = useState("")
   const [songEditorOpen, setSongEditorOpen] = useState(false)
+  const [pickedIds, setPickedIds] = useState<string[]>([])
+
+  // Picks survive filter/search changes but not asset deletion.
+  const activePickedIds = useMemo(
+    () =>
+      pruneOrderedSelection(pickedIds, new Set(assets.map((a) => a.id))),
+    [assets, pickedIds]
+  )
+
+  const togglePick = (id: string) =>
+    setPickedIds((current) => toggleOrderedSelection(current, id))
+
+  const clearPicks = () => setPickedIds([])
+
+  const queuePickedAssets = () => {
+    const byId = new Map(assets.map((asset) => [asset.id, asset]))
+    const picked = activePickedIds.flatMap((id) => {
+      const asset = byId.get(id)
+      return asset ? [asset] : []
+    })
+    if (queueLibraryAssetsInPickOrder(picked) > 0) clearPicks()
+  }
 
   const selectedCollectionId = filter.startsWith("collection:")
     ? filter.slice("collection:".length)
@@ -91,6 +118,22 @@ export function LibraryWorkspace() {
               Add collection to plan
             </Button>
           ) : null}
+          {activePickedIds.length > 0 ? (
+            <>
+              <Button type="button" size="xs" onClick={queuePickedAssets}>
+                <PlusIcon className="size-3" />
+                Queue selected ({activePickedIds.length})
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                onClick={clearPicks}
+              >
+                Clear
+              </Button>
+            </>
+          ) : null}
           <Button
             type="button"
             size="xs"
@@ -119,8 +162,18 @@ export function LibraryWorkspace() {
         {songEditorOpen ? (
           <SongEditor onClose={() => setSongEditorOpen(false)} />
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <AssetGrid assets={visibleAssets} />
+          <div
+            className="min-h-0 flex-1 overflow-y-auto p-3 outline-none"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") clearPicks()
+            }}
+          >
+            <AssetGrid
+              assets={visibleAssets}
+              pickedIds={activePickedIds}
+              onSelectToggle={togglePick}
+            />
           </div>
         )}
       </section>

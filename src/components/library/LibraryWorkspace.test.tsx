@@ -102,6 +102,63 @@ describe("LibraryWorkspace", () => {
     ).toEqual(["Offering Background", "Welcome Background"])
   })
 
+  it("queues picked assets in pick order, independent of import numbers", () => {
+    useLibraryStore.setState({
+      assets: [
+        imageAsset("welcome", "Welcome Background", [], 2),
+        imageAsset("offering", "Offering Background", [], 1),
+        imageAsset("sermon", "Sermon Background", [], 3),
+      ],
+      collections: [],
+    })
+    renderWorkspace()
+
+    // Pick in an order that disagrees with import numbering (3, 1, 2).
+    fireEvent.click(screen.getByTestId("library-card-sermon"))
+    fireEvent.click(screen.getByTestId("library-card-offering"))
+    fireEvent.click(screen.getByTestId("library-card-welcome"))
+
+    expect(
+      screen.getByRole("button", { name: /queue selected \(3\)/i })
+    ).toBeTruthy()
+    expect(screen.getByLabelText("Pick 1 Sermon Background")).toBeTruthy()
+    expect(screen.getByLabelText("Pick 2 Offering Background")).toBeTruthy()
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /queue selected \(3\)/i })
+    )
+
+    expect(
+      useQueueStore.getState().items.map((item) => item.presentation.reference)
+    ).toEqual([
+      "Sermon Background",
+      "Offering Background",
+      "Welcome Background",
+    ])
+    expect(
+      screen.queryByRole("button", { name: /queue selected/i })
+    ).toBeNull()
+  })
+
+  it("clicking again unpicks and renumbers; card action buttons do not toggle picks", () => {
+    renderWorkspace()
+
+    fireEvent.click(screen.getByTestId("library-card-welcome"))
+    fireEvent.click(screen.getByTestId("library-card-offering"))
+    fireEvent.click(screen.getByTestId("library-card-welcome"))
+
+    expect(screen.getByLabelText("Pick 1 Offering Background")).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: /queue selected \(1\)/i })
+    ).toBeTruthy()
+
+    // Card buttons act without changing the pick selection.
+    fireEvent.click(screen.getAllByRole("button", { name: /^queue$/i })[0])
+    expect(
+      screen.getByRole("button", { name: /queue selected \(1\)/i })
+    ).toBeTruthy()
+  })
+
   it("adds the selected collection assets to the service plan", () => {
     renderWorkspace()
 

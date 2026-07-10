@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { libraryAssetToServiceItem } from "@/lib/library/asset-to-service-item"
 import {
   previewLibraryAsset,
@@ -19,9 +20,16 @@ import type { LibraryAsset } from "@/types/library"
 
 interface AssetCardProps {
   asset: LibraryAsset
+  /** 0-based pick position when selected, null when not selected. */
+  selectionIndex?: number | null
+  onSelectToggle?: (id: string) => void
 }
 
-export function AssetCard({ asset }: AssetCardProps) {
+export function AssetCard({
+  asset,
+  selectionIndex = null,
+  onSelectToggle,
+}: AssetCardProps) {
   const collections = useLibraryStore((state) => state.collections)
   const deleteAsset = useLibraryStore((state) => state.deleteAsset)
   const updateAsset = useLibraryStore((state) => state.updateAsset)
@@ -48,9 +56,18 @@ export function AssetCard({ asset }: AssetCardProps) {
     (collection) => !asset.collectionIds.includes(collection.id)
   )
 
+  const selectable = Boolean(onSelectToggle) && asset.type !== "theme"
+  const isSelected = selectionIndex !== null
+
   return (
     <article
-      className="group flex min-h-64 flex-col overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+      data-testid={`library-card-${asset.id}`}
+      onClick={selectable ? () => onSelectToggle?.(asset.id) : undefined}
+      className={cn(
+        "group flex min-h-64 flex-col overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)]",
+        selectable && "cursor-pointer",
+        isSelected && "ring-2 ring-[var(--accent)]"
+      )}
       draggable={asset.type === "image"}
       onDragStart={(event) => {
         if (asset.type !== "image") return
@@ -83,6 +100,11 @@ export function AssetCard({ asset }: AssetCardProps) {
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
+            {isSelected ? (
+              <Badge aria-label={`Pick ${selectionIndex! + 1} ${asset.name}`}>
+                {selectionIndex! + 1}
+              </Badge>
+            ) : null}
             {asset.importOrder ? (
               <Badge variant="outline">
                 #{String(asset.importOrder).padStart(3, "0")}
@@ -98,7 +120,10 @@ export function AssetCard({ asset }: AssetCardProps) {
         </div>
 
         {asset.type === "slide-template" ? (
-          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <label
+            className="flex items-center gap-1.5 text-[10px] text-muted-foreground"
+            onClick={(event) => event.stopPropagation()}
+          >
             <input
               type="checkbox"
               checked={asset.applyTheme ?? false}
@@ -111,7 +136,10 @@ export function AssetCard({ asset }: AssetCardProps) {
           </label>
         ) : null}
 
-        <div className="mt-auto flex flex-wrap gap-1.5">
+        <div
+          className="mt-auto flex flex-wrap gap-1.5"
+          onClick={(event) => event.stopPropagation()}
+        >
           {asset.type === "theme" ? (
             <Button type="button" size="xs" onClick={applyTheme}>
               <PlayIcon className="size-3" />

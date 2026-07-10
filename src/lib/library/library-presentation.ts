@@ -198,6 +198,26 @@ export function queueLibraryAsset(asset: LibraryAsset): number {
   return items.length
 }
 
+/**
+ * Queue assets in the exact order given (the operator's pick order), unlike
+ * queueLibraryAssetsInImportOrder which re-sorts by the library's catalog
+ * numbering. Queue positions stay independent of library import numbers.
+ */
+export function queueLibraryAssetsInPickOrder(assets: LibraryAsset[]): number {
+  const presentable = assets.filter(isPresentableLibraryAsset)
+  const items = presentable.flatMap(createQueueItemsForLibraryAsset)
+  if (items.length === 0) return 0
+
+  const first = presentable
+    .map(libraryAssetToFirstPresentation)
+    .find((presentation): presentation is LibraryPresentation =>
+      Boolean(presentation)
+    )
+  if (first) prepareDeckStores(first)
+  useQueueStore.getState().addItems(items)
+  return items.length
+}
+
 export function queueLibraryAssetsInImportOrder(assets: LibraryAsset[]): number {
   const items = createQueueItemsForLibraryAssets(assets)
   if (items.length === 0) return 0
