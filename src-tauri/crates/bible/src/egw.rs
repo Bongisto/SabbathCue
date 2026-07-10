@@ -2,6 +2,17 @@ use crate::db::BibleDb;
 use crate::error::BibleError;
 use crate::models::{EgwBook, EgwChapterInfo, EgwPageInfo, EgwParagraph};
 
+const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+fn fnv1a_update(mut hash: u64, bytes: &[u8]) -> u64 {
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
 impl BibleDb {
     /// List all EGW books, ordered by book number.
     ///
@@ -173,6 +184,48 @@ impl BibleDb {
         )?;
         let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    /// Cheap content fingerprint for the EGW corpus: (row count, sum of ids,
+    /// stable text hash) over page-resolved paragraphs.
+    pub fn egw_content_fingerprint(&self) -> Result<(i64, i64, u64), BibleError> {
+        let conn = self.conn()?;
+        let table_exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='egw_paragraphs'",
+                [],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+        if !table_exists {
+            return Ok((0, 0, 0));
+        }
+        let mut stmt = conn.prepare(
+            "SELECT id, text FROM egw_paragraphs \
+             WHERE page > 0 AND page_paragraph > 0 \
+             ORDER BY id",
+        )?;
+        let mut rows = stmt.query([])?;
+        let mut count = 0_i64;
+        let mut id_sum = 0_i64;
+        let mut text_hash = FNV_OFFSET_BASIS;
+
+        while let Some(row) = rows.next()? {
+            let id: i64 = row.get(0)?;
+            let text: String = row.get(1)?;
+            count += 1;
+            id_sum += id;
+            text_hash = fnv1a_update(text_hash, &id.to_le_bytes());
+            text_hash = fnv1a_update(text_hash, b"\0");
+            text_hash = fnv1a_update(text_hash, text.as_bytes());
+            text_hash = fnv1a_update(text_hash, b"\xff");
+        }
+
+        if count == 0 {
+            text_hash = 0;
+        }
+
+        Ok((count, id_sum, text_hash))
     }
 
     /// Get a single paragraph by its row id.
@@ -455,5 +508,33 @@ mod tests {
     fn empty_query_returns_no_results() {
         let db = test_db();
         assert!(db.search_egw("   ", 10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn fingerprint_counts_only_page_resolved_paragraphs() {
+        let db = test_db();
+        // test_db has 2 page-resolved paragraphs (ids 1, 2) and 1 hidden (id 3).
+        let (count, id_sum, text_hash) = db.egw_content_fingerprint().unwrap();
+        assert_eq!((count, id_sum), (2, 3));
+        assert_ne!(text_hash, 0);
+    }
+
+    #[test]
+    fn fingerprint_changes_when_paragraph_text_changes() {
+        let db = test_db();
+        let before = db.egw_content_fingerprint().unwrap();
+        {
+            let conn = db.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE egw_paragraphs SET text = ?1 WHERE id = 2",
+                ["The repaired history of the great conflict."],
+            )
+            .unwrap();
+        }
+        let after = db.egw_content_fingerprint().unwrap();
+
+        assert_eq!(before.0, after.0);
+        assert_eq!(before.1, after.1);
+        assert_ne!(before.2, after.2);
     }
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { persist } from "zustand/middleware"
 import {
   getVerseFromItem,
   type QueueItem,
@@ -16,6 +17,19 @@ interface QueueState {
   addOrFlashItem: (item: QueueItem) => "added" | "duplicate"
   addOrFlashDetectionItem: (item: QueueItem) => "added" | "duplicate"
   removeItem: (id: string) => void
+  /**
+   * Bulk-remove every item whose id is in `ids`. The currently active item
+   * stays active (its index is recomputed); if it was removed, the active
+   * position is clamped into the remaining list (or cleared when empty).
+   */
+  removeItems: (ids: string[]) => void
+  /**
+   * Move the items identified by `ids` as a contiguous block, preserving their
+   * relative order, so they are inserted at `toIndex` — the insertion position
+   * within the REMAINING items after the selection is pulled out. The active
+   * item stays active (index recomputed).
+   */
+  moveItems: (ids: string[], toIndex: number) => void
   reorderItems: (fromIndex: number, toIndex: number) => void
   setActive: (index: number | null) => void
   clearQueue: () => void
@@ -40,7 +54,9 @@ function clearAllFlashTimers(): void {
   flashTimers.clear()
 }
 
-export const useQueueStore = create<QueueState>((set, get) => ({
+export const useQueueStore = create<QueueState>()(
+  persist(
+    (set, get) => ({
   items: [],
   activeIndex: null,
   highlightedId: null,
@@ -60,7 +76,7 @@ export const useQueueStore = create<QueueState>((set, get) => ({
           })
         : state.items.some((i) => i.id === item.id)
       if (duplicate) return state
-      return { items: [item, ...state.items] }
+      return { items: [...state.items, item] }
     }),
   addItems: (items) =>
     set((state) => {
@@ -70,11 +86,9 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       const newItems = items.filter((item) => !existingIds.has(item.id))
       if (newItems.length === 0) return state
 
-      return {
-        items: [...newItems, ...state.items],
-        activeIndex:
-          state.activeIndex === null ? null : state.activeIndex + newItems.length,
-      }
+      // Appends go to the end and NEVER shift activeIndex — an existing item's
+      // position is stable when new items are added (PowerPoint model).
+      return { items: [...state.items, ...newItems] }
     }),
   addOrFlashItem: (item) => {
     const itemVerse = getVerseFromItem(item)
@@ -143,6 +157,43 @@ export const useQueueStore = create<QueueState>((set, get) => ({
       }
 
       return { items, activeIndex }
+    }),
+  removeItems: (ids) =>
+    set((state) => {
+      const idSet = new Set(ids)
+      const activeItem =
+        state.activeIndex === null ? null : state.items[state.activeIndex] ?? null
+      const items = state.items.filter((i) => !idSet.has(i.id))
+      let activeIndex: number | null = null
+      if (activeItem) {
+        const keptIndex = items.findIndex((i) => i.id === activeItem.id)
+        activeIndex =
+          keptIndex !== -1
+            ? keptIndex
+            : items.length > 0
+              ? Math.min(state.activeIndex ?? 0, items.length - 1)
+              : null
+      }
+      return { items, activeIndex }
+    }),
+  moveItems: (ids, toIndex) =>
+    set((state) => {
+      const idSet = new Set(ids)
+      const moving = state.items.filter((i) => idSet.has(i.id))
+      if (moving.length === 0) return state
+      const activeItem =
+        state.activeIndex === null ? null : state.items[state.activeIndex] ?? null
+      const remaining = state.items.filter((i) => !idSet.has(i.id))
+      const insertAt = Math.max(0, Math.min(toIndex, remaining.length))
+      const items = [
+        ...remaining.slice(0, insertAt),
+        ...moving,
+        ...remaining.slice(insertAt),
+      ]
+      const activeIndex = activeItem
+        ? items.findIndex((i) => i.id === activeItem.id)
+        : null
+      return { items, activeIndex: activeIndex === -1 ? null : activeIndex }
     }),
   reorderItems: (fromIndex, toIndex) =>
     set((state) => {
@@ -255,4 +306,34 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     })
     return found
   },
-}))
+    }),
+    {
+      name: "sabbathcue-queue-v1",
+      version: 1,
+      partialize: (state) => ({
+        items: state.items,
+        activeIndex: state.activeIndex,
+      }),
+      merge: (persisted, current) => {
+        const p = persisted as
+          | { items?: unknown; activeIndex?: unknown }
+          | undefined
+        const items = Array.isArray(p?.items)
+          ? (p.items as QueueItem[]).filter(
+              (i) =>
+                i != null &&
+                typeof i.id === "string" &&
+                typeof i.presentation?.kind === "string",
+            )
+          : []
+        const activeIndex =
+          typeof p?.activeIndex === "number" &&
+          p.activeIndex >= 0 &&
+          p.activeIndex < items.length
+            ? p.activeIndex
+            : null
+        return { ...current, items, activeIndex }
+      },
+    },
+  ),
+)

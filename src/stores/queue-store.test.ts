@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { useQueueStore } from "./queue-store"
 import type { QueueItem } from "@/types"
@@ -25,9 +26,16 @@ function makeItem(id: string, verse: number): QueueItem {
   }
 }
 
+function seed(items: QueueItem[], activeIndex: number | null = null): void {
+  useQueueStore.getState().addItems(items)
+  if (activeIndex !== null) useQueueStore.getState().setActive(activeIndex)
+}
+
 describe("queue-store", () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    localStorage.clear()
+    useQueueStore.persist?.clearStorage?.()
     useQueueStore.getState().clearQueue()
     useQueueStore.setState({
       items: [],
@@ -65,7 +73,7 @@ describe("queue-store", () => {
     expect(useQueueStore.getState().activeIndex).toBe(0)
   })
 
-  it("adds multiple items at the front without reversing their order", () => {
+  it("appends multiple items to the end without reversing their order", () => {
     useQueueStore.setState({
       items: [makeItem("existing", 19)],
       activeIndex: 0,
@@ -80,12 +88,13 @@ describe("queue-store", () => {
     ])
 
     expect(useQueueStore.getState().items.map((i) => i.id)).toEqual([
+      "existing",
       "a",
       "b",
       "c",
-      "existing",
     ])
-    expect(useQueueStore.getState().activeIndex).toBe(3)
+    // Appends never shift activeIndex — the existing active item stays put.
+    expect(useQueueStore.getState().activeIndex).toBe(0)
   })
 
   it("keeps active item attached when another item is dragged around it", () => {
@@ -150,5 +159,75 @@ describe("queue-store", () => {
 
     expect(useQueueStore.getState().highlightedIds).toEqual([])
     expect(useQueueStore.getState().highlightedId).toBeNull()
+  })
+
+  describe("append ordering", () => {
+    const itemA = makeItem("a", 16)
+    const itemB = makeItem("b", 17)
+    const itemC = makeItem("c", 18)
+
+    it("appends new items at the end and never shifts activeIndex", () => {
+      const store = useQueueStore.getState()
+      store.addItem(itemA)
+      store.addItem(itemB)
+      useQueueStore.getState().setActive(0)
+      store.addItem(itemC)
+      const state = useQueueStore.getState()
+      expect(state.items.map((i) => i.id)).toEqual([itemA.id, itemB.id, itemC.id])
+      expect(state.activeIndex).toBe(0)
+    })
+  })
+
+  describe("bulk operations", () => {
+    const itemA = makeItem("a", 16)
+    const itemB = makeItem("b", 17)
+    const itemC = makeItem("c", 18)
+    const itemD = makeItem("d", 19)
+
+    it("removeItems drops all given ids and keeps the active item active", () => {
+      seed([itemA, itemB, itemC, itemD], 2) // active = itemC
+      useQueueStore.getState().removeItems([itemA.id, itemD.id])
+      const state = useQueueStore.getState()
+      expect(state.items.map((i) => i.id)).toEqual([itemB.id, itemC.id])
+      expect(state.activeIndex).toBe(1)
+    })
+
+    it("moveItems moves a selection as a block preserving relative order", () => {
+      seed([itemA, itemB, itemC, itemD])
+      useQueueStore.getState().moveItems([itemA.id, itemC.id], 2)
+      expect(useQueueStore.getState().items.map((i) => i.id)).toEqual([
+        itemB.id,
+        itemD.id,
+        itemA.id,
+        itemC.id,
+      ])
+    })
+  })
+
+  describe("persistence", () => {
+    const itemA = makeItem("a", 16)
+
+    it("persists items and activeIndex but not highlight state", () => {
+      seed([itemA])
+      useQueueStore.getState().flashItem(itemA.id)
+      const raw = localStorage.getItem("sabbathcue-queue-v1")
+      expect(raw).toBeTruthy()
+      const persisted = JSON.parse(raw!)
+      expect(persisted.state.items).toHaveLength(1)
+      expect(persisted.state.highlightedIds).toBeUndefined()
+    })
+
+    it("drops malformed persisted items instead of crashing", async () => {
+      localStorage.setItem(
+        "sabbathcue-queue-v1",
+        JSON.stringify({
+          state: { items: [{ bogus: true }], activeIndex: 5 },
+          version: 1,
+        }),
+      )
+      await useQueueStore.persist.rehydrate()
+      expect(useQueueStore.getState().items).toEqual([])
+      expect(useQueueStore.getState().activeIndex).toBeNull()
+    })
   })
 })

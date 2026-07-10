@@ -20,6 +20,12 @@ interface CleanedParagraph {
 
 const MIN_READABLE_PARAGRAPH_CHARS = 420
 const MAX_READABLE_PARAGRAPH_CHARS = 850
+// A paragraph longer than this is split at sentence boundaries even when no page
+// artifact was detected. Page-spanning paragraphs are normally split for
+// readability once their page-transition header is recognized, but even-page
+// running headers ("<page> <BookTitle>") merge inline and evade that detection,
+// leaving a few genuinely over-long paragraphs. This is the backstop for them.
+const OVERLONG_PARAGRAPH_CHARS = 2000
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -345,7 +351,8 @@ export function cleanEgwParagraphs(
 
   const readable = mergeReadableContinuations(
     healed.flatMap((paragraph) =>
-      paragraph.hadPageArtifact
+      paragraph.hadPageArtifact ||
+      paragraph.text.length > OVERLONG_PARAGRAPH_CHARS
         ? splitReadableParagraph(paragraph.text).map((text, index, pieces) => ({
             page: paragraph.page,
             continued_pages:

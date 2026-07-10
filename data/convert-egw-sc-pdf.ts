@@ -34,6 +34,13 @@ const config: EgwBookConfig = {
     "steps-to-christ.json",
   ),
   debugSlug: "steps-to-christ",
+  // SC chapter titles render in a ~17pt display font over ~10pt body text.
+  // A wrapped title (e.g. ch. 2 "The Sinner's Need of / Christ") puts its
+  // second line ~24 units below the first — past the default gap-break
+  // threshold — which would split the title and break anchor matching.
+  // Treating tall heading-font lines as non-breaking keeps wrapped titles
+  // intact; body paragraphs (normal font) are detected as before.
+  layout: { headingHeightRatio: 1.1 },
   requiredTokens: [
     "Contents",
     "Chap. 1 - God's Love for Man",
