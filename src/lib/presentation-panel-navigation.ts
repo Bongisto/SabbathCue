@@ -8,7 +8,10 @@ import {
   selectPreviewVerse,
   selectPreviewItem,
 } from "@/lib/presentation-workflow"
-import { presentQueuedItem } from "@/lib/queue-presentation"
+import {
+  presentQueuedItem,
+  presentQueuedItemAtEnd,
+} from "@/lib/queue-presentation"
 import { restoreQueuedHymnDeckForRenderItem } from "@/lib/queued-hymn-deck"
 import { useBibleStore } from "@/stores/bible-store"
 import { getBroadcastLiveStore } from "@/stores/broadcast/live-store"
@@ -28,7 +31,13 @@ import {
   type PresentationDeckSlide,
 } from "@/lib/presentation-deck-navigation"
 import type { KeyboardEvent } from "react"
-import type { EgwParagraph, PresentationRenderData, Verse } from "@/types"
+import { getVerseFromItem } from "@/types"
+import type {
+  EgwParagraph,
+  PresentationRenderData,
+  QueueItem,
+  Verse,
+} from "@/types"
 
 export function isPresentationNavigationEditableTarget(
   target: EventTarget | null
@@ -254,6 +263,32 @@ function queueEgwParagraphAdvance(
   return true
 }
 
+// PowerPoint-style queue walk: when live and already at the boundary slide of
+// the current item, cross into the adjacent queue item — its FIRST slide going
+// forward, its LAST slide going backward. Only fires when the live content
+// actually corresponds to the active queue item (matchesActive), and never
+// wraps around either end of the queue.
+function advanceQueueAtBoundary(
+  delta: number,
+  isLive: boolean,
+  matchesActive: (item: QueueItem) => boolean
+): boolean {
+  if (!isLive) return false
+  const queue = useQueueStore.getState()
+  if (queue.activeIndex === null) return false
+  const active = queue.items[queue.activeIndex]
+  if (!active || !matchesActive(active)) return false
+
+  const nextIndex = queue.activeIndex + delta
+  const next = queue.items[nextIndex]
+  if (!next) return true // at either end of the queue: consume the key, no wrap
+
+  queue.setActive(nextIndex)
+  if (delta < 0) presentQueuedItemAtEnd(next)
+  else presentQueuedItem(next)
+  return true
+}
+
 function advanceLiveHymnGroup(delta: number): boolean {
   const queue = useQueueStore.getState()
   const activeQueueItem =
@@ -296,6 +331,7 @@ function advanceDeck<T extends Parameters<typeof presentItem>[0]>(
     activeIndex: number
     setActive: (nextIndex: number) => void
     stopAtBoundary: boolean
+    onBoundary?: () => boolean
   }
 ): boolean {
   if (config.rawDeck.length === 0) return false
@@ -306,7 +342,9 @@ function advanceDeck<T extends Parameters<typeof presentItem>[0]>(
   )
   const nextIndex = clampDeckIndex(config.slides.length, currentIndex, delta)
   const next = config.rawDeck[nextIndex]
-  if (!next || nextIndex === currentIndex) return config.stopAtBoundary
+  if (!next || nextIndex === currentIndex) {
+    return config.onBoundary?.() ?? config.stopAtBoundary
+  }
   config.setActive(nextIndex)
   presentOrPreview(next, isLive)
   return true
@@ -325,6 +363,12 @@ function advanceHymnDeck(
     activeIndex: hymnSlides.activeIndex,
     setActive: (nextIndex) => hymnSlides.setDeck(hymnSlides.deck, nextIndex),
     stopAtBoundary: true,
+    onBoundary: () =>
+      advanceQueueAtBoundary(
+        delta,
+        isLive,
+        (item) => item.presentation.kind === "hymn"
+      ),
   })
 }
 
@@ -340,6 +384,15 @@ function advanceEgwDeck(
     activeIndex: egwSlides.activeIndex,
     setActive: (nextIndex) => egwSlides.setDeck(egwSlides.deck, nextIndex),
     stopAtBoundary: false,
+    onBoundary: () =>
+      advanceQueueAtBoundary(
+        delta,
+        isLive,
+        (item) =>
+          item.presentation.kind === "egw" &&
+          item.presentation.paragraph.id ===
+            (egwParagraphFromTarget(targetItem)?.id ?? -1)
+      ),
   })
 }
 
@@ -360,6 +413,12 @@ function advanceSermonDeck(
         sermonSlides.activeItemId
       ),
     stopAtBoundary: true,
+    onBoundary: () =>
+      advanceQueueAtBoundary(
+        delta,
+        isLive,
+        (item) => item.presentation.kind === "slideDeck"
+      ),
   })
 }
 
@@ -370,6 +429,24 @@ export function advancePresentationTarget(
 ): boolean {
   const deckKind = presentationDeckKind(targetItem)
   if (!deckKind) {
+    // Scripture is single-slide, so a live verse that matches the active queue
+    // item crosses straight to the adjacent item (no slide-boundary gate).
+    // When the live verse does not match (detection-driven flow), fall through
+    // to ordinary verse +1/-1 navigation.
+    const liveVerse = isLive ? scriptureFromTarget(targetItem) : null
+    if (
+      liveVerse &&
+      advanceQueueAtBoundary(delta, isLive, (item) => {
+        const itemVerse = getVerseFromItem(item)
+        return (
+          itemVerse?.book_number === liveVerse.book_number &&
+          itemVerse.chapter === liveVerse.chapter &&
+          itemVerse.verse === liveVerse.verse
+        )
+      })
+    ) {
+      return true
+    }
     return queueScriptureAdvance(delta, targetItem, isLive)
   }
 
