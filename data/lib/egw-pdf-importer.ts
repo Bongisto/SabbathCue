@@ -206,7 +206,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-function stripChapterFurniture(
+export function stripChapterFurniture(
   raw: string,
   bookTitle: string,
   currentTitle: string,
@@ -214,8 +214,16 @@ function stripChapterFurniture(
   const escBook = escapeRegExp(bookTitle)
   const escTitle = escapeRegExp(currentTitle)
   return raw
-    .replace(new RegExp(`\\b${escBook}\\b`, "gi"), "")
-    .replace(new RegExp(`${escTitle}\\s+\\d+`, "gi"), "")
+    // Running headers only — never a bare title word. Even pages print
+    // "<page> <Book Title>", odd pages "<Chapter Title> <page>". Convert each to
+    // a [page] marker so the printed page survives (that number appears nowhere
+    // else) while the title text is dropped. The former `\b<Book Title>\b` strip
+    // also deleted every ordinary occurrence of the title word — erasing
+    // "education" from Education and "the great controversy" from GC — and the
+    // former `<Chapter Title>\s+\d+` strip discarded the page number with the
+    // header, which lost whole printed pages (e.g. Education pp. 9-13).
+    .replace(new RegExp(`\\b(\\d{1,3})\\s+${escBook}\\b`, "gi"), " [$1] ")
+    .replace(new RegExp(`${escTitle}\\s+(\\d{1,3})\\b`, "gi"), " [$1] ")
     .replace(/^\s*\d+\s*$/gm, "")
     .replace(/^\s*Contents\s*$/gim, "")
     .replace(/^\s*Appendix\s*$/gim, "")
