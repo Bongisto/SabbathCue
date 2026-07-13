@@ -95,33 +95,63 @@ describe("EGW text cleanup", () => {
     )
   })
 
-  it("restores Desire of Ages Sabbath text damaged by the legacy importer", () => {
+  it("merges a same-page sentence split that has no page artifact", () => {
+    // The layout heuristics sometimes break one sentence in two on the same
+    // page (e.g. the Education ch.1 epigraph). Neither fragment carries a page
+    // artifact, but the first has no closing punctuation and the second
+    // continues it in lower case, so they must be rejoined.
     const paragraphs = cleanEgwParagraphs(
       [
         {
           paragraph: 1,
-          text: "was hallowed at the creation. Because He had rested upon, God blessed the seventh day.",
+          page: 8,
+          text: 'the knowledge of the holy is understanding; "Acquaint now',
         },
-        {
-          paragraph: 2,
-          text: "And since is a memorial of the work of creation, it is a token of the love and power of Christ.",
-        },
+        { paragraph: 2, page: 8, text: 'thyself with Him."' },
       ],
-      {
-        bookTitle: "The Desire of Ages",
-        chapterTitle: "The Sabbath",
-      },
+      options,
     )
 
-    expect(paragraphs[0]?.text).toContain(
-      "The Sabbath was hallowed at the creation.",
+    expect(paragraphs).toHaveLength(1)
+    expect(paragraphs[0]?.text).toContain("Acquaint now thyself with Him")
+  })
+
+  it("merges a continuation that spans a printed page and records the span", () => {
+    const paragraphs = cleanEgwParagraphs(
+      [
+        { paragraph: 1, page: 9, text: "More and more fully would he" },
+        {
+          paragraph: 2,
+          page: 10,
+          text: "have fulfilled the object of his creation.",
+        },
+      ],
+      options,
     )
-    expect(paragraphs[0]?.text).toContain(
-      "Because He had rested upon the Sabbath, God blessed the seventh day.",
+
+    expect(paragraphs).toHaveLength(1)
+    expect(paragraphs[0]?.text).toBe(
+      "More and more fully would he have fulfilled the object of his creation.",
     )
-    expect(paragraphs[1]?.text).toContain(
-      "And since the Sabbath is a memorial of the work of creation",
-    )
+    expect(paragraphs[0]?.page).toBe(9)
+    expect(paragraphs[0]?.continued_pages).toContain(10)
+  })
+
+  it("leaves correct Desire of Ages Sabbath prose untouched", () => {
+    // The legacy dropout patch force-inserted "the Sabbath" to repair text the
+    // old title strip had mangled. With the strip fixed, source text arrives
+    // intact, and re-running those insertions doubled the phrase ("The Sabbath
+    // The Sabbath calls our thoughts to nature"). Correct prose must pass
+    // through unchanged.
+    const text =
+      "The Sabbath calls our thoughts to nature, and brings us into communion with the Creator. The Sabbath was not for Israel merely, but for the world."
+    const paragraphs = cleanEgwParagraphs([{ paragraph: 1, text }], {
+      bookTitle: "The Desire of Ages",
+      chapterTitle: "The Sabbath",
+    })
+
+    expect(paragraphs).toHaveLength(1)
+    expect(paragraphs[0]?.text).toBe(text)
   })
 
   it("re-splits long healed page runs into readable sentence groups", () => {
