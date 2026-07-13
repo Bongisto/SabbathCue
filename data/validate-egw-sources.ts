@@ -27,7 +27,15 @@ const FORBIDDEN_TEXT = [
   "/* List Definitions */",
 ] as const
 
-const EXPECTED = [
+interface ExpectedBook {
+  abbreviation: string
+  chapters: number
+  file: string
+  minParasPerPage: number
+  maxParagraphChars?: number
+}
+
+const EXPECTED: readonly ExpectedBook[] = [
   {
     abbreviation: "PP",
     chapters: 73,
