@@ -4,20 +4,77 @@ import {
   normalizeInput,
   findMatchingBook,
   getAutocompleteSuggestion,
+  getGhostSuggestionSuffix,
   getTabNavigationResult,
   type Book,
 } from "./quick-search"
 
 // Mock book data
 const mockBooks: Book[] = [
-  { id: 1, translation_id: 1, book_number: 1, name: "Genesis", abbreviation: "Gen", testament: "OT" },
-  { id: 43, translation_id: 1, book_number: 43, name: "John", abbreviation: "John", testament: "NT" },
-  { id: 62, translation_id: 1, book_number: 62, name: "I John", abbreviation: "1John", testament: "NT" },
-  { id: 63, translation_id: 1, book_number: 63, name: "II John", abbreviation: "2John", testament: "NT" },
-  { id: 64, translation_id: 1, book_number: 64, name: "III John", abbreviation: "3John", testament: "NT" },
-  { id: 45, translation_id: 1, book_number: 45, name: "Romans", abbreviation: "Rom", testament: "NT" },
-  { id: 19, translation_id: 1, book_number: 19, name: "Psalms", abbreviation: "Ps", testament: "OT" },
-  { id: 46, translation_id: 1, book_number: 46, name: "I Corinthians", abbreviation: "1Cor", testament: "NT" },
+  {
+    id: 1,
+    translation_id: 1,
+    book_number: 1,
+    name: "Genesis",
+    abbreviation: "Gen",
+    testament: "OT",
+  },
+  {
+    id: 43,
+    translation_id: 1,
+    book_number: 43,
+    name: "John",
+    abbreviation: "John",
+    testament: "NT",
+  },
+  {
+    id: 62,
+    translation_id: 1,
+    book_number: 62,
+    name: "I John",
+    abbreviation: "1John",
+    testament: "NT",
+  },
+  {
+    id: 63,
+    translation_id: 1,
+    book_number: 63,
+    name: "II John",
+    abbreviation: "2John",
+    testament: "NT",
+  },
+  {
+    id: 64,
+    translation_id: 1,
+    book_number: 64,
+    name: "III John",
+    abbreviation: "3John",
+    testament: "NT",
+  },
+  {
+    id: 45,
+    translation_id: 1,
+    book_number: 45,
+    name: "Romans",
+    abbreviation: "Rom",
+    testament: "NT",
+  },
+  {
+    id: 19,
+    translation_id: 1,
+    book_number: 19,
+    name: "Psalms",
+    abbreviation: "Ps",
+    testament: "OT",
+  },
+  {
+    id: 46,
+    translation_id: 1,
+    book_number: 46,
+    name: "I Corinthians",
+    abbreviation: "1Cor",
+    testament: "NT",
+  },
 ]
 
 describe("numberToRoman", () => {
@@ -274,5 +331,21 @@ describe("getTabNavigationResult", () => {
   it("advances from 'Romans 8' to 'Romans 8:' when suggestion is 'Romans 8:1'", () => {
     const result = getTabNavigationResult("Romans 8", "Romans 8:1")
     expect(result).toBe("Romans 8:")
+  })
+})
+
+describe("getGhostSuggestionSuffix", () => {
+  it("returns only the suffix for a case-insensitive prefix match", () => {
+    expect(getGhostSuggestionSuffix("jo", "John 1:1")).toBe("hn 1:1")
+  })
+
+  it("returns null for normalized suggestions that do not start with the raw input", () => {
+    expect(getGhostSuggestionSuffix("1 j", "I John 1:1")).toBeNull()
+  })
+
+  it("returns null for empty, cleared, or complete inputs", () => {
+    expect(getGhostSuggestionSuffix("", "John 1:1")).toBeNull()
+    expect(getGhostSuggestionSuffix("John 1:1", "John 1:1")).toBeNull()
+    expect(getGhostSuggestionSuffix("John", "")).toBeNull()
   })
 })

@@ -17,6 +17,7 @@ import { useBibleStore } from "@/stores/bible-store"
 import { useLibraryStore } from "@/stores/library-store"
 import {
   getAutocompleteSuggestion,
+  getGhostSuggestionSuffix,
   getTabNavigationResult,
   type Book as QuickSearchBook,
 } from "@/lib/quick-search"
@@ -34,9 +35,7 @@ import type { LibraryAsset } from "@/types/library"
 const QUICK_PREVIEW_DEBOUNCE_MS = 120
 
 function quickContentQuery(value: string): string {
-  return value
-    .replace(/^(?:hymn|song)\s+(?:number\s+)?/i, "")
-    .trim()
+  return value.replace(/^(?:hymn|song)\s+(?:number\s+)?/i, "").trim()
 }
 
 function librarySearchText(asset: LibraryAsset): string {
@@ -64,6 +63,10 @@ export function PreviewQuickSearch() {
   const bibleResult = useMemo(
     () => getAutocompleteSuggestion(query, books as QuickSearchBook[]),
     [books, query]
+  )
+  const ghostSuggestionSuffix = getGhostSuggestionSuffix(
+    query,
+    bibleResult.suggestion
   )
   const hymnQuery = useMemo(() => quickContentQuery(query), [query])
   const hymnMatches = useMemo(
@@ -102,7 +105,8 @@ export function PreviewQuickSearch() {
         limit: 3,
       })
         .then((results) => {
-          if (requestId === verseSearchRequestIdRef.current) setVerseMatches(results)
+          if (requestId === verseSearchRequestIdRef.current)
+            setVerseMatches(results)
         })
         .catch(() => {
           if (requestId === verseSearchRequestIdRef.current) setVerseMatches([])
@@ -164,7 +168,9 @@ export function PreviewQuickSearch() {
         setFeedback("")
         return
       }
-      setFeedback(`Previewed ${result.book_name} ${result.chapter}:${result.verse}`)
+      setFeedback(
+        `Previewed ${result.book_name} ${result.chapter}:${result.verse}`
+      )
     },
     [activeTranslationId]
   )
@@ -311,12 +317,15 @@ export function PreviewQuickSearch() {
     <div className="relative w-full min-w-[13rem] sm:w-72 xl:w-80">
       {/* The real input renders the typed text; the overlay reuses it as an
           invisible spacer so only the grey suggestion suffix is drawn after it. */}
-      {bibleResult.suggestion && bibleResult.suggestion !== query ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center px-8">
+      {ghostSuggestionSuffix ? (
+        <div
+          data-testid="quick-search-ghost"
+          className="pointer-events-none absolute inset-0 z-10 flex items-center px-8"
+        >
           <span className="truncate text-xs">
             <span className="invisible">{query}</span>
             <span className="text-muted-foreground">
-              {bibleResult.suggestion.slice(query.length)}
+              {ghostSuggestionSuffix}
             </span>
           </span>
         </div>

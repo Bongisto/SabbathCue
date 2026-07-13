@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input"
+import { getGhostSuggestionSuffix } from "@/lib/quick-search"
 import type { Verse } from "@/types"
 
 export function QuickVerseSearch({
@@ -22,21 +23,23 @@ export function QuickVerseSearch({
 }) {
   // Hide the grey autocomplete hint once the verse results dropdown is open,
   // so it doesn't linger over the input while matching content is shown.
-  const showGhost =
-    Boolean(quickSuggestion) &&
-    quickSuggestion !== quickInput &&
-    !shouldShowVerseDropdown
+  const ghostSuggestionSuffix = shouldShowVerseDropdown
+    ? null
+    : getGhostSuggestionSuffix(quickInput, quickSuggestion)
 
   return (
     <div className="relative flex-1">
       {/* The real input renders the typed text; the overlay reuses it as an
           invisible spacer so only the grey suggestion suffix is drawn after it. */}
-      {showGhost ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center px-3">
+      {ghostSuggestionSuffix ? (
+        <div
+          data-testid="quick-search-ghost"
+          className="pointer-events-none absolute inset-0 z-10 flex items-center px-3"
+        >
           <span className="text-xs font-normal">
             <span className="invisible">{quickInput}</span>
             <span className="text-gray-500 dark:text-gray-400">
-              {quickSuggestion.slice(quickInput.length)}
+              {ghostSuggestionSuffix}
             </span>
           </span>
         </div>
@@ -64,7 +67,9 @@ export function QuickVerseSearch({
                 <span className="w-6 shrink-0 text-right font-semibold text-primary">
                   {verse.verse}
                 </span>
-                <span className="line-clamp-1 flex-1 text-muted-foreground">{verse.text}</span>
+                <span className="line-clamp-1 flex-1 text-muted-foreground">
+                  {verse.text}
+                </span>
               </button>
             ))}
           </div>
