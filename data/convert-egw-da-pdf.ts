@@ -128,9 +128,12 @@ function mergeParagraphs(
     throw new Error("Cannot merge an empty Desire of Ages range")
   }
 
-  const continuedPages = paragraphs.flatMap(
-    (paragraph) => paragraph.continued_pages ?? []
-  )
+  const continuedPages = paragraphs.flatMap((paragraph) => [
+    ...(paragraph.page != null && paragraph.page !== first.page
+      ? [paragraph.page]
+      : []),
+    ...(paragraph.continued_pages ?? []),
+  ])
 
   return {
     paragraph: first.paragraph,
@@ -183,7 +186,7 @@ function alignChapter1CanonicalParagraphs(
   return renumberChapter({ ...chapter, paragraphs: aligned })
 }
 
-function alignDesireOfAgesCanonicalParagraphs(
+export function alignDesireOfAgesCanonicalParagraphs(
   chapters: EgwDraftChapter[]
 ): EgwDraftChapter[] {
   return chapters.map(alignChapter1CanonicalParagraphs)
@@ -225,7 +228,9 @@ async function main() {
   await importEgwPdf(config)
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
+}

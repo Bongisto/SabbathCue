@@ -720,11 +720,13 @@ export async function importEgwPdf(config: EgwBookConfig): Promise<void> {
         `Chapter order broken: ${chapterPositions[i].anchor} comes before ${chapterPositions[i - 1].anchor}`
       )
     }
+    const currentFolioPos = chapterPositions[i].folioPos
+    const previousFolioPos = chapterPositions[i - 1].folioPos
     if (
       pageSource === "folios" &&
-      chapterPositions[i].folioPos != null &&
-      chapterPositions[i - 1].folioPos != null &&
-      chapterPositions[i].folioPos <= chapterPositions[i - 1].folioPos
+      currentFolioPos != null &&
+      previousFolioPos != null &&
+      currentFolioPos <= previousFolioPos
     ) {
       throw new Error(
         `Folio chapter order broken: ${chapterPositions[i].anchor} comes before ${chapterPositions[i - 1].anchor}`

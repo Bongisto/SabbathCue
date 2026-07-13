@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
+import { alignDesireOfAgesCanonicalParagraphs } from "./convert-egw-da-pdf"
 
 type EgwSource = {
   title: string
@@ -109,5 +110,33 @@ describe("The Desire of Ages source", () => {
       )
       expect(entry?.paragraphs[0]?.page).toBe(expectedPage)
     }
+  })
+
+  test("tracks the pages of merged chapter 1 continuation fragments", () => {
+    const [chapter] = alignDesireOfAgesCanonicalParagraphs([
+      {
+        chapter: 1,
+        title: '"God With Us"',
+        paragraphs: [
+          {
+            paragraph: 1,
+            page: 8,
+            text: "In the beginning, God was revealed in all the works of creation.",
+          },
+          {
+            paragraph: 2,
+            page: 9,
+            text: "9 earth with beauty, and filled it with things useful to man.",
+          },
+        ],
+      },
+    ])
+
+    expect(chapter?.paragraphs).toHaveLength(1)
+    expect(chapter?.paragraphs[0]?.page).toBe(8)
+    expect(chapter?.paragraphs[0]?.continued_pages).toEqual([9])
+    expect(chapter?.paragraphs[0]?.text).toBe(
+      "In the beginning, God was revealed in all the works of creation. earth with beauty, and filled it with things useful to man."
+    )
   })
 })

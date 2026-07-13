@@ -50,9 +50,12 @@ function mergeParagraphs(paragraphs: ScParagraph[]): ScParagraph {
     throw new Error("Cannot merge an empty paragraph range")
   }
 
-  const continuedPages = paragraphs.flatMap(
-    (paragraph) => paragraph.continued_pages ?? [],
-  )
+  const continuedPages = paragraphs.flatMap((paragraph) => [
+    ...(paragraph.page != null && paragraph.page !== first.page
+      ? [paragraph.page]
+      : []),
+    ...(paragraph.continued_pages ?? []),
+  ])
 
   return {
     paragraph: first.paragraph,

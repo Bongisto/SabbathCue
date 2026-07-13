@@ -110,7 +110,9 @@ function mergeParagraphs(paragraphs: PpParagraph[]): PpParagraph {
   }
 
   const continuedPages = paragraphs.flatMap((paragraph) => [
-    ...(paragraph.page !== first.page ? [paragraph.page] : []),
+    ...(paragraph.page != null && paragraph.page !== first.page
+      ? [paragraph.page]
+      : []),
     ...(paragraph.continued_pages ?? []),
   ])
 

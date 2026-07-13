@@ -403,4 +403,34 @@ describe("Steps to Christ source", () => {
     expect(chapter?.paragraphs[1]?.page).toBe(25)
     expect(chapter?.paragraphs[2]?.page).toBe(25)
   })
+
+  test("tracks the pages of merged chapter 1 psalm block fragments", () => {
+    const [chapter] = alignStepsToChristCanonicalParagraphs([
+      {
+        chapter: 1,
+        title: "God's Love for Man",
+        paragraphs: [
+          {
+            paragraph: 1,
+            page: 9,
+            text: '"The eyes of all wait upon Thee; and Thou givest them their meat in due season.',
+          },
+          {
+            paragraph: 2,
+            page: 9,
+            text: "Thou openest Thine hand, and satisfiest the desire of every living thing.\"",
+          },
+          {
+            paragraph: 3,
+            page: 10,
+            text: "Psalm 145:15, 16.",
+          },
+        ],
+      },
+    ])
+
+    expect(chapter?.paragraphs).toHaveLength(1)
+    expect(chapter?.paragraphs[0]?.page).toBe(9)
+    expect(chapter?.paragraphs[0]?.continued_pages).toEqual([10])
+  })
 })
