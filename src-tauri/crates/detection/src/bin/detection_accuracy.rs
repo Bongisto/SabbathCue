@@ -37,6 +37,7 @@ enum CaseMode {
 struct BenchCase {
     language: String,
     category: String,
+    timestamp: Option<String>,
     text: String,
     mode: CaseMode,
     expected_refs: Vec<String>,
@@ -48,6 +49,7 @@ struct BenchCase {
 struct FixtureCase {
     language: Option<String>,
     category: String,
+    timestamp: Option<String>,
     text: String,
     mode: Option<CaseMode>,
     expected: Option<String>,
@@ -660,6 +662,7 @@ fn main() {
             .forbidden_refs
             .iter()
             .find(|forbidden| detected_refs.iter().any(|got| ref_eq(forbidden, got)));
+        let held = held_summary(&detections, &refs);
 
         let entry = by_cat.entry(case.category.clone()).or_insert((0, 0));
         entry.1 += 1;
@@ -746,7 +749,15 @@ fn main() {
             entry.0 += 1;
         }
         let want = case.want_label();
-        println!("[{:>12}] want {want:<28} -> {outcome}", case.category);
+        let outcome = append_held(outcome, &held);
+        let timestamp = case
+            .timestamp
+            .as_deref()
+            .map_or_else(String::new, |value| format!(" @{value}"));
+        println!(
+            "[{:>12}{timestamp:<10}] want {want:<28} -> {outcome}",
+            case.category
+        );
     }
 
     let total = cases.len();
@@ -852,6 +863,7 @@ impl FixtureCase {
         Ok(BenchCase {
             language,
             category,
+            timestamp: self.timestamp.and_then(|value| trim_non_empty(&value)),
             text,
             mode,
             expected_refs,
@@ -880,6 +892,7 @@ fn built_in_case(language: &str, case: &Case) -> BenchCase {
     BenchCase {
         language: language.to_string(),
         category: case.0.to_string(),
+        timestamp: None,
         text: case.1.to_string(),
         mode,
         expected_refs,
@@ -938,6 +951,60 @@ fn detection_ref(
     detection.verse_id.and_then(|id| refs.get(&id).cloned())
 }
 
+fn held_summary(
+    detections: &[rhema_detection::MergedDetection],
+    refs: &HashMap<i64, String>,
+) -> Vec<String> {
+    let mut entries = detections
+        .iter()
+        .filter_map(|result| {
+            detection_ref(&result.detection, refs).map(|reference| {
+                let source = match result.detection.source {
+                    rhema_detection::types::DetectionSource::DirectReference => "direct",
+                    rhema_detection::types::DetectionSource::Semantic { .. } => "semantic",
+                };
+                (
+                    reference.clone(),
+                    result.detection.confidence,
+                    format!(
+                        "{} {:.0}% {}",
+                        reference,
+                        result.detection.confidence * 100.0,
+                        source
+                    ),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|a, b| {
+        b.1.partial_cmp(&a.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    let mut seen = Vec::<String>::new();
+    entries
+        .into_iter()
+        .filter_map(|(reference, _confidence, summary)| {
+            if seen.iter().any(|value| ref_eq(value, &reference)) {
+                None
+            } else {
+                seen.push(reference);
+                Some(summary)
+            }
+        })
+        .take(5)
+        .collect()
+}
+
+fn append_held(outcome: String, held: &[String]) -> String {
+    if held.is_empty() {
+        outcome
+    } else {
+        format!("{outcome} | held {}", held.join(", "))
+    }
+}
+
 /// Compare two references for the same verse, tolerant of book-name spelling
 /// (`1`/`I`/`First` Corinthians, `Psalm`/`Psalms`).
 fn ref_eq(a: &str, b: &str) -> bool {
@@ -967,6 +1034,7 @@ fn normalize_ref(s: &str) -> Option<(String, String)> {
 fn singularize(book: &str) -> String {
     // Only Psalms varies between singular/plural in practice here.
     match book {
+        "revelation of john" => "revelation".to_string(),
         "psalm" => "psalms".to_string(),
         other => other.to_string(),
     }
@@ -1004,6 +1072,7 @@ mod tests {
         let case = FixtureCase {
             language: None,
             category: "fixture".to_string(),
+            timestamp: None,
             text: "Galatians 2:20".to_string(),
             mode: None,
             expected: Some("Galatians 2:20".to_string()),
@@ -1021,6 +1090,7 @@ mod tests {
         let err = FixtureCase {
             language: None,
             category: "fixture".to_string(),
+            timestamp: None,
             text: "ordinary speech".to_string(),
             mode: Some(CaseMode::Hint),
             expected: None,
@@ -1040,5 +1110,40 @@ mod tests {
         let cases = load_fixture_cases(&path).unwrap();
 
         assert!(cases.iter().any(|case| case.mode == CaseMode::Hint));
+    }
+
+    #[test]
+    fn fixture_case_accepts_optional_timestamp_metadata() {
+        let json = r#"[
+          {
+            "language": "en",
+            "category": "fixture",
+            "timestamp": "01:07:37",
+            "text": "Revelation 14:4",
+            "mode": "hint",
+            "expectedAny": ["Revelation 14:4", "Revelation 14:1"]
+          },
+          {
+            "language": "en",
+            "category": "fixture",
+            "text": "ordinary speech",
+            "mode": "silent"
+          }
+        ]"#;
+        let fixture_cases = serde_json::from_str::<Vec<FixtureCase>>(json).unwrap();
+        let cases = fixture_cases
+            .into_iter()
+            .enumerate()
+            .map(|(index, case)| case.into_bench_case(Path::new("fixture.json"), index + 1))
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(cases[0].timestamp.as_deref(), Some("01:07:37"));
+        assert_eq!(cases[1].timestamp, None);
+    }
+
+    #[test]
+    fn ref_eq_accepts_revelation_of_john_alias() {
+        assert!(ref_eq("Revelation 5:12", "Revelation of John 5:12"));
     }
 }

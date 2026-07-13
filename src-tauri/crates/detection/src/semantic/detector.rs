@@ -142,8 +142,10 @@ impl SemanticDetector {
                                     2 => AGREEMENT_BONUS,
                                     _ => AGREEMENT_BONUS * 2.0,
                                 };
-                                let confidence =
-                                    (result.best_similarity + agreement_bonus).min(1.0);
+                                let confidence = cap_pastoral_prayer_address_confidence(
+                                    chunk,
+                                    (result.best_similarity + agreement_bonus).min(1.0),
+                                );
                                 let entry = best_by_verse.entry(result.verse_id);
                                 match entry {
                                     std::collections::hash_map::Entry::Occupied(mut existing)
@@ -210,9 +212,11 @@ impl SemanticDetector {
                     if result.similarity >= self.confidence_threshold
                         && seen_verse_ids.insert(result.verse_id)
                     {
+                        let confidence =
+                            cap_pastoral_prayer_address_confidence(&chunk, result.similarity);
                         detections.push(Self::make_detection(
                             result.verse_id,
-                            result.similarity,
+                            confidence,
                             &chunk,
                             now,
                         ));
@@ -302,6 +306,55 @@ impl SemanticDetector {
             is_chapter_only: false,
         }
     }
+}
+
+pub(crate) fn cap_pastoral_prayer_address_confidence(text: &str, confidence: f64) -> f64 {
+    if is_pastoral_prayer_address(text) {
+        confidence.min(0.89)
+    } else {
+        confidence
+    }
+}
+
+pub(crate) fn is_pastoral_prayer_address(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    let has_prayer_address = [
+        "dear lord",
+        "dear father",
+        "loving father",
+        "heavenly father",
+        "father, i pray",
+        "lord, i pray",
+        "father i pray",
+        "lord i pray",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    let has_intercession_language = [
+        "i pray",
+        "we pray",
+        "may you",
+        "bless them",
+        "bless us",
+        "convict them",
+        "convert them",
+        "thank you",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    let has_citation_language = [
+        "the bible says",
+        "scripture says",
+        "it is written",
+        "turn to",
+        "read verse",
+        "verse ",
+        "chapter ",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+
+    has_prayer_address && has_intercession_language && !has_citation_language
 }
 
 #[cfg(test)]
@@ -578,5 +631,47 @@ mod tests {
         let results = detector.search_query("manual semantic search text", 2);
 
         assert_eq!(results, vec![(1001, 0.20), (1002, 0.90)]);
+    }
+
+    #[test]
+    fn pastoral_prayer_address_caps_semantic_confidence_below_live_fire() {
+        let mut detector = SemanticDetector::new(
+            Box::new(StubEmbedder::new(128)),
+            Box::new(FakeIndex {
+                results: vec![SearchResult {
+                    verse_id: 1001,
+                    similarity: 0.95,
+                }],
+            }),
+        );
+
+        let detections = detector.detect(
+            "And father, I pray that you may convict them, convert them right now on the spot, dear Lord, because you are able to do the impossible, dear father.",
+        );
+
+        assert_eq!(detections.len(), 1);
+        assert!(
+            detections[0].confidence < 0.90,
+            "pastoral prayer address may be a held hint, not a live-fire semantic result"
+        );
+    }
+
+    #[test]
+    fn non_prayer_semantic_hits_keep_high_confidence() {
+        let mut detector = SemanticDetector::new(
+            Box::new(StubEmbedder::new(128)),
+            Box::new(FakeIndex {
+                results: vec![SearchResult {
+                    verse_id: 1001,
+                    similarity: 0.95,
+                }],
+            }),
+        );
+
+        let detections =
+            detector.detect("for God so loved the world that he gave his only begotten son");
+
+        assert_eq!(detections.len(), 1);
+        assert!(detections[0].confidence >= 0.95);
     }
 }

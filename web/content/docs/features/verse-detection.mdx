@@ -119,3 +119,21 @@ The confidence threshold is exposed as a UI control and via the remote
 control API (`/sabbathcue/confidence`). Bumping it up reduces false positives
 on noisy services; lowering it surfaces more candidates for manual
 queueing.
+
+## Golden replay fixtures
+
+Detection changes are checked against labeled sermon replay fixtures in
+`data/detection-fixtures/`. The closing-sermon golden fixture preserves the
+operator transcript with timestamps and replays STT-sized windows through the
+same direct + semantic + FTS hybrid path used by live detection:
+
+```bash
+cargo run --manifest-path src-tauri/Cargo.toml -p rhema-detection --features precompute-bin --release --bin detection_accuracy -- --cases data/detection-fixtures/sermon-closing-2026-07.json
+```
+
+The fixture distinguishes live-fire matches, held semantic hints, and silent
+story/prayer windows. Hymn lyric matching is out of coverage: spoken hymnal
+commands are routed separately, and sung lyric fragments are not treated as
+hymn detections. If a lyric fragment clearly overlaps scripture, it may appear
+as a held Bible hint, such as `Revelation 5:12` for "worthy is the lamb", but
+it must not auto-fire.
