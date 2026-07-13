@@ -486,6 +486,37 @@ and was deliberately deferred; sense and order are preserved.
 manually verified per Mode C; item 6's app check pending next fresh app build — db verified
 directly via SQL).
 
+### A.8 — EXTENSION: PP + DA (2026-07-13, operator-requested)
+
+Extended the plan to Patriarchs and Prophets (egwwritings book 84, `en_PP (2).pdf`) and The
+Desire of Ages (book 130, `en_DA.pdf`). Same defects confirmed (title phrase count 1;
+fragmentation PP 16.3% / DA 10.9%) plus three new root causes found and fixed (commits
+`54c4487` + `00671d0`):
+
+1. **Two-pagination mixing (affected the earlier Ed/GC regeneration too).** These PDFs carry
+   inline `[n]` bracket markers (printed/citation pagination) AND their own folio/header
+   numbers (a different sequence). The header→marker conversion from A.2.WI-A.1 and the legacy
+   standalone-folio promotion both leaked PDF-print numbers into the page stream. New
+   `pageSource: "brackets"` mode (PP/DA/Ed/GC): pages come from bracket markers only; headers
+   removed number-and-all; folio promotion skipped; chapter start = anchor's own marker ??
+   nearest-before ?? next-marker-minus-one (roman front matter). SC keeps legacy mode (its
+   brackets are not page markers: 1765 gaps). Bracket coverage measured: PP 743, DA 817,
+   Ed 292, GC 677 markers, gaps ≤10 each. Page monotonicity after fix: 0 violations ×5 books.
+2. **`restoreKnownLegacyDropouts` removed.** On intact text it double-inserted ("The Sabbath
+   The Sabbath calls our thoughts…" — 4 doubles were already in the shipped DA JSON). Test now
+   asserts correct Sabbath prose passes through unchanged. Doubles after regen: 0.
+3. **Marker-in-wrapped-title broke anchors.** en_DA ch.75 heading = "…the Court of [698]
+   Caiaphas" → exact-string search fell back to the TOC entry → "chapter order broken". New
+   `findChapterAnchor` tolerates interleaved markers (tests in egw-pdf-importer.test.ts).
+
+**Results (all five books regenerated on bracket pagination):** PP 73 ch / 2638 paras / frag
+6.9%; DA 87 ch / 2835 / 4.2%; Ed 35 / 1311 / 13.8% (ch1 now p.13); GC 42 / 1873 / 1.1% (ch1
+now p.17); SC unchanged (272 / 0.4% / ch1 p.9). Chapter-1 openings verified canonical in
+rhema.db: PP pg29 "God is love." 1 John 4:16; DA pg18 "His name shall be called Immanuel…"
+(pages are the PDFs' own bracket pagination — operator spot-check against the Writings URLs
+confirms citation alignment per Mode C). `bun test data/lib` 26 pass / 0 fail; `validate:egw`
+PASS; `build:egw` rebuilt rhema.db with 8,929 paragraphs.
+
 ---
 
 ## PLAN COMPLETION SIGN-OFF
