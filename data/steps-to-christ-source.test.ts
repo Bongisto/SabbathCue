@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
+import { alignStepsToChristCanonicalParagraphs } from "./convert-egw-sc-pdf"
 
 type EgwSource = {
   title: string
@@ -370,5 +371,36 @@ describe("Steps to Christ source", () => {
     expect(chapter3?.paragraphs[7]?.text).toContain("Psalm 51:1-14")
     expect(chapter3?.paragraphs[8]?.page_paragraph).toBe(3)
     expect(chapter3?.paragraphs[8]?.text).toMatch(/^A repentance such as this/)
+  })
+
+  test("does not keep continued page metadata on the isolated chapter 3 prose fragment", () => {
+    const [chapter] = alignStepsToChristCanonicalParagraphs([
+      {
+        chapter: 3,
+        title: "Repentance",
+        paragraphs: [
+          {
+            paragraph: 6,
+            page: 24,
+            continued_pages: [25],
+            text: [
+              "The prayer of David after his fall, illustrates the nature of true sorrow for sin. This was the language of his soul:",
+              '"Blessed is he whose transgression is forgiven, whose sin is covered." Psalm 32:1, 2.',
+              '"Have mercy upon me, O God, according to Thy loving-kindness." Psalm 51:1-14.',
+              "A repentance such as this, is beyond the reach of our own power to accomplish.",
+            ].join(" "),
+          },
+        ],
+      },
+    ])
+
+    expect(chapter?.paragraphs[0]).toEqual({
+      paragraph: 1,
+      page: 24,
+      text: "The prayer of David after his fall, illustrates the nature of true sorrow for sin. This was the language of his soul:",
+    })
+    expect(chapter?.paragraphs[0]).not.toHaveProperty("continued_pages")
+    expect(chapter?.paragraphs[1]?.page).toBe(25)
+    expect(chapter?.paragraphs[2]?.page).toBe(25)
   })
 })

@@ -130,7 +130,8 @@ function alignChapter3DavidPsalmBlock(
     )
 
     paragraphs.push({
-      ...paragraph,
+      paragraph: paragraph.paragraph,
+      page: paragraph.page,
       text: proseText,
     })
     paragraphs.push({
@@ -153,7 +154,7 @@ function alignChapter3DavidPsalmBlock(
   return renumberChapter({ ...chapter, paragraphs })
 }
 
-function alignStepsToChristCanonicalParagraphs(
+export function alignStepsToChristCanonicalParagraphs(
   chapters: EgwDraftChapter[],
 ): EgwDraftChapter[] {
   return chapters.map((chapter) =>
@@ -200,7 +201,9 @@ async function main() {
   await importEgwPdf(config)
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
+}
