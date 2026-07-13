@@ -5,6 +5,7 @@ use rhema_bible::Bm25Result;
 
 use crate::direct::detector::DirectDetector;
 use crate::merger::{AutoQueueCooldown, DetectionMerger, MergedDetection};
+use crate::semantic::detector::cap_pastoral_prayer_address_confidence;
 use crate::semantic::detector::SemanticDetector;
 use crate::types::{Detection, DetectionSource, VerseRef};
 
@@ -201,8 +202,10 @@ impl DetectionPipeline {
             // quotes routinely arrive as keyword-band OR hits.
             let overlap_confidence = quote_overlap_confidence(text, &fts.text);
             let rank_confidence = fts_confidence(rank, fts.rank, fts.is_broad_match);
-            let confidence =
-                overlap_confidence.map_or(rank_confidence, |overlap| overlap.max(rank_confidence));
+            let confidence = cap_pastoral_prayer_address_confidence(
+                text,
+                overlap_confidence.map_or(rank_confidence, |overlap| overlap.max(rank_confidence)),
+            );
             log::debug!(
                 "[DET-SEMANTIC] FTS5 candidate idx={rank} bm25={:.3} {} {}:{} conf={:.0}% overlap={:?}",
                 fts.rank,
