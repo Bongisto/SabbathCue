@@ -97,9 +97,21 @@ function alignChapter6CanonicalParagraphs(
   if (chapter.chapter !== 6) return chapter
 
   const paragraphs = chapter.paragraphs
+  const opensParagraph =
+    paragraphs[5]?.text.startsWith("In both the school and the home") === true
+
+  // The page-break split this aligner repairs is now usually healed upstream
+  // by the text cleanup's page-turn continuation merge.
+  if (
+    opensParagraph &&
+    paragraphs[5]?.text.includes("God things new and old") === true
+  ) {
+    return chapter
+  }
+
   const expectedPageBreakSplit =
-    paragraphs[5]?.text.startsWith("In both the school and the home") ===
-      true && paragraphs[6]?.text.startsWith("God things new and old") === true
+    opensParagraph &&
+    paragraphs[6]?.text.startsWith("God things new and old") === true
 
   if (!expectedPageBreakSplit) {
     throw new Error(

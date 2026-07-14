@@ -119,6 +119,20 @@ function startsAsContinuation(text: string): boolean {
   return /^[a-z]/.test(text) || /^(?:and|or|but|for|nor|so|yet)\b/i.test(text)
 }
 
+/** True when the text ends with an inline section heading: either the whole
+ * chunk is nothing but capitalized words ("Illustrations", "Nature
+ * Teaching"), or a run of two or more capitalized words follows a sentence
+ * end ("…a lifework? The Master Teacher"). A single capitalized word after a
+ * sentence end is not treated as a heading — sentence-initial words at a
+ * page break look the same. */
+function endsWithSectionHeading(text: string): boolean {
+  const trimmed = text.trim()
+  if (/^(?:[A-Z][\w'-]*)(?:\s+[A-Z][\w'-]*)*$/.test(trimmed)) return true
+  return /[.!?]["')\]]?\s+(?:["'(]?[A-Z][\w'-]*\s+)+["'(]?[A-Z][\w'-]*$/.test(
+    trimmed
+  )
+}
+
 function hasTerminalPunctuation(text: string): boolean {
   return /[.!?]["')\]]?$/.test(text.trim())
 }
@@ -133,11 +147,42 @@ function shouldMergeParagraphs(
   // across a printed page or within one, so it is checked before the older
   // page-artifact heuristics (which refused to merge across differing pages and
   // ignored same-page layout splits that carried no page artifact).
-  if (
-    !hasTerminalPunctuation(previous.text) &&
-    startsAsContinuation(next.text)
-  ) {
-    return true
+  if (!hasTerminalPunctuation(previous.text)) {
+    if (startsAsContinuation(next.text)) return true
+    // The previous fragment continues mid-flow unless it ends with a colon
+    // (which can lawfully introduce a separate block quote or psalm
+    // paragraph) or with an inline section heading (which opens what
+    // follows rather than continuing the sentence).
+    const previousContinues =
+      !/:$/.test(previous.text.trim()) &&
+      !endsWithSectionHeading(previous.text)
+    // A page-top fragment (its running header was stripped) resuming with a
+    // capitalized word ("…the service of | God. They were…") is still a
+    // continuation.
+    if (previousContinues && next.hadPageArtifact) return true
+    // The same capitalized-resume split at a page turn, when the header was
+    // already stripped upstream: the fragment ends on a bare word, comma, or
+    // dash (no sentence can end there) and the next chunk opens a new page.
+    // Citation pages can span several print pages, so the print-page
+    // (output_page) turn counts too. Poem lines ending ";" or ":" don't
+    // qualify, and neither does a fragment whose tail is a section heading
+    // (a sentence end followed only by capitalized words, e.g. "…lifework?
+    // The Master Teacher") — the heading opens what follows, it doesn't
+    // continue the sentence.
+    const crossesPage =
+      (previous.page != null &&
+        next.page != null &&
+        next.page !== previous.page) ||
+      (previous.output_page != null &&
+        next.output_page != null &&
+        next.output_page !== previous.output_page)
+    if (
+      crossesPage &&
+      previousContinues &&
+      /[A-Za-z0-9,-]$/.test(previous.text.trim())
+    ) {
+      return true
+    }
   }
   if (
     previous.page != null &&

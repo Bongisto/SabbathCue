@@ -97,7 +97,7 @@ describe("Education source", () => {
         (count, chapter) => count + chapter.paragraphs.length,
         0
       )
-    ).toBe(1310)
+    ).toBe(1300)
     expect(chapter6?.paragraphs).toHaveLength(16)
     expect(paragraph?.page).toBe(34)
     expect(paragraph?.page_paragraph).toBe(3)

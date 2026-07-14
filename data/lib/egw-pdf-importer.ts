@@ -308,8 +308,19 @@ function alignFolioParagraphs(
         folioIndex += 1
         continue
       }
+      const folioText = folioParagraphs[folioIndex]?.text ?? ""
+      let diffAt = 0
+      while (
+        diffAt < citation.text.length &&
+        citation.text[diffAt] === folioText[diffAt]
+      ) {
+        diffAt += 1
+      }
       throw new Error(
-        `Folio paragraph text alignment failed in chapter ${chapter} at ${citationIndex + 1}`
+        `Folio paragraph text alignment failed in chapter ${chapter} at ${citationIndex + 1}, ` +
+          `first difference at ${diffAt}: ` +
+          `citation "…${citation.text.slice(Math.max(0, diffAt - 40), diffAt + 60)}" ` +
+          `vs folio "…${folioText.slice(Math.max(0, diffAt - 40), diffAt + 60)}"`
       )
     }
 
@@ -349,8 +360,11 @@ export function stripChapterFurniture(
     chapterHeaderTitles
       .reduce(
         (text, escTitle) =>
+          // The trailing (?![:\d]) keeps scripture references intact: a
+          // chapter titled "The Exodus" must not eat "Exodus 12" out of
+          // "Exodus 12:34" — running headers end in a bare page number.
           text.replace(
-            new RegExp(`(?<!\\w)${escTitle}\\s+\\d{1,3}\\b`, "gi"),
+            new RegExp(`(?<!\\w)${escTitle}\\s+\\d{1,3}\\b(?![:\\d])`, "gi"),
             " "
           ),
         raw
@@ -364,6 +378,10 @@ export function stripChapterFurniture(
       // occurrence of the title word — erasing "education" from Education and
       // "the great controversy" from GC — which is why only full headers match.
       .replace(new RegExp(`\\b\\d{1,3}\\s+${escBook}\\b`, "gi"), " ")
+      // Appendix pages carry "Appendix <page>" running headers that belong to
+      // no chapter title; body references use "Note …. Page …" wording, never
+      // "Appendix <number>".
+      .replace(/(?<!\w)Appendix\s+\d{1,4}\b(?![:\d])/gi, " ")
       .replace(/^\s*\d+\s*$/gm, "")
       .replace(/^\s*Contents\s*$/gim, "")
       .replace(/^\s*Appendix\s*$/gim, "")

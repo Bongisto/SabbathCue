@@ -135,13 +135,24 @@ function alignChapter1CanonicalParagraphs(
   if (chapter.chapter !== 1) return chapter
 
   const paragraphs = chapter.paragraphs
+  // Canonical PP 33.2 is the whole psalm quotation plus its R.V. note as one
+  // paragraph; the PDF sets each verse line apart, so merge the range by its
+  // text bounds rather than fixed indices (upstream cleanup can change how
+  // many pieces the psalm arrives in).
+  const start = paragraphs.findIndex((paragraph) =>
+    paragraph.text.startsWith('"Strong is Thy hand')
+  )
+  const end = paragraphs.findIndex((paragraph) =>
+    paragraph.text.endsWith("Version.]")
+  )
   const expectedOpening =
     paragraphs[0]?.text.startsWith('"God is love."') === true &&
     paragraphs[1]?.text.startsWith("Every manifestation") === true &&
-    paragraphs[2]?.text.startsWith('"Strong is Thy hand') === true &&
-    paragraphs[14]?.text === "Version.]" &&
-    paragraphs[15]?.text.startsWith("The history of the great conflict") ===
-      true
+    start >= 2 &&
+    end >= start &&
+    paragraphs[end + 1]?.text.startsWith(
+      "The history of the great conflict"
+    ) === true
 
   if (!expectedOpening) {
     throw new Error(
@@ -150,12 +161,75 @@ function alignChapter1CanonicalParagraphs(
   }
 
   const aligned = [
-    paragraphs[0],
-    paragraphs[1],
-    mergeParagraphs(paragraphs.slice(2, 15)),
-    paragraphs[15],
-    ...paragraphs.slice(16),
+    ...paragraphs.slice(0, start),
+    mergeParagraphs(paragraphs.slice(start, end + 1)),
+    ...paragraphs.slice(end + 1),
   ]
+
+  return renumberChapter({ ...chapter, paragraphs: aligned })
+}
+
+// PP 556-557: Hannah's song is one poetry block introduced by "…and said:".
+// The PDF sets each verse line apart; merge the block by its text bounds.
+function alignChapter55HannahSong(chapter: EgwDraftChapter): EgwDraftChapter {
+  if (chapter.chapter !== 55) return chapter
+
+  const paragraphs = chapter.paragraphs
+  const start = paragraphs.findIndex((paragraph) =>
+    paragraph.text.startsWith('"My heart rejoiceth in the Lord;')
+  )
+  const end = paragraphs.findIndex((paragraph) =>
+    paragraph.text.endsWith('exalt the horn of His anointed."')
+  )
+
+  if (start === -1) {
+    if (
+      paragraphs.some((paragraph) =>
+        paragraph.text.includes('"My heart rejoiceth in the Lord;')
+      )
+    ) {
+      return chapter
+    }
+    throw new Error(
+      "Unexpected Patriarchs and Prophets chapter 55 song layout; canonical postprocess needs review."
+    )
+  }
+  if (end < start) {
+    throw new Error(
+      "Unexpected Patriarchs and Prophets chapter 55 song layout; canonical postprocess needs review."
+    )
+  }
+
+  const aligned = [
+    ...paragraphs.slice(0, start),
+    mergeParagraphs(paragraphs.slice(start, end + 1)),
+    ...paragraphs.slice(end + 1),
+  ]
+
+  return renumberChapter({ ...chapter, paragraphs: aligned })
+}
+
+// PP 662: Michal's taunt belongs to the paragraph that introduces it —
+// "Keen and cutting was the irony of her speech:" continues into the quote.
+function alignChapter70MichalSpeech(chapter: EgwDraftChapter): EgwDraftChapter {
+  if (chapter.chapter !== 70) return chapter
+
+  const aligned: PpParagraph[] = []
+  for (let index = 0; index < chapter.paragraphs.length; index += 1) {
+    const current = chapter.paragraphs[index]
+    const next = chapter.paragraphs[index + 1]
+
+    if (
+      current?.text.endsWith("irony of her speech:") &&
+      next?.text.startsWith('"How glorious was the king of Israel')
+    ) {
+      aligned.push(mergeParagraphs([current, next]))
+      index += 1
+      continue
+    }
+
+    if (current) aligned.push(current)
+  }
 
   return renumberChapter({ ...chapter, paragraphs: aligned })
 }
@@ -163,7 +237,11 @@ function alignChapter1CanonicalParagraphs(
 function alignPatriarchsAndProphetsCanonicalParagraphs(
   chapters: EgwDraftChapter[]
 ): EgwDraftChapter[] {
-  return chapters.map(alignChapter1CanonicalParagraphs)
+  return chapters.map((chapter) =>
+    alignChapter70MichalSpeech(
+      alignChapter55HannahSong(alignChapter1CanonicalParagraphs(chapter))
+    )
+  )
 }
 
 const config: EgwBookConfig = {

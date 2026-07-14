@@ -111,6 +111,18 @@ describe("stripChapterFurniture", () => {
     expect(out).toContain("Father's hands")
   })
 
+  it("does not strip a scripture reference that matches the chapter title", () => {
+    // PP ch. 25 "The Exodus": the header variant "Exodus <page>" must not eat
+    // "Exodus 12" out of "Exodus 12:34-51" — running headers are never
+    // followed by a colon or more digits.
+    const out = stripChapterFurniture(
+      "This chapter is based on Exodus 12:34-51; 13-15.",
+      "Patriarchs and Prophets",
+      "The Exodus"
+    )
+    expect(out).toBe("This chapter is based on Exodus 12:34-51; 13-15.")
+  })
+
   it("does not strip a chapter title that starts inside another word", () => {
     const out = stripChapterFurniture(
       "XYZSource and Aim of True Education 11 should remain ordinary text.",
