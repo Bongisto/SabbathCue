@@ -19,7 +19,9 @@ vi.mock("@/components/layout/operator-status-strip", () => ({
 }))
 
 vi.mock("@/components/panels/transcript-panel", () => ({
-  TranscriptPanel: () => <div data-slot="transcript-panel" />,
+  TranscriptPanel: ({ className }: { className?: string }) => (
+    <div data-slot="transcript-panel" className={className} />
+  ),
 }))
 
 vi.mock("@/components/panels/preview-panel", () => ({
@@ -69,6 +71,15 @@ describe("Dashboard workspace routing", () => {
     expect(document.querySelector('[data-slot="search-panel"]')).toBeNull()
     expect(document.querySelector('[data-slot="detections-panel"]')).toBeNull()
     expect(document.querySelector('[data-slot="queue-panel"]')).toBeTruthy()
+  })
+
+  it("sizes the live transcript to reach the bottom live-desk row", () => {
+    render(<Dashboard />)
+
+    const transcript = document.querySelector('[data-slot="transcript-panel"]')
+    expect(transcript?.getAttribute("class")).toContain(
+      "h-[calc(clamp(360px,47vh,560px)+clamp(240px,31vh,380px)+0.75rem)]"
+    )
   })
 
   it("Detections workspace renders DetectionsPanel", () => {
