@@ -79,7 +79,7 @@ function WorkspaceFallback() {
 function LiveDeskPage() {
   return (
     <div className="view-pane grid grid-cols-12 gap-3">
-      <TranscriptPanel className="glass-panel col-span-12 h-[clamp(560px,77vh,880px)] xl:col-span-3" />
+      <TranscriptPanel className="glass-panel col-span-12 h-[calc(clamp(360px,47vh,560px)+clamp(240px,31vh,380px)+0.75rem)] xl:col-span-3" />
 
       <div className="col-span-12 grid h-fit grid-cols-12 gap-3 xl:col-span-9">
         <PreviewPanel className="col-span-12 h-[clamp(360px,47vh,560px)] lg:col-span-5" />
