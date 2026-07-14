@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 // CSS is not executed under jsdom, so these regression tests assert against the
 // stylesheet as source text. They guard a batch of UI-polish changes so the old
 // pre-polish values cannot silently return.
-const REPO_ROOT = join(import.meta.dirname, "../..")
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..")
 const CSS = readFileSync(join(REPO_ROOT, "src/index.css"), "utf8")
 const DASHBOARD = readFileSync(
   join(REPO_ROOT, "src/components/layout/dashboard.tsx"),
@@ -148,7 +149,9 @@ describe("index.css prefers-reduced-motion honours the polish", () => {
 
 describe("dashboard LiveDeskPage uses clamp() panel heights", () => {
   it("declares the clamp()-based responsive panel heights", () => {
-    expect(DASHBOARD).toContain("h-[clamp(560px,77vh,880px)]")
+    expect(DASHBOARD).toContain(
+      "h-[calc(clamp(360px,47vh,560px)+clamp(240px,31vh,380px)+0.75rem)]",
+    )
     expect(DASHBOARD).toContain("h-[clamp(360px,47vh,560px)]")
     expect(DASHBOARD).toContain("h-[clamp(240px,31vh,380px)]")
   })
