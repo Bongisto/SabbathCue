@@ -219,7 +219,7 @@ function LiveSendControls({
         Send Preview Live
       </Button>
       {isLive && presentationDeckKind(liveItem) ? (
-        <PresentationDeckControls item={liveItem} crossQueueBoundaries />
+        <PresentationDeckControls item={liveItem} isLive crossQueueBoundaries />
       ) : isLive && liveItem?.kind === "scripture" ? (
         <PresentationArrowControls item={liveItem} isLive />
       ) : null}

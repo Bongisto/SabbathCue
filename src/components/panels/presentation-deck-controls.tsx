@@ -29,9 +29,9 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 interface PresentationDeckControlsProps {
   item: PresentationRenderData | null
   onNavigate?: (kind: PresentationDeckKind, index: number) => void
-  // Live panel only: clicks route through advancePresentationTarget (the
-  // keyboard path), so at the deck's first/last slide the arrows stay enabled
-  // and cross into the adjacent queue item. onNavigate is unused in this mode.
+  // When true, clicks route through advancePresentationTarget (the keyboard
+  // path), so boundary arrows can cross into adjacent queue items.
+  isLive?: boolean
   crossQueueBoundaries?: boolean
 }
 
@@ -50,6 +50,7 @@ const NEXT_TITLES: Record<PresentationDeckKind, string> = {
 export function PresentationDeckControls({
   item,
   onNavigate,
+  isLive = false,
   crossQueueBoundaries = false,
 }: PresentationDeckControlsProps) {
   // Subscribed so boundary enabled-state updates as the queue changes.
@@ -88,7 +89,7 @@ export function PresentationDeckControls({
 
   const navigate = (delta: number) => {
     if (crossQueueBoundaries) {
-      advancePresentationTarget(delta, item, true)
+      advancePresentationTarget(delta, item, isLive)
       return
     }
     const nextIndex = clampDeckIndex(deckSlides.length, currentIndex, delta)
@@ -99,7 +100,8 @@ export function PresentationDeckControls({
 
   const canAdvance = (delta: number) =>
     canNavigateDeck(deckSlides.length, currentIndex, delta) ||
-    (crossQueueBoundaries && canCrossQueueAtBoundary(delta, item))
+    (crossQueueBoundaries &&
+      (canCrossQueueAtBoundary(delta, item) || kind === "egw"))
 
   return (
     <div className="flex items-center gap-1">

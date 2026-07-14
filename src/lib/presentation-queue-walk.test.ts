@@ -8,6 +8,8 @@ vi.mock("@/lib/queue-presentation", async (importOriginal) => {
     ...actual,
     presentQueuedItem: vi.fn(),
     presentQueuedItemAtEnd: vi.fn(),
+    previewQueuedItem: vi.fn(),
+    previewQueuedItemAtEnd: vi.fn(),
   }
 })
 
@@ -15,6 +17,8 @@ import { advancePresentationTarget } from "@/lib/presentation-panel-navigation"
 import {
   presentQueuedItem,
   presentQueuedItemAtEnd,
+  previewQueuedItem,
+  previewQueuedItemAtEnd,
 } from "@/lib/queue-presentation"
 import { createEgwDeckItems } from "@/lib/egw-deck"
 import { useEgwSlideStore } from "@/stores/egw-slide-store"
@@ -94,6 +98,16 @@ function makeHymnSlide(index: number): HymnPresentationItemData {
   }
 }
 
+function hymnQueueItem(id: string, slide: HymnPresentationItemData): QueueItem {
+  return {
+    id,
+    presentation: slide,
+    confidence: 1,
+    source: "hymn",
+    added_at: Date.now(),
+  }
+}
+
 function makeSermonSlide(index: number): SlideDeckPresentationItemData {
   return {
     kind: "slideDeck",
@@ -129,6 +143,8 @@ describe("live arrow navigation across queue items", () => {
     useSermonSlideStore.getState().setDeck([], 0, null)
     vi.mocked(presentQueuedItem).mockClear()
     vi.mocked(presentQueuedItemAtEnd).mockClear()
+    vi.mocked(previewQueuedItem).mockClear()
+    vi.mocked(previewQueuedItemAtEnd).mockClear()
   })
 
   it("advances to the next queue item past the last EGW slide", async () => {
@@ -174,6 +190,57 @@ describe("live arrow navigation across queue items", () => {
     expect(presentQueuedItem).not.toHaveBeenCalled()
     expect(presentQueuedItemAtEnd).not.toHaveBeenCalled()
     expect(useQueueStore.getState().activeIndex).toBe(1)
+  })
+
+  it("previews the next queue item past the last hymn slide", async () => {
+    const deck = [makeHymnSlide(0), makeHymnSlide(1), makeHymnSlide(2)]
+    const nextSlide = {
+      ...makeHymnSlide(0),
+      hymnId: "hymn-99",
+      screenId: "next-hymn-screen-0",
+      reference: "Next hymn - Slide 1 of 1",
+      slideCount: 1,
+    }
+    seedQueue([
+      hymnQueueItem("hymn-a", deck[deck.length - 1]!),
+      hymnQueueItem("hymn-b", nextSlide),
+    ])
+    useHymnSlideStore.getState().setDeck(deck, deck.length - 1)
+    const preview = getPresentationRenderData(deck[deck.length - 1]!)
+
+    const handled = advancePresentationTarget(1, preview, false)
+
+    expect(handled).toBe(true)
+    expect(useQueueStore.getState().activeIndex).toBe(1)
+    expect(vi.mocked(previewQueuedItem).mock.calls[0][0].id).toBe("hymn-b")
+    expect(presentQueuedItem).not.toHaveBeenCalled()
+  })
+
+  it("previews the previous queue item's last slide from the first hymn slide", async () => {
+    const deck = [makeHymnSlide(0), makeHymnSlide(1), makeHymnSlide(2)]
+    const previousSlide = {
+      ...makeHymnSlide(0),
+      hymnId: "hymn-01",
+      screenId: "previous-hymn-screen-0",
+      reference: "Previous hymn - Slide 1 of 1",
+      slideCount: 1,
+    }
+    useQueueStore.getState().addItems([
+      hymnQueueItem("hymn-a", previousSlide),
+      hymnQueueItem("hymn-b", deck[0]!),
+    ])
+    useQueueStore.getState().setActive(1)
+    useHymnSlideStore.getState().setDeck(deck, 0)
+    const preview = getPresentationRenderData(deck[0]!)
+
+    const handled = advancePresentationTarget(-1, preview, false)
+
+    expect(handled).toBe(true)
+    expect(useQueueStore.getState().activeIndex).toBe(0)
+    expect(vi.mocked(previewQueuedItemAtEnd).mock.calls[0][0].id).toBe(
+      "hymn-a",
+    )
+    expect(presentQueuedItemAtEnd).not.toHaveBeenCalled()
   })
 
   it("does not walk the queue when the live item did not come from the queue", async () => {
