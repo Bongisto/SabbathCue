@@ -5,7 +5,11 @@ import {
   getQueuedHymnDeckForRenderItem,
   restoreQueuedHymnDeckForRenderItem,
 } from "@/lib/queued-hymn-deck"
-import { presentQueuedItem, previewQueuedItem } from "@/lib/queue-presentation"
+import {
+  presentQueuedItem,
+  previewQueuedItem,
+  previewQueuedItemAtEnd,
+} from "@/lib/queue-presentation"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
 import { useQueueStore } from "@/stores/queue-store"
@@ -85,6 +89,24 @@ describe("queued hymn deck presentation", () => {
     expect(useBroadcastStore.getState().previewItem?.hymnSlide?.screenId).toBe(
       "queued-screen-1"
     )
+  })
+
+  it("previews the last slide of a queued hymn deck when moving backward", () => {
+    const queuedDeck = makeDeck("queued")
+    const currentDeck = makeDeck("current")
+    const queuedItem = makeQueuedHymnItem(queuedDeck, 0)
+    useHymnSlideStore.getState().setDeck(currentDeck, 0)
+
+    previewQueuedItemAtEnd(queuedItem)
+
+    expect(
+      useHymnSlideStore.getState().deck.map((slide) => slide.screenId)
+    ).toEqual(queuedDeck.map((slide) => slide.screenId))
+    expect(useHymnSlideStore.getState().activeIndex).toBe(2)
+    expect(useBroadcastStore.getState().previewItem?.hymnSlide?.screenId).toBe(
+      "queued-screen-2"
+    )
+    expect(useBroadcastStore.getState().liveItem).toBeNull()
   })
 
   it("resolves deck controls from the active queued hymn deck", () => {

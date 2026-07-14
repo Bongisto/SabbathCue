@@ -11,6 +11,8 @@ import {
 import {
   presentQueuedItem,
   presentQueuedItemAtEnd,
+  previewQueuedItem,
+  previewQueuedItemAtEnd,
 } from "@/lib/queue-presentation"
 import { restoreQueuedHymnDeckForRenderItem } from "@/lib/queued-hymn-deck"
 import { useBibleStore } from "@/stores/bible-store"
@@ -301,7 +303,7 @@ function queueWalkMatcher(
   }
 }
 
-// Pure check for the on-screen arrows: true when a live boundary click would
+// Pure check for the on-screen arrows: true when a boundary click would
 // cross into an adjacent queue item (mirrors advanceQueueAtBoundary without
 // its side effects).
 export function canCrossQueueAtBoundary(
@@ -322,7 +324,6 @@ function advanceQueueAtBoundary(
   isLive: boolean,
   matchesActive: (item: QueueItem) => boolean
 ): boolean | undefined {
-  if (!isLive) return undefined
   const queue = useQueueStore.getState()
   if (queue.activeIndex === null) return undefined
   const active = queue.items[queue.activeIndex]
@@ -333,19 +334,31 @@ function advanceQueueAtBoundary(
   if (!next) return true // at either end of the queue: consume the key, no wrap
 
   queue.setActive(nextIndex)
-  if (delta < 0) presentQueuedItemAtEnd(next)
-  else presentQueuedItem(next)
+  if (isLive) {
+    if (delta < 0) presentQueuedItemAtEnd(next)
+    else presentQueuedItem(next)
+  } else if (delta < 0) {
+    previewQueuedItemAtEnd(next)
+  } else {
+    previewQueuedItem(next)
+  }
   return true
 }
 
-function advanceLiveHymnGroup(delta: number): boolean {
+function advanceHymnGroup(
+  delta: number,
+  targetItem: PresentationRenderData | null,
+  isLive: boolean
+): boolean {
+  if (targetItem?.kind !== "hymn") return false
   const queue = useQueueStore.getState()
   const activeQueueItem =
     queue.activeIndex === null ? null : (queue.items[queue.activeIndex] ?? null)
 
   if (
     activeQueueItem?.presentation.kind === "hymn" &&
-    activeQueueItem.hymnGroup
+    activeQueueItem.hymnGroup &&
+    activeQueueItem.presentation.screenId === targetItem.hymnSlide?.screenId
   ) {
     const activeGroup = activeQueueItem.hymnGroup
     const targetItemIndex = activeGroup.itemIndex + delta
@@ -360,7 +373,8 @@ function advanceLiveHymnGroup(delta: number): boolean {
     const target = queue.items[targetQueueIndex]
     if (target) {
       queue.setActive(targetQueueIndex)
-      presentQueuedItem(target)
+      if (isLive) presentQueuedItem(target)
+      else previewQueuedItem(target)
       return true
     }
   }
@@ -472,17 +486,17 @@ export function advancePresentationTarget(
 ): boolean {
   const deckKind = presentationDeckKind(targetItem)
   if (!deckKind) {
-    // Scripture is single-slide, so a live verse that matches the active queue
+    // Scripture is single-slide, so a verse that matches the active queue
     // item crosses straight to the adjacent item (no slide-boundary gate).
-    // When the live verse does not match (detection-driven flow), fall through
+    // When the verse does not match (detection-driven flow), fall through
     // to ordinary verse +1/-1 navigation.
-    if (isLive && walkQueueAtBoundary(delta, targetItem, isLive)) {
+    if (walkQueueAtBoundary(delta, targetItem, isLive)) {
       return true
     }
     return queueScriptureAdvance(delta, targetItem, isLive)
   }
 
-  if (isLive && deckKind === "hymn" && advanceLiveHymnGroup(delta)) {
+  if (deckKind === "hymn" && advanceHymnGroup(delta, targetItem, isLive)) {
     return true
   }
   if (deckKind === "hymn") return advanceHymnDeck(delta, targetItem, isLive)

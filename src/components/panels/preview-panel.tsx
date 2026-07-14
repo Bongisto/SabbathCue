@@ -180,6 +180,8 @@ export function PreviewPanel({ className }: { className?: string }) {
             <PresentationDeckControls
               item={previewItem}
               onNavigate={navigatePreviewDeck}
+              isLive={false}
+              crossQueueBoundaries
             />
           ) : previewItem?.kind === "scripture" ? (
             <PresentationArrowControls item={previewItem} isLive={false} />

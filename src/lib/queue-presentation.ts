@@ -15,6 +15,43 @@ export function presentQueuedItem(item: QueueItem): void {
   presentItem(item.presentation)
 }
 
+export function previewQueuedItemAtEnd(item: QueueItem): void {
+  restorePresentationDeckForQueueItem(item)
+  const kind = item.presentation.kind
+
+  if (kind === "egw") {
+    const store = useEgwSlideStore.getState()
+    const last = store.deck[store.deck.length - 1]
+    if (last) {
+      store.setDeck(store.deck, store.deck.length - 1)
+      selectPreviewItem(last)
+      return
+    }
+  }
+
+  if (kind === "slideDeck") {
+    const store = useSermonSlideStore.getState()
+    const last = store.deck[store.deck.length - 1]
+    if (last) {
+      store.setDeck(store.deck, store.deck.length - 1, store.activeItemId)
+      selectPreviewItem(last)
+      return
+    }
+  }
+
+  if (kind === "hymn") {
+    const store = useHymnSlideStore.getState()
+    const last = store.deck[store.deck.length - 1]
+    if (last) {
+      store.setDeck(store.deck, store.deck.length - 1)
+      selectPreviewItem(last)
+      return
+    }
+  }
+
+  selectPreviewItem(item.presentation)
+}
+
 /**
  * Present a queue item positioned on its LAST slide. Used when walking the
  * queue backward (ArrowLeft at the first slide of the live item) so the
