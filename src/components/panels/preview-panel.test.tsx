@@ -19,6 +19,7 @@ const navigateToVerseMock = vi.fn()
 const setPreviewItemMock = vi.fn()
 const setLiveItemMock = vi.fn()
 const setLiveMock = vi.fn()
+const presentationDeckControlsMock = vi.fn()
 
 let activeTranslationId = 1
 let previewItem: unknown = null
@@ -57,6 +58,13 @@ const translations = [
 
 vi.mock("@/components/ui/canvas-verse", () => ({
   CanvasPresentation: () => React.createElement("div", { "data-testid": "canvas-presentation" }),
+}))
+
+vi.mock("@/components/panels/presentation-deck-controls", () => ({
+  PresentationDeckControls: (props: Record<string, unknown>) => {
+    presentationDeckControlsMock(props)
+    return null
+  },
 }))
 
 vi.mock("@/hooks/use-bible", () => ({
@@ -303,5 +311,24 @@ describe("PreviewPanel", () => {
       })
     )
     expect(navigateToVerseMock).toHaveBeenCalledWith(43, 3, 17)
+  })
+
+  it("pins deck navigation controls to preview mode", async () => {
+    previewItem = {
+      kind: "hymn",
+      reference: "Hymn 12",
+      segments: [{ text: "A hymn line" }],
+    }
+
+    await renderPanel()
+
+    expect(presentationDeckControlsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        item: previewItem,
+        crossQueueBoundaries: true,
+        isLive: false,
+        onNavigate: expect.any(Function),
+      })
+    )
   })
 })

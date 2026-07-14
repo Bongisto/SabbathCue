@@ -78,18 +78,17 @@ describe("PresentationDeckControls queue-boundary crossing", () => {
   function render(
     slideIndex: number,
     crossQueueBoundaries: boolean,
-    isLive = crossQueueBoundaries
+    isLive?: boolean
   ) {
     const item = getPresentationRenderData(deck[slideIndex]!)
+    const props: Parameters<typeof PresentationDeckControls>[0] = {
+      item,
+      onNavigate: () => {},
+      crossQueueBoundaries,
+    }
+    if (isLive !== undefined) props.isLive = isLive
     act(() => {
-      root.render(
-        <PresentationDeckControls
-          item={item}
-          onNavigate={() => {}}
-          crossQueueBoundaries={crossQueueBoundaries}
-          isLive={isLive}
-        />
-      )
+      root.render(<PresentationDeckControls {...props} />)
     })
   }
 
@@ -103,7 +102,7 @@ describe("PresentationDeckControls queue-boundary crossing", () => {
     useQueueStore.getState().addItems([hymnItemA, hymnItemB])
     useQueueStore.getState().setActive(0)
     useHymnSlideStore.getState().setDeck(deck, deck.length - 1)
-    render(deck.length - 1, true)
+    render(deck.length - 1, true, true)
 
     const next = button("Next hymn slide")
     expect(next.disabled).toBe(false)
@@ -117,7 +116,7 @@ describe("PresentationDeckControls queue-boundary crossing", () => {
     useQueueStore.getState().addItems([hymnItemA, hymnItemB])
     useQueueStore.getState().setActive(1)
     useHymnSlideStore.getState().setDeck(deck, 0)
-    render(0, true)
+    render(0, true, true)
 
     const prev = button("Previous hymn slide")
     expect(prev.disabled).toBe(false)
@@ -146,11 +145,28 @@ describe("PresentationDeckControls queue-boundary crossing", () => {
     expect(useQueueStore.getState().activeIndex).toBe(1)
   })
 
+  it("defaults omitted live mode to preview while crossing queue boundaries", () => {
+    useQueueStore.getState().addItems([hymnItemA, hymnItemB])
+    useQueueStore.getState().setActive(0)
+    useHymnSlideStore.getState().setDeck(deck, deck.length - 1)
+    render(deck.length - 1, true)
+
+    const next = button("Next hymn slide")
+    expect(next.disabled).toBe(false)
+    act(() => next.click())
+
+    expect(vi.mocked(previewQueuedItem).mock.calls[0][0].id).toBe(
+      hymnItemB.id
+    )
+    expect(presentQueuedItem).not.toHaveBeenCalled()
+    expect(useQueueStore.getState().activeIndex).toBe(1)
+  })
+
   it("disables next at the deck end when the queue has no next item", () => {
     useQueueStore.getState().addItems([hymnItemA])
     useQueueStore.getState().setActive(0)
     useHymnSlideStore.getState().setDeck(deck, deck.length - 1)
-    render(deck.length - 1, true)
+    render(deck.length - 1, true, true)
 
     expect(button("Next hymn slide").disabled).toBe(true)
   })
