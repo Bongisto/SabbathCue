@@ -27,12 +27,21 @@ const FORBIDDEN_TEXT = [
   "/* List Definitions */",
 ] as const
 
-const EXPECTED = [
+interface ExpectedBook {
+  abbreviation: string
+  chapters: number
+  file: string
+  minParasPerPage: number
+  maxParagraphChars?: number
+}
+
+const EXPECTED: readonly ExpectedBook[] = [
   {
     abbreviation: "PP",
     chapters: 73,
     file: "patriarchs-and-prophets.json",
     minParasPerPage: 1.8,
+    maxParagraphChars: 2250,
   },
   {
     abbreviation: "SC",
@@ -45,6 +54,7 @@ const EXPECTED = [
     chapters: 87,
     file: "the-desire-of-ages.json",
     minParasPerPage: 1.8,
+    maxParagraphChars: 2050,
   },
   {
     abbreviation: "Ed",
@@ -57,6 +67,7 @@ const EXPECTED = [
     chapters: 42,
     file: "the-great-controversy.json",
     minParasPerPage: 1.8,
+    maxParagraphChars: 2250,
   },
 ] as const
 
@@ -96,6 +107,7 @@ function assertParagraphQuality(
   abbreviation: string,
   stats: ParagraphStats,
   minParasPerPage: number,
+  maxParagraphChars: number,
   errors: string[],
 ): void {
   if (stats.parasPerPage < minParasPerPage) {
@@ -106,8 +118,8 @@ function assertParagraphQuality(
   if (stats.p90 > P90_MAX_CHARS) {
     errors.push(`${abbreviation}: p90 paragraph length ${stats.p90} > ${P90_MAX_CHARS} chars`)
   }
-  if (stats.max > HARD_MAX_CHARS) {
-    errors.push(`${abbreviation}: max paragraph length ${stats.max} > ${HARD_MAX_CHARS} chars`)
+  if (stats.max > maxParagraphChars) {
+    errors.push(`${abbreviation}: max paragraph length ${stats.max} > ${maxParagraphChars} chars`)
   }
 }
 
@@ -236,6 +248,7 @@ function main() {
       book.abbreviation,
       stats,
       book.minParasPerPage,
+      book.maxParagraphChars ?? HARD_MAX_CHARS,
       qualityErrors,
     )
 

@@ -30,6 +30,91 @@ describe("EGW text cleanup", () => {
     ])
   })
 
+  it("merges a page-top continuation that starts with a proper noun", () => {
+    // DA 285.2 splits at the page 234→235 break: "…was in the service of" |
+    // "God. They were performing…". startsAsContinuation alone misses it
+    // because the continuation begins with a capitalized word; the bare-word
+    // ending at a page turn marks it as a continuation.
+    const paragraphs = cleanEgwParagraphs(
+      [
+        {
+          paragraph: 1,
+          page: 234,
+          text: "but the work of the priests was in the service of",
+        },
+        {
+          paragraph: 2,
+          page: 235,
+          text: "God. They were performing those rites that pointed to the redeeming power of Christ.",
+        },
+      ],
+      { bookTitle: "The Desire of Ages", chapterTitle: "The Sabbath" },
+    )
+
+    expect(paragraphs).toHaveLength(1)
+    expect(paragraphs[0]?.text).toBe(
+      "but the work of the priests was in the service of God. They were performing those rites that pointed to the redeeming power of Christ.",
+    )
+    expect(paragraphs[0]?.page).toBe(234)
+    expect(paragraphs[0]?.continued_pages).toEqual([235])
+  })
+
+  it("does not merge across an inline section heading at a page turn", () => {
+    // Ed ch. 7: "…results of such a lifework? The Master Teacher" ends with a
+    // section heading; the quote on the next page opens the new section
+    // rather than continuing the sentence.
+    const paragraphs = cleanEgwParagraphs(
+      [
+        {
+          paragraph: 1,
+          page: 80,
+          text: "What were the results of such a lifework? The Master Teacher",
+        },
+        {
+          paragraph: 2,
+          page: 81,
+          text: '"Never man spake like this Man."',
+        },
+      ],
+      options,
+    )
+
+    expect(paragraphs).toHaveLength(2)
+  })
+
+  it("keeps a colon-introduced quote block and unpunctuated poem lines apart", () => {
+    // A trailing colon can lawfully introduce a separate psalm/quote block
+    // (PP 33.2), and poem lines shipped as their own paragraphs must not be
+    // absorbed by the mid-sentence rule when no page artifact corroborates.
+    const paragraphs = cleanEgwParagraphs(
+      [
+        {
+          paragraph: 1,
+          page: 33,
+          text: "His care for all the works of His hand. The psalmist says:",
+        },
+        {
+          paragraph: 2,
+          page: 33,
+          text: '"Strong is Thy hand, and high is Thy right hand.',
+        },
+        {
+          paragraph: 3,
+          page: 33,
+          text: "Even a fruitful bough by a well;",
+        },
+        {
+          paragraph: 4,
+          page: 33,
+          text: "By the hands of the mighty God of Jacob;",
+        },
+      ],
+      options,
+    )
+
+    expect(paragraphs).toHaveLength(4)
+  })
+
   it("strips running chapter headers before continuation text", () => {
     const paragraphs = cleanEgwParagraphs(
       [

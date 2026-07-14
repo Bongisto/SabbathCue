@@ -1,5 +1,9 @@
 import { join } from "node:path"
-import { importEgwPdf, type EgwBookConfig } from "./lib/egw-pdf-importer"
+import {
+  importEgwPdf,
+  type EgwBookConfig,
+  type EgwDraftChapter,
+} from "./lib/egw-pdf-importer"
 
 const CHAPTERS = [
   { chapter: 1, title: "Why was Sin Permitted?" },
@@ -77,7 +81,169 @@ const CHAPTERS = [
   { chapter: 73, title: "The Last Years of David" },
 ] as const
 
-const inputPdf = process.argv[2] ?? String.raw`C:\Users\fanel\Downloads\en_PP (2).pdf`
+const inputPdf =
+  process.argv[2] ?? String.raw`C:\Users\fanel\Downloads\en_PP (2).pdf`
+
+type PpParagraph = EgwDraftChapter["paragraphs"][number]
+
+function normalizeJoinedText(text: string): string {
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim()
+}
+
+function renumberChapter(chapter: EgwDraftChapter): EgwDraftChapter {
+  return {
+    ...chapter,
+    paragraphs: chapter.paragraphs.map((paragraph, index) => ({
+      ...paragraph,
+      paragraph: index + 1,
+    })),
+  }
+}
+
+function mergeParagraphs(paragraphs: PpParagraph[]): PpParagraph {
+  const [first] = paragraphs
+  if (!first) {
+    throw new Error("Cannot merge an empty Patriarchs and Prophets range")
+  }
+
+  const continuedPages = paragraphs.flatMap((paragraph) => [
+    ...(paragraph.page != null && paragraph.page !== first.page
+      ? [paragraph.page]
+      : []),
+    ...(paragraph.continued_pages ?? []),
+  ])
+
+  return {
+    paragraph: first.paragraph,
+    page: first.page,
+    continued_pages:
+      continuedPages.length > 0
+        ? Array.from(new Set(continuedPages))
+        : undefined,
+    text: normalizeJoinedText(
+      paragraphs.map((paragraph) => paragraph.text).join(" ")
+    ),
+  }
+}
+
+function alignChapter1CanonicalParagraphs(
+  chapter: EgwDraftChapter
+): EgwDraftChapter {
+  if (chapter.chapter !== 1) return chapter
+
+  const paragraphs = chapter.paragraphs
+  // Canonical PP 33.2 is the whole psalm quotation plus its R.V. note as one
+  // paragraph; the PDF sets each verse line apart, so merge the range by its
+  // text bounds rather than fixed indices (upstream cleanup can change how
+  // many pieces the psalm arrives in).
+  const start = paragraphs.findIndex((paragraph) =>
+    paragraph.text.startsWith('"Strong is Thy hand')
+  )
+  const end = paragraphs.findIndex((paragraph) =>
+    paragraph.text.endsWith("Version.]")
+  )
+  const expectedOpening =
+    paragraphs[0]?.text.startsWith('"God is love."') === true &&
+    paragraphs[1]?.text.startsWith("Every manifestation") === true &&
+    start >= 2 &&
+    end >= start &&
+    paragraphs[end + 1]?.text.startsWith(
+      "The history of the great conflict"
+    ) === true
+
+  if (!expectedOpening) {
+    throw new Error(
+      "Unexpected Patriarchs and Prophets chapter 1 opening layout; canonical postprocess needs review."
+    )
+  }
+
+  const aligned = [
+    ...paragraphs.slice(0, start),
+    mergeParagraphs(paragraphs.slice(start, end + 1)),
+    ...paragraphs.slice(end + 1),
+  ]
+
+  return renumberChapter({ ...chapter, paragraphs: aligned })
+}
+
+// PP 556-557: Hannah's song is one poetry block introduced by "…and said:".
+// The PDF sets each verse line apart; merge the block by its text bounds.
+function alignChapter55HannahSong(chapter: EgwDraftChapter): EgwDraftChapter {
+  if (chapter.chapter !== 55) return chapter
+
+  const paragraphs = chapter.paragraphs
+  const start = paragraphs.findIndex((paragraph) =>
+    paragraph.text.startsWith('"My heart rejoiceth in the Lord;')
+  )
+  const end = paragraphs.findIndex((paragraph) =>
+    paragraph.text.endsWith('exalt the horn of His anointed."')
+  )
+
+  if (start === -1) {
+    if (
+      paragraphs.some((paragraph) =>
+        paragraph.text.includes('"My heart rejoiceth in the Lord;')
+      )
+    ) {
+      return chapter
+    }
+    throw new Error(
+      "Unexpected Patriarchs and Prophets chapter 55 song layout; canonical postprocess needs review."
+    )
+  }
+  if (end < start) {
+    throw new Error(
+      "Unexpected Patriarchs and Prophets chapter 55 song layout; canonical postprocess needs review."
+    )
+  }
+
+  const aligned = [
+    ...paragraphs.slice(0, start),
+    mergeParagraphs(paragraphs.slice(start, end + 1)),
+    ...paragraphs.slice(end + 1),
+  ]
+
+  return renumberChapter({ ...chapter, paragraphs: aligned })
+}
+
+// PP 662: Michal's taunt belongs to the paragraph that introduces it —
+// "Keen and cutting was the irony of her speech:" continues into the quote.
+function alignChapter70MichalSpeech(chapter: EgwDraftChapter): EgwDraftChapter {
+  if (chapter.chapter !== 70) return chapter
+
+  const aligned: PpParagraph[] = []
+  for (let index = 0; index < chapter.paragraphs.length; index += 1) {
+    const current = chapter.paragraphs[index]
+    const next = chapter.paragraphs[index + 1]
+
+    if (
+      current?.text.endsWith("irony of her speech:") &&
+      next?.text.startsWith('"How glorious was the king of Israel')
+    ) {
+      aligned.push(mergeParagraphs([current, next]))
+      index += 1
+      continue
+    }
+
+    if (current) aligned.push(current)
+  }
+
+  return renumberChapter({ ...chapter, paragraphs: aligned })
+}
+
+function alignPatriarchsAndProphetsCanonicalParagraphs(
+  chapters: EgwDraftChapter[]
+): EgwDraftChapter[] {
+  return chapters.map((chapter) =>
+    alignChapter70MichalSpeech(
+      alignChapter55HannahSong(alignChapter1CanonicalParagraphs(chapter))
+    )
+  )
+}
+
 const config: EgwBookConfig = {
   title: "Patriarchs and Prophets",
   abbreviation: "PP",
@@ -89,16 +255,15 @@ const config: EgwBookConfig = {
     import.meta.dir,
     "sources",
     "egw",
-    "patriarchs-and-prophets.json",
+    "patriarchs-and-prophets.json"
   ),
   debugSlug: "en_PP",
-  pageSource: "brackets",
-  requiredTokens: [
-    "Contents",
-    "Chapter 1—Why was Sin Permitted?",
-    "Appendix",
-  ],
+  pageSource: "folios",
+  requiredTokens: ["Contents", "Chapter 1—Why was Sin Permitted?", "Appendix"],
   appendixMarker: "Appendix [",
+  splitReadableParagraphs: false,
+  countContinuedPagesForPageParagraphs: false,
+  postprocessChapters: alignPatriarchsAndProphetsCanonicalParagraphs,
   chapters: CHAPTERS,
 }
 
