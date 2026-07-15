@@ -1,6 +1,7 @@
 import { EyeIcon, PlayIcon, PlusIcon, RadarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { CollectDetectionButton } from "@/components/panels/collect-detection-button"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
@@ -13,7 +14,7 @@ import type { DetectionResult } from "@/types"
 function LiveDetectionRow({ detection }: { detection: DetectionResult }) {
   const actions = getDetectionActions(detection)
   return (
-    <div className="flex min-w-0 items-center gap-3 border-b border-[var(--border-subtle)] px-3 py-2 last:border-0 [contain-intrinsic-size:0_64px] [content-visibility:auto]">
+    <div className="flex min-w-0 flex-col gap-2 border-b border-[var(--border-subtle)] px-3 py-2 [contain-intrinsic-size:0_64px] [content-visibility:auto] last:border-0 sm:flex-row sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 items-center gap-2">
           <ConfidenceDot confidence={detection.confidence} />
@@ -31,7 +32,7 @@ function LiveDetectionRow({ detection }: { detection: DetectionResult }) {
           </p>
         ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:w-auto">
         <Button
           variant="outline"
           size="xs"
@@ -62,6 +63,7 @@ function LiveDetectionRow({ detection }: { detection: DetectionResult }) {
         >
           <PlusIcon className="size-3" />
         </Button>
+        <CollectDetectionButton detection={detection} compact />
       </div>
     </div>
   )

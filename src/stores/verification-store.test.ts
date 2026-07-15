@@ -60,6 +60,24 @@ describe("verification-store", () => {
     expect(isAppVerified()).toBe(false)
   })
 
+  it("hydrate leaves checking and surfaces a retryable error when startup auth stalls", async () => {
+    mockLoadCachedVerification.mockReturnValue(new Promise(() => undefined))
+
+    const { hydrateVerification, useVerificationStore } =
+      await import("./verification-store")
+
+    void hydrateVerification()
+    await vi.advanceTimersByTimeAsync(15_000)
+
+    expect(useVerificationStore.getState()).toEqual(
+      expect.objectContaining({
+        status: "error",
+        errorCode: "network",
+        isHydrated: true,
+      })
+    )
+  })
+
   it("signIn applies a verified snapshot and starts a single heartbeat interval", async () => {
     mockSignIn.mockResolvedValue({
       status: "verified",

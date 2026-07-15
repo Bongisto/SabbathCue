@@ -10,6 +10,7 @@ const mockGetRefreshToken = vi.fn()
 const mockGetSessionMetadata = vi.fn()
 const mockSetSessionMetadata = vi.fn()
 const mockClearSessionMetadata = vi.fn()
+const mockClearToken = vi.fn()
 
 vi.mock("@/lib/supabase/auth", () => ({
   restoreSession: (...args: unknown[]) => mockRestoreSession(...args),
@@ -27,6 +28,7 @@ vi.mock("@/lib/verification/device-id", () => ({
 }))
 
 vi.mock("@/lib/verification/session-storage", () => ({
+  clearToken: (...args: unknown[]) => mockClearToken(...args),
   getRefreshToken: (...args: unknown[]) => mockGetRefreshToken(...args),
   getSessionMetadata: (...args: unknown[]) => mockGetSessionMetadata(...args),
   setSessionMetadata: (...args: unknown[]) => mockSetSessionMetadata(...args),
@@ -47,6 +49,7 @@ describe("verification-provider", () => {
     mockGetSessionMetadata.mockReset()
     mockSetSessionMetadata.mockReset()
     mockClearSessionMetadata.mockReset()
+    mockClearToken.mockReset()
 
     mockGetOrCreateDeviceId.mockResolvedValue("device-1")
     mockRegisterDevice.mockResolvedValue({
@@ -67,7 +70,7 @@ describe("verification-provider", () => {
     expect(mockRestoreSession).not.toHaveBeenCalled()
   })
 
-  it("loadCachedVerification returns expired when refresh is rejected", async () => {
+  it("loadCachedVerification clears an expired session and returns sign-in required", async () => {
     mockGetRefreshToken.mockResolvedValue("stale-token")
     mockRestoreSession.mockResolvedValue({
       ok: false,
@@ -79,7 +82,9 @@ describe("verification-provider", () => {
       await import("@/lib/verification/verification-provider")
     const result = await loadCachedVerification()
 
-    expect(result.status).toBe("expired")
+    expect(result.status).toBe("required")
+    expect(mockClearToken).toHaveBeenCalledTimes(1)
+    expect(mockClearSessionMetadata).toHaveBeenCalledTimes(1)
     expect(mockRegisterDevice).not.toHaveBeenCalled()
   })
 
@@ -480,9 +485,8 @@ describe("verification-provider", () => {
       accessTokenExpiresAt: Date.now() + 3_600_000,
     })
 
-    const { heartbeatDeviceRegistration } = await import(
-      "@/lib/verification/verification-provider"
-    )
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
     const result = await heartbeatDeviceRegistration()
 
     expect(mockRestoreSession).toHaveBeenCalledTimes(1)
@@ -490,7 +494,7 @@ describe("verification-provider", () => {
     expect(result).toBeNull()
   })
 
-  it("heartbeat blocks with expired when the refresh token is rejected", async () => {
+  it("heartbeat clears an expired session and requires sign-in", async () => {
     mockGetSessionMetadata.mockResolvedValue({
       verifiedUserId: "user-1",
       verifiedDeviceId: "device-1",
@@ -506,12 +510,12 @@ describe("verification-provider", () => {
       message: "Stored session is no longer valid.",
     })
 
-    const { heartbeatDeviceRegistration } = await import(
-      "@/lib/verification/verification-provider"
-    )
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
     const result = await heartbeatDeviceRegistration()
 
-    expect(result?.status).toBe("expired")
+    expect(result?.status).toBe("required")
+    expect(mockClearToken).toHaveBeenCalledTimes(1)
     expect(mockClearSessionMetadata).toHaveBeenCalledTimes(1)
     expect(mockRegisterDevice).not.toHaveBeenCalled()
   })
@@ -532,9 +536,8 @@ describe("verification-provider", () => {
       message: "Unable to reach the authentication service.",
     })
 
-    const { heartbeatDeviceRegistration } = await import(
-      "@/lib/verification/verification-provider"
-    )
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
     const result = await heartbeatDeviceRegistration()
 
     expect(result).toBeNull()

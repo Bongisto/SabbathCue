@@ -4,20 +4,17 @@ import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
 import { ConfidenceDot } from "@/components/ui/confidence-dot"
 import { Button } from "@/components/ui/button"
+import { CollectDetectionButton } from "@/components/panels/collect-detection-button"
 import {
   BrainCircuitIcon,
   EyeIcon,
   PlayIcon,
   PlusIcon,
   RadarIcon,
-  XIcon,
 } from "lucide-react"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { useSettingsStore } from "@/stores/settings-store"
-import {
-  useCollectedDetectionsStore,
-  type CollectedDetection,
-} from "@/stores/collected-detections-store"
+import { useCollectedDetectionsStore } from "@/stores/collected-detections-store"
 import { useQueueStore } from "@/stores/queue-store"
 import {
   buildDetectionContextStack,
@@ -108,7 +105,7 @@ function HymnDetectionCard({
         </p>
       )}
 
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="outline"
@@ -131,6 +128,7 @@ function HymnDetectionCard({
           <PlusIcon className="size-3" />
           Queue
         </Button>
+        <CollectDetectionButton detection={detection} />
       </div>
     </div>
   )
@@ -235,7 +233,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
         </p>
       )}
 
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="outline"
@@ -258,6 +256,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
           <PlusIcon className="size-3" />
           Queue
         </Button>
+        <CollectDetectionButton detection={detection} />
       </div>
     </div>
   )
@@ -331,113 +330,8 @@ function HeldReferencesPanel({
   )
 }
 
-function CollectedDetectionsSection({
-  items,
-}: {
-  items: CollectedDetection[]
-}) {
-  const clearCollected = useCollectedDetectionsStore((s) => s.clear)
-  const removeCollected = useCollectedDetectionsStore((s) => s.remove)
-
-  return (
-    <div className="border-b border-[var(--border-subtle)]">
-      <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <div className="flex min-w-0 items-center gap-1.5 text-[0.625rem] font-medium text-muted-foreground uppercase">
-          <RadarIcon className="size-3" />
-          Collected for this service
-          {items.length > 0 ? (
-            <span className="rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[0.5625rem]">
-              {items.length}
-            </span>
-          ) : null}
-        </div>
-        {items.length > 0 ? (
-          <Button variant="ghost" size="xs" onClick={clearCollected}>
-            Clear
-          </Button>
-        ) : null}
-      </div>
-
-      {items.length === 0 ? (
-        <p className="px-3 pb-3 text-xs text-muted-foreground">
-          Verses you present or queue during this service appear here for quick
-          reuse.
-        </p>
-      ) : (
-        <div className="flex flex-col">
-          {items.map((item) => {
-            const actions = getDetectionActions(item.detection)
-            return (
-              <div
-                key={item.key}
-                className="queue-item flex items-start gap-3 p-3 last:border-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <SourceBadge source={item.source} />
-                    <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-                      {item.reference}
-                    </span>
-                    {item.useCount > 1 ? (
-                      <span className="rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[0.5625rem] text-muted-foreground">
-                        x{item.useCount}
-                      </span>
-                    ) : null}
-                  </div>
-                  {item.text ? (
-                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-                      {item.text}
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      onClick={actions.preview}
-                    >
-                      <EyeIcon className="size-3" />
-                      Preview
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="gap-1"
-                      onClick={actions.present}
-                    >
-                      <PlayIcon className="size-3" />
-                      Go Live
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={actions.queue}
-                    >
-                      <PlusIcon className="size-3" />
-                      Queue
-                    </Button>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`Remove ${item.reference}`}
-                  onClick={() => removeCollected(item.key)}
-                >
-                  <XIcon className="size-3" />
-                </Button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function DetectionsPanel({ className }: { className?: string }) {
   const { detections } = useDetection()
-  const collectedDetections = useCollectedDetectionsStore((s) => s.items)
   const confidenceThreshold = useSettingsStore((s) => s.confidenceThreshold)
   const semanticDetectionEnabled = useSettingsStore(
     (s) => s.semanticDetectionEnabled
@@ -523,7 +417,6 @@ export function DetectionsPanel({ className }: { className?: string }) {
       </PanelHeader>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <CollectedDetectionsSection items={collectedDetections} />
         <DetectionContextStack entries={contextStack} />
         <HeldReferencesPanel candidates={heldReferences} />
         <div className="flex flex-col gap-0">

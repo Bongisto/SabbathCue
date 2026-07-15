@@ -9,6 +9,7 @@ import { registerDevice } from "@/lib/supabase/devices"
 import { getOrCreateDeviceId } from "@/lib/verification/device-id"
 import {
   clearSessionMetadata,
+  clearToken,
   getRefreshToken,
   getSessionMetadata,
   setSessionMetadata,
@@ -196,7 +197,8 @@ export async function loadCachedVerification(): Promise<VerificationStateSnapsho
   const restored = await restoreSession()
   if (!restored.ok) {
     if (restored.code === "expired") {
-      return emptySnapshot("expired", restored.message)
+      await Promise.allSettled([clearToken(), clearSessionMetadata()])
+      return emptySnapshot("required")
     }
     if (restored.code === "network") {
       const grace = await offlineGraceSnapshot()
@@ -286,8 +288,8 @@ export async function heartbeatDeviceRegistration(): Promise<VerificationStateSn
     const restored = await restoreSession()
     if (!restored.ok) {
       if (restored.code === "network") return null
-      await clearSessionMetadata()
-      return emptySnapshot("expired", restored.message)
+      await Promise.allSettled([clearToken(), clearSessionMetadata()])
+      return emptySnapshot("required")
     }
     await setSessionMetadata({
       ...cached,

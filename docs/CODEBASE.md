@@ -1,5 +1,5 @@
 # Codebase Map - SabbathCue
-Created: 2026-07-12 - Last verified: 2026-07-13 - Confidence: Medium
+Created: 2026-07-12 - Last verified: 2026-07-15 - Confidence: Medium
 
 ## 0 - Snapshot
 | Field | Value |
@@ -66,6 +66,8 @@ Core modules:
 | Module | Location | Responsibility | Depended on by |
 |---|---|---|---|
 | Settings store | src/stores/settings-store.ts:6 | STT provider setting and cloud key status | Settings UI, transcript panel, transcription hook |
+| Verification store | src/stores/verification-store.ts:20 | Bounds startup/session refresh checks and exposes auth state | Verification gate and sign-in screen |
+| Verification provider | src/lib/verification/verification-provider.ts:191 | Restores sessions, clears expired credentials, and verifies device access | Verification store and heartbeat |
 | STT provider routing | src-tauri/src/commands/stt/provider.rs:95 | Selects Vosk, Deepgram, or Soniox and handles removed providers | Tauri STT commands |
 | Collected detections store | src/stores/collected-detections-store.ts:48 | Session-scoped reuse list of presented/queued detections | Detections panel |
 | Detection actions | src/components/panels/detections-panel.tsx:144 | Shared preview/present/queue closures for detection types | Detection cards, latest bar, collection UI |
@@ -73,6 +75,21 @@ Core modules:
 | Quick search helper | src/lib/quick-search.ts:167 | Prefix-safe ghost suggestion suffix | Preview and Search quick inputs |
 
 ## 6 - Traced flows
+### Flow: startup authentication and expired-session handling
+```text
+main starts verification hydration without blocking first paint
+  -> src/main.tsx:52
+Verification store bounds startup and retry checks to 15 seconds
+  -> src/stores/verification-store.ts:14
+  -> src/stores/verification-store.ts:20
+Provider restores the saved Supabase session and verifies device access
+  -> src/lib/verification/verification-provider.ts:191
+Rejected refresh tokens clear token plus metadata and return required
+  -> src/lib/verification/verification-provider.ts:200
+Verification gate renders the sign-in screen for required/error states
+  -> src/components/verification/VerificationGate.tsx:22
+```
+
 ### Flow: STT provider selection
 ```text
 Settings store type allows deepgram, soniox, vosk
@@ -316,3 +333,4 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 |---|---|---|
 | 2026-07-12 | Initial scoped map for STT cleanup, collected detections, theme catalog, and quick-search ghost text work. | 0-15 |
 | 2026-07-13 | Added EGW source-generation map for Steps to Christ paragraph/page alignment. | 4, 6, 7, 10, 15 |
+| 2026-07-15 | Added bounded startup-auth and automatic expired-session sign-in flow. | 5, 6, 15 |

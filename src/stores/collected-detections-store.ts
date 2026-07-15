@@ -34,7 +34,7 @@ function normalizeReference(reference: string): string {
   return reference.trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-function collectedKey(detection: DetectionResult): string {
+export function getCollectedDetectionKey(detection: DetectionResult): string {
   return `${detectionKind(detection)}:${normalizeReference(detection.verse_ref)}`
 }
 
@@ -50,7 +50,7 @@ export const useCollectedDetectionsStore = create<CollectedDetectionsState>(
     items: [],
     record: (detection, now = Date.now()) =>
       set((state) => {
-        const key = collectedKey(detection)
+        const key = getCollectedDetectionKey(detection)
         const existing = state.items.find((item) => item.key === key)
         if (existing) {
           return {

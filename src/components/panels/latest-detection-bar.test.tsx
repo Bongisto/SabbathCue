@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import type { DetectionResult } from "@/types"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
+import { useCollectedDetectionsStore } from "@/stores/collected-detections-store"
 
 const { detectionsRef, previewMock, clearDetectionsMock } = vi.hoisted(() => ({
   detectionsRef: { current: [] as DetectionResult[] },
@@ -54,6 +55,7 @@ beforeEach(() => {
   detectionsRef.current = []
   previewMock.mockClear()
   clearDetectionsMock.mockClear()
+  useCollectedDetectionsStore.getState().clear()
   useDashboardWorkspaceStore.setState({ workspace: "live" })
 })
 afterEach(() => cleanup())
@@ -75,6 +77,19 @@ describe("LatestDetectionBar", () => {
     render(<LatestDetectionBar />)
     fireEvent.click(screen.getByRole("button", { name: /preview john 3:16/i }))
     expect(previewMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("manually collects the latest detection and disables its collect button", () => {
+    detectionsRef.current = [detection]
+    render(<LatestDetectionBar />)
+
+    fireEvent.click(screen.getByRole("button", { name: /collect john 3:16/i }))
+
+    expect(useCollectedDetectionsStore.getState().items).toHaveLength(1)
+    expect(
+      screen.getByRole("button", { name: /john 3:16 collected/i })
+    ).toHaveProperty("disabled", true)
+    expect(screen.getByText("Collected \u2713")).toBeTruthy()
   })
 
   it("shows the latest five detections on the live desk", () => {

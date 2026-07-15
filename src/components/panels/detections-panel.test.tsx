@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { DetectionsPanel } from "./detections-panel"
+import { CollectedDetectionsPanel } from "./collected-detections-panel"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useCollectedDetectionsStore } from "@/stores/collected-detections-store"
 import type { DetectionResult, Verse } from "@/types"
@@ -155,6 +156,14 @@ describe("DetectionsPanel", () => {
     ).toBeNull()
   })
 
+  it("does not render collected detections inside the detections panel", () => {
+    useCollectedDetectionsStore.getState().record(detection)
+
+    render(<DetectionsPanel />)
+
+    expect(screen.queryByText("Collected for this service")).toBeNull()
+  })
+
   it("presents a detection without navigating the Bible search panel", () => {
     render(<DetectionsPanel />)
 
@@ -167,8 +176,27 @@ describe("DetectionsPanel", () => {
     )
   })
 
-  it("collects detections that are presented or queued, but not previewed", () => {
+  it("manually collects a Bible detection and disables its collect button", () => {
     render(<DetectionsPanel />)
+
+    fireEvent.click(screen.getByRole("button", { name: /collect john 3:16/i }))
+
+    expect(useCollectedDetectionsStore.getState().items[0]?.kind).toBe(
+      "scripture"
+    )
+    expect(
+      screen.getByRole("button", { name: /john 3:16 collected/i })
+    ).toHaveProperty("disabled", true)
+    expect(screen.getByText("Collected \u2713")).toBeTruthy()
+  })
+
+  it("collects detections that are presented or queued, but not previewed", () => {
+    render(
+      <>
+        <DetectionsPanel />
+        <CollectedDetectionsPanel />
+      </>
+    )
 
     fireEvent.click(screen.getByRole("button", { name: /preview/i }))
     expect(screen.getByText(/verses you present or queue/i)).toBeTruthy()
@@ -182,7 +210,12 @@ describe("DetectionsPanel", () => {
   })
 
   it("removes and clears collected detections", () => {
-    render(<DetectionsPanel />)
+    render(
+      <>
+        <DetectionsPanel />
+        <CollectedDetectionsPanel />
+      </>
+    )
 
     fireEvent.click(screen.getByRole("button", { name: /present/i }))
     fireEvent.click(screen.getByRole("button", { name: /remove john 3:16/i }))
@@ -227,6 +260,18 @@ describe("DetectionsPanel", () => {
     expect(
       screen.getByText("Nature and revelation alike testify of God's love.")
     ).toBeTruthy()
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /collect steps to christ p\.9 par\.2/i,
+      })
+    )
+    expect(useCollectedDetectionsStore.getState().items[0]?.kind).toBe("egw")
+    expect(
+      screen.getByRole("button", {
+        name: /steps to christ p\.9 par\.2 collected/i,
+      })
+    ).toHaveProperty("disabled", true)
   })
 
   it("renders a spoken hymn as a card and sends it live", async () => {
@@ -235,6 +280,12 @@ describe("DetectionsPanel", () => {
 
     expect(screen.getByText("Hymn 46")).toBeTruthy()
     expect(screen.getByText("Holy, Holy, Holy")).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: /collect hymn 46/i }))
+    expect(useCollectedDetectionsStore.getState().items[0]?.kind).toBe("hymn")
+    expect(
+      screen.getByRole("button", { name: /hymn 46 collected/i })
+    ).toHaveProperty("disabled", true)
 
     fireEvent.click(screen.getByRole("button", { name: /present/i }))
 

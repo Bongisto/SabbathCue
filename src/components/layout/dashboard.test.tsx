@@ -44,6 +44,12 @@ vi.mock("@/components/panels/detections-panel", () => ({
   DetectionsPanel: () => <div data-slot="detections-panel" />,
 }))
 
+vi.mock("@/components/panels/collected-detections-panel", () => ({
+  CollectedDetectionsPanel: ({ className }: { className?: string }) => (
+    <div data-slot="collected-detections-panel" className={className} />
+  ),
+}))
+
 vi.mock("@/components/panels/search-panel", () => ({
   SearchPanel: () => <div data-slot="search-panel" />,
 }))
@@ -62,7 +68,7 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe("Dashboard workspace routing", () => {
-  it("Live Desk renders the latest-detection bar without SearchPanel or DetectionsPanel", () => {
+  it("Live Desk renders collected detections below the live cards", () => {
     render(<Dashboard />)
 
     expect(
@@ -71,6 +77,29 @@ describe("Dashboard workspace routing", () => {
     expect(document.querySelector('[data-slot="search-panel"]')).toBeNull()
     expect(document.querySelector('[data-slot="detections-panel"]')).toBeNull()
     expect(document.querySelector('[data-slot="queue-panel"]')).toBeTruthy()
+
+    const transcript = document.querySelector('[data-slot="transcript-panel"]')!
+    const latestDetection = document.querySelector(
+      '[data-slot="latest-detection-bar"]'
+    )!
+    const queue = document.querySelector('[data-slot="queue-panel"]')!
+    const collected = document.querySelector(
+      '[data-slot="collected-detections-panel"]'
+    )!
+
+    expect(collected.getAttribute("class")).toContain("col-span-12")
+    expect(
+      transcript.compareDocumentPosition(collected) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      latestDetection.compareDocumentPosition(collected) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(
+      queue.compareDocumentPosition(collected) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 
   it("sizes the live transcript to reach the bottom live-desk row", () => {
@@ -82,7 +111,7 @@ describe("Dashboard workspace routing", () => {
     )
   })
 
-  it("Detections workspace renders DetectionsPanel", () => {
+  it("Detections workspace renders DetectionsPanel without collected detections", () => {
     useDashboardWorkspaceStore.setState({ workspace: "detections" })
     render(<Dashboard />)
 
@@ -91,6 +120,9 @@ describe("Dashboard workspace routing", () => {
     ).toBeTruthy()
     expect(
       document.querySelector('[data-slot="latest-detection-bar"]')
+    ).toBeNull()
+    expect(
+      document.querySelector('[data-slot="collected-detections-panel"]')
     ).toBeNull()
   })
 
