@@ -373,7 +373,10 @@ pub fn semantic_embedding_candidates(app: &AppHandle) -> Vec<(PathBuf, PathBuf)>
     .collect();
 
     let pairs = [
-        (PREFERRED_EMBEDDINGS_FILENAME, PREFERRED_EMBEDDING_IDS_FILENAME),
+        (
+            PREFERRED_EMBEDDINGS_FILENAME,
+            PREFERRED_EMBEDDING_IDS_FILENAME,
+        ),
         (LEGACY_EMBEDDINGS_FILENAME, LEGACY_EMBEDDING_IDS_FILENAME),
     ];
 

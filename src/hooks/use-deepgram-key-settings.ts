@@ -11,6 +11,7 @@ const deepgramKeyActions = createProviderKeyActions({
   setCommand: "set_deepgram_api_key",
   hasCommand: "has_deepgram_api_key",
   clearCommand: "clear_deepgram_api_key",
+  validateCommand: "validate_deepgram_api_key",
 })
 
 export async function saveDeepgramApiKey(
@@ -38,6 +39,7 @@ export function useDeepgramKeySettings() {
     setHasKey: setHasDeepgramApiKey,
     save: saveDeepgramApiKey,
     clear: clearDeepgramApiKey,
+    validate: deepgramKeyActions.validateApiKey,
   })
 
   const restartActiveTranscription = useCallback(async () => {

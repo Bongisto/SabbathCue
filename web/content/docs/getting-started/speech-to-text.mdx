@@ -1,12 +1,12 @@
 ---
 title: Speech-to-Text Engines
-description: Choose between local Vosk and cloud Deepgram or Soniox.
+description: Choose between local Vosk and cloud Deepgram, Soniox, or Speechmatics.
 icon: Mic
 ---
 
 import { Card, Cards } from "fumadocs-ui/components/card"
 
-SabbathCue supports three STT engines, and you can swap between them at
+SabbathCue supports four STT engines, and you can swap between them at
 runtime from the settings dialog. They map to two operating modes:
 zero-marginal-cost local recognition, or cloud streaming when you want a
 managed STT service.
@@ -23,6 +23,10 @@ managed STT service.
   <Card
     title="Soniox (cloud, paid)"
     description="Streams audio through Soniox with language hints and feeds the same live verse detection pipeline."
+  />
+  <Card
+    title="Speechmatics (cloud)"
+    description="Streams 16 kHz audio to Speechmatics real-time transcription with partial and final multilingual results."
   />
 </Cards>
 
@@ -52,9 +56,13 @@ Deepgram is a cloud speech-to-text service that streams audio over a WebSocket.
 SabbathCue also has a REST fallback that uploads short windows if the WebSocket
 disconnects.
 
-1. Get an API key at [deepgram.com](https://deepgram.com/).
-2. Open Settings -> Speech.
-3. Choose **Deepgram** and save the key.
+1. Open the [Deepgram Console](https://console.deepgram.com/), select your
+   project, and go to **Settings -> API Keys**.
+2. Create a key named `SabbathCue` using the least-privileged transcription
+   role available and an expiration you can maintain.
+3. Copy the secret immediately; it is displayed only once.
+4. Open **Settings -> Speech Recognition**, choose **Deepgram**, paste and save
+   the key, then select **Test key**.
 
 The key is stored in the OS keychain.
 
@@ -62,21 +70,39 @@ The key is stored in the OS keychain.
 
 Soniox is another cloud STT option with multilingual live streaming support.
 
-1. Get an API key at [soniox.com](https://soniox.com/).
-2. Open Settings -> Speech.
-3. Choose **Soniox** and save the key.
+1. Open the [Soniox Console](https://console.soniox.com/), enter **My First
+   Project**, and select **API Keys**.
+2. Generate and copy a new key.
+3. Open **Settings -> Speech Recognition**, choose **Soniox**, paste and save
+   the key, then select **Test key**.
 
 The key is stored in the OS keychain.
 
+## Option 4: Speechmatics
+
+Speechmatics provides multilingual real-time partial and final transcripts.
+
+1. Create an account or sign in to the
+   [Speechmatics Portal](https://portal.speechmatics.com/).
+2. Open **API Keys** from the project or account navigation and generate a key
+   named `SabbathCue`.
+3. Open **Settings -> Speech Recognition**, choose **Speechmatics**, paste and
+   save the key, then select **Test key**.
+4. Select the sermon language and start live transcription.
+
+The long-lived key stays in the OS keychain and is used only by the native
+desktop backend.
+
 ## Comparing Providers
 
-|                     | Vosk (local)                       | Deepgram (cloud)          | Soniox (cloud)      |
-| ------------------- | ---------------------------------- | ------------------------- | ------------------- |
-| API cost            | Free                               | Per-minute billing        | Per-minute billing  |
-| Internet required   | No                                 | Yes                       | Yes                 |
-| Recognition mode    | Local worker + constrained grammar | Keyword-boosted streaming | Live streaming      |
-| Transcript coverage | Best for verse/reference cues      | Full general speech       | Full general speech |
-| Works offline       | Yes                                | No                        | No                  |
+|                     | Vosk (local)                       | Deepgram (cloud)          | Soniox (cloud)      | Speechmatics (cloud)       |
+| ------------------- | ---------------------------------- | ------------------------- | ------------------- | -------------------------- |
+| API cost            | Free                               | Provider rates apply      | Provider rates apply| Provider rates apply       |
+| Internet required   | No                                 | Yes                       | Yes                 | Yes                        |
+| Recognition mode    | Local worker + constrained grammar | Keyword-boosted streaming | Live streaming      | Partial + final streaming  |
+| Transcript coverage | Best for verse/reference cues      | Full general speech       | Full general speech | Full multilingual speech   |
+| Works offline       | Yes                                | No                        | No                  | No                         |
 
-Pick Vosk for the no-cost offline path. Pick Deepgram or Soniox when you have
-a reliable network and want cloud transcription quality.
+Pick Vosk for the no-cost offline path. Pick Deepgram, Soniox, or Speechmatics
+when you have a reliable network and want cloud transcription quality. Use the
+in-app current-pricing links before committing to a provider.

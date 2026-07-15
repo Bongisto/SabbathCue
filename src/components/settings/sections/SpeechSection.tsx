@@ -6,12 +6,21 @@ import { Switch } from "@/components/ui/switch"
 import { useAssets } from "@/hooks/use-assets"
 import { useDeepgramKeySettings } from "@/hooks/use-deepgram-key-settings"
 import { useSonioxKeySettings } from "@/hooks/use-soniox-key-settings"
+import { useSpeechmaticsKeySettings } from "@/hooks/use-speechmatics-key-settings"
 import {
   useSettingsStore,
   type SttLanguage,
   type SttProvider,
 } from "@/stores/settings-store"
-import { CheckIcon, DownloadIcon, HardDriveIcon, ZapIcon } from "lucide-react"
+import {
+  CheckCircle2Icon,
+  CheckIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  HardDriveIcon,
+  Loader2Icon,
+  ZapIcon,
+} from "lucide-react"
 
 function ProviderOption({
   value,
@@ -73,6 +82,12 @@ function ProviderSelector({
           activeProvider={sttProvider}
           title="Cloud (Soniox, Afrikaans)"
           description="Uses Soniox stt-rt-v5 for real-time Afrikaans transcription with language_hints and endpoint detection. Requires an API key and internet connection."
+        />
+        <ProviderOption
+          value="speechmatics"
+          activeProvider={sttProvider}
+          title="Cloud (Speechmatics, multilingual)"
+          description="Uses Speechmatics real-time partial and final transcripts. Supports Afrikaans, English, Spanish, French, Portuguese, and many more languages. Requires an API key and internet connection."
         />
         <ProviderOption
           value="vosk"
@@ -174,6 +189,10 @@ type KeySettings = {
   keyActionLabel: string
   handleKeyAction: () => Promise<void>
   handleClearKey: () => Promise<void>
+  validating: boolean
+  keyVerified: boolean
+  validationMessage: string | null
+  handleValidateKey: () => Promise<void>
 }
 
 function voskMissingMessageFor(
@@ -208,6 +227,10 @@ function deepgramKeyAdapter(
     keyActionLabel: settings.keyActionLabel,
     handleKeyAction: settings.handleKeyAction,
     handleClearKey: settings.handleClearKey,
+    validating: settings.validating,
+    keyVerified: settings.keyVerified,
+    validationMessage: settings.validationMessage,
+    handleValidateKey: settings.handleValidateKey,
   }
 }
 
@@ -238,8 +261,11 @@ function ProviderKeySettings({
           {providerName} API Key
         </label>
         {settings.hasApiKey ? (
-          <Badge variant="outline" className="text-[0.5rem]">
-            Key configured
+          <Badge variant="outline" className="gap-1 text-[0.5rem]">
+            {settings.keyVerified ? (
+              <CheckCircle2Icon className="size-2.5 text-emerald-500" />
+            ) : null}
+            {settings.keyVerified ? "Key verified" : "Key configured"}
           </Badge>
         ) : null}
       </div>
@@ -278,14 +304,48 @@ function ProviderKeySettings({
             Remove
           </Button>
         ) : null}
+        {settings.hasApiKey ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={settings.validating}
+            onClick={() => void settings.handleValidateKey()}
+          >
+            {settings.validating ? (
+              <Loader2Icon className="size-3 animate-spin" />
+            ) : (
+              <CheckCircle2Icon className="size-3" />
+            )}
+            {settings.validating ? "Testing" : "Test key"}
+          </Button>
+        ) : null}
       </div>
       {settings.keyError ? (
         <p className="text-[0.625rem] text-red-500">{settings.keyError}</p>
       ) : null}
+      {settings.validationMessage ? (
+        <p
+          className={`text-[0.625rem] ${
+            settings.keyVerified ? "text-emerald-600" : "text-red-500"
+          }`}
+          role="status"
+        >
+          {settings.validationMessage}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-1.5 text-[0.625rem] text-muted-foreground">
         <p>
           Required for live transcription. Get a key at{" "}
-          <span className="text-primary select-all">{signupUrl}</span>:
+          <a
+            href={signupUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-primary underline underline-offset-2"
+          >
+            Open {providerName} console
+            <ExternalLinkIcon className="size-2.5" />
+          </a>
+          :
         </p>
         <ol className="ml-3 flex list-decimal flex-col gap-0.5">
           {steps.map((step) => (
@@ -294,7 +354,16 @@ function ProviderKeySettings({
         </ol>
         <p>
           Cost: {cost} Current rates at{" "}
-          <span className="text-primary select-all">{pricingUrl}</span>.
+          <a
+            href={pricingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-primary underline underline-offset-2"
+          >
+            View current pricing
+            <ExternalLinkIcon className="size-2.5" />
+          </a>
+          .
         </p>
       </div>
     </div>
@@ -302,7 +371,7 @@ function ProviderKeySettings({
 }
 
 const CLOUD_LANGUAGE_OPTIONS: Record<
-  "deepgram" | "soniox",
+  "deepgram" | "soniox" | "speechmatics",
   { value: SttLanguage; label: string }[]
 > = {
   deepgram: [
@@ -318,6 +387,13 @@ const CLOUD_LANGUAGE_OPTIONS: Record<
     { value: "fr", label: "French (fr)" },
     { value: "pt", label: "Portuguese (pt)" },
   ],
+  speechmatics: [
+    { value: "en", label: "English (en)" },
+    { value: "af", label: "Afrikaans (af)" },
+    { value: "es", label: "Spanish (es)" },
+    { value: "fr", label: "French (fr)" },
+    { value: "pt", label: "Portuguese (pt)" },
+  ],
 }
 
 function CloudLanguageSelector({
@@ -325,7 +401,7 @@ function CloudLanguageSelector({
   sttLanguage,
   switchingStt,
 }: {
-  provider: "deepgram" | "soniox"
+  provider: "deepgram" | "soniox" | "speechmatics"
   sttLanguage: SttLanguage
   switchingStt: boolean
 }) {
@@ -404,6 +480,8 @@ export function SpeechSection() {
   const { sttProvider, switchingStt, handleProviderChange } =
     deepgramKeySettings
   const sonioxKeySettings = useSonioxKeySettings(handleProviderChange)
+  const speechmaticsKeySettings =
+    useSpeechmaticsKeySettings(handleProviderChange)
 
   const {
     status: assetStatus,
@@ -449,14 +527,15 @@ export function SpeechSection() {
           />
           <ProviderKeySettings
             providerName="Deepgram"
-            signupUrl="console.deepgram.com"
+            signupUrl="https://console.deepgram.com"
             steps={[
-              "Sign up, then open Projects ▸ Settings ▸ API Keys.",
-              "Create a New API Key and copy the secret — it shows only once.",
-              "Paste it above and save.",
+              "Sign up or sign in, select your project, then open Settings → API Keys.",
+              "Choose Create a New API Key. Name it SabbathCue, use the least-privileged transcription role offered, and choose an expiration you can maintain.",
+              "Create and copy the secret now — Deepgram shows it only once.",
+              "Paste it above, save it securely, then select Test key.",
             ]}
-            cost="about R3,280 free credit, then from R0.08/min for streaming (billed in USD)."
-            pricingUrl="deepgram.com/pricing"
+            cost="Free signup currently includes introductory credit; paid usage is billed in USD."
+            pricingUrl="https://deepgram.com/pricing"
             settings={deepgramKeyAdapter(deepgramKeySettings)}
           />
         </>
@@ -471,14 +550,14 @@ export function SpeechSection() {
           />
           <ProviderKeySettings
             providerName="Soniox"
-            signupUrl="console.soniox.com"
+            signupUrl="https://console.soniox.com"
             steps={[
-              "Sign up at Soniox and create an API key.",
-              "Copy the key — it shows only once.",
-              "Paste it above and save.",
+              "Sign up or sign in, open My First Project, then select API Keys.",
+              "Generate a new API key and copy the complete key while it is visible.",
+              "Paste it above, save it securely, then select Test key.",
             ]}
-            cost="pay-as-you-go streaming; see Soniox pricing for current rates."
-            pricingUrl="soniox.com/pricing"
+            cost="Pay-as-you-go streaming; review the provider's current allowance and rates before use."
+            pricingUrl="https://soniox.com/pricing"
             settings={{
               hasApiKey: sonioxKeySettings.hasSonioxApiKey,
               keyValue: sonioxKeySettings.keyValue,
@@ -491,6 +570,50 @@ export function SpeechSection() {
               keyActionLabel: sonioxKeySettings.keyActionLabel,
               handleKeyAction: sonioxKeySettings.handleKeyAction,
               handleClearKey: sonioxKeySettings.handleClearKey,
+              validating: sonioxKeySettings.validating,
+              keyVerified: sonioxKeySettings.keyVerified,
+              validationMessage: sonioxKeySettings.validationMessage,
+              handleValidateKey: sonioxKeySettings.handleValidateKey,
+            }}
+          />
+        </>
+      )}
+
+      {sttProvider === "speechmatics" && (
+        <>
+          <CloudLanguageSelector
+            provider="speechmatics"
+            sttLanguage={sttLanguage}
+            switchingStt={switchingStt}
+          />
+          <ProviderKeySettings
+            providerName="Speechmatics"
+            signupUrl="https://portal.speechmatics.com"
+            steps={[
+              "Create a free Speechmatics account or sign in to the Portal.",
+              "Open API Keys from your project or account navigation and generate a key named SabbathCue.",
+              "Copy the complete key and keep it private.",
+              "Paste it above, save it securely, then select Test key.",
+            ]}
+            cost="A free monthly real-time allowance is currently available; paid usage follows the provider's current rates."
+            pricingUrl="https://www.speechmatics.com/pricing"
+            settings={{
+              hasApiKey: speechmaticsKeySettings.hasSpeechmaticsApiKey,
+              keyValue: speechmaticsKeySettings.keyValue,
+              setKeyValue: speechmaticsKeySettings.setKeyValue,
+              editingSavedKey: speechmaticsKeySettings.editingSavedKey,
+              setEditingSavedKey:
+                speechmaticsKeySettings.setEditingSavedKey,
+              saved: speechmaticsKeySettings.saved,
+              keyError: speechmaticsKeySettings.keyError,
+              displayedKeyValue: speechmaticsKeySettings.displayedKeyValue,
+              keyActionLabel: speechmaticsKeySettings.keyActionLabel,
+              handleKeyAction: speechmaticsKeySettings.handleKeyAction,
+              handleClearKey: speechmaticsKeySettings.handleClearKey,
+              validating: speechmaticsKeySettings.validating,
+              keyVerified: speechmaticsKeySettings.keyVerified,
+              validationMessage: speechmaticsKeySettings.validationMessage,
+              handleValidateKey: speechmaticsKeySettings.handleValidateKey,
             }}
           />
         </>

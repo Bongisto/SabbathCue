@@ -729,10 +729,7 @@ pub fn is_english_filler_word(word: &str) -> bool {
 pub fn strip_english_filler_words(text: &str) -> String {
     text.split_whitespace()
         .filter(|token| {
-            let core: String = token
-                .chars()
-                .filter(|c| c.is_alphabetic())
-                .collect();
+            let core: String = token.chars().filter(|c| c.is_alphabetic()).collect();
             !is_english_filler_word(&core)
         })
         .collect::<Vec<_>>()

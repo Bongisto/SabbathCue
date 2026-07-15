@@ -257,7 +257,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="settings-section-speech"]',
     title: "Cloud API keys",
     content:
-      "Deepgram and Soniox require your own paid third-party accounts; they are not free or included with SabbathCue. Create an account with the provider, generate an API key in that provider's dashboard, then paste it into the key field in Settings > Speech Recognition, press Save, and choose that cloud provider. Vosk is local and does not need an API key.",
+      "Deepgram, Soniox, and Speechmatics use your own third-party cloud accounts and are not free app features; paid rates and free allowances vary by provider. In Settings > Speech Recognition, choose a provider, use its Open console link to generate an API key, paste the key, press Save, then select Test key. Vosk is local and needs no API key.",
     placement: "left",
     before: () =>
       prepareTarget('[data-tour="settings-section-speech"]', {
@@ -305,7 +305,7 @@ export const TUTORIAL_STEPS: Step[] = [
     target: '[data-tour="settings-section-api-keys"]',
     title: "API Key Status",
     content:
-      "Settings > API Keys shows at a glance whether your Deepgram and Soniox keys are configured. Keys are entered and saved in the Speech Recognition section; no key is needed when using local Vosk.",
+      "Settings > API Keys shows whether your Deepgram, Soniox, and Speechmatics keys are configured. Create, save, and test keys in Speech Recognition; no key is needed when using local Vosk.",
     placement: "left",
     before: () =>
       prepareTarget('[data-tour="settings-section-api-keys"]', {

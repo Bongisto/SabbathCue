@@ -61,6 +61,8 @@ function providerLabel(provider: SttProvider): string {
       return "Deepgram"
     case "soniox":
       return "Soniox"
+    case "speechmatics":
+      return "Speechmatics"
     case "vosk":
       return "Vosk"
   }

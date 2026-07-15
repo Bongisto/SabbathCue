@@ -3,7 +3,7 @@ import { load, type Store } from "@tauri-apps/plugin-store"
 import { isTauriRuntime, invokeTauri } from "@/lib/tauri-runtime"
 import { useBroadcastOutputIssueStore } from "@/stores/broadcast/output-issue-store"
 
-export type SttProvider = "deepgram" | "soniox" | "vosk"
+export type SttProvider = "deepgram" | "soniox" | "speechmatics" | "vosk"
 export type SttLanguage = "en" | "af" | "es" | "fr" | "pt"
 
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.85
@@ -29,6 +29,7 @@ interface SettingsState {
   sttProvider: SttProvider
   sttLanguage: SttLanguage
   hasSonioxApiKey: boolean
+  hasSpeechmaticsApiKey: boolean
   /** Reduce CPU/RAM use on weaker machines (semantic detection runs on
    *  finished sentences only). */
   lowPowerMode: boolean
@@ -46,12 +47,14 @@ interface SettingsState {
   setSttProvider: (provider: SttProvider) => void
   setSttLanguage: (language: SttLanguage) => void
   setHasSonioxApiKey: (has: boolean) => void
+  setHasSpeechmaticsApiKey: (has: boolean) => void
   setLowPowerMode: (enabled: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   hasDeepgramApiKey: false,
   hasSonioxApiKey: false,
+  hasSpeechmaticsApiKey: false,
   audioDeviceId: null,
   gain: 1.0,
   autoMode: false,
@@ -67,6 +70,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
 
   setHasDeepgramApiKey: (hasDeepgramApiKey) => set({ hasDeepgramApiKey }),
   setHasSonioxApiKey: (hasSonioxApiKey) => set({ hasSonioxApiKey }),
+  setHasSpeechmaticsApiKey: (hasSpeechmaticsApiKey) =>
+    set({ hasSpeechmaticsApiKey }),
   setAudioDeviceId: (audioDeviceId) => set({ audioDeviceId }),
   setGain: (gain) => set({ gain }),
   setAutoMode: (autoMode) => set({ autoMode }),
@@ -103,7 +108,12 @@ const PERSISTED_KEYS = [
 ] as const satisfies readonly (keyof SettingsState)[]
 
 function parseSttProvider(value: unknown): SttProvider {
-  if (value === "deepgram" || value === "soniox" || value === "vosk") {
+  if (
+    value === "deepgram" ||
+    value === "soniox" ||
+    value === "speechmatics" ||
+    value === "vosk"
+  ) {
     return value
   }
   // Migrate removed/legacy local providers (whisper, faster-whisper,
@@ -185,12 +195,17 @@ export function hydrateSettings(): Promise<void> {
 
       // Resolve keyring-backed secret presence and write only boolean flags.
       // Best-effort and independent: if a command isn't available (web/dev), keep the default.
-      const [deepgram, soniox] = await Promise.all([
+      const [deepgram, soniox, speechmatics] = await Promise.all([
         invokeTauri<boolean>("has_deepgram_api_key").catch(() => undefined),
         invokeTauri<boolean>("has_soniox_api_key").catch(() => undefined),
+        invokeTauri<boolean>("has_speechmatics_api_key").catch(
+          () => undefined
+        ),
       ])
       if (deepgram !== undefined) patch.hasDeepgramApiKey = deepgram
       if (soniox !== undefined) patch.hasSonioxApiKey = soniox
+      if (speechmatics !== undefined)
+        patch.hasSpeechmaticsApiKey = speechmatics
 
       if (Object.keys(patch).length > 0) {
         useSettingsStore.setState(patch)
