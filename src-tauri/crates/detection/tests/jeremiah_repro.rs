@@ -45,7 +45,11 @@ fn um_filler_inside_real_reference_still_detects() {
 
     let mut detector = DirectDetector::new();
     let detections = detector.detect("john chapter um eight verse um nine");
-    assert_eq!(detections.len(), 1, "fillers inside a reference: {detections:?}");
+    assert_eq!(
+        detections.len(),
+        1,
+        "fillers inside a reference: {detections:?}"
+    );
     assert_eq!(detections[0].verse_ref.chapter, 8);
     assert_eq!(detections[0].verse_ref.verse_start, 9);
 }

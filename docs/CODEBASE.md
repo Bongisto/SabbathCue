@@ -25,7 +25,7 @@ SabbathCue listens to live sermon audio, transcribes it, detects scripture/EGW/h
 | Backend language | Rust | 1.77.2 minimum | src-tauri/Cargo.toml:37 |
 | Testing | Vitest | 4.1.8 | package.json:16, package.json:128 |
 | Data | SQLite via rusqlite | 0.34 | src-tauri/Cargo.toml:75 |
-| STT | Vosk, Deepgram, Soniox | internal crate | src-tauri/crates/stt/src/lib.rs:3 |
+| STT | Vosk, Deepgram, Soniox, Speechmatics | internal crate | src-tauri/crates/stt/src/lib.rs:3 |
 
 ## 3 - Architecture overview
 ```mermaid
@@ -60,7 +60,7 @@ Where the pattern is violated or watchlisted: the theme catalog still exports `K
 | Vite dev app | package.json:7 | React app dev server |
 | Tauri app | package.json:13 | Desktop shell and native command handlers |
 | Tauri command registration | src-tauri/src/lib.rs:126 | Native commands including STT lifecycle |
-| STT crate exports | src-tauri/crates/stt/src/lib.rs:32 | Deepgram, Soniox, and Vosk providers |
+| STT crate exports | src-tauri/crates/stt/src/lib.rs:32 | Deepgram, Soniox, Speechmatics, and Vosk providers |
 
 Core modules:
 | Module | Location | Responsibility | Depended on by |
@@ -92,13 +92,13 @@ Verification gate renders the sign-in screen for required/error states
 
 ### Flow: STT provider selection
 ```text
-Settings store type allows deepgram, soniox, vosk
+Settings store type allows deepgram, soniox, speechmatics, vosk
   -> src/stores/settings-store.ts:6
 Settings UI offers Soniox key controls
   -> src/components/settings/sections/SpeechSection.tsx:465
 Backend route maps removed gladia to removed-provider error
   -> src-tauri/src/commands/stt/provider.rs:95
-Backend constructs Deepgram, Soniox, or Vosk providers
+Backend constructs Deepgram, Soniox, Speechmatics, or Vosk providers
   -> src-tauri/src/commands/stt/provider.rs:122
   -> src-tauri/src/commands/stt/provider.rs:148
   -> src-tauri/src/commands/stt/provider.rs:68
@@ -212,7 +212,7 @@ Build script imports the generated JSON into egw_books / egw_paragraphs
 | Entity | Storage | Key fields | Relationships | Defined at |
 |---|---|---|---|---|
 | STT settings | Tauri store plus Zustand hydration | sttProvider, key status booleans | Settings UI, transcription hook | src/stores/settings-store.ts:6, src/stores/settings-store.ts:188 |
-| Cloud API keys | OS keyring via Tauri commands | Deepgram/Soniox key presence | STT provider routing | src-tauri/Cargo.toml:70, src/components/settings/sections/ApiKeysSection.tsx:5 |
+| Cloud API keys | OS keyring via Tauri commands | Deepgram/Soniox/Speechmatics key presence and validation | STT provider routing | src-tauri/Cargo.toml:70, src/components/settings/sections/ApiKeysSection.tsx:5 |
 | Collected detections | In-memory Zustand only | detection, source, kind, useCount, timestamps | Detections panel action reuse | src/stores/collected-detections-store.ts:20, src/stores/collected-detections-store.ts:85 |
 | Broadcast themes | Broadcast Zustand slice | activeThemeId, themes, kinetic flag | Theme catalog and renderer | src/components/broadcast/KineticThemesPage.tsx:146, src/components/broadcast/theme-library.tsx:54 |
 | Bible/EGW content | SQLite | translations, verses, EGW paragraphs | Search/detection/presentation | README.md:49, src-tauri/Cargo.toml:75 |
@@ -232,6 +232,7 @@ External services:
 |---|---|---|---|
 | Deepgram | Cloud STT | watch | src-tauri/crates/stt/src/lib.rs:11 |
 | Soniox | Cloud STT | watch | src-tauri/crates/stt/src/lib.rs:12 |
+| Speechmatics | Cloud STT | watch | src-tauri/crates/stt/src/speechmatics.rs:17 |
 | Vosk | Local STT worker/model | healthy | src-tauri/crates/stt/src/lib.rs:39 |
 
 ## 9 - Configuration & environments
@@ -240,6 +241,7 @@ External services:
 | `sttProvider` | Selected STT backend | yes | Vosk-compatible fallback | src/stores/settings-store.ts:105 |
 | Deepgram API key | Cloud STT auth | only for Deepgram | absent | src/stores/settings-store.ts:188 |
 | Soniox API key | Cloud STT auth | only for Soniox | absent | src/stores/settings-store.ts:190 |
+| Speechmatics API key | Cloud STT auth | only for Speechmatics | absent | src/stores/settings-store.ts:198 |
 | Vosk model/worker resources | Local STT runtime | required for local STT | downloaded/bundled by scripts | src-tauri/tauri.conf.json:42, src-tauri/tauri.conf.json:44 |
 
 Environments: development uses Vite/Tauri commands; release uses Tauri build and bundled public assets. Receipts: package.json:7, package.json:14, README.md:32.
@@ -334,3 +336,4 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 | 2026-07-12 | Initial scoped map for STT cleanup, collected detections, theme catalog, and quick-search ghost text work. | 0-15 |
 | 2026-07-13 | Added EGW source-generation map for Steps to Christ paragraph/page alignment. | 4, 6, 7, 10, 15 |
 | 2026-07-15 | Added bounded startup-auth and automatic expired-session sign-in flow. | 5, 6, 15 |
+| 2026-07-15 | Added provider-specific cloud-key onboarding and validation plus Speechmatics real-time transcription. | 2, 5-9, 15 |

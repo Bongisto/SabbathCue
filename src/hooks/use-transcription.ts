@@ -50,13 +50,14 @@ interface UseTranscriptionOptions {
 
 const MISSING_DEEPGRAM_KEY_MARKER = "No Deepgram API key"
 const MISSING_SONIOX_KEY_MARKER = "No Soniox API key"
+const MISSING_SPEECHMATICS_KEY_MARKER = "No Speechmatics API key"
 const NOT_RUNNING_ERROR = "Transcription is not running"
 const MAYBE_HYMN_CUE_PATTERN =
   /\b(?:(?:sda|adventist|adventiste|seventh(?:\s|-)?day\s+adventist|sewende(?:\s|-)?dag\s+adventiste)\s+(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke)|(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke))(?:\s+(?:number|nommer))?\s+[a-z0-9]/i
 const BILLING_ERROR_PATTERN =
-  /\b(?:402|balance exhausted|insufficient balance|quota|credits?|billing|payment|tokens?|funds?|autopay)\b/i
+  /\b(?:402|balance exhausted|insufficient balance|insufficient[_ ]funds|quota|credits?|billing|payment|tokens?|funds?|autopay)\b/i
 const AUTH_ERROR_PATTERN =
-  /\b(?:401|403|unauthorized|forbidden|invalid api key|authentication|permission denied)\b/i
+  /\b(?:401|403|unauthorized|not[_ ]authorised|forbidden|invalid api key|authentication|permission denied)\b/i
 const NETWORK_ERROR_PATTERN =
   /\b(?:connection failed|failed to connect|timeout|timed out|dns|network|websocket|socket closed|closed unexpectedly)\b/i
 const MODEL_MISSING_PATTERN =
@@ -66,19 +67,22 @@ const STT_STATUS_TOAST_ID = "stt-status"
 const PROVIDER_LABELS: Record<SttProvider, string> = {
   deepgram: "Deepgram",
   soniox: "Soniox",
+  speechmatics: "Speechmatics",
   vosk: "Vosk",
 }
 
 function isMissingApiKeyMessage(message: string): boolean {
   return (
     message.includes(MISSING_DEEPGRAM_KEY_MARKER) ||
-    message.includes(MISSING_SONIOX_KEY_MARKER)
+    message.includes(MISSING_SONIOX_KEY_MARKER) ||
+    message.includes(MISSING_SPEECHMATICS_KEY_MARKER)
   )
 }
 
 function providerFromMessage(message: string): SttProvider | null {
   if (message.includes(MISSING_DEEPGRAM_KEY_MARKER)) return "deepgram"
   if (message.includes(MISSING_SONIOX_KEY_MARKER)) return "soniox"
+  if (message.includes(MISSING_SPEECHMATICS_KEY_MARKER)) return "speechmatics"
   return null
 }
 

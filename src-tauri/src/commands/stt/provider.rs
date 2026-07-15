@@ -4,7 +4,9 @@ use tauri::AppHandle;
 
 use crate::asset_paths;
 use crate::commands::secrets;
-use rhema_stt::{DeepgramClient, SonioxClient, SttConfig, SttProvider, VoskProvider};
+use rhema_stt::{
+    DeepgramClient, SonioxClient, SpeechmaticsClient, SttConfig, SttProvider, VoskProvider,
+};
 
 pub(crate) fn missing_vosk_model_error(model_path: &Path) -> String {
     format!(
@@ -70,7 +72,7 @@ async fn build_vosk_provider(
 
 fn removed_provider_error(provider_name: &str) -> String {
     format!(
-        "The {provider_name} speech-to-text provider has been removed. Choose Vosk, Deepgram, or Soniox."
+        "The {provider_name} speech-to-text provider has been removed. Choose Vosk, Deepgram, Soniox, or Speechmatics."
     )
 }
 
@@ -147,10 +149,32 @@ pub(crate) async fn build_stt_provider(
 
             Ok(Box::new(SonioxClient::new(stt_config)))
         }
+        "speechmatics" => {
+            let resolved_api_key = secrets::get_speechmatics_api_key_or_empty()?;
+            if resolved_api_key.is_empty() {
+                log::warn!(
+                    "[STT-MODEL] failed provider=speechmatics model=standard reason=missing_api_key"
+                );
+                return Err("No Speechmatics API key configured. Set it in Settings.".into());
+            }
+
+            let model = rhema_stt::SPEECHMATICS_MODEL;
+            let language = stt_language.unwrap_or("en");
+            log::info!(
+                "[STT-MODEL] selected provider=speechmatics model={model} language={language} source=remote api_key_configured=true device_id={device_id:?} gain={gain:?}"
+            );
+            Ok(Box::new(SpeechmaticsClient::new(SttConfig {
+                api_key: resolved_api_key,
+                model: model.to_string(),
+                sample_rate: 16_000,
+                encoding: "pcm_s16le".to_string(),
+                language: Some(language.to_string()),
+            })))
+        }
         _ => {
             log::warn!("[STT-MODEL] failed provider={provider_name} reason=unknown_provider");
             Err(format!(
-                "Unknown speech-to-text provider \"{provider_name}\". Choose Vosk, Deepgram, or Soniox."
+                "Unknown speech-to-text provider \"{provider_name}\". Choose Vosk, Deepgram, Soniox, or Speechmatics."
             ))
         }
     }
@@ -194,7 +218,7 @@ mod tests {
 
         assert_eq!(
             error,
-            "The faster-whisper speech-to-text provider has been removed. Choose Vosk, Deepgram, or Soniox."
+            "The faster-whisper speech-to-text provider has been removed. Choose Vosk, Deepgram, Soniox, or Speechmatics."
         );
     }
 
@@ -204,7 +228,7 @@ mod tests {
 
         assert_eq!(
             error,
-            "The gladia speech-to-text provider has been removed. Choose Vosk, Deepgram, or Soniox."
+            "The gladia speech-to-text provider has been removed. Choose Vosk, Deepgram, Soniox, or Speechmatics."
         );
     }
 

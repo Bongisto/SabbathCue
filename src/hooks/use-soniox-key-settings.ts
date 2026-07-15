@@ -11,6 +11,7 @@ const sonioxKeyActions = createProviderKeyActions({
   setCommand: "set_soniox_api_key",
   hasCommand: "has_soniox_api_key",
   clearCommand: "clear_soniox_api_key",
+  validateCommand: "validate_soniox_api_key",
 })
 
 export async function saveSonioxApiKey(
@@ -33,6 +34,7 @@ export function useSonioxKeySettings(
     setHasKey: setHasSonioxApiKey,
     save: saveSonioxApiKey,
     clear: clearSonioxApiKey,
+    validate: sonioxKeyActions.validateApiKey,
     onSaved: restartActiveTranscriptionIfNeeded,
   })
 

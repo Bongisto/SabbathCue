@@ -12,6 +12,7 @@ interface ProviderKeyCommandConfig {
   setCommand: string
   hasCommand: string
   clearCommand: string
+  validateCommand: string
 }
 
 export function createProviderKeyActions({
@@ -19,6 +20,7 @@ export function createProviderKeyActions({
   setCommand,
   hasCommand,
   clearCommand,
+  validateCommand,
 }: ProviderKeyCommandConfig) {
   return {
     async saveApiKey(apiKey: string): Promise<{ hasKey: boolean; error?: string }> {
@@ -40,6 +42,15 @@ export function createProviderKeyActions({
         return {}
       } catch (e) {
         return { error: String(e) }
+      }
+    },
+
+    async validateApiKey(): Promise<{ valid: boolean; error?: string }> {
+      try {
+        await invokeTauri(validateCommand)
+        return { valid: true }
+      } catch (e) {
+        return { valid: false, error: String(e) }
       }
     },
   }

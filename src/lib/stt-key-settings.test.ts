@@ -31,6 +31,7 @@ describe("createProviderKeyActions", () => {
       setCommand: "set_test_api_key",
       hasCommand: "has_test_api_key",
       clearCommand: "clear_test_api_key",
+      validateCommand: "validate_test_api_key",
     })
 
     await expect(actions.saveApiKey("secret-key")).resolves.toEqual({
@@ -50,6 +51,7 @@ describe("createProviderKeyActions", () => {
       setCommand: "set_test_api_key",
       hasCommand: "has_test_api_key",
       clearCommand: "clear_test_api_key",
+      validateCommand: "validate_test_api_key",
     })
 
     await expect(actions.saveApiKey("bad-key")).resolves.toEqual({
@@ -66,11 +68,27 @@ describe("createProviderKeyActions", () => {
       setCommand: "set_test_api_key",
       hasCommand: "has_test_api_key",
       clearCommand: "clear_test_api_key",
+      validateCommand: "validate_test_api_key",
     })
 
     await expect(actions.clearApiKey()).resolves.toEqual({
       error: "Error: clear failed",
     })
     expect(mockInvoke).toHaveBeenCalledWith("clear_test_api_key")
+  })
+
+  it("validates a stored provider key without sending the secret from the UI", async () => {
+    mockInvoke.mockResolvedValue(undefined)
+    const { createProviderKeyActions } = await loadModules()
+    const actions = createProviderKeyActions({
+      label: "TestSTT",
+      setCommand: "set_test_api_key",
+      hasCommand: "has_test_api_key",
+      clearCommand: "clear_test_api_key",
+      validateCommand: "validate_test_api_key",
+    })
+
+    await expect(actions.validateApiKey()).resolves.toEqual({ valid: true })
+    expect(mockInvoke).toHaveBeenCalledWith("validate_test_api_key")
   })
 })
