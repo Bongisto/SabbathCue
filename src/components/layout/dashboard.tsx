@@ -6,6 +6,7 @@ import { PreviewPanel } from "@/components/panels/preview-panel"
 import { LiveOutputPanel } from "@/components/panels/live-output-panel"
 import { QueuePanel } from "@/components/panels/queue-panel"
 import { DetectionsPanel } from "@/components/panels/detections-panel"
+import { CollectedDetectionsPanel } from "@/components/panels/collected-detections-panel"
 import { LatestDetectionBar } from "@/components/panels/latest-detection-bar"
 import { SearchPanel } from "@/components/panels/search-panel"
 import { useDashboardKeyboardControls } from "@/hooks/use-dashboard-keyboard-controls"
@@ -87,6 +88,8 @@ function LiveDeskPage() {
         <LatestDetectionBar className="col-span-12 h-[clamp(240px,31vh,380px)] lg:col-span-6" />
         <QueuePanel className="col-span-12 h-[clamp(240px,31vh,380px)] lg:col-span-6" />
       </div>
+
+      <CollectedDetectionsPanel className="col-span-12" />
     </div>
   )
 }

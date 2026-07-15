@@ -11,6 +11,41 @@ import {
 import type { VerificationStateSnapshot } from "@/types/verification"
 
 const HEARTBEAT_MS = 60 * 1000
+const STARTUP_VERIFICATION_TIMEOUT_MS = 15 * 1000
+const STARTUP_VERIFICATION_TIMEOUT_MESSAGE =
+  "Unable to confirm your session. Check your network and try again."
+
+class StartupVerificationTimeoutError extends Error {}
+
+async function withStartupVerificationTimeout(
+  check: () => Promise<VerificationStateSnapshot>
+): Promise<VerificationStateSnapshot> {
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  try {
+    return await Promise.race([
+      check(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new StartupVerificationTimeoutError()),
+          STARTUP_VERIFICATION_TIMEOUT_MS
+        )
+      }),
+    ])
+  } finally {
+    if (timeout !== null) clearTimeout(timeout)
+  }
+}
+
+function applyVerificationFailure(error: unknown): void {
+  const timedOut = error instanceof StartupVerificationTimeoutError
+  stopHeartbeat()
+  useVerificationStore.setState({
+    status: "error",
+    error: timedOut ? STARTUP_VERIFICATION_TIMEOUT_MESSAGE : String(error),
+    errorCode: timedOut ? "network" : "unknown",
+    isHydrated: true,
+  })
+}
 
 interface VerificationStore extends VerificationStateSnapshot {
   isHydrated: boolean
@@ -117,22 +152,22 @@ export const useVerificationStore = create<VerificationStore>(() => ({
     if (hydrationPromise) return hydrationPromise
     hydrationPromise = (async () => {
       try {
-        applySnapshot(await loadCachedVerification())
+        applySnapshot(
+          await withStartupVerificationTimeout(loadCachedVerification)
+        )
       } catch (error) {
-        stopHeartbeat()
-        useVerificationStore.setState({
-          status: "error",
-          error: String(error),
-          errorCode: "unknown",
-          isHydrated: true,
-        })
+        applyVerificationFailure(error)
       }
     })()
     return hydrationPromise
   },
 
   signIn: async (email, password) => {
-    useVerificationStore.setState({ status: "checking", error: null, errorCode: null })
+    useVerificationStore.setState({
+      status: "checking",
+      error: null,
+      errorCode: null,
+    })
     try {
       applySnapshot(await providerSignIn(email, password))
     } catch (error) {
@@ -147,7 +182,11 @@ export const useVerificationStore = create<VerificationStore>(() => ({
   },
 
   signUp: async (email, password) => {
-    useVerificationStore.setState({ status: "checking", error: null, errorCode: null })
+    useVerificationStore.setState({
+      status: "checking",
+      error: null,
+      errorCode: null,
+    })
     try {
       applySnapshot(await providerSignUp(email, password))
     } catch (error) {
@@ -162,28 +201,34 @@ export const useVerificationStore = create<VerificationStore>(() => ({
   },
 
   signOut: async () => {
-    useVerificationStore.setState({ status: "checking", error: null, errorCode: null })
+    useVerificationStore.setState({
+      status: "checking",
+      error: null,
+      errorCode: null,
+    })
     stopHeartbeat()
     applySnapshot(await providerSignOut())
   },
 
   refresh: async () => {
-    useVerificationStore.setState({ status: "checking", error: null, errorCode: null })
+    useVerificationStore.setState({
+      status: "checking",
+      error: null,
+      errorCode: null,
+    })
     try {
-      applySnapshot(await refreshVerification())
+      applySnapshot(await withStartupVerificationTimeout(refreshVerification))
     } catch (error) {
-      stopHeartbeat()
-      useVerificationStore.setState({
-        status: "error",
-        error: String(error),
-        errorCode: "unknown",
-        isHydrated: true,
-      })
+      applyVerificationFailure(error)
     }
   },
 
   clear: async () => {
-    useVerificationStore.setState({ status: "checking", error: null, errorCode: null })
+    useVerificationStore.setState({
+      status: "checking",
+      error: null,
+      errorCode: null,
+    })
     stopHeartbeat()
     applySnapshot(await clearVerification())
   },
