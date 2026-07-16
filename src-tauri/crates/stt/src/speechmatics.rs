@@ -19,6 +19,7 @@ const SPEECHMATICS_RT_URL: &str = "wss://eu2.rt.speechmatics.com/v2";
 const BATCH_SAMPLES: usize = 800;
 const MAX_RECONNECT_ATTEMPTS: u32 = 5;
 pub const SPEECHMATICS_MODEL: &str = "standard";
+const SPEECHMATICS_MAX_DELAY_SECONDS: f64 = 1.0;
 
 #[derive(Debug, Deserialize, Default)]
 struct Metadata {
@@ -176,7 +177,7 @@ pub(crate) fn build_start_payload(config: &SttConfig) -> serde_json::Value {
             "language": config.language.as_deref().unwrap_or("en"),
             "operating_point": config.model,
             "enable_partials": true,
-            "max_delay": 2.0,
+            "max_delay": SPEECHMATICS_MAX_DELAY_SECONDS,
             "max_delay_mode": "flexible",
         },
     })
@@ -411,6 +412,11 @@ mod tests {
         assert_eq!(payload["audio_format"]["encoding"], "pcm_s16le");
         assert_eq!(payload["transcription_config"]["language"], "af");
         assert_eq!(payload["transcription_config"]["enable_partials"], true);
+        assert_eq!(payload["transcription_config"]["max_delay"], 1.0);
+        assert_eq!(
+            payload["transcription_config"]["max_delay_mode"],
+            "flexible"
+        );
     }
 
     #[test]

@@ -398,6 +398,7 @@ pub async fn start_transcription(
                                 TranscriptPayload {
                                     text: transcript.clone(),
                                     is_final: false,
+                                    provider: provider_log_name.clone(),
                                     confidence,
                                     words: to_word_payloads(words),
                                 },
@@ -481,6 +482,7 @@ pub async fn start_transcription(
                                 TranscriptPayload {
                                     text: transcript.clone(),
                                     is_final: true,
+                                    provider: provider_log_name.clone(),
                                     confidence,
                                     words: to_word_payloads(words),
                                 },

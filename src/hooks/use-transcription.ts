@@ -29,6 +29,7 @@ import { useTauriEvent } from "./use-tauri-event"
 interface TranscriptPartialPayload {
   text: string
   is_final: boolean
+  provider?: SttProvider
   confidence: number
   words: Array<{
     text: string
@@ -261,6 +262,7 @@ export async function handleTranscriptFinalPayload(
     confidence: payload.confidence,
     words: payload.words,
     timestamp: Date.now(),
+    provider: payload.provider,
   })
   if (handleSermonSlideVoiceControl(payload.text)) return
   if (!MAYBE_HYMN_CUE_PATTERN.test(payload.text)) return

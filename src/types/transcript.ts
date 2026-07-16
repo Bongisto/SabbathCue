@@ -1,3 +1,5 @@
+import type { SttProvider } from "@/stores/settings-store"
+
 export interface Word {
   text: string
   start: number
@@ -13,6 +15,7 @@ export interface TranscriptSegment {
   confidence: number
   words: Word[]
   timestamp: number
+  provider?: SttProvider
 }
 
 export type TranscriptEventPayload =

@@ -23,6 +23,7 @@ pub struct WordPayload {
 pub struct TranscriptPayload {
     pub text: String,
     pub is_final: bool,
+    pub provider: String,
     pub confidence: f64,
     pub words: Vec<WordPayload>,
 }

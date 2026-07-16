@@ -474,6 +474,91 @@ describe("use-transcription", () => {
   })
 
   describe("handleTranscriptFinalPayload", () => {
+    it("coalesces adjacent Speechmatics finals into one visible segment", async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_000)
+      const { useTranscriptStore, handleTranscriptFinalPayload } =
+        await loadModules()
+
+      await handleTranscriptFinalPayload({
+        text: "The first part of the sentence",
+        is_final: true,
+        confidence: 0.9,
+        words: [],
+        provider: "speechmatics",
+      })
+      vi.setSystemTime(3_000)
+      await handleTranscriptFinalPayload({
+        text: "continues in the next final span.",
+        is_final: true,
+        confidence: 0.95,
+        words: [],
+        provider: "speechmatics",
+      })
+
+      expect(useTranscriptStore.getState().segments).toMatchObject([
+        {
+          text: "The first part of the sentence continues in the next final span.",
+          provider: "speechmatics",
+        },
+      ])
+      vi.useRealTimers()
+    })
+
+    it("starts a new Speechmatics line after the coalescing gap", async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_000)
+      const { useTranscriptStore, handleTranscriptFinalPayload } =
+        await loadModules()
+
+      await handleTranscriptFinalPayload({
+        text: "First thought.",
+        is_final: true,
+        confidence: 0.9,
+        words: [],
+        provider: "speechmatics",
+      })
+      vi.setSystemTime(5_001)
+      await handleTranscriptFinalPayload({
+        text: "Second thought.",
+        is_final: true,
+        confidence: 0.9,
+        words: [],
+        provider: "speechmatics",
+      })
+
+      expect(useTranscriptStore.getState().segments).toHaveLength(2)
+      vi.useRealTimers()
+    })
+
+    it("keeps non-Speechmatics finals as separate visible segments", async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(1_000)
+      const { useTranscriptStore, handleTranscriptFinalPayload } =
+        await loadModules()
+
+      for (const provider of ["deepgram", "soniox"] as const) {
+        await handleTranscriptFinalPayload({
+          text: `${provider} first`,
+          is_final: true,
+          confidence: 0.9,
+          words: [],
+          provider,
+        })
+        vi.setSystemTime(Date.now() + 2_000)
+        await handleTranscriptFinalPayload({
+          text: `${provider} second`,
+          is_final: true,
+          confidence: 0.9,
+          words: [],
+          provider,
+        })
+      }
+
+      expect(useTranscriptStore.getState().segments).toHaveLength(4)
+      vi.useRealTimers()
+    })
+
     it("stores final transcript segments and invokes hymn voice control", async () => {
       const { useTranscriptStore, handleTranscriptFinalPayload } =
         await loadModules()
