@@ -737,12 +737,16 @@ fn is_previous_verse_command(command: &str) -> bool {
 fn extract_verse_number(text: &str) -> Option<i32> {
     // Find "verse N" or "verses N" anywhere in the text
     for keyword in &["verse ", "verses "] {
-        if let Some(pos) = text.find(keyword) {
-            if has_reference_context_before_verse(text, pos) {
-                return None;
+        let mut search_start = 0;
+        while let Some(relative_pos) = text[search_start..].find(keyword) {
+            let pos = search_start + relative_pos;
+            if !has_reference_context_before_verse(text, pos) {
+                let rest = &text[pos + keyword.len()..];
+                if let Some(verse) = parse_number_token(rest) {
+                    return Some(verse);
+                }
             }
-            let rest = &text[pos + keyword.len()..];
-            return parse_number_token(rest);
+            search_start = pos + keyword.len();
         }
     }
 
@@ -783,6 +787,8 @@ fn has_reference_context_before_verse(text: &str, verse_pos: usize) -> bool {
     !prefix.is_empty()
         && prefix
             .split_whitespace()
+            .rev()
+            .take(3)
             .any(|token| parse_number_token(token).is_some())
 }
 
@@ -1192,6 +1198,24 @@ mod tests {
 
         assert_eq!(result, None);
         assert_eq!(rm.current_verse(), Some(1));
+    }
+
+    #[test]
+    fn later_verse_command_wins_after_full_reference_in_same_fragment() {
+        let mut rm = ReadingMode::new();
+        let verses: Vec<(i32, String)> = (1..=22)
+            .map(|i| (i, format!("alpha beta gamma delta marker{i}")))
+            .collect();
+        rm.start(66, "Revelation", 1, 9, verses);
+
+        let transcript = concat!(
+            "Revelation chapter 1 verse 9 I John who also am your brother and companion ",
+            "in tribulation was on the island called Patmos. Verse 10 I was in the spirit ",
+            "on the Lord's day."
+        );
+        let advance = rm.check_transcript(transcript);
+
+        assert_eq!(advance.map(|result| result.verse), Some(10));
     }
 
     #[test]
