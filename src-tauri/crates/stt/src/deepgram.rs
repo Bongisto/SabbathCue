@@ -20,7 +20,7 @@ const RECONNECT_DELAY: Duration = Duration::from_secs(1);
 /// Batch up to 50ms of audio before sending (at 16kHz, that is 800 samples).
 /// This keeps Deepgram behaving like live captions instead of delayed dictation.
 const BATCH_SAMPLES: usize = 800;
-pub(crate) const DEEPGRAM_ENDPOINTING_MS: &str = "300";
+pub(crate) const DEEPGRAM_ENDPOINTING_MS: &str = "250";
 pub(crate) const DEEPGRAM_UTTERANCE_END_MS: &str = "1000";
 pub(crate) const MAX_DEEPGRAM_KEYTERMS: usize = 100;
 
@@ -654,7 +654,7 @@ mod tests {
         assert!(pairs.contains(&("dictation".into(), "true".into())));
         assert!(pairs.contains(&("filler_words".into(), "true".into())));
         assert!(pairs.contains(&("interim_results".into(), "true".into())));
-        assert!(pairs.contains(&("endpointing".into(), DEEPGRAM_ENDPOINTING_MS.into())));
+        assert!(pairs.contains(&("endpointing".into(), "250".into())));
         assert!(pairs.contains(&("utterance_end_ms".into(), DEEPGRAM_UTTERANCE_END_MS.into())));
         assert!(pairs.contains(&("language".into(), "en".into())));
         assert!(pairs.contains(&("keyterm".into(), "Jesus".into())));

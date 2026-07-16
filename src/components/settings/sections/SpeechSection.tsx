@@ -27,21 +27,37 @@ function ProviderOption({
   activeProvider,
   title,
   description,
+  recommended = false,
 }: {
   value: SttProvider
   activeProvider: SttProvider
   title: string
   description: string
+  recommended?: boolean
 }) {
   return (
     <label
+      data-recommended={recommended ? "true" : undefined}
       className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary/20 ${
-        activeProvider !== value ? "hover:border-muted-foreground/25" : ""
+        recommended
+          ? "border-primary/60 bg-primary/5 ring-1 ring-primary/20"
+          : ""
+      } ${
+        activeProvider !== value && !recommended
+          ? "hover:border-muted-foreground/25"
+          : ""
       }`}
     >
       <RadioGroupItem value={value} className="mt-0.5" />
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-foreground">{title}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-foreground">{title}</span>
+          {recommended ? (
+            <Badge className="border-primary/40 bg-primary/15 text-primary">
+              Best
+            </Badge>
+          ) : null}
+        </div>
         <p className="text-[0.625rem] leading-relaxed text-muted-foreground">
           {description}
         </p>
@@ -50,7 +66,7 @@ function ProviderOption({
   )
 }
 
-function ProviderSelector({
+export function ProviderSelector({
   sttProvider,
   switchingStt,
   onProviderChange,
@@ -82,6 +98,7 @@ function ProviderSelector({
           activeProvider={sttProvider}
           title="Cloud (Soniox, Afrikaans)"
           description="Uses Soniox stt-rt-v5 for real-time Afrikaans transcription with language_hints and endpoint detection. Requires an API key and internet connection."
+          recommended
         />
         <ProviderOption
           value="speechmatics"

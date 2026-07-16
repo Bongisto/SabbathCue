@@ -104,6 +104,21 @@ Backend constructs Deepgram, Soniox, Speechmatics, or Vosk providers
   -> src-tauri/src/commands/stt/provider.rs:68
 ```
 
+### Flow: Speechmatics visible transcript coalescing
+```text
+Rust transcript payload includes the active provider
+  -> src-tauri/src/events.rs:23
+  -> src-tauri/src/commands/stt/mod.rs:398
+  -> src-tauri/src/commands/stt/mod.rs:482
+Final payload is appended to the transcript store immediately
+  -> src/hooks/use-transcription.ts:243
+The store coalesces only adjacent Speechmatics finals arriving within 4 seconds
+  -> src/stores/transcript-store.ts:6
+  -> src/stores/transcript-store.ts:45
+Deepgram, Soniox, Vosk, and Speechmatics spans after a longer pause remain separate rows
+  -> src/hooks/use-transcription.test.ts:476
+```
+
 ### Flow: collected detections
 ```text
 Detection panel builds shared actions
@@ -239,6 +254,8 @@ External services:
 | Variable / setting | Purpose | Required | Default | Read at |
 |---|---|---|---|---|
 | `sttProvider` | Selected STT backend | yes | Vosk-compatible fallback | src/stores/settings-store.ts:105 |
+| Deepgram endpointing | Finalize after a short speech pause | only for Deepgram | 250 ms | src-tauri/crates/stt/src/deepgram.rs:23 |
+| Speechmatics max delay | Upper target for final transcript latency, with flexible entity formatting | only for Speechmatics | 1.0 second | src-tauri/crates/stt/src/speechmatics.rs:22, src-tauri/crates/stt/src/speechmatics.rs:180 |
 | Deepgram API key | Cloud STT auth | only for Deepgram | absent | src/stores/settings-store.ts:188 |
 | Soniox API key | Cloud STT auth | only for Soniox | absent | src/stores/settings-store.ts:190 |
 | Speechmatics API key | Cloud STT auth | only for Speechmatics | absent | src/stores/settings-store.ts:198 |
@@ -337,3 +354,5 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 | 2026-07-13 | Added EGW source-generation map for Steps to Christ paragraph/page alignment. | 4, 6, 7, 10, 15 |
 | 2026-07-15 | Added bounded startup-auth and automatic expired-session sign-in flow. | 5, 6, 15 |
 | 2026-07-15 | Added provider-specific cloud-key onboarding and validation plus Speechmatics real-time transcription. | 2, 5-9, 15 |
+| 2026-07-16 | Added provider-aware visible transcript coalescing for adjacent Speechmatics final spans without delaying detection. | 6, 15 |
+| 2026-07-16 | Tuned Deepgram endpointing to 250 ms and Speechmatics flexible final delay to 1.0 second. | 9, 15 |
