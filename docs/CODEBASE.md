@@ -197,7 +197,8 @@ Operator actions append privacy-safe local feedback without transcript content
 Frontend profiling measures the full asynchronous event workflow, top-candidate
 switches inside the confirmation window, and first-seen-to-selection latency
   -> src/lib/detection-profiler.ts:28
-CI replays the full-model corpus at 90% and 85% with precision/recall gates
+CI gates the full-model corpus at the production 90% policy and reports a
+non-gating 85% calibration probe to expose the lower threshold's tradeoffs
   -> .github/workflows/desktop-ci.yml:184
 ```
 
@@ -447,3 +448,4 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 | 2026-07-16 | Replaced UUID-only device counting with managed approved/pending/revoked activations, OS-keychain P-256 identity proof, service-role-only registration/approval, and signed configurable offline leases. | 5-11, 15 |
 | 2026-07-20 | Separated verse rank evidence from displayed match strength, added STT-aware semantic safety and repeat confirmation, production-faithful calibration gates, and privacy-safe local correction feedback. | 5-11, 15 |
 | 2026-07-20 | Added asynchronous detection latency, candidate-switch stability, and semantic confirmation-latency measurements without retaining transcript or audio. | 6, 10, 11, 15 |
+| 2026-07-20 | Corrected the accuracy corpus to replay stable partial/final candidate pairs, retained the 90% release gate, and made the unsafe 85% comparison report-only. | 6, 10, 11, 15 |
