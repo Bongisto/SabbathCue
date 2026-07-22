@@ -301,36 +301,37 @@ async function queueDetectedVerse(
 let detectionHandlingChain: Promise<void> = Promise.resolve()
 const SEMANTIC_SINGLE_PASS_MATCH_STRENGTH = 0.95
 const SEMANTIC_CONFIRMATION_WINDOW_MS = 8_000
-let pendingSemanticConfirmation: { key: string; seenAt: number } | null = null
+const pendingSemanticConfirmations = new Map<string, number>()
 
 export function resetSemanticConfirmationForTests() {
-  pendingSemanticConfirmation = null
+  pendingSemanticConfirmations.clear()
 }
 
 function confirmedSemanticHit(
   detection: DetectionResult | null
 ): DetectionResult | null {
   if (!detection || detection.source !== "semantic") {
-    pendingSemanticConfirmation = null
+    pendingSemanticConfirmations.clear()
     return detection
   }
 
   if (detection.confidence >= SEMANTIC_SINGLE_PASS_MATCH_STRENGTH) {
-    pendingSemanticConfirmation = null
+    pendingSemanticConfirmations.clear()
     return detection
   }
 
   const key = `${detection.book_number}:${detection.chapter}:${detection.verse}`
   const now = Date.now()
   if (
-    pendingSemanticConfirmation?.key === key &&
-    now - pendingSemanticConfirmation.seenAt <= SEMANTIC_CONFIRMATION_WINDOW_MS
+    pendingSemanticConfirmations.has(key) &&
+    now - (pendingSemanticConfirmations.get(key) ?? 0) <=
+      SEMANTIC_CONFIRMATION_WINDOW_MS
   ) {
-    pendingSemanticConfirmation = null
+    pendingSemanticConfirmations.delete(key)
     return detection
   }
 
-  pendingSemanticConfirmation = { key, seenAt: now }
+  pendingSemanticConfirmations.set(key, now)
   return null
 }
 

@@ -312,6 +312,43 @@ describe("verse detection workflow", () => {
     )
   })
 
+  it("confirms a semantic verse after an intervening semantic candidate", async () => {
+    const first = makeDetection({
+      source: "semantic",
+      verse_ref: "Daniel 7:10",
+      verse_text: "The court was seated, and the books were opened.",
+      book_name: "Daniel",
+      book_number: 27,
+      chapter: 7,
+      verse: 10,
+      confidence: 0.85,
+      auto_queued: false,
+    })
+    const intervening = makeDetection({
+      source: "semantic",
+      verse_ref: "Romans 8:1",
+      verse_text: "There is therefore now no condemnation.",
+      book_name: "Romans",
+      book_number: 45,
+      chapter: 8,
+      verse: 1,
+      confidence: 0.85,
+      auto_queued: false,
+    })
+
+    await handleVerseDetections([first])
+    vi.advanceTimersByTime(1_000)
+    await handleVerseDetections([intervening])
+    vi.advanceTimersByTime(1_000)
+    await handleVerseDetections([first])
+
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_number: 27,
+      chapter: 7,
+      verse: 10,
+    })
+  })
+
   it("auto-previews one exceptionally strong semantic detection", async () => {
     await handleVerseDetections([
       makeDetection({ source: "semantic", confidence: 0.95 }),
