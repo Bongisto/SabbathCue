@@ -150,6 +150,7 @@ export function PreviewPanel({ className }: { className?: string }) {
   return (
     <div
       data-slot="preview-panel"
+      data-preview-ready={previewItem ? "true" : "false"}
       tabIndex={0}
       onKeyDown={handlePanelKeyDown}
       className={cn(
@@ -213,7 +214,10 @@ export function PreviewPanel({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+      <div
+        data-slot="preview-stage"
+        className="flex min-h-0 flex-1 items-center justify-center p-4"
+      >
         {previewItem?.kind === "video" && previewVideoSrc(previewItem) ? (
           previewItem.video?.source === "youtube" ? (
             <iframe

@@ -25,7 +25,8 @@ function readAccentTheme(): AccentTheme {
       raw === "gold" ||
       raw === "emerald" ||
       raw === "purple" ||
-      raw === "aurora"
+      raw === "aurora" ||
+      raw === "obsidian"
     ) {
       return raw
     }

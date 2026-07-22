@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils"
 import { recordDetectionFeedback } from "@/lib/detection-feedback"
 import { PanelHeader } from "@/components/ui/panel-header"
 import { PanelEmptyState } from "@/components/ui/panel-empty-state"
-import { ConfidenceDot } from "@/components/ui/confidence-dot"
+import { ConfidenceRing } from "@/components/ui/confidence-ring"
 import { Button } from "@/components/ui/button"
 import { CollectDetectionButton } from "@/components/panels/collect-detection-button"
 import {
@@ -90,7 +90,7 @@ function HymnDetectionCard({
   return (
     <div className="queue-item p-3 last:border-0">
       <div className="flex items-center gap-2">
-        <ConfidenceDot confidence={detection.confidence} />
+        <ConfidenceRing confidence={detection.confidence} />
         <span className="text-xs font-medium text-muted-foreground">
           {Math.round(detection.confidence * 100)}%
         </span>
@@ -235,7 +235,7 @@ function DetectionCard({ detection }: { detection: DetectionResult }) {
   return (
     <div className="queue-item p-3 last:border-0">
       <div className="flex items-center gap-2">
-        <ConfidenceDot confidence={detection.confidence} />
+        <ConfidenceRing confidence={detection.confidence} />
         <span className="text-xs font-medium text-muted-foreground">
           {Math.round(detection.confidence * 100)}%
         </span>

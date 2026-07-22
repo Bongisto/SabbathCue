@@ -2,15 +2,6 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const BAR_COLORS = [
-  "bg-confidence-high",
-  "bg-confidence-high",
-  "bg-confidence-high",
-  "bg-confidence-high",
-  "bg-confidence-mid",
-  "bg-confidence-low",
-] as const
-
 function LevelMeter({
   className,
   level,
@@ -37,15 +28,12 @@ function LevelMeter({
     >
       {Array.from({ length: bars }, (_, i) => {
         const active = i < litCount
-        const color = BAR_COLORS[Math.min(i, BAR_COLORS.length - 1)]
 
         return (
           <span
             key={i}
-            className={cn(
-              "w-0.75 rounded-sm transition-[background-color] duration-75",
-              active ? color : "bg-muted-foreground/15"
-            )}
+            data-active={active ? "true" : "false"}
+            className="level-meter-bar w-0.75 origin-bottom rounded-sm"
             style={{ height: `${6 + i * 2.5}px` }}
           />
         )

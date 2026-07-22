@@ -274,7 +274,11 @@ export function TranscriptPanel({ className }: { className?: string }) {
             return (
               <p
                 key={seg.id}
-                className={`text-sm leading-relaxed transition-colors duration-300 ${opacity}`}
+                className={cn(
+                  "text-sm leading-relaxed transition-[color,border-color] duration-300",
+                  opacity,
+                  distFromEnd === 0 && "border-l-2 border-[var(--accent)] pl-2"
+                )}
               >
                 {seg.text}
               </p>

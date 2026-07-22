@@ -31,6 +31,7 @@ const ACCENT_SWATCHES: { id: AccentTheme; className: string; title: string }[] =
       title: "Royal Amethyst",
     },
     { id: "aurora", className: "bg-sky-400", title: "Midnight Aurora" },
+    { id: "obsidian", className: "bg-amber-500", title: "Obsidian" },
   ]
 
 function formatClock(date: Date): string {
