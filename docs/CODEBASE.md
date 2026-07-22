@@ -1,5 +1,5 @@
 # Codebase Map - SabbathCue
-Created: 2026-07-12 - Last verified: 2026-07-16 - Confidence: Medium
+Created: 2026-07-12 - Last verified: 2026-07-22 - Confidence: Medium
 
 ## 0 - Snapshot
 | Field | Value |
@@ -213,6 +213,19 @@ Theme designer library reads useBroadcastThemeDesignerStore alias
 Both aliases point to broadcast theme slice wrappers
   -> src/stores/broadcast/theme-store.ts:32
   -> src/stores/broadcast/theme-designer-store.ts:38
+```
+
+### Flow: operator accent themes
+```text
+Accent theme IDs persist independently from light/dark color mode
+  -> src/stores/accent-theme-store.ts:3
+The controller header switches among the registered accent themes
+  -> src/components/layout/app-controller-header.tsx:23
+Operator shell tokens and atmosphere resolve under #bodyThemeContainer
+  -> src/index.css:353
+  -> src/index.css:440
+Broadcast output reads the same accent ID but keeps its separate canvas/theme rendering path
+  -> src/broadcast-output.tsx:20
 ```
 
 ### Flow: quick-search ghost text
@@ -449,3 +462,4 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 | 2026-07-20 | Separated verse rank evidence from displayed match strength, added STT-aware semantic safety and repeat confirmation, production-faithful calibration gates, and privacy-safe local correction feedback. | 5-11, 15 |
 | 2026-07-20 | Added asynchronous detection latency, candidate-switch stability, and semantic confirmation-latency measurements without retaining transcript or audio. | 6, 10, 11, 15 |
 | 2026-07-20 | Corrected the accuracy corpus to replay stable partial/final candidate pairs, retained the 90% release gate, and made the unsafe 85% comparison report-only. | 6, 10, 11, 15 |
+| 2026-07-22 | Added the opt-in obsidian operator accent, scoped dark/light atmosphere tokens, and token-driven confidence/meter/preview/live-state visuals without changing projector themes. | 3, 6, 15 |

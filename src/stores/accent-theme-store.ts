@@ -1,6 +1,7 @@
 import { create } from "zustand"
 
-export type AccentTheme = "teal" | "gold" | "emerald" | "purple" | "aurora"
+export type AccentTheme =
+  "teal" | "gold" | "emerald" | "purple" | "aurora" | "obsidian"
 
 export const ACCENT_THEME_STORAGE_KEY = "sabbathcue-accent-theme"
 
@@ -12,7 +13,8 @@ function readStoredTheme(): AccentTheme {
       raw === "gold" ||
       raw === "emerald" ||
       raw === "purple" ||
-      raw === "aurora"
+      raw === "aurora" ||
+      raw === "obsidian"
     ) {
       return raw
     }

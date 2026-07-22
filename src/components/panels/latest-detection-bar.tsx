@@ -2,7 +2,7 @@ import { EyeIcon, PlayIcon, PlusIcon, RadarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { CollectDetectionButton } from "@/components/panels/collect-detection-button"
-import { ConfidenceDot } from "@/components/ui/confidence-dot"
+import { ConfidenceRing } from "@/components/ui/confidence-ring"
 import { useDetection, detectionActions } from "@/hooks/use-detection"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import {
@@ -17,7 +17,7 @@ function LiveDetectionRow({ detection }: { detection: DetectionResult }) {
     <div className="flex min-w-0 flex-col gap-2 border-b border-[var(--border-subtle)] px-3 py-2 [contain-intrinsic-size:0_64px] [content-visibility:auto] last:border-0 sm:flex-row sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 items-center gap-2">
-          <ConfidenceDot confidence={detection.confidence} />
+          <ConfidenceRing confidence={detection.confidence} size="sm" />
           <span className="shrink-0 text-xs font-medium text-muted-foreground">
             {Math.round(detection.confidence * 100)}%
           </span>

@@ -438,6 +438,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
     <div
       ref={panelRef}
       data-slot="live-output-panel"
+      data-live={isLive ? "true" : "false"}
       data-fullscreen-layout={isFullscreenLayout ? "true" : undefined}
       tabIndex={0}
       onKeyDown={handlePanelKeyDown}
