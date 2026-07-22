@@ -307,6 +307,10 @@ export function resetSemanticConfirmationForTests() {
   pendingSemanticConfirmations.clear()
 }
 
+export function pendingSemanticConfirmationCountForTests() {
+  return pendingSemanticConfirmations.size
+}
+
 function confirmedSemanticHit(
   detection: DetectionResult | null
 ): DetectionResult | null {
@@ -322,11 +326,16 @@ function confirmedSemanticHit(
 
   const key = `${detection.book_number}:${detection.chapter}:${detection.verse}`
   const now = Date.now()
-  if (
-    pendingSemanticConfirmations.has(key) &&
-    now - (pendingSemanticConfirmations.get(key) ?? 0) <=
-      SEMANTIC_CONFIRMATION_WINDOW_MS
-  ) {
+
+  // Evict confirmations that have aged out of the window so the map cannot
+  // grow unbounded over a long session.
+  for (const [pendingKey, seenAt] of pendingSemanticConfirmations) {
+    if (now - seenAt > SEMANTIC_CONFIRMATION_WINDOW_MS) {
+      pendingSemanticConfirmations.delete(pendingKey)
+    }
+  }
+
+  if (pendingSemanticConfirmations.has(key)) {
     pendingSemanticConfirmations.delete(key)
     return detection
   }

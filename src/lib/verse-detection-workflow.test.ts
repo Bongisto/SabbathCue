@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   handleReadingAdvance,
   handleVerseDetections,
+  pendingSemanticConfirmationCountForTests,
   resetSemanticConfirmationForTests,
 } from "./verse-detection-workflow"
 import { useBibleStore } from "@/stores/bible-store"
@@ -347,6 +348,40 @@ describe("verse detection workflow", () => {
       chapter: 7,
       verse: 10,
     })
+  })
+
+  it("prunes expired pending semantic confirmations instead of accumulating them", async () => {
+    const unconfirmed = [
+      { verse_ref: "Daniel 7:10", book_name: "Daniel", book_number: 27, chapter: 7, verse: 10 },
+      { verse_ref: "Romans 8:1", book_name: "Romans", book_number: 45, chapter: 8, verse: 1 },
+      { verse_ref: "Isaiah 40:8", book_name: "Isaiah", book_number: 23, chapter: 40, verse: 8 },
+      { verse_ref: "Psalm 46:1", book_name: "Psalms", book_number: 19, chapter: 46, verse: 1 },
+    ]
+    for (const v of unconfirmed) {
+      await handleVerseDetections([
+        makeDetection({ source: "semantic", confidence: 0.85, auto_queued: false, ...v }),
+      ])
+    }
+    expect(pendingSemanticConfirmationCountForTests()).toBe(unconfirmed.length)
+
+    // Let every pending entry age out past the confirmation window.
+    vi.advanceTimersByTime(9_000)
+
+    // A fresh weak semantic detection must evict the expired keys, not pile on.
+    await handleVerseDetections([
+      makeDetection({
+        source: "semantic",
+        confidence: 0.85,
+        auto_queued: false,
+        verse_ref: "Micah 6:8",
+        book_name: "Micah",
+        book_number: 33,
+        chapter: 6,
+        verse: 8,
+      }),
+    ])
+
+    expect(pendingSemanticConfirmationCountForTests()).toBe(1)
   })
 
   it("auto-previews one exceptionally strong semantic detection", async () => {
