@@ -79,6 +79,15 @@ const NATURE_MOTION: KineticMotion = {
   saturationBoost: 0.08,
 }
 
+// KNFC verse-stage scenes: the shimmer rotates once per 18-second loop while
+// the stage colors remain stable.
+const STAGE_MOTION: KineticMotion = {
+  durationMs: 18000,
+  driftAmount: 0.25,
+  hueShiftDegrees: 0,
+  saturationBoost: 0,
+}
+
 export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
   // ---- Classical serif group (fluid waves) -------------------------------
   {
@@ -362,6 +371,63 @@ export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
     // No hue/saturation breathing in this design; 6.5s matches the slowest
     // fold loop so kinetic hosts keep animating continuously.
     motion: { durationMs: 6500, driftAmount: 0.6, hueShiftDegrees: 0, saturationBoost: 0 },
+  },
+  // ---- KNFC verse-stage group ---------------------------------------------
+  // colors = [stage-a, stage-b, glow].
+  {
+    presetId: "stage-navy",
+    name: "KNFC Navy Stage (Kinetic)",
+    group: "classical",
+    backgroundKind: "stage",
+    colors: ["#071a35", "#102d56", "#2769a8"],
+    accentColor: "#e8b84d",
+    textColor: "#ffffff",
+    fontFamily: GEORGIA,
+    motion: STAGE_MOTION,
+  },
+  {
+    presetId: "stage-teal",
+    name: "KNFC Teal Stage (Kinetic)",
+    group: "classical",
+    backgroundKind: "stage",
+    colors: ["#062f35", "#0b5860", "#18a693"],
+    accentColor: "#e8b84d",
+    textColor: "#ffffff",
+    fontFamily: GEORGIA,
+    motion: STAGE_MOTION,
+  },
+  {
+    presetId: "stage-blue",
+    name: "KNFC Blue Stage (Kinetic)",
+    group: "classical",
+    backgroundKind: "stage",
+    colors: ["#082b4a", "#145d89", "#3297cd"],
+    accentColor: "#e8b84d",
+    textColor: "#ffffff",
+    fontFamily: GEORGIA,
+    motion: STAGE_MOTION,
+  },
+  {
+    presetId: "stage-violet",
+    name: "KNFC Violet Stage (Kinetic)",
+    group: "classical",
+    backgroundKind: "stage",
+    colors: ["#1d173c", "#3d306e", "#7860d6"],
+    accentColor: "#e8b84d",
+    textColor: "#ffffff",
+    fontFamily: GEORGIA,
+    motion: STAGE_MOTION,
+  },
+  {
+    presetId: "stage-slate",
+    name: "KNFC Slate Stage (Kinetic)",
+    group: "classical",
+    backgroundKind: "stage",
+    colors: ["#172632", "#344f61", "#6a96b0"],
+    accentColor: "#e8b84d",
+    textColor: "#ffffff",
+    fontFamily: GEORGIA,
+    motion: STAGE_MOTION,
   },
 ]
 
