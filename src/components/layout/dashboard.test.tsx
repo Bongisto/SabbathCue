@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react"
+import { cleanup, render, waitFor } from "@testing-library/react"
 import { Dashboard } from "./dashboard"
 import { useAccentThemeStore } from "@/stores/accent-theme-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
-import { useProjectorSetupStore } from "@/stores/projector-setup-store"
 
 vi.mock("@/hooks/use-dashboard-keyboard-controls", () => ({
   useDashboardKeyboardControls: vi.fn(),
@@ -110,16 +109,6 @@ describe("Dashboard workspace routing", () => {
     expect(transcript?.getAttribute("class")).toContain(
       "h-[calc(clamp(360px,47vh,560px)+clamp(240px,31vh,380px)+0.75rem)]"
     )
-  })
-
-  it("restores the live-page projector setup button", () => {
-    render(<Dashboard />)
-
-    fireEvent.click(
-      document.querySelector('[data-slot="setup-projector-button"]')!
-    )
-
-    expect(useProjectorSetupStore.getState().open).toBe(true)
   })
 
   it("Detections workspace renders DetectionsPanel without collected detections", () => {

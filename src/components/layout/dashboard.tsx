@@ -22,8 +22,6 @@ import {
   darkSurfaceClassName,
   useColorModeStore,
 } from "@/stores/color-mode-store"
-import { openProjectorSetup } from "@/stores/projector-setup-store"
-import { MonitorIcon } from "lucide-react"
 
 const LazyHymnWorkspace = lazy(() =>
   import("@/components/hymnal/HymnWorkspace").then((mod) => ({
@@ -86,17 +84,6 @@ function WorkspaceFallback() {
 function LiveDeskPage() {
   return (
     <div className="view-pane grid grid-cols-12 gap-3">
-      <div className="col-span-12 flex justify-end">
-        <button
-          type="button"
-          data-slot="setup-projector-button"
-          onClick={openProjectorSetup}
-          className="btn-action inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-glow)] px-3 text-xs font-semibold text-foreground"
-        >
-          <MonitorIcon className="size-4" />
-          Set up projector
-        </button>
-      </div>
       <TranscriptPanel className="glass-panel col-span-12 h-[calc(clamp(360px,47vh,560px)+clamp(240px,31vh,380px)+0.75rem)] xl:col-span-3" />
 
       <div className="col-span-12 grid h-fit grid-cols-12 gap-3 xl:col-span-9">
