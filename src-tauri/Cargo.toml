@@ -83,3 +83,11 @@ workspace = true
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+
+# Cargo's default release profile leaves LTO off and splits into 16 codegen
+# units, which costs cross-crate inlining in the detection hot path.
+# `panic` stays at "unwind": the STT task supervisor relies on catch_unwind
+# (src/commands/stt/tasks.rs) to survive a panicking worker.
+[profile.release]
+lto = "thin"
+codegen-units = 1

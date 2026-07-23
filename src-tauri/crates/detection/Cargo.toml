@@ -21,6 +21,7 @@ ort = { version = "2.0.0-rc.12", optional = true }
 ndarray = { version = "0.17", optional = true }
 tokenizers = { version = "0.22", default-features = false, features = ["progressbar", "onig"], optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
+rayon = { version = "1", optional = true }
 
 # Dependencies only needed by the precompute binary
 env_logger = { version = "0.11", optional = true }
@@ -28,7 +29,7 @@ env_logger = { version = "0.11", optional = true }
 [features]
 default = []
 onnx = ["ort", "ndarray", "tokenizers"]
-vector-search = ["bytemuck"]
+vector-search = ["bytemuck", "rayon"]
 precompute-bin = ["onnx", "vector-search", "env_logger"]
 
 [[bin]]
