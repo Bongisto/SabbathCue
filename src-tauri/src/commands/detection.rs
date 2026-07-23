@@ -165,6 +165,62 @@ pub fn stop_reading_mode(state: State<'_, Mutex<ReadingMode>>) -> Result<(), Str
     Ok(())
 }
 
+fn set_reading_mode_reference_inner(
+    app_state: &AppState,
+    reading_mode: &mut ReadingMode,
+    book_number: i32,
+    book_name: &str,
+    chapter: i32,
+    verse: i32,
+) -> Result<(), String> {
+    let db = app_state
+        .bible_db
+        .as_ref()
+        .ok_or_else(|| "Bible database not initialized".to_string())?;
+    let chapter_verses = db
+        .get_chapter(app_state.active_translation_id, book_number, chapter)
+        .map_err(|error| error.to_string())?;
+    if chapter_verses.is_empty() {
+        return Err(format!("No verses found for {book_name} {chapter}"));
+    }
+    reading_mode.start(
+        book_number,
+        book_name,
+        chapter,
+        verse,
+        chapter_verses
+            .into_iter()
+            .map(|item| (item.verse, item.text))
+            .collect(),
+    );
+    Ok(())
+}
+
+/// Keep reading-mode navigation aligned when a semantic quote, rather than an
+/// explicitly spoken citation, becomes the active live verse.
+#[tauri::command]
+pub fn set_reading_mode_reference(
+    state: State<'_, Mutex<AppState>>,
+    reading_mode_state: State<'_, Mutex<ReadingMode>>,
+    book_number: i32,
+    book_name: String,
+    chapter: i32,
+    verse: i32,
+) -> Result<(), String> {
+    let app_state = state.lock().map_err(|error| error.to_string())?;
+    let mut reading_mode = reading_mode_state
+        .lock()
+        .map_err(|error| error.to_string())?;
+    set_reading_mode_reference_inner(
+        &app_state,
+        &mut reading_mode,
+        book_number,
+        &book_name,
+        chapter,
+        verse,
+    )
+}
+
 #[tauri::command]
 #[expect(
     clippy::too_many_arguments,
@@ -498,6 +554,22 @@ mod tests {
         assert_eq!(result.verse_text, "NKJV John 3:16 text.");
         assert_eq!(result.source, "direct");
         assert!(result.auto_queued);
+    }
+
+    #[test]
+    fn semantic_live_reference_seeds_next_verse_navigation() {
+        let fixture = fixture_state(1);
+        let mut reading_mode = ReadingMode::new();
+
+        set_reading_mode_reference_inner(&fixture.state, &mut reading_mode, 43, "John", 3, 16)
+            .expect("seed reading mode");
+
+        let advance = reading_mode
+            .check_transcript("Let's go to the next verse.")
+            .expect("next verse command");
+        assert_eq!(advance.book_name, "John");
+        assert_eq!(advance.chapter, 3);
+        assert_eq!(advance.verse, 17);
     }
 
     #[test]

@@ -27,6 +27,10 @@ import {
   accentThemeClassName,
   useAccentThemeStore,
 } from "@/stores/accent-theme-store"
+import {
+  darkSurfaceClassName,
+  useColorModeStore,
+} from "@/stores/color-mode-store"
 import { useVerificationStore } from "@/stores/verification-store"
 import type {
   VerificationErrorCode,
@@ -763,6 +767,7 @@ function AuthPanel({
 
 export function VerificationScreen() {
   const accentTheme = useAccentThemeStore((s) => s.theme)
+  const darkSurface = useColorModeStore((s) => s.darkSurface)
   const status = useVerificationStore((s) => s.status)
   const error = useVerificationStore((s) => s.error)
   const errorCode = useVerificationStore((s) => s.errorCode)
@@ -874,6 +879,7 @@ export function VerificationScreen() {
       id="bodyThemeContainer"
       className={cn(
         accentThemeClassName(accentTheme),
+        darkSurfaceClassName(darkSurface),
         "fixed inset-0 overflow-hidden bg-[var(--bg-deep)] text-foreground"
       )}
     >

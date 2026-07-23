@@ -80,6 +80,8 @@ export type KineticBackgroundKind =
   | "aurora"
   // Worship scenes (deterministic canvas ports of standalone HTML designs).
   | "cloth"
+  // KNFC premium-light verse stage: gradient, glow, conic shimmer, and stars.
+  | "stage"
 
 export type KineticPattern = "dot-grid" | "diagonal-stripes"
 

@@ -18,6 +18,10 @@ import {
 } from "@/stores/accent-theme-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
+import {
+  darkSurfaceClassName,
+  useColorModeStore,
+} from "@/stores/color-mode-store"
 
 const LazyHymnWorkspace = lazy(() =>
   import("@/components/hymnal/HymnWorkspace").then((mod) => ({
@@ -115,6 +119,7 @@ export function Dashboard() {
   const setWorkspace = useDashboardWorkspaceStore((s) => s.setWorkspace)
   const plannerOpen = useServicePlanStore((s) => s.plannerOpen)
   const accentTheme = useAccentThemeStore((s) => s.theme)
+  const darkSurface = useColorModeStore((s) => s.darkSurface)
   const hydrateAccent = useAccentThemeStore((s) => s.hydrate)
   const workspaceScrollRef = useRef<HTMLDivElement>(null)
 
@@ -205,6 +210,7 @@ export function Dashboard() {
       id="bodyThemeContainer"
       className={cn(
         accentThemeClassName(accentTheme),
+        darkSurfaceClassName(darkSurface),
         "fixed inset-0 overflow-hidden"
       )}
     >

@@ -437,23 +437,28 @@
   --accent-dark: #0369a1;
 }
 
-.dark #bodyThemeContainer.theme-obsidian {
+#bodyThemeContainer.theme-obsidian {
   --accent: #ff982b;
   --accent-glow: rgba(255, 152, 43, 0.45);
   --accent-border: rgba(245, 175, 55, 0.32);
   --accent-dark: #e07f16;
+}
+
+/* Obsidian surface: near-black shell and matte panels. Colour comes from the
+   selected accent, so the look holds for every accent instead of only amber. */
+.dark #bodyThemeContainer.surface-warm {
   --bg-deep: #000;
   --bg-base: #050505;
   --bg-surface: rgba(16, 16, 20, 0.78);
   --bg-elevated: rgba(12, 12, 16, 0.92);
   --shell-bg-sunken: rgba(8, 8, 11, 0.82);
-  --border-subtle: rgba(245, 175, 55, 0.18);
-  --border-dim: rgba(255, 195, 70, 0.32);
+  --border-subtle: color-mix(in srgb, var(--accent) 18%, transparent);
+  --border-dim: color-mix(in srgb, var(--accent) 32%, transparent);
   --text-primary: #f7f8fc;
   --text-secondary: #a0aabf;
   --text-muted: #717b92;
-  --gradient-warm: rgba(255, 120, 0, 0.22);
-  --gradient-cool: rgba(250, 185, 40, 0.18);
+  --gradient-warm: color-mix(in srgb, var(--accent) 22%, transparent);
+  --gradient-cool: color-mix(in srgb, var(--accent) 18%, transparent);
   --grain-opacity: 0.58;
   --panel-surface-matte: linear-gradient(
     180deg,
@@ -494,8 +499,6 @@
   --accent-glow: rgba(180, 83, 9, 0.18);
   --accent-border: rgba(180, 83, 9, 0.42);
   --accent-dark: #92400e;
-  --gradient-warm: rgba(201, 143, 29, 0.18);
-  --gradient-cool: rgba(24, 52, 96, 0.08);
 }
 
 .light #bodyThemeContainer.theme-emerald {
@@ -543,26 +546,33 @@
   transition: all 0.8s ease-in-out;
 }
 
-.dark #bodyThemeContainer.theme-obsidian::before {
+.dark #bodyThemeContainer.surface-warm::before {
   inset: -8%;
   background:
     radial-gradient(
       45% 45% at 18% 18%,
-      rgba(255, 120, 0, 0.22),
+      color-mix(in srgb, var(--accent) 22%, transparent),
       transparent 68%
     ),
     radial-gradient(
       52% 52% at 82% 28%,
-      rgba(250, 185, 40, 0.18),
+      color-mix(in srgb, var(--accent) 18%, transparent),
       transparent 70%
     ),
     radial-gradient(
       58% 58% at 48% 88%,
-      rgba(217, 119, 6, 0.15),
+      color-mix(in srgb, var(--accent-dark) 20%, transparent),
       transparent 72%
     ),
-    linear-gradient(rgba(245, 175, 55, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(245, 175, 55, 0.06) 1px, transparent 1px);
+    linear-gradient(
+      color-mix(in srgb, var(--accent) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 6%, transparent) 1px,
+      transparent 1px
+    );
   background-size:
     100% 100%,
     100% 100%,
@@ -633,7 +643,7 @@
   z-index: 2;
 }
 
-.dark #bodyThemeContainer.theme-obsidian .glass-panel {
+.dark #bodyThemeContainer.surface-warm .glass-panel {
   backdrop-filter: blur(18px) saturate(125%);
   border-color: var(--border-subtle);
 }
@@ -656,7 +666,7 @@
 }
 
 .dark
-  #bodyThemeContainer.theme-obsidian
+  #bodyThemeContainer.surface-warm
   [data-slot="live-output-panel"][data-live="true"]::before {
   height: 3px;
   background: linear-gradient(90deg, transparent, var(--accent), transparent);
@@ -664,7 +674,7 @@
 }
 
 .dark
-  #bodyThemeContainer.theme-obsidian
+  #bodyThemeContainer.surface-warm
   [data-slot="live-output-panel"][data-live="true"]
   [data-slot="live-output-stage"] {
   background:

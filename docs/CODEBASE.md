@@ -356,6 +356,14 @@ External services:
 
 Environments: development uses Vite/Tauri commands; release uses Tauri build and bundled public assets. Receipts: package.json:7, package.json:14, README.md:32.
 
+The desktop app installs as `SabbathCue Personal`, uses the distinct Tauri
+identifier `com.bongandlovu.sabbathcue.personal`, and builds the
+`SabbathCuePersonal` binary. This isolates it from the KNFC pilot's
+`SabbathCue` / `com.bongandlovu.sabbathcue` installation identity and WebView
+data directory. The unsigned local installer command is
+`npm.cmd run tauri:build:local`. Receipts: src-tauri/tauri.conf.json:3,
+src-tauri/tauri.conf.json:4, src-tauri/tauri.conf.json:6, package.json:14.
+
 ## 10 - Build, run & test - commands that actually ran
 ```bash
 npm.cmd run typecheck
@@ -388,6 +396,18 @@ npm.cmd run build
 # Result after implementation: passed; Vite reported existing large chunk warning class.
 # Result after church organization signup/profile implementation: passed; Vite reported the existing large chunk warning class.
 # Result after approved-computer activation hardening: passed; Vite reported the existing large chunk warning class.
+# Result after Personal identity and KNFC stage themes: passed; Vite reported the existing large chunk warning class.
+
+npm.cmd run test:unit -- src/lib/kinetic-themes.test.ts src/lib/kinetic-theme-renderer.test.ts
+# Result after KNFC stage-theme port: 2 files passed, 41 tests passed.
+
+npm.cmd run test:unit
+# Result after Personal identity and KNFC stage themes: 140 files passed,
+# 999 tests passed, 1 skipped.
+
+npm.cmd run tauri:build:local
+# Result: passed; produced SabbathCuePersonal.exe and
+# SabbathCue Personal_0.1.7_x64-setup.exe.
 
 git diff --check
 # Result after implementation: passed; Git reported line-ending notices only.
@@ -463,3 +483,6 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 | 2026-07-20 | Added asynchronous detection latency, candidate-switch stability, and semantic confirmation-latency measurements without retaining transcript or audio. | 6, 10, 11, 15 |
 | 2026-07-20 | Corrected the accuracy corpus to replay stable partial/final candidate pairs, retained the 90% release gate, and made the unsafe 85% comparison report-only. | 6, 10, 11, 15 |
 | 2026-07-22 | Added the opt-in obsidian operator accent, scoped dark/light atmosphere tokens, and token-driven confidence/meter/preview/live-state visuals without changing projector themes. | 3, 6, 15 |
+| 2026-07-23 | Fixed dangling cross-segment chapter parsing, synchronized semantic auto-live verses into reading-mode navigation, separated warm/charcoal dark surfaces from accent colors, and restored the Live Desk projector-setup entry point. | 3, 5, 6, 10, 15 |
+| 2026-07-23 | Isolated the desktop installation as SabbathCue Personal and ported the five KNFC stage kinetic themes with their canvas renderer and regression coverage. | 3, 6, 9, 10, 15 |
+| 2026-07-23 | Restored the obsidian accent so it stays amber when selected, made both dark surfaces derive their atmosphere from the active accent, applied the surface class to the verification screen, and removed the duplicate Live Desk projector button (the header entry point at app-controller-header.tsx:138 is the only one). | 3, 6, 15 |

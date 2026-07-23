@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ThemeSection } from "./ThemeSection"
+import { useColorModeStore } from "@/stores/color-mode-store"
 
 const mockSetWorkspace = vi.hoisted(() => vi.fn())
 const mockSetDesignerOpen = vi.hoisted(() => vi.fn())
@@ -25,6 +26,7 @@ vi.mock("@/components/broadcast/theme-designer", () => ({
 describe("ThemeSection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    useColorModeStore.setState({ darkSurface: "charcoal" })
   })
 
   afterEach(() => cleanup())
@@ -43,5 +45,23 @@ describe("ThemeSection", () => {
     fireEvent.click(screen.getByRole("button", { name: /Open theme designer/ }))
 
     expect(mockSetDesignerOpen).toHaveBeenCalledWith(true)
+  })
+
+  it("keeps charcoal and warm obsidian mutually exclusive", () => {
+    render(<ThemeSection />)
+
+    fireEvent.click(screen.getByRole("switch", { name: "Warm obsidian dark mode" }))
+
+    expect(useColorModeStore.getState().darkSurface).toBe("warm")
+    expect(
+      screen
+        .getByRole("switch", { name: "Warm obsidian dark mode" })
+        .getAttribute("aria-checked")
+    ).toBe("true")
+    expect(
+      screen
+        .getByRole("switch", { name: "Charcoal dark mode" })
+        .getAttribute("aria-checked")
+    ).toBe("false")
   })
 })

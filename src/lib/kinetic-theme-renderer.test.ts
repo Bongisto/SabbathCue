@@ -179,6 +179,25 @@ describe("drawKineticBackground", () => {
     expect(r.arcs).toBe(0)
   })
 
+  it("draws the KNFC verse stage and reports handled", () => {
+    const r = createRecorder()
+    const drew = drawKineticBackground(r.ctx, preset("stage-navy"), 0)
+    expect(drew).toBe(true)
+    expect(r.linear.length).toBeGreaterThan(0)
+    expect(r.radial.length).toBeGreaterThan(0)
+    expect(r.arcs).toBeGreaterThan(50)
+  })
+
+  it("verse stage is deterministic and works without createConicGradient", () => {
+    const a = createRecorder()
+    const b = createRecorder()
+    expect(drawKineticBackground(a.ctx, preset("stage-teal"), 4000)).toBe(true)
+    expect(drawKineticBackground(b.ctx, preset("stage-teal"), 4000)).toBe(true)
+    expect(a.radial).toEqual(b.radial)
+    expect(a.linear).toEqual(b.linear)
+    expect(a.arcArgs).toEqual(b.arcArgs)
+  })
+
   it("draws the desert cloth scene and reports handled", () => {
     const r = createRecorder()
     const drew = drawKineticBackground(r.ctx, preset("desert-cloth"), 0)

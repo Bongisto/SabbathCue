@@ -62,6 +62,127 @@ fn semantic_index_sanity_check(
     }
 }
 
+/// Load the ONNX embedder and the pre-computed verse index into the shared
+/// pipeline.
+///
+/// Runs off the setup hook: the model plus a ~91 MB embedding file take long
+/// enough that doing this inline delays the event loop, and nothing needs it
+/// to start — the pipeline serves direct detection from its stub semantic
+/// detector until this swaps in the real one.
+#[expect(clippy::too_many_lines, reason = "candidate resolution kept in one flow")]
+fn load_semantic_assets(app: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    let model_path = asset_paths::onnx_model_path(app);
+    let tokenizer_path = asset_paths::tokenizer_path(app);
+    let embedding_candidates = asset_paths::semantic_embedding_candidates(app);
+
+    log::info!("Resolved ONNX model path: {}", model_path.display());
+    log::info!("Resolved tokenizer path: {}", tokenizer_path.display());
+    for (embeddings, ids) in &embedding_candidates {
+        log::info!(
+            "Embeddings candidate: {} (ids={})",
+            embeddings.display(),
+            ids.display()
+        );
+    }
+
+    if !model_path.exists() || !tokenizer_path.exists() {
+        log::info!(
+            "ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download."
+        );
+        return;
+    }
+
+    let embedder = match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
+        Ok(embedder) => {
+            log::info!("ONNX embedding model loaded");
+            embedder
+        }
+        Err(e) => {
+            log::warn!("Failed to load ONNX model: {e}");
+            return;
+        }
+    };
+
+    if embedding_candidates.is_empty() {
+        log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
+    }
+
+    // Walk the candidates in resolution order; the first pair that loads AND
+    // passes the sanity check wins. A stale app-data file must not disable
+    // vector search while a healthy bundled/dev copy exists.
+    let dim = embedder.dimension();
+    let mut healthy_index = None;
+    for (embeddings_path, ids_path) in &embedding_candidates {
+        if !asset_paths::semantic_assets_are_compatible(
+            &model_path,
+            &tokenizer_path,
+            embeddings_path,
+            ids_path,
+        ) {
+            log::warn!(
+                "Skipping embeddings candidate from a different model family: {}",
+                embeddings_path.display()
+            );
+            continue;
+        }
+        match rhema_detection::HnswVectorIndex::load(embeddings_path, ids_path, dim) {
+            Ok(index) => match semantic_index_sanity_check(&embedder, &index) {
+                Ok(similarity) => {
+                    log::info!(
+                        "Resolved embeddings path: {} (sanity check passed, self-similarity {similarity:.3})",
+                        embeddings_path.display()
+                    );
+                    healthy_index = Some((index, embeddings_path.clone()));
+                    break;
+                }
+                Err(reason) => {
+                    log::error!(
+                        "Embeddings candidate failed sanity check, trying next: {reason} (embeddings={})",
+                        embeddings_path.display()
+                    );
+                }
+            },
+            Err(e) => {
+                log::warn!(
+                    "Failed to load verse embeddings from {}: {e}",
+                    embeddings_path.display()
+                );
+            }
+        }
+    }
+
+    let Some((index, embeddings_path)) = healthy_index else {
+        if !embedding_candidates.is_empty() {
+            log::error!(
+                "SEMANTIC VECTOR SEARCH DISABLED — no embeddings candidate passed the sanity check; \
+                 regenerate with `bun run precompute:embeddings`"
+            );
+        }
+        return;
+    };
+
+    let semantic_corpus = if embeddings_path.file_name().and_then(|name| name.to_str())
+        == Some(asset_paths::PREFERRED_EMBEDDINGS_FILENAME)
+    {
+        "public-domain multi-vector corpus"
+    } else {
+        "KJV canonical legacy"
+    };
+    log::info!(
+        "Verse embeddings loaded ({} vectors, corpus={semantic_corpus}; semantic hits resolve to active translation)",
+        index.len(),
+    );
+
+    let semantic = rhema_detection::SemanticDetector::new(Box::new(embedder), Box::new(index));
+    let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
+    match managed_pipeline.lock() {
+        Ok(mut pipeline) => pipeline.set_semantic(semantic),
+        Err(_) => log::error!("Detection pipeline lock poisoned; semantic search stays disabled"),
+    };
+}
+
 #[expect(clippy::too_many_lines, reason = "app setup is inherently complex")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -116,6 +237,7 @@ pub fn run() {
             commands::detection::toggle_paraphrase_detection,
             commands::detection::reading_mode_status,
             commands::detection::stop_reading_mode,
+            commands::detection::set_reading_mode_reference,
             commands::detection::update_detection_settings,
             commands::detection::set_detection_paused,
             commands::detection::detection_control_status,
@@ -236,111 +358,8 @@ pub fn run() {
                 log::warn!("Bible database not found at {}", db_path.display());
             }
 
-            let model_path = asset_paths::onnx_model_path(app.handle());
-            let tokenizer_path = asset_paths::tokenizer_path(app.handle());
-            let embedding_candidates = asset_paths::semantic_embedding_candidates(app.handle());
-
-            log::info!("Resolved ONNX model path: {}", model_path.display());
-            log::info!("Resolved tokenizer path: {}", tokenizer_path.display());
-            for (embeddings, ids) in &embedding_candidates {
-                log::info!(
-                    "Embeddings candidate: {} (ids={})",
-                    embeddings.display(),
-                    ids.display()
-                );
-            }
-
-            if model_path.exists() && tokenizer_path.exists() {
-                match rhema_detection::OnnxEmbedder::load(&model_path, &tokenizer_path) {
-                    Ok(embedder) => {
-                        log::info!("ONNX embedding model loaded");
-                        let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
-                        let mut pipeline = managed_pipeline
-                            .lock()
-                            .map_err(|_| poisoned_lock_error("Detection pipeline"))?;
-
-                        if embedding_candidates.is_empty() {
-                            log::info!("No pre-computed verse embeddings found. Run 'bun run export:verses' then the precompute binary.");
-                        }
-
-                        // Walk the candidates in resolution order; the first
-                        // pair that loads AND passes the sanity check wins. A
-                        // stale app-data file must not disable vector search
-                        // while a healthy bundled/dev copy exists.
-                        let dim = embedder.dimension();
-                        let mut healthy_index = None;
-                        for (embeddings_path, ids_path) in &embedding_candidates {
-                            if !asset_paths::semantic_assets_are_compatible(
-                                &model_path,
-                                &tokenizer_path,
-                                embeddings_path,
-                                ids_path,
-                            ) {
-                                log::warn!(
-                                    "Skipping embeddings candidate from a different model family: {}",
-                                    embeddings_path.display()
-                                );
-                                continue;
-                            }
-                            match rhema_detection::HnswVectorIndex::load(embeddings_path, ids_path, dim) {
-                                Ok(index) => match semantic_index_sanity_check(&embedder, &index) {
-                                    Ok(similarity) => {
-                                        log::info!(
-                                            "Resolved embeddings path: {} (sanity check passed, self-similarity {similarity:.3})",
-                                            embeddings_path.display()
-                                        );
-                                        healthy_index = Some((index, embeddings_path.clone()));
-                                        break;
-                                    }
-                                    Err(reason) => {
-                                        log::error!(
-                                            "Embeddings candidate failed sanity check, trying next: {reason} (embeddings={})",
-                                            embeddings_path.display()
-                                        );
-                                    }
-                                },
-                                Err(e) => {
-                                    log::warn!(
-                                        "Failed to load verse embeddings from {}: {e}",
-                                        embeddings_path.display()
-                                    );
-                                }
-                            }
-                        }
-
-                        if let Some((index, embeddings_path)) = healthy_index {
-                            let semantic_corpus = if embeddings_path
-                                .file_name()
-                                .and_then(|name| name.to_str())
-                                == Some(asset_paths::PREFERRED_EMBEDDINGS_FILENAME)
-                            {
-                                "public-domain multi-vector corpus"
-                            } else {
-                                "KJV canonical legacy"
-                            };
-                            log::info!(
-                                "Verse embeddings loaded ({} vectors, corpus={semantic_corpus}; semantic hits resolve to active translation)",
-                                index.len(),
-                            );
-                            let semantic = rhema_detection::SemanticDetector::new(
-                                Box::new(embedder),
-                                Box::new(index),
-                            );
-                            pipeline.set_semantic(semantic);
-                        } else if !embedding_candidates.is_empty() {
-                            log::error!(
-                                "SEMANTIC VECTOR SEARCH DISABLED — no embeddings candidate passed the sanity check; \
-                                 regenerate with `bun run precompute:embeddings`"
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!("Failed to load ONNX model: {e}");
-                    }
-                }
-            } else {
-                log::info!("ONNX model not found. Semantic search disabled. Run 'bun run download:model' to download.");
-            }
+            let semantic_app = app.handle().clone();
+            std::thread::spawn(move || load_semantic_assets(&semantic_app));
 
             Ok(())
         })

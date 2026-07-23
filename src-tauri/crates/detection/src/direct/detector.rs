@@ -999,7 +999,13 @@ impl DirectDetector {
                     let starts_with_verse_keyword = after_book_lower.starts_with("verse");
                     let mut has_explicit_chapter = after_book
                         .starts_with(|c: char| c.is_ascii_digit())
-                        || after_book_lower.starts_with("chapter");
+                        || matches!(
+                            parser::try_extract_continuation(after_book, true),
+                            Some(
+                                parser::Continuation::ChapterAndVerse(..)
+                                    | parser::Continuation::ChapterOnly(_)
+                            )
+                        );
 
                     // A bare re-mention of a book (no chapter spoken) must not
                     // clobber a chapter already established for the same book.
@@ -2490,10 +2496,7 @@ mod tests {
         let mut detector = DirectDetector::new();
 
         let results = detector.detect("daniel chapter");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_chapter_only);
-        assert_eq!(results[0].verse_ref.book_name, "Daniel");
-        assert_eq!(results[0].verse_ref.chapter, 1);
+        assert!(results.is_empty());
         assert!(detector.incomplete.is_some());
 
         let results = detector.detect("1 verse 5");
@@ -2502,6 +2505,20 @@ mod tests {
         assert_eq!(results[0].verse_ref.book_name, "Daniel");
         assert_eq!(results[0].verse_ref.chapter, 1);
         assert_eq!(results[0].verse_ref.verse_start, 5);
+    }
+
+    #[test]
+    fn transcript_philippians_dangling_chapter_then_four_verse_six() {
+        let mut detector = DirectDetector::new();
+
+        let first = detector.detect("okay and then let's go to philippians chapter");
+        assert!(first.is_empty());
+
+        let results = detector.detect("4 verse 6");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verse_ref.book_name, "Philippians");
+        assert_eq!(results[0].verse_ref.chapter, 4);
+        assert_eq!(results[0].verse_ref.verse_start, 6);
     }
 
     #[test]
