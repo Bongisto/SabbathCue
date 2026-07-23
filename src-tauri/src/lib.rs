@@ -116,6 +116,7 @@ pub fn run() {
             commands::detection::toggle_paraphrase_detection,
             commands::detection::reading_mode_status,
             commands::detection::stop_reading_mode,
+            commands::detection::set_reading_mode_reference,
             commands::detection::update_detection_settings,
             commands::detection::set_detection_paused,
             commands::detection::detection_control_status,

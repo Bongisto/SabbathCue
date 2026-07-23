@@ -1,5 +1,6 @@
 import { bibleActions } from "@/hooks/use-bible"
 import { toVerseRenderData } from "@/hooks/use-broadcast"
+import { invokeTauri } from "@/lib/tauri-runtime"
 import { useBibleStore } from "@/stores/bible-store"
 import { getBroadcastLiveStore } from "@/stores/broadcast/live-store"
 import type {
@@ -202,6 +203,14 @@ export function previewVerseAndMaybeAutoLive(
       verse: traceVerseDetails(verse),
     })
     commitVerseToLive(verse, { makeLive: true })
+    void invokeTauri("set_reading_mode_reference", {
+      bookNumber: verse.book_number,
+      bookName: verse.book_name,
+      chapter: verse.chapter,
+      verse: verse.verse,
+    }).catch((error) => {
+      console.warn("[reading-mode] Could not align live verse context", error)
+    })
   }
 
   selectPreviewVerse(verse, { navigate: options?.navigate })

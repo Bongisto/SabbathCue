@@ -797,6 +797,23 @@ pub fn try_extract_continuation(text: &str, is_book_only: bool) -> Option<Contin
         return None;
     }
 
+    // A pending book-only fragment followed by "N verse M" supplies both
+    // missing values. Parse the leading number as the chapter before the
+    // generic "verse M" scan can classify the fragment as verse-only.
+    if is_book_only {
+        if let Some((chapter, next_idx)) = consume_number_at(&tokens, 0) {
+            if matches!(tokens.get(next_idx), Some(Token::Word(word)) if is_verse_keyword(word)) {
+                if let Some((verse, verse_next)) = corrected_number_after(&tokens, next_idx + 1) {
+                    return Some(Continuation::ChapterAndVerse(
+                        chapter,
+                        verse,
+                        scan_verse_end(&tokens, verse_next),
+                    ));
+                }
+            }
+        }
+    }
+
     // Pattern 1: "chapter N [... verse M]"
     if let Some(continuation) = find_chapter_keyword_pattern(&tokens) {
         return Some(continuation);
@@ -1383,6 +1400,14 @@ mod tests {
         assert_eq!(
             try_extract_continuation("3 verse", true),
             Some(Continuation::ChapterOnly(3))
+        );
+    }
+
+    #[test]
+    fn test_continuation_number_verse_number_after_book_only_sets_both() {
+        assert_eq!(
+            try_extract_continuation("4 verse 6", true),
+            Some(Continuation::ChapterAndVerse(4, 6, None))
         );
     }
 
