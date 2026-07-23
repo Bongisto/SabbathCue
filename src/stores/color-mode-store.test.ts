@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   COLOR_MODE_STORAGE_KEY,
+  DARK_SURFACE_STORAGE_KEY,
   useColorModeStore,
   type ColorMode,
 } from "./color-mode-store"
@@ -37,6 +38,7 @@ function resetStore(mode: ColorMode = "dark") {
   })
   useColorModeStore.setState({
     mode,
+    darkSurface: "charcoal",
   })
 }
 
@@ -79,6 +81,28 @@ describe("color mode store", () => {
 
     expect(useColorModeStore.getState().mode).toBe("light")
     expect(classList.contains("light")).toBe(true)
+  })
+
+  it("persists one mutually exclusive dark surface", () => {
+    useColorModeStore.getState().setDarkSurface("warm")
+    expect(useColorModeStore.getState().darkSurface).toBe("warm")
+    expect(storage.get(DARK_SURFACE_STORAGE_KEY)).toBe("warm")
+
+    useColorModeStore.getState().setDarkSurface("charcoal")
+    expect(useColorModeStore.getState().darkSurface).toBe("charcoal")
+    expect(storage.get(DARK_SURFACE_STORAGE_KEY)).toBe("charcoal")
+  })
+
+  it("hydrates the warm surface independently of color mode", () => {
+    storage.set(COLOR_MODE_STORAGE_KEY, "dark")
+    storage.set(DARK_SURFACE_STORAGE_KEY, "warm")
+
+    useColorModeStore.getState().hydrate()
+
+    expect(useColorModeStore.getState()).toMatchObject({
+      mode: "dark",
+      darkSurface: "warm",
+    })
   })
 
   it("falls back to dark when storage is unavailable", () => {
