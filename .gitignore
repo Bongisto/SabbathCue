@@ -50,6 +50,8 @@ models/*
 sidecars/*
 !sidecars/.gitkeep
 .env
+vercel.production.env
+vercel.production.import.env
 .venv/
 .superpowers/
 embeddings/*
@@ -78,3 +80,5 @@ playwright-report/
 blob-report/
 
 test-results/
+.vercel
+.env*
