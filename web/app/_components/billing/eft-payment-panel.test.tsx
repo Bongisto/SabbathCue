@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createElement } from "react"
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -15,9 +16,8 @@ vi.mock("../ui/button", () => ({
     children?: unknown
   }) =>
     href
-      ? // eslint-disable-next-line jsx-a11y/anchor-is-valid
-        require("react").createElement("a", { href }, children)
-      : require("react").createElement("button", null, children),
+      ? createElement("a", { href }, children)
+      : createElement("button", null, children),
 }))
 
 vi.mock("../../_lib/eft-payment", () => ({

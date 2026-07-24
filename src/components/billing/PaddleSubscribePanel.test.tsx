@@ -13,6 +13,7 @@ vi.mock("@/lib/paddle/checkout", () => ({
 
 vi.mock("@/lib/paddle/client", () => ({
   getPaddleInstance: vi.fn().mockResolvedValue({}),
+  setPaddleCustomerIdForInit: vi.fn(),
 }))
 
 vi.mock("@/lib/paddle/config", () => ({
@@ -20,8 +21,14 @@ vi.mock("@/lib/paddle/config", () => ({
   isYearlyCheckoutAvailable: () => mockIsYearlyCheckoutAvailable(),
 }))
 
+// The panel's mount effect awaits fetchMyBillingSummary before it flips to
+// ready, so omitting it here leaves the subscribe button permanently disabled.
 vi.mock("@/lib/supabase/billing", () => ({
   ensureFreshAuthSession: vi.fn().mockResolvedValue(true),
+  fetchMyBillingSummary: vi.fn().mockResolvedValue({
+    ok: true,
+    summary: { paddleCustomerId: null },
+  }),
 }))
 
 vi.mock("sonner", () => ({
