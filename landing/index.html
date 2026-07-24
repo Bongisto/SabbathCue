@@ -403,7 +403,9 @@ footer a:hover{color:var(--paper)}
 .price-name{font-family:var(--mono);font-size:.7rem;letter-spacing:.24em;color:var(--slate-dim);text-transform:uppercase}
 .price-amount{font-family:var(--display);font-weight:300;font-size:clamp(2.2rem,5vw,3rem);line-height:1;color:var(--paper)}
 .price-amount span{font-family:var(--mono);font-size:.8rem;letter-spacing:.1em;color:var(--slate);margin-left:8px}
-.price-card .btn{width:100%;justify-content:center;margin-top:auto}
+.price-card .btn{width:100%;justify-content:center}
+.price-actions{display:flex;flex-direction:column;gap:12px;margin-top:auto;width:100%}
+.price-actions .btn{margin-top:0}
 .price-sub{font-size:.85rem;color:var(--slate)}
 .price-foot{text-align:center;margin-top:28px;font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;color:var(--slate-dim)}
 
@@ -492,7 +494,7 @@ footer a:hover{color:var(--paper)}
       <a class="btn btn-gold" href="#download">Start 14-day free trial</a>
       <a class="btn btn-ghost" href="#how">See how it works</a>
     </div>
-    <p class="trial-note stage d4">14-day free trial · no card required · Afrikaans workflow coming soon · then R300/mo or R3,000/yr</p>
+    <p class="trial-note stage d4">14-day free trial · no card required · Afrikaans workflow coming soon · then R200/mo or R2,000/yr</p>
 
     <!-- signature: live demo console -->
     <div class="console stage d5" id="demo" aria-label="Live demonstration of SabbathCue detecting a verse">
@@ -707,22 +709,27 @@ footer a:hover{color:var(--paper)}
     <div class="sec-head reveal">
       <p class="eyebrow">Simple pricing</p>
       <h2>Start free for 14 days. <em>Keep going for the price of a coffee run.</em></h2>
-      <p>Every plan starts with a full 14-day free trial — no card required. Current renewal options are R300/month or R3,000/year. The annual plan saves R600 versus 12 monthly payments, which equals two monthly payments. Cancellation stops renewal/access after the paid period; current paid periods are not refunded.</p>
+      <p>Every plan starts with a full 14-day free trial — no card required. Current renewal options are R200/month or R2,000/year. The annual plan saves R400 versus 12 monthly payments, which equals two monthly payments. Cancellation stops renewal/access after the paid period; current paid periods are not refunded.</p>
     </div>
     <div class="price-grid">
       <div class="price-card reveal">
         <p class="price-name">Standard</p>
-        <p class="price-amount">R300 <span>/ month</span></p>
+        <p class="price-amount">R200 <span>/ month</span></p>
         <p class="price-sub">Billed monthly. Cancel renewal anytime; no refunds for the current paid period. Access continues until the subscribed period ends. Activate up to two approved computers, with self-service deactivation.</p>
-        <a class="btn btn-ghost" href="#download">Start 14-day free trial</a>
+        <div class="price-actions">
+          <a class="btn btn-ghost" href="#download">Start 14-day free trial</a>
+          <a class="btn btn-gold" href="/pricing/">Subscribe monthly</a>
+        </div>
       </div>
       <div class="price-card featured reveal">
         <span class="price-tag">Best value · 2 months free</span>
         <p class="price-name">Annual</p>
-        <p class="price-amount">R3,000 <span>/ year</span></p>
-        <p class="price-sub">Billed yearly — R3,000 instead of R3,600 for 12 monthly payments, so the R600 saving equals two months free. Cancel renewal anytime; no refunds for the current paid period. Access continues until the subscribed period ends.</p>
-        <a class="btn btn-gold" href="#download">Start 14-day free trial</a>
-      </div>
+        <p class="price-amount">R2,000 <span>/ year</span></p>
+        <p class="price-sub">Billed yearly — R2,000 instead of R2,400 for 12 monthly payments, so the R400 saving equals two months free. Cancel renewal anytime; no refunds for the current paid period. Access continues until the subscribed period ends.</p>
+        <div class="price-actions">
+          <a class="btn btn-ghost" href="#download">Start 14-day free trial</a>
+          <a class="btn btn-gold" href="/pricing/?interval=year">Subscribe yearly</a>
+        </div>
     </div>
     <p class="price-foot">14-day free trial · no card required · cancellation stops renewal, not the current paid period</p>
   </section>
@@ -760,7 +767,11 @@ footer a:hover{color:var(--paper)}
   <span>SabbathCue — AI-assisted Bible, Ellen G. White, and hymn workflows for live HDMI/projector display.</span>
   <div class="f-links">
     <a href="#pricing">Pricing</a>
+    <a href="/pricing/">Subscribe</a>
     <a href="#help">Support</a>
+    <a href="/terms/">Terms</a>
+    <a href="/privacy/">Privacy</a>
+    <a href="/refund/">Refund</a>
     <a href="mailto:fanelesibonge50@gmail.com?subject=SabbathCue%20support%20request">Email</a>
   </div>
 </footer>

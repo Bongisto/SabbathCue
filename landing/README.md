@@ -14,24 +14,35 @@ python -m http.server 8000
 
 ## Deploy to Vercel
 
-This folder is a standalone static site, separate from the Next.js site in
-`web/` (which deploys to GitHub Pages) and the Tauri app at the repo root.
+This folder is the **marketing homepage** for [sabbath-cue-two.vercel.app](https://sabbath-cue-two.vercel.app/).
+Paddle checkout lives in `web/` and is merged at deploy time by the repo root build
+(`npm run build:vercel`): your landing HTML stays at `/`, while `/pricing/`, `/pay/`,
+and `/welcome/` come from the Next.js static export.
 
-### Option A — Vercel dashboard
+Set these **Vercel project environment variables** (Production) before deploying:
+
+- `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` — sandbox `test_...` until live verification, then `live_...`
+- `NEXT_PUBLIC_PADDLE_ENV` — `sandbox` or `production`
+- `NEXT_PUBLIC_PADDLE_PRICE_PRO_MONTH` / `NEXT_PUBLIC_PADDLE_PRICE_PRO_YEAR`
+- `NEXT_PUBLIC_SITE_ORIGIN` — `https://sabbath-cue-two.vercel.app`
+- `NEXT_PUBLIC_BASE_PATH` — leave empty (root deploy)
+
+Paddle **default payment link** (Checkout → Checkout settings):
+
+`https://sabbath-cue-two.vercel.app/pay/`
+
+### Option A — Vercel dashboard (recommended)
 
 1. Import the GitHub repo at <https://vercel.com/new>.
-2. Set **Root Directory** to `landing`.
-3. **Framework Preset**: Other. Leave build & output commands empty
-   (it's a static site — no build step).
-4. Deploy.
+2. Leave **Root Directory** at the repo root (not `landing/`).
+3. **Framework Preset**: Other. Build command `npm run build:vercel`, output `dist`.
+4. Add the Paddle env vars above, then deploy.
 
 ### Option B — Vercel CLI
 
 ```bash
-cd landing
 vercel        # preview deploy
 vercel --prod # production deploy
 ```
 
-When the CLI asks, set the root directory to the current folder and skip the
-build command.
+When the CLI asks, use the **repo root** as the project directory.

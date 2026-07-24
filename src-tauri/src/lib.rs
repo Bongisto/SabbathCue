@@ -69,7 +69,6 @@ fn semantic_index_sanity_check(
 /// enough that doing this inline delays the event loop, and nothing needs it
 /// to start — the pipeline serves direct detection from its stub semantic
 /// detector until this swaps in the real one.
-#[expect(clippy::too_many_lines, reason = "candidate resolution kept in one flow")]
 fn load_semantic_assets(app: &tauri::AppHandle) {
     use tauri::Manager;
 

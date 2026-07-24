@@ -120,6 +120,13 @@ export async function signUpWithEmail(
 
     await setRefreshToken(data.session.refresh_token)
 
+    if (data.session.access_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+    }
+
     return {
       ok: true,
       needsEmailConfirmation: false,
@@ -162,6 +169,13 @@ export async function signInWithEmail(email: string, password: string): Promise<
     }
 
     await setRefreshToken(refreshToken)
+
+    if (data.session?.access_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: refreshToken,
+      })
+    }
 
     return {
       ok: true,
@@ -251,6 +265,13 @@ export async function restoreSession(): Promise<RestoreSessionResult> {
     }
 
     await setRefreshToken(rotatedToken)
+
+    if (data.session?.access_token && data.session.refresh_token) {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+    }
 
     return {
       ok: true,

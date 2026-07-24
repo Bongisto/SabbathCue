@@ -17,25 +17,43 @@ export function PricingSection() {
           <SectionHeading id="pricing-heading">Pricing</SectionHeading>
         </Reveal>
         <Reveal>
-          <div className="flex flex-col gap-6 border border-border-strong p-8 md:p-10">
-            <div className="flex flex-col gap-2">
-              <p className="text-[34px] font-medium leading-none tracking-[-0.04em] text-foreground">
-                Free
-              </p>
-              <p className="max-w-[1080px] text-lg leading-8 text-muted-foreground lg:text-2xl">
-                SabbathCue is a gift from us to help church display scripture
-                effortlessly during every sermon.
-              </p>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="flex flex-col gap-6 border border-border-strong p-8 md:p-10">
+              <div className="flex flex-col gap-2">
+                <p className="text-[34px] font-medium leading-none tracking-[-0.04em] text-foreground">
+                  14-day trial
+                </p>
+                <p className="text-lg leading-8 text-muted-foreground lg:text-xl">
+                  Create an account in the desktop app to try SabbathCue free for
+                  two weeks.
+                </p>
+              </div>
+              <div>
+                <Button
+                  href={downloadLink.href}
+                  target={downloadLink.target}
+                  download={downloadLink.download}
+                  variant="primary"
+                >
+                  Download
+                </Button>
+              </div>
             </div>
-            <div>
-              <Button
-                href={downloadLink.href}
-                target={downloadLink.target}
-                download={downloadLink.download}
-                variant="primary"
-              >
-                Download
-              </Button>
+            <div className="flex flex-col gap-6 border border-border-strong p-8 md:p-10">
+              <div className="flex flex-col gap-2">
+                <p className="text-[34px] font-medium leading-none tracking-[-0.04em] text-foreground">
+                  Subscription
+                </p>
+                <p className="text-lg leading-8 text-muted-foreground lg:text-xl">
+                  After your trial, renew access with Paddle checkout from the
+                  app or on the web.
+                </p>
+              </div>
+              <div>
+                <Button href="/pricing/" variant="secondary">
+                  View pricing
+                </Button>
+              </div>
             </div>
           </div>
         </Reveal>

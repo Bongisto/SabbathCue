@@ -9,12 +9,17 @@ const webRoot = fileURLToPath(new URL(".", import.meta.url));
 // on Windows shells with restricted parent-directory access.
 process.env._FUMADOCS_MDX = "1";
 
+/** GitHub Pages uses /SabbathCue; Vercel production sets NEXT_PUBLIC_BASE_PATH="". */
+const basePath =
+  process.env.NEXT_PUBLIC_BASE_PATH !== undefined
+    ? process.env.NEXT_PUBLIC_BASE_PATH.trim()
+    : "/SabbathCue";
+
 const nextConfig: NextConfig = {
   output: "export",
-  // Served as a GitHub Pages project site under /SabbathCue/. Next prefixes
-  // routes and next/image automatically; CSS url() values and manifest.ts
-  // do NOT get rewritten and carry the prefix by hand.
-  basePath: "/SabbathCue",
+  // Next prefixes routes and next/image automatically; CSS url() values and
+  // manifest.ts do NOT get rewritten and carry the prefix by hand.
+  basePath,
   trailingSlash: true,
   // The default next/image loader requires a server runtime; with
   // output: "export" we ship every image through the static pipeline,

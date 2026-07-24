@@ -4,7 +4,7 @@
 //! model/index files the app loads.
 //!
 //! Usage (from src-tauri):
-//!   cargo run -p rhema-detection --features precompute-bin --bin live_probe -- \
+//!   cargo run -p rhema-detection --features precompute-bin --bin `live_probe` -- \
 //!     --model ../models/minilm-l6-v2-int8/onnx/model_quantized.onnx \
 //!     --tokenizer ../models/minilm-l6-v2/tokenizer.json \
 //!     --embeddings ../embeddings/kjv-nkjv-nlt-minilm-l6-v2.bin \

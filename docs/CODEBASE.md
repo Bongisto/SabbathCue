@@ -138,6 +138,36 @@ as blocking responses
   -> src/lib/verification/verification-provider.ts:374
 ```
 
+### Flow: Paddle subscription billing and access synchronization
+```text
+Authenticated checkout sends the account email plus Supabase user ID as Paddle custom data
+  -> src/lib/paddle/checkout.ts:28
+Paddle webhook verifies the RAW signed body (text, never JSON.parse-first) with
+PADDLE_NOTIFICATION_WEBHOOK_SECRET via paddle.webhooks.unmarshal, then routes
+customer/subscription/transaction.completed events to service-role RPCs
+  -> supabase/functions/paddle-webhook/index.ts
+Database RPCs claim the event and mutate mirrored state in one transaction, retain
+Paddle occurred_at ordering, and leave failed claims retryable
+  -> supabase/migrations/010_paddle_billing.sql:296
+  -> supabase/migrations/011_paddle_transaction_and_scheduled_action.sql
+Subscription changes recalculate account access across every eligible subscription
+(active|trialing|past_due); scheduled cancel/pause does not revoke while status stays active
+  -> supabase/migrations/010_paddle_billing.sql:122
+  -> src/lib/paddle/access.ts
+Marketing-site buyers who pay before signing up are claimed by email when the
+account is created, since web checkout carries no Supabase user ID
+  -> supabase/migrations/010_paddle_billing.sql:181
+Authenticated billing summaries resolve nullable customer/subscription state without
+exposing the RLS-protected mirror tables directly
+  -> supabase/migrations/010_paddle_billing.sql:398
+  -> supabase/migrations/011_paddle_transaction_and_scheduled_action.sql (scheduled_change_action)
+Customer portal: auth first, resolve paddle_customers by user_id/email server-side,
+mint portal session with PADDLE_API_KEY (never trust a client-supplied customer id)
+  -> supabase/functions/paddle-portal/index.ts
+  -> src/lib/supabase/billing.ts (createCustomerPortalSession)
+  -> src/components/billing/ManageSubscriptionButton.tsx
+```
+
 ### Flow: STT provider selection
 ```text
 Settings store type allows deepgram, soniox, speechmatics, vosk
@@ -319,6 +349,9 @@ Build script imports the generated JSON into egw_books / egw_paragraphs
 | Account flags | Supabase Postgres | user_id, access_expires_at, suspended, is_church_organization, church_name | Auth user, registered devices, admin account list | supabase/migrations/008_church_organization_profiles.sql:4 |
 | Device activations | Supabase Postgres | user_id, device_id, public_key, status, first/last seen, approved/revoked timestamps | Account, installation identity, admin/user management | supabase/migrations/009_device_activation_management.sql:4 |
 | Signed activation lease | Tauri store, verified against build-time public key | payload, signature, user/device binding, issued/expires/access expiry | Offline verification session | src/lib/verification/activation-lease.ts:1, src/lib/verification/session-storage.ts:21 |
+| Paddle customer mirror | Supabase Postgres | customer_id, email, user_id, last event time | Auth user and Paddle subscriptions | supabase/migrations/010_paddle_billing.sql:4 |
+| Paddle subscription mirror | Supabase Postgres | subscription/customer IDs, status, price/product, billing period, scheduled change, last event time | Customer mirror and account access | supabase/migrations/010_paddle_billing.sql:19 |
+| Paddle webhook ledger | Supabase Postgres | event ID/type, occurred/received/processed timestamps | Atomic webhook deduplication and retry recovery | supabase/migrations/010_paddle_billing.sql:38 |
 
 Account/access schema changes are versioned in `/supabase/migrations`; migration 008 extends the existing trial/device/admin RPC contract with the optional church organization profile. Receipt: supabase/migrations/008_church_organization_profiles.sql:1.
 
@@ -338,6 +371,7 @@ External services:
 | Vosk | Local STT worker/model | healthy | src-tauri/crates/stt/src/lib.rs:39 |
 | Supabase | Account auth, trial/device access, optional church profile, admin account listing | critical | src/lib/supabase/client.ts:6, supabase/migrations/008_church_organization_profiles.sql:23 |
 | Supabase Edge Function | Installation proof verification and signed activation lease issuance | critical | supabase/functions/device-activation/index.ts:178 |
+| Paddle Billing | Checkout, customer portal, signed webhook subscription mirror, and access renewal | critical | src/lib/paddle/checkout.ts:28, supabase/functions/paddle-webhook/index.ts:139 |
 
 ## 9 - Configuration & environments
 | Variable / setting | Purpose | Required | Default | Read at |
@@ -353,6 +387,7 @@ External services:
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Supabase account/auth client | required for account-enabled builds | absent | src/lib/supabase/client.ts:6 |
 | `VITE_ACTIVATION_LEASE_PUBLIC_KEY` | Verify server-signed offline leases | required for offline access | absent | src/lib/verification/activation-lease.ts:94 |
 | `ACTIVATION_LEASE_PRIVATE_KEY` | Sign offline leases in the Edge Function | required in Supabase Function secrets | absent | supabase/functions/device-activation/index.ts:64 |
+| `PADDLE_API_KEY`, `PADDLE_NOTIFICATION_WEBHOOK_SECRET`, `PADDLE_ENV` | Verify/process Paddle webhooks and create portal sessions | required for Paddle Edge Functions | sandbox environment fallback | supabase/functions/paddle-webhook/index.ts:19, supabase/functions/paddle-portal/index.ts:13 |
 
 Environments: development uses Vite/Tauri commands; release uses Tauri build and bundled public assets. Receipts: package.json:7, package.json:14, README.md:32.
 
@@ -404,6 +439,14 @@ npm.cmd run test:unit -- src/lib/kinetic-themes.test.ts src/lib/kinetic-theme-re
 npm.cmd run test:unit
 # Result after Personal identity and KNFC stage themes: 140 files passed,
 # 999 tests passed, 1 skipped.
+
+npm.cmd run test:db
+# Applies supabase/migrations/*.sql to a throwaway Postgres container (Docker
+# required) and runs supabase/tests/*.test.sql against it.
+# Result before the billing access fixes: 3 of 7 failed - signup did not claim a
+# pre-signup Paddle customer, an admin comp was clawed back by a cancellation,
+# and a corrected customer email did not recalculate access.
+# Result after the fixes: 7 of 7 passed, including a repeat apply of migration 010.
 
 npm.cmd run tauri:build:local
 # Result: passed; produced SabbathCuePersonal.exe and
@@ -486,3 +529,4 @@ Top risks (ranked): 1. STT provider removal can leave stale docs or tests if his
 | 2026-07-23 | Fixed dangling cross-segment chapter parsing, synchronized semantic auto-live verses into reading-mode navigation, separated warm/charcoal dark surfaces from accent colors, and restored the Live Desk projector-setup entry point. | 3, 5, 6, 10, 15 |
 | 2026-07-23 | Isolated the desktop installation as SabbathCue Personal and ported the five KNFC stage kinetic themes with their canvas renderer and regression coverage. | 3, 6, 9, 10, 15 |
 | 2026-07-23 | Restored the obsidian accent so it stays amber when selected, made both dark surfaces derive their atmosphere from the active accent, applied the surface class to the verification screen, and removed the duplicate Live Desk projector button (the header entry point at app-controller-header.tsx:138 is the only one). | 3, 6, 15 |
+| 2026-07-23 | Added the Paddle billing mirror flow with atomic retryable webhook processing, event-time ordering, verified user linkage, multi-subscription access recalculation, and nullable authenticated billing summaries. | 6-10, 15 |

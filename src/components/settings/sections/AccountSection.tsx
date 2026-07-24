@@ -23,10 +23,22 @@ import {
   type AdminAccountRow,
 } from "@/lib/supabase/account"
 import {
+  fetchMyBillingSummary,
+  formatSubscriptionStatusLabel,
+  canCancelSubscription,
+  canActivateSubscriptionEarly,
+  isSubscriptionCancelScheduled,
+  type BillingSummary,
+} from "@/lib/supabase/billing"
+import {
   buildCancellationEmailOptions,
   openSupportEmail,
 } from "@/lib/support-contact"
 import { useVerificationStore } from "@/stores/verification-store"
+import { ManageSubscriptionButton } from "@/components/billing/ManageSubscriptionButton"
+import { CancelSubscriptionButton } from "@/components/billing/CancelSubscriptionButton"
+import { ActivateSubscriptionButton } from "@/components/billing/ActivateSubscriptionButton"
+import { PaddleSubscribePanel } from "@/components/billing/PaddleSubscribePanel"
 import { AnnouncementsAdminPanel } from "@/components/settings/sections/AnnouncementsAdminPanel"
 import {
   adminListDevices,
@@ -533,6 +545,37 @@ export function AccountSection() {
   const [requestingCancellation, setRequestingCancellation] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(
+    null
+  )
+  const [billingMessage, setBillingMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchMyBillingSummary().then((result) => {
+      if (cancelled) return
+      if (result.ok) {
+        setBillingSummary(result.summary)
+        setBillingMessage(null)
+      } else {
+        setBillingMessage(result.message)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const subscriptionLabel = formatSubscriptionStatusLabel(billingSummary)
+  const verifiedUserId = useVerificationStore((s) => s.verifiedUserId)
+
+  async function reloadBillingSummary() {
+    const result = await fetchMyBillingSummary()
+    if (result.ok) {
+      setBillingSummary(result.summary)
+      setBillingMessage(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -617,10 +660,50 @@ export function AccountSection() {
 
       <div className="glass-panel space-y-3 p-4">
         <div>
+          <p className="text-sm font-medium">Subscription</p>
+          <p className="text-xs text-muted-foreground">
+            Start or renew paid access with Paddle checkout. Manage billing,
+            payment method, and cancellation in the customer portal.
+          </p>
+        </div>
+        {billingMessage ? (
+          <p className="text-xs text-muted-foreground">{billingMessage}</p>
+        ) : subscriptionLabel ? (
+          <p className="text-xs font-medium text-foreground">{subscriptionLabel}</p>
+        ) : billingSummary?.paddleCustomerId ? (
+          <p className="text-xs text-muted-foreground">No active subscription on file.</p>
+        ) : null}
+        {billingSummary?.accessExpiresAt ? (
+          <p className="text-xs text-muted-foreground">
+            App access until{" "}
+            {new Date(billingSummary.accessExpiresAt).toLocaleString()}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {verifiedEmail && verifiedUserId ? (
+            <PaddleSubscribePanel
+              email={verifiedEmail}
+              userId={verifiedUserId}
+              onCompleted={() => void reloadBillingSummary()}
+            />
+          ) : null}
+          {canActivateSubscriptionEarly(billingSummary) ? (
+            <ActivateSubscriptionButton
+              onActivated={() => void reloadBillingSummary()}
+            />
+          ) : null}
+          {billingSummary?.paddleCustomerId ? (
+            <ManageSubscriptionButton />
+          ) : null}
+        </div>
+      </div>
+
+      <div className="glass-panel space-y-3 p-4">
+        <div>
           <p className="text-sm font-medium">Cancel subscription</p>
           <p className="text-xs text-muted-foreground">
-            Request cancellation of renewal/access. The request is saved to
-            your account and does not delete your service history.
+            Stop renewal at the end of your current billing period or trial.
+            You keep access until then; no refund for time already paid.
           </p>
         </div>
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--shell-bg-sunken)] p-3 text-xs text-muted-foreground">
@@ -631,7 +714,15 @@ export function AccountSection() {
             SabbathCue access is disabled unless renewed.
           </p>
         </div>
-        {confirmingCancellation ? (
+        {isSubscriptionCancelScheduled(billingSummary) ? (
+          <p className="text-xs font-medium text-foreground">
+            {subscriptionLabel ?? "Your subscription is scheduled to cancel."}
+          </p>
+        ) : canCancelSubscription(billingSummary) ? (
+          <CancelSubscriptionButton
+            onBillingStateChanged={() => void reloadBillingSummary()}
+          />
+        ) : confirmingCancellation ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="destructive"
@@ -659,7 +750,7 @@ export function AccountSection() {
             onClick={() => setConfirmingCancellation(true)}
           >
             <BanIcon className="mr-1.5 size-3.5" />
-            Request cancellation
+            Request cancellation by email
           </Button>
         )}
       </div>

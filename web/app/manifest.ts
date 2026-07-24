@@ -10,8 +10,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: SITE.description,
     start_url: "/SabbathCue/",
     display: "standalone",
-    background_color: "#000000",
-    theme_color: "#000000",
+    background_color: "#f5f7fa",
+    theme_color: "#f5f7fa",
     icons: [
       {
         src: "/SabbathCue/sabbathcue-icon.png",

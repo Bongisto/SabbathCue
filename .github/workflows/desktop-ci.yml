@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # vitest.config.ts includes web/app/** in the root test run, and those
+      # tests import next/* and other web-only packages.
+      - name: Install web dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
       - name: Typecheck
         run: bun run typecheck
 

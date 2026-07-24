@@ -1,0 +1,7 @@
+# Paste your full API key on the next line (69 chars).
+# Sandbox: pdl_sdbx_apikey_...
+# Live:    pdl_live_apikey_...
+# Save as .paddle-api-key.local in the repo root, then run:
+#   node web/scripts/seed-paddle-sandbox-catalog.mjs   (sandbox)
+#   node web/scripts/seed-paddle-live-catalog.mjs      (live)#
+# This file is gitignored (*.local). Never commit the real key.
