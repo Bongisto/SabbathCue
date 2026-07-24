@@ -67,6 +67,36 @@ jobs:
             exit 1
           }
 
+      # Runs before any toolchain or model download. This used to sit just above
+      # "Build Tauri installer", where a missing secret failed the run after 42
+      # minutes of Bible data, models, clippy and cargo-deny — the guard was
+      # correct but told you far too late to be useful.
+      - name: Verify desktop build env
+        shell: pwsh
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ACTIVATION_LEASE_PUBLIC_KEY: ${{ secrets.VITE_ACTIVATION_LEASE_PUBLIC_KEY }}
+        run: |
+          $missing = @()
+          foreach ($name in @(
+            "VITE_SUPABASE_URL",
+            "VITE_SUPABASE_ANON_KEY",
+            "VITE_ACTIVATION_LEASE_PUBLIC_KEY"
+          )) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              $missing += $name
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            # Report every gap at once so one re-run is enough.
+            Write-Error "Missing repository secret(s): $($missing -join ', '). Add them under Settings > Secrets and variables > Actions."
+            exit 1
+          }
+
+          Write-Host "All desktop build secrets present."
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -193,26 +223,6 @@ jobs:
         working-directory: src-tauri
         continue-on-error: true
         run: cargo cyclonedx --all --format json
-
-      - name: Verify desktop build env
-        shell: pwsh
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_ACTIVATION_LEASE_PUBLIC_KEY: ${{ secrets.VITE_ACTIVATION_LEASE_PUBLIC_KEY }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:VITE_SUPABASE_URL)) {
-            Write-Error "Missing repository secret: VITE_SUPABASE_URL"
-            exit 1
-          }
-          if ([string]::IsNullOrWhiteSpace($env:VITE_SUPABASE_ANON_KEY)) {
-            Write-Error "Missing repository secret: VITE_SUPABASE_ANON_KEY"
-            exit 1
-          }
-          if ([string]::IsNullOrWhiteSpace($env:VITE_ACTIVATION_LEASE_PUBLIC_KEY)) {
-            Write-Error "Missing repository secret: VITE_ACTIVATION_LEASE_PUBLIC_KEY"
-            exit 1
-          }
 
       - name: Build Tauri installer
         env:

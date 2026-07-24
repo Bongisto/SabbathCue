@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
+import { subscriptionStatusGrantsAccess } from "./access"
 
 const migration = readFileSync(
   new URL("../../../supabase/migrations/010_paddle_billing.sql", import.meta.url),
@@ -10,6 +11,10 @@ const migration011 = readFileSync(
     "../../../supabase/migrations/011_paddle_transaction_and_scheduled_action.sql",
     import.meta.url
   ),
+  "utf8"
+)
+const migration012 = readFileSync(
+  new URL("../../../supabase/migrations/012_no_past_due_grace.sql", import.meta.url),
   "utf8"
 )
 const webhook = readFileSync(
@@ -74,13 +79,27 @@ describe("Paddle billing database contract", () => {
   })
 
   it("recalculates access from every eligible subscription", () => {
-    expect(migration).toContain(
+    // 012 is the live definition; 010 introduced it and still contains the
+    // superseded past_due variant, so assert against the newer file.
+    expect(migration012).toContain(
       "CREATE OR REPLACE FUNCTION public.paddle_recalculate_user_access"
     )
-    expect(migration).toMatch(
-      /subscription_status IN \('active', 'trialing', 'past_due'\)/
+    expect(migration012).toMatch(
+      /subscription_status IN \('active', 'trialing'\)/
     )
-    expect(migration).toContain("max(current_period_end)")
+    expect(migration012).toContain("max(current_period_end)")
+  })
+
+  it("withholds access during past_due, matching access.ts", () => {
+    // subscriptionStatusGrantsAccess("past_due") === false. If a grace window
+    // is ever wanted, access_expires_at needs an explicit margin — putting
+    // past_due back in this IN list alone would not create one.
+    expect(migration012).not.toMatch(
+      /subscription_status IN \([^)]*'past_due'[^)]*\)/
+    )
+    expect(subscriptionStatusGrantsAccess("past_due")).toBe(false)
+    expect(subscriptionStatusGrantsAccess("active")).toBe(true)
+    expect(subscriptionStatusGrantsAccess("trialing")).toBe(true)
   })
 
   it("handles transaction.completed via an idempotent RPC", () => {
