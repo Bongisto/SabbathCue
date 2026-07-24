@@ -11,6 +11,7 @@ export default defineConfig({
     include: [
       "src/**/*.{test,spec}.{ts,tsx}",
       "web/app/**/*.{test,spec}.{ts,tsx}",
+      "supabase/functions/_shared/**/*.{test,spec}.{ts,tsx}",
     ],
     exclude: [...configDefaults.exclude, "tests/e2e/**"],
     setupFiles: ["./src/test/setup.ts"],

@@ -37,17 +37,17 @@
 }
 
 :root {
-  --background: #000000;
-  --foreground: #ffffff;
-  --muted-foreground: rgba(255, 255, 255, 0.6);
-  --subtle-foreground: rgba(255, 255, 255, 0.4);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.1);
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-strong: rgba(255, 255, 255, 0.15);
+  --background: #f5f7fa;
+  --foreground: #0a0a0a;
+  --muted-foreground: rgba(10, 10, 10, 0.62);
+  --subtle-foreground: rgba(10, 10, 10, 0.42);
+  --border: rgba(10, 10, 10, 0.08);
+  --border-strong: rgba(10, 10, 10, 0.14);
+  --surface: rgba(10, 10, 10, 0.03);
+  --surface-strong: rgba(10, 10, 10, 0.08);
   --accent: #0099ff;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
 }
 
 @theme inline {
@@ -138,31 +138,30 @@ html.lenis body {
 /*
  * Fumadocs theme: align the docs surface with the SabbathCue brand.
  * Uses HSL channel triplets for the fumadocs preset; map to SabbathCue accent
- * (#0099ff) and the same near-black surface as the marketing site.
+ * (#0099ff) and the same light surface as the marketing site.
  */
-.dark {
-  --color-fd-background: 0 0% 0%;
-  --color-fd-foreground: 0 0% 100%;
-  --color-fd-muted: 0 0% 6%;
-  --color-fd-muted-foreground: 0 0% 60%;
-  --color-fd-popover: 0 0% 4%;
-  --color-fd-popover-foreground: 0 0% 96%;
-  --color-fd-card: 0 0% 4%;
-  --color-fd-card-foreground: 0 0% 96%;
-  --color-fd-border: 0 0% 12%;
+:root {
+  --color-fd-background: 210 20% 97%;
+  --color-fd-foreground: 0 0% 4%;
+  --color-fd-muted: 210 16% 94%;
+  --color-fd-muted-foreground: 0 0% 40%;
+  --color-fd-popover: 0 0% 100%;
+  --color-fd-popover-foreground: 0 0% 4%;
+  --color-fd-card: 0 0% 100%;
+  --color-fd-card-foreground: 0 0% 4%;
+  --color-fd-border: 210 12% 88%;
   --color-fd-primary: 204 100% 50%;
-  --color-fd-primary-foreground: 0 0% 0%;
-  --color-fd-secondary: 0 0% 6%;
-  --color-fd-secondary-foreground: 0 0% 96%;
-  --color-fd-accent: 0 0% 8%;
-  --color-fd-accent-foreground: 0 0% 96%;
+  --color-fd-primary-foreground: 0 0% 100%;
+  --color-fd-secondary: 210 16% 94%;
+  --color-fd-secondary-foreground: 0 0% 4%;
+  --color-fd-accent: 210 16% 94%;
+  --color-fd-accent-foreground: 0 0% 4%;
   --color-fd-ring: 204 100% 50%;
 }
 
-/* Slightly soften the docs surface against the pure-black marketing site */
 #nd-docs-layout,
 #nd-page {
-  --color-fd-background: 0 0% 3%;
+  --color-fd-background: 210 20% 97%;
 }
 
 /* Use the same brand sans-serif for docs content */

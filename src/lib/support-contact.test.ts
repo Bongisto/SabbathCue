@@ -49,13 +49,13 @@ describe("support-contact", () => {
       expect.objectContaining({
         id: "standard",
         name: "Standard",
-        price: "R250",
+        price: "R200",
         term: "per month",
       }),
       expect.objectContaining({
         id: "annual",
         name: "Annual",
-        price: "R2,500",
+        price: "R2,000",
         term: "per year",
       }),
     ])
@@ -71,7 +71,7 @@ describe("support-contact", () => {
     const url = buildSupportEmailUrl(options)
 
     expect(options.subject).toBe("SabbathCue Annual renewal")
-    expect(options.body).toContain("Selected plan: Annual - R2,500/year")
+    expect(options.body).toContain("Selected plan: Annual - R2,000/year")
     expect(options.body).toContain("Account email: media@example.com")
     expect(options.body).toContain("Payment/reference:\nChurch name:")
     expect(url).toContain("subject=SabbathCue+Annual+renewal")

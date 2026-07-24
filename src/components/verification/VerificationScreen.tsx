@@ -17,12 +17,9 @@ import { SegmentedControl } from "@/components/ui/segmented-control"
 import { APP_DISPLAY_NAME } from "@/lib/app-brand"
 import { cn } from "@/lib/utils"
 import { requestPasswordReset } from "@/lib/supabase/auth"
-import {
-  buildRenewalEmailOptions,
-  openSupportEmail,
-  RENEWAL_PLANS,
-  type RenewalPlanId,
-} from "@/lib/support-contact"
+import { PaddleSubscribeButton } from "@/components/billing/PaddleSubscribeButton"
+import { EftPaymentOptions } from "@/components/billing/EftPaymentOptions"
+import { isPaddleCheckoutConfigured } from "@/lib/paddle/config"
 import {
   accentThemeClassName,
   useAccentThemeStore,
@@ -480,16 +477,25 @@ function AuthFooterActions({
 function TrialExpiredPanel({
   busy,
   message,
-  onSelectPlan,
+  accountEmail,
+  accountUserId,
   onRetry,
   onSignOut,
+  onCheckoutCompleted,
 }: {
   busy: boolean
   message: string
-  onSelectPlan: (planId: RenewalPlanId) => void
+  accountEmail: string | null
+  accountUserId: string | null
   onRetry: () => void
   onSignOut: () => void
+  onCheckoutCompleted: () => void
 }) {
+  const paddleReady =
+    isPaddleCheckoutConfigured() &&
+    Boolean(accountEmail?.trim()) &&
+    Boolean(accountUserId)
+
   return (
     <div className="flex flex-col gap-5 text-left">
       <div className="flex items-start gap-3">
@@ -506,26 +512,33 @@ function TrialExpiredPanel({
         </div>
       </div>
 
-      <div className="grid gap-2">
-        {RENEWAL_PLANS.map((plan) => (
-          <Button
-            key={plan.id}
-            className="h-auto w-full justify-between gap-3 px-3 py-2 text-left"
+      {paddleReady && accountEmail && accountUserId ? (
+        <div className="space-y-2">
+          <PaddleSubscribeButton
+            email={accountEmail}
+            userId={accountUserId}
+            label="Subscribe with Paddle"
             disabled={busy}
-            type="button"
-            variant="outline"
-            onClick={() => onSelectPlan(plan.id)}
-          >
-            <span className="flex min-w-0 flex-col">
-              <span className="text-sm font-semibold">{plan.name}</span>
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {plan.price} {plan.term}
-              </span>
-            </span>
-            <MailIcon className="size-4" />
-          </Button>
-        ))}
-      </div>
+            size="default"
+            onCompleted={onCheckoutCompleted}
+          />
+          <p className="text-xs text-muted-foreground">
+            Card checkout via Paddle. After payment, choose Retry to refresh
+            your access.
+          </p>
+        </div>
+      ) : null}
+
+      {paddleReady ? (
+        <div className="relative py-1">
+          <div className="absolute inset-x-0 top-1/2 h-px bg-[var(--border-dim)]" />
+          <p className="relative mx-auto w-fit bg-[var(--bg-surface)] px-3 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            or
+          </p>
+        </div>
+      ) : null}
+
+      <EftPaymentOptions accountEmail={accountEmail} disabled={busy} />
 
       <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[var(--border-dim)] pt-4">
         <Button
@@ -772,6 +785,7 @@ export function VerificationScreen() {
   const error = useVerificationStore((s) => s.error)
   const errorCode = useVerificationStore((s) => s.errorCode)
   const verifiedEmail = useVerificationStore((s) => s.verifiedEmail)
+  const verifiedUserId = useVerificationStore((s) => s.verifiedUserId)
   const signIn = useVerificationStore((s) => s.signIn)
   const signUp = useVerificationStore((s) => s.signUp)
   const signOut = useVerificationStore((s) => s.signOut)
@@ -904,15 +918,11 @@ export function VerificationScreen() {
                     busy={isBusy}
                     message={
                       feedback.message ??
-                      "Your access has ended. Contact the developer to renew."
+                      "Your access has ended. Subscribe to renew, or contact support."
                     }
-                    onSelectPlan={(planId) =>
-                      void openSupportEmail({
-                        ...buildRenewalEmailOptions(planId, {
-                          accountEmail: verifiedEmail,
-                        }),
-                      })
-                    }
+                    accountEmail={verifiedEmail ?? null}
+                    accountUserId={verifiedUserId ?? null}
+                    onCheckoutCompleted={() => void refresh()}
                     onRetry={() => void refresh()}
                     onSignOut={() => void signOut()}
                   />

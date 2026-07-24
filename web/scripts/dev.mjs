@@ -3,7 +3,11 @@ import { platform } from "node:os";
 import { generateFumadocsSource } from "./generate-fumadocs-source.mjs";
 
 const PORT = Number(process.env.PORT ?? 3029);
-const URL = `http://localhost:${PORT}`;
+const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH?.trim() || "/SabbathCue").replace(
+  /\/$/,
+  "",
+);
+const URL = `http://localhost:${PORT}${BASE_PATH}/`;
 
 await generateFumadocsSource();
 

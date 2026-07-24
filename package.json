@@ -19,6 +19,7 @@
     "test:vercel-build": "node scripts/test-vercel-build.mjs",
     "test:semantic-detections": "vitest --run src/stores/detection-store.semantic-replay.test.ts",
     "test:coverage": "vitest --run --coverage",
+    "test:db": "node scripts/run-sql-tests.mjs",
     "test:e2e": "node scripts/run-playwright-e2e.mjs",
     "dup": "jscpd",
     "convert:afrikaans-bible": "bun run data/convert-afrikaans-bible.ts",
@@ -52,7 +53,13 @@
     "web:dev": "cd web && bun run dev",
     "web:build": "cd web && bun run build",
     "web:start": "cd web && bun run start",
-    "web:lint": "cd web && bun run lint"
+    "web:lint": "cd web && bun run lint",
+    "paddle:setup": "node web/scripts/seed-paddle-sandbox-catalog.mjs",
+    "paddle:ensure-trial": "node web/scripts/ensure-paddle-access-trial.mjs",
+    "paddle:ensure-domain": "node web/scripts/ensure-paddle-checkout-domain.mjs",
+    "paddle:seed-live": "node web/scripts/seed-paddle-live-catalog.mjs",
+    "paddle:audit-live": "node web/scripts/audit-paddle-live-readiness.mjs",
+    "paddle:setup:ps1": "powershell -NoProfile -ExecutionPolicy Bypass -File web/scripts/setup-paddle.ps1"
   },
   "dependencies": {
     "@dnd-kit/react": "^0.3.2",
@@ -65,6 +72,7 @@
     "@fontsource/dm-mono": "^5.2.7",
     "@fontsource/dm-serif-display": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",
+    "@paddle/paddle-js": "^1.6.4",
     "@supabase/supabase-js": "^2.110.0",
     "@tailwindcss/vite": "^4.3.2",
     "@tauri-apps/api": "2.10.1",
@@ -107,6 +115,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@paddle/paddle-node-sdk": "2.8.0",
     "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.11.4",
     "@testing-library/react": "^16.3.2",

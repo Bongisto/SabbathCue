@@ -33,11 +33,11 @@ const sizes: Record<Size, string> = {
 };
 
 const variants: Record<Variant, string> = {
-  primary: "bg-primary text-primary-foreground hover:bg-white/90",
+  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
   secondary:
-    "bg-surface-strong text-foreground hover:bg-white/25",
+    "bg-surface-strong text-foreground hover:bg-black/10",
   ghost:
-    "border border-border-strong bg-transparent text-foreground hover:bg-white/5",
+    "border border-border-strong bg-transparent text-foreground hover:bg-black/5",
 };
 
 export function Button({

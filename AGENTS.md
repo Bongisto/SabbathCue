@@ -22,3 +22,12 @@ reading its SKILL.md (and the reference files it links) before starting the matc
   writing, reviewing, or refactoring Rust code (src-tauri).
 - **vercel-react-best-practices** — `.agents/skills/vercel-react-best-practices/SKILL.md`.
   Use when writing or reviewing React/frontend code.
+
+## Paddle
+
+- **Agent skills** (checkout, webhooks, sync, etc.) live under `.agents/skills/paddle-*`.
+- **Paddle MCP** (`paddle-sandbox` / `paddle-live`) is optional and configured in Cursor
+  MCP Tools — see `.cursor/mcp.json.example` and
+  [Paddle MCP server](https://developer.paddle.com/sdks/ai/paddle-mcp.md). When MCP tools
+  are available, prefer them for catalog setup and webhook configuration (`paddle-catalog-setup`).
+  Sandbox keys only work against `https://sandbox-mcp.paddle.com/mcp`.

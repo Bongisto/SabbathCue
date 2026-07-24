@@ -22,4 +22,30 @@ for (const asset of ["sabbathcue-demo.mp4", "afrikaans-live-test.mp4"]) {
   assert.equal(statSync(output).size, statSync(source).size)
 }
 
-console.log("[test-vercel-build] Static landing artifact verified")
+for (const route of [
+    "pricing/index.html",
+    "pay/index.html",
+    "welcome/index.html",
+    "terms/index.html",
+    "privacy/index.html",
+    "refund/index.html",
+  ]) {
+  assert.ok(
+    existsSync(join(repoRoot, "dist", route)),
+    `dist/${route} must exist (Paddle checkout routes from web/)`
+  )
+}
+
+assert.match(
+  readFileSync(outputHtml, "utf8"),
+  /href="\/pricing\/"/,
+  "landing homepage must link to /pricing/"
+)
+
+assert.match(
+  readFileSync(outputHtml, "utf8"),
+  /href="\/terms\/"/,
+  "landing homepage must link to /terms/"
+)
+
+console.log("[test-vercel-build] Hybrid landing + Paddle checkout artifact verified")

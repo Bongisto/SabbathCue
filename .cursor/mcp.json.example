@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "paddle-sandbox": {
+      "type": "http",
+      "url": "https://sandbox-mcp.paddle.com/mcp",
+      "headers": {
+        "Authorization": "Bearer PASTE_pdl_sdbx_apikey_HERE"
+      }
+    },
+    "paddle-live": {
+      "type": "http",
+      "url": "https://mcp.paddle.com/mcp",
+      "headers": {
+        "Authorization": "Bearer PASTE_pdl_live_apikey_HERE"
+      }
+    }
+  }
+}

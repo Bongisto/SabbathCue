@@ -219,7 +219,7 @@ export function ResetPasswordForm() {
         <span>New password</span>
         <input
           autoComplete="new-password"
-          className="rounded-[8px] border border-border bg-black px-3 py-2 text-foreground transition-colors outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-[8px] border border-border bg-background px-3 py-2 text-foreground transition-colors outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60"
           disabled={busy}
           minLength={MIN_PASSWORD_LENGTH}
           required
@@ -236,7 +236,7 @@ export function ResetPasswordForm() {
         <span>Confirm password</span>
         <input
           autoComplete="new-password"
-          className="rounded-[8px] border border-border bg-black px-3 py-2 text-foreground transition-colors outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-[8px] border border-border bg-background px-3 py-2 text-foreground transition-colors outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60"
           disabled={busy}
           minLength={MIN_PASSWORD_LENGTH}
           required

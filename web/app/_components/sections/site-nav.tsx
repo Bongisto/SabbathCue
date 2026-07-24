@@ -102,7 +102,7 @@ export function SiteNav({ stars }: { stars: number }) {
           aria-controls="mobile-nav"
           aria-label="Toggle menu"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground hover:bg-white/5 lg:hidden"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground hover:bg-black/5 lg:hidden"
         >
           {open ? <IconX size={20} /> : <IconMenu2 size={20} />}
         </button>
@@ -124,7 +124,7 @@ export function SiteNav({ stars }: { stars: number }) {
               target={l.external ? "_blank" : undefined}
               rel={l.external ? "noopener noreferrer" : undefined}
               onClick={() => setOpen(false)}
-              className="rounded-md px-3 py-3 text-lg text-foreground hover:bg-white/5"
+              className="rounded-md px-3 py-3 text-lg text-foreground hover:bg-black/5"
             >
               {l.label}
             </Link>

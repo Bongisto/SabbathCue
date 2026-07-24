@@ -77,8 +77,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
-  colorScheme: "dark",
+  themeColor: "#f5f7fa",
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
 };
@@ -89,8 +89,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="dark h-full antialiased"
-      data-theme="dark"
+      className="h-full antialiased"
+      data-theme="light"
       suppressHydrationWarning
     >
       <body
@@ -100,8 +100,8 @@ export default function RootLayout({
         <StructuredData />
         <RootProvider
           theme={{
-            defaultTheme: "dark",
-            forcedTheme: "dark",
+            defaultTheme: "light",
+            forcedTheme: "light",
             enableSystem: false,
           }}
           search={{
