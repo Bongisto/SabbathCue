@@ -29,3 +29,4 @@ const env = {
 
 await run(process.execPath, ["node_modules/next/dist/bin/next", "build"], { env });
 await run(process.execPath, ["scripts/postbuild-og.mjs"], { env });
+await run(process.execPath, ["scripts/postbuild-css-basepath.mjs"], { env });

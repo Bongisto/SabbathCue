@@ -3,12 +3,19 @@
 @import "fumadocs-ui/css/preset.css";
 @source "../node_modules/fumadocs-ui/dist/**/*.js";
 
+/*
+ * Author these as root-relative. Next does not rewrite CSS url() values with
+ * basePath, so scripts/postbuild-css-basepath.mjs prefixes them after the
+ * build when NEXT_PUBLIC_BASE_PATH is set (GitHub Pages). Vercel deploys at
+ * the root and needs no prefix.
+ *
+ * public/fonts holds .woff2 only — do not add .woff/.ttf sources for files
+ * that are not in the repo, or every miss costs two extra 404s.
+ */
 @font-face {
   font-family: "GT Walsheim Pro";
   src: local("GT Walsheim Pro Regular"),
-    url("/SabbathCue/fonts/GTWalsheimProRegular.woff2") format("woff2"),
-    url("/SabbathCue/fonts/GTWalsheimProRegular.woff") format("woff"),
-    url("/SabbathCue/fonts/GTWalsheimProRegular.ttf") format("truetype");
+    url("/fonts/GTWalsheimProRegular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -17,9 +24,7 @@
 @font-face {
   font-family: "GT Walsheim Pro";
   src: local("GT Walsheim Pro Medium"),
-    url("/SabbathCue/fonts/GTWalsheimProMedium.woff2") format("woff2"),
-    url("/SabbathCue/fonts/GTWalsheimProMedium.woff") format("woff"),
-    url("/SabbathCue/fonts/GTWalsheimProMedium.ttf") format("truetype");
+    url("/fonts/GTWalsheimProMedium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -28,9 +33,7 @@
 @font-face {
   font-family: "GT Walsheim Pro";
   src: local("GT Walsheim Pro Bold"),
-    url("/SabbathCue/fonts/GTWalsheimProBold.woff2") format("woff2"),
-    url("/SabbathCue/fonts/GTWalsheimProBold.woff") format("woff"),
-    url("/SabbathCue/fonts/GTWalsheimProBold.ttf") format("truetype");
+    url("/fonts/GTWalsheimProBold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
