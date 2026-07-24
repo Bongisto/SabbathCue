@@ -1,0 +1,54 @@
+name: Verify deployed site
+
+# What this guards against was a Vercel dashboard setting (Root Directory =
+# "landing"), not a code change: every route but "/" 404'd in production while
+# desktop-ci stayed green, because test:vercel-build only inspects dist/ on
+# disk and never touches the deployed origin.
+#
+# A push-triggered job would never have caught that, so this runs on three
+# signals: after each Vercel production deploy, daily (to catch someone
+# changing project settings again), and on demand.
+on:
+  deployment_status:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Origin to verify
+        required: false
+        default: https://sabbath-cue-two.vercel.app
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-deployed-site
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Smoke test production origin
+    # deployment_status also fires for pending/error and for previews, which
+    # are behind Vercel deployment protection and would 401.
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       contains(github.event.deployment_status.environment, 'Production'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # verify-deployed-site.mjs uses only node: builtins and global fetch,
+      # so there is deliberately no install step — this stays a fast check.
+      - name: Verify deployed origin
+        run: >-
+          node scripts/verify-deployed-site.mjs
+          "${{ github.event.inputs.origin || 'https://sabbath-cue-two.vercel.app' }}"
