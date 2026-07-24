@@ -17,6 +17,7 @@
     "test": "vitest",
     "test:unit": "vitest --run",
     "test:vercel-build": "node scripts/test-vercel-build.mjs",
+    "verify:deployed-site": "node scripts/verify-deployed-site.mjs",
     "test:semantic-detections": "vitest --run src/stores/detection-store.semantic-replay.test.ts",
     "test:coverage": "vitest --run --coverage",
     "test:db": "node scripts/run-sql-tests.mjs",
