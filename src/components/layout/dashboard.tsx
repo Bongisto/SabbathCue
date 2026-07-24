@@ -1,6 +1,7 @@
 import { useEffect, lazy, Suspense, useLayoutEffect, useRef } from "react"
 import { AppControllerHeader } from "@/components/layout/app-controller-header"
 import { OperatorStatusStrip } from "@/components/layout/operator-status-strip"
+import { TrialWarningBanner } from "@/components/billing/TrialWarningBanner"
 import { TranscriptPanel } from "@/components/panels/transcript-panel"
 import { PreviewPanel } from "@/components/panels/preview-panel"
 import { LiveOutputPanel } from "@/components/panels/live-output-panel"
@@ -216,6 +217,15 @@ export function Dashboard() {
     >
       <div className="app-shell">
         <AppControllerHeader />
+
+        {/*
+          Inside the shell rather than App.tsx: this container is
+          `fixed inset-0`, so a sibling of <Dashboard /> would be painted under
+          it. app-shell is a 100vh flex column, so the banner pushes the
+          workspace row down instead of covering any live controls. Renders
+          nothing until access is within a few days of ending.
+        */}
+        <TrialWarningBanner />
 
         <div className="flex flex-1 overflow-hidden">
           <main className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">

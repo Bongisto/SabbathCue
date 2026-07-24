@@ -396,6 +396,92 @@ END
 $$;
 
 
+-- past_due grants no grace (012). When a renewal charge fails, access stops at
+-- the last period actually paid for.
+--
+-- Before 012, past_due sat in the access-granting IN list, so the eligible
+-- branch ran and GREATEST() held access at the older, longer expiry — the user
+-- kept working for the remainder of the previous period.
+DO $$
+DECLARE
+  v_user uuid;
+  v_access timestamptz;
+BEGIN
+  INSERT INTO auth.users (email) VALUES ('pastdue@example.com')
+  RETURNING id INTO v_user;
+
+  -- Beat the automatic 14-day signup trial so access_expires_at and
+  -- paddle_access_expires_at converge. While they differ the value is treated
+  -- as a trial/admin comp and is deliberately never lowered.
+  PERFORM public.paddle_process_subscription_event(
+    'evt_pastdue_1', 'subscription.created', now() - interval '2 minutes',
+    'sub_pastdue', 'ctm_pastdue', 'pastdue@example.com', v_user,
+    'active', 'pri_1', 'pro_1', now() + interval '20 days', NULL);
+
+  -- The renewal fails and the paid period has lapsed.
+  PERFORM public.paddle_process_subscription_event(
+    'evt_pastdue_2', 'subscription.updated', now() - interval '1 minute',
+    'sub_pastdue', 'ctm_pastdue', 'pastdue@example.com', v_user,
+    'past_due', 'pri_1', 'pro_1', now() - interval '1 hour', NULL);
+
+  SELECT access_expires_at INTO v_access
+  FROM public.account_flags WHERE user_id = v_user;
+
+  PERFORM test_assert(v_access <= now(),
+    'past_due does not extend access beyond the period actually paid for');
+
+  INSERT INTO test_results VALUES ('past_due_grants_no_grace', true, NULL);
+EXCEPTION WHEN others THEN
+  INSERT INTO test_results VALUES ('past_due_grants_no_grace', false, SQLERRM);
+END
+$$;
+
+
+-- Entitlement -> unlock. Every other billing test stops at account_flags; this
+-- carries on into register_device_verified, the gate the desktop app actually
+-- hits. Without it, nothing proves that a processed payment lets someone in.
+DO $$
+DECLARE
+  v_user uuid;
+  v_blocked jsonb;
+  v_unlocked jsonb;
+BEGIN
+  INSERT INTO auth.users (email) VALUES ('unlock@example.com')
+  RETURNING id INTO v_user;
+
+  -- Expire the automatic signup trial so the account starts locked. Both
+  -- columns are set so the value reads as Paddle's to revoke, not a comp.
+  UPDATE public.account_flags
+  SET access_expires_at = now() - interval '1 day',
+      paddle_access_expires_at = now() - interval '1 day'
+  WHERE user_id = v_user;
+
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+
+  v_blocked := public.register_device_verified(
+    v_user, 'device-unlock-1', 'windows', '0.1.8');
+  PERFORM test_assert(v_blocked->>'status' = 'trial_expired',
+    'an expired account is refused before payment');
+
+  PERFORM public.paddle_process_subscription_event(
+    'evt_unlock_1', 'subscription.created', now(),
+    'sub_unlock', 'ctm_unlock', 'unlock@example.com', v_user,
+    'active', 'pri_1', 'pro_1', now() + interval '30 days', NULL);
+
+  v_unlocked := public.register_device_verified(
+    v_user, 'device-unlock-1', 'windows', '0.1.8');
+  -- Asserting "not trial_expired" rather than a specific status keeps this
+  -- about the billing gate; device approval and limits are separate concerns.
+  PERFORM test_assert(v_unlocked->>'status' IS DISTINCT FROM 'trial_expired',
+    'a processed subscription event unlocks the device');
+
+  INSERT INTO test_results VALUES ('paddle_event_unlocks_device', true, NULL);
+EXCEPTION WHEN others THEN
+  INSERT INTO test_results VALUES ('paddle_event_unlocks_device', false, SQLERRM);
+END
+$$;
+
+
 \echo ''
 SELECT
   CASE WHEN passed THEN 'ok  ' ELSE 'FAIL' END AS result,

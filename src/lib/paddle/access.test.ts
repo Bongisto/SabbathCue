@@ -7,8 +7,8 @@ describe("subscriptionStatusGrantsAccess", () => {
     expect(subscriptionStatusGrantsAccess("trialing")).toBe(true)
   })
 
-  it("keeps access during past_due dunning", () => {
-    expect(subscriptionStatusGrantsAccess("past_due")).toBe(true)
+  it("denies access during past_due — no dunning grace", () => {
+    expect(subscriptionStatusGrantsAccess("past_due")).toBe(false)
   })
 
   it("denies access when paused or canceled", () => {

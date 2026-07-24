@@ -37,6 +37,17 @@ AS $$
   SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
 
+-- register_device_verified gates on auth.role() = 'service_role'. Same GUC
+-- approach as auth.uid(); tests opt in with
+--   SET LOCAL "request.jwt.claim.role" = 'service_role';
+CREATE OR REPLACE FUNCTION auth.role()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('request.jwt.claim.role', true), '')
+$$;
+
 -- 004 revokes access to a dashboard-created function that is not in this repo.
 CREATE OR REPLACE FUNCTION public.rls_auto_enable()
 RETURNS void
