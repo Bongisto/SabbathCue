@@ -719,7 +719,9 @@ export function AccountSection() {
             {subscriptionLabel ?? "Your subscription is scheduled to cancel."}
           </p>
         ) : canCancelSubscription(billingSummary) ? (
-          <CancelSubscriptionButton onCancelled={() => void reloadBillingSummary()} />
+          <CancelSubscriptionButton
+            onBillingStateChanged={() => void reloadBillingSummary()}
+          />
         ) : confirmingCancellation ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button

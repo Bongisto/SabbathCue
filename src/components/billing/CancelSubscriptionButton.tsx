@@ -6,7 +6,7 @@ import { cancelSubscriptionAtPeriodEnd } from "@/lib/supabase/billing"
 
 interface CancelSubscriptionButtonProps {
   disabled?: boolean
-  onCancelled?: () => void
+  onBillingStateChanged?: () => void
 }
 
 function formatCancelDate(iso: string | null): string {
@@ -17,7 +17,7 @@ function formatCancelDate(iso: string | null): string {
 
 export function CancelSubscriptionButton({
   disabled = false,
-  onCancelled,
+  onBillingStateChanged,
 }: CancelSubscriptionButtonProps) {
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -30,7 +30,10 @@ export function CancelSubscriptionButton({
     if (!result.ok) {
       if (result.message === "Subscription already scheduled to cancel") {
         toast.message("Your subscription is already scheduled to cancel.")
-        onCancelled?.()
+        // This button only renders when our summary says the subscription is
+        // NOT scheduled to cancel, so this response means the summary is stale.
+        // Reload it or the UI keeps offering a cancel the server will reject.
+        onBillingStateChanged?.()
       } else if (result.message === "No cancellable subscription") {
         toast.error("No active subscription to cancel.")
       } else {
@@ -44,7 +47,7 @@ export function CancelSubscriptionButton({
       `Renewal canceled. Access continues until ${formatCancelDate(result.result.scheduledChange)}.`
     )
     setConfirming(false)
-    onCancelled?.()
+    onBillingStateChanged?.()
   }
 
   if (confirming) {

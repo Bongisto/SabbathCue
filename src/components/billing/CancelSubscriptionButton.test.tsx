@@ -50,7 +50,7 @@ describe("CancelSubscriptionButton", () => {
     expect(mockCancelSubscriptionAtPeriodEnd).toHaveBeenCalledTimes(1)
   })
 
-  it("calls onCancelled after a successful cancel", async () => {
+  it("calls onBillingStateChanged after a successful cancel", async () => {
     mockCancelSubscriptionAtPeriodEnd.mockResolvedValue({
       ok: true,
       result: {
@@ -59,11 +59,11 @@ describe("CancelSubscriptionButton", () => {
       },
     })
 
-    const onCancelled = vi.fn()
+    const onBillingStateChanged = vi.fn()
     const { CancelSubscriptionButton } = await import(
       "@/components/billing/CancelSubscriptionButton"
     )
-    render(<CancelSubscriptionButton onCancelled={onCancelled} />)
+    render(<CancelSubscriptionButton onBillingStateChanged={onBillingStateChanged} />)
 
     fireEvent.click(screen.getByRole("button", { name: /cancel subscription/i }))
     fireEvent.click(
@@ -71,7 +71,56 @@ describe("CancelSubscriptionButton", () => {
     )
 
     await vi.waitFor(() => {
-      expect(onCancelled).toHaveBeenCalledTimes(1)
+      expect(onBillingStateChanged).toHaveBeenCalledTimes(1)
     })
+  })
+
+  it("calls onBillingStateChanged when the server says it is already scheduled to cancel", async () => {
+    // The button only renders when the parent's billing summary says the
+    // subscription is not scheduled to cancel, so this response proves that
+    // summary is stale. onBillingStateChanged refetches it; without that call the parent
+    // keeps showing a cancel button the server will reject.
+    mockCancelSubscriptionAtPeriodEnd.mockResolvedValue({
+      ok: false,
+      message: "Subscription already scheduled to cancel",
+    })
+
+    const onBillingStateChanged = vi.fn()
+    const { CancelSubscriptionButton } = await import(
+      "@/components/billing/CancelSubscriptionButton"
+    )
+    render(<CancelSubscriptionButton onBillingStateChanged={onBillingStateChanged} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /cancel subscription/i }))
+    fireEvent.click(
+      screen.getByRole("button", { name: /confirm cancel renewal/i })
+    )
+
+    await vi.waitFor(() => {
+      expect(onBillingStateChanged).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it("does not call onBillingStateChanged on a genuine failure", async () => {
+    mockCancelSubscriptionAtPeriodEnd.mockResolvedValue({
+      ok: false,
+      message: "No cancellable subscription",
+    })
+
+    const onBillingStateChanged = vi.fn()
+    const { CancelSubscriptionButton } = await import(
+      "@/components/billing/CancelSubscriptionButton"
+    )
+    render(<CancelSubscriptionButton onBillingStateChanged={onBillingStateChanged} />)
+
+    fireEvent.click(screen.getByRole("button", { name: /cancel subscription/i }))
+    fireEvent.click(
+      screen.getByRole("button", { name: /confirm cancel renewal/i })
+    )
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: /cancel subscription/i })).toBeTruthy()
+    })
+    expect(onBillingStateChanged).not.toHaveBeenCalled()
   })
 })
