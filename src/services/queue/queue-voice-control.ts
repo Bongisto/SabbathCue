@@ -6,12 +6,35 @@ import { useQueueStore } from "@/stores/queue-store"
 
 const QUEUE_ITEM_COMMAND_PATTERN =
   /^(?:please\s+)?(?:(?:show|present|display)\s+|go\s+to\s+)?item(?:\s+number)?\s+(.+)$/
+/**
+ * Polite fillers that may trail an explicit queue command without changing
+ * it ("go to item 3 please"). Deliberately a closed set: general trailing
+ * words must stay rejected so sermon prose ("item one in our discussion is
+ * faith") never presents a queue item.
+ */
+const QUEUE_TAIL_FILLER_WORDS = new Set(["again", "now", "please"])
+
 function normalizeTranscript(text: string): string {
   return text
     .toLowerCase()
+    // Fold diacritics before stripping so Afrikaans number words written with
+    // a diaeresis ("tweeëntwintig") survive as one token.
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s-]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+function stripTrailingFillerWords(tail: string): string {
+  const tokens = tail.split(/\s+/).filter(Boolean)
+  while (
+    tokens.length > 0 &&
+    QUEUE_TAIL_FILLER_WORDS.has(tokens[tokens.length - 1])
+  ) {
+    tokens.pop()
+  }
+  return tokens.join(" ")
 }
 
 export function parseQueueItemCommand(text: string): number | null {
@@ -19,7 +42,7 @@ export function parseQueueItemCommand(text: string): number | null {
   const match = normalized.match(QUEUE_ITEM_COMMAND_PATTERN)
   if (!match) return null
 
-  return parsePositiveSpokenNumber(match[1])
+  return parsePositiveSpokenNumber(stripTrailingFillerWords(match[1]))
 }
 
 export function resetQueueVoiceControlState(): void {

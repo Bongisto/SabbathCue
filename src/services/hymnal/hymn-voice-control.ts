@@ -8,8 +8,11 @@ import {
 } from "@/services/hymnal/hymn-presentation"
 import { addRecentHymn } from "@/services/hymnal/hymnal-history"
 import { getHymnByNumber } from "@/services/hymnal/hymnal-repository"
-import { parsePositiveSpokenNumber } from "@/lib/spoken-number"
-import { extractHymnNumberPhrase, matchHymnCue } from "@/lib/hymn-cue"
+import {
+  extractSpokenNumberPhrase,
+  parsePositiveSpokenNumber,
+} from "@/lib/spoken-number"
+import { matchHymnCue } from "@/lib/hymn-cue"
 import { getBroadcastLiveStore } from "@/stores/broadcast/live-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
@@ -34,7 +37,7 @@ export function parseHymnCommand(text: string): number | null {
   const numberPhrase = matchHymnCue(text)
   if (numberPhrase === null) return null
 
-  const number = parsePositiveSpokenNumber(extractHymnNumberPhrase(numberPhrase))
+  const number = parsePositiveSpokenNumber(extractSpokenNumberPhrase(numberPhrase))
   if (number === null || !isValidHymnNumber(number)) return null
 
   return number

@@ -1,7 +1,4 @@
-import {
-  isSpokenNumberConnector,
-  isSpokenNumberToken,
-} from "@/lib/spoken-number"
+import { extractSpokenNumberPhrase } from "@/lib/spoken-number"
 
 /**
  * Single source of truth for recognising spoken hymn/song commands.
@@ -25,36 +22,14 @@ const HYMN_COMMAND_PATTERN = new RegExp(
 export function normalizeHymnCueText(text: string): string {
   return text
     .toLowerCase()
+    // Fold diacritics before stripping so Afrikaans compound numbers written
+    // with a diaeresis ("tweeëntwintig") stay one token instead of splitting
+    // at the ë.
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s-]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-}
-
-/**
- * Trim the tail captured after a hymn cue word down to the number phrase at
- * its start. The capture runs to the end of the utterance, so trailing
- * service speech ("hymn 46 then we pray") must not be fed to the number
- * parser; conversely, filler between the cue and the number ("our next hymn
- * is number 302") must be skipped. Trailing "and"/"en" are connectors, never
- * the end of a number.
- */
-export function extractHymnNumberPhrase(phrase: string): string {
-  const out: string[] = []
-  for (const token of phrase.split(/\s+/).filter(Boolean)) {
-    if (isSpokenNumberToken(token) || isSpokenNumberConnector(token)) {
-      out.push(token)
-    } else if (out.length > 0) {
-      break
-    }
-  }
-  // Connectors are phrase-internal only ("ses en veertig"); at the edges they
-  // belong to surrounding speech ("hymn 46 and then the sermon").
-  while (out.length > 0 && isSpokenNumberConnector(out[out.length - 1])) {
-    out.pop()
-  }
-  let start = 0
-  while (start < out.length && isSpokenNumberConnector(out[start])) start++
-  return out.slice(start).join(" ")
 }
 
 /** Captured tail after a hymn cue word, or null when no cue is present. */
@@ -73,5 +48,5 @@ export function matchHymnCue(text: string): string | null {
  */
 export function looksLikeHymnCommand(text: string): boolean {
   const phrase = matchHymnCue(text)
-  return phrase !== null && extractHymnNumberPhrase(phrase) !== ""
+  return phrase !== null && extractSpokenNumberPhrase(phrase) !== ""
 }

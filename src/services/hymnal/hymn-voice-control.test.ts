@@ -121,6 +121,12 @@ describe("hymn voice control", () => {
       expect(parseHymnCommand("lied nr 12")).toBe(12)
     })
 
+    it("accepts Afrikaans compound numbers written as one word", () => {
+      expect(parseHymnCommand("Hymn tweeëntwintig.")).toBe(22)
+      expect(parseHymnCommand("lied drieentwintig")).toBe(23)
+      expect(parseHymnCommand("hymn negeënveertig")).toBe(49)
+    })
+
     it("accepts punctuation glued to the cue or number", () => {
       expect(parseHymnCommand("hymn #46")).toBe(46)
       expect(parseHymnCommand("hymn: 46")).toBe(46)

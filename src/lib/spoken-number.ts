@@ -62,11 +62,59 @@ const TENS: Record<string, number> = {
 
 const HUNDRED_WORDS = new Set(["hundred", "honderd"])
 
+/** Afrikaans inverted number compounds spoken as one word — "eenentwintig"
+ *  (21), "tweeëntwintig" (22), "drieënveertig" (43) — built as
+ *  [ones] + en/ën + [tens]. Only exact ones/tens bookends match, so ordinary
+ *  words never decompose into numbers. */
+const AFRIKAANS_COMPOUND_ONES: Record<string, number> = {
+  een: 1,
+  twee: 2,
+  drie: 3,
+  vier: 4,
+  vyf: 5,
+  ses: 6,
+  sewe: 7,
+  agt: 8,
+  nege: 9,
+}
+const AFRIKAANS_COMPOUND_TENS: Record<string, number> = {
+  twintig: 20,
+  dertig: 30,
+  veertig: 40,
+  vyftig: 50,
+  sestig: 60,
+  sewentig: 70,
+  tagtig: 80,
+  negentig: 90,
+}
+
+function foldDiacritics(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+}
+
+function parseAfrikaansCompoundNumber(token: string): number | null {
+  const folded = foldDiacritics(token.toLowerCase())
+  for (const [ones, onesValue] of Object.entries(AFRIKAANS_COMPOUND_ONES)) {
+    if (!folded.startsWith(ones)) continue
+    const rest = folded.slice(ones.length)
+    if (!rest.startsWith("en")) continue
+    const tensValue = AFRIKAANS_COMPOUND_TENS[rest.slice(2)]
+    if (tensValue !== undefined) return tensValue + onesValue
+  }
+  return null
+}
+
 /** True for any token `parsePositiveSpokenNumber` accepts inside a number
- *  phrase: digits, English/Afrikaans number words, and "hundred". */
+ *  phrase: digits, English/Afrikaans number words, "hundred", and Afrikaans
+ *  inverted compounds ("drieentwintig"). */
 export function isSpokenNumberToken(token: string): boolean {
+  const folded = foldDiacritics(token.toLowerCase())
   return (
-    /^\d+$/.test(token) || token in ONES || token in TENS || HUNDRED_WORDS.has(token)
+    /^\d+$/.test(folded) ||
+    Object.hasOwn(ONES, folded) ||
+    Object.hasOwn(TENS, folded) ||
+    HUNDRED_WORDS.has(folded) ||
+    parseAfrikaansCompoundNumber(folded) !== null
   )
 }
 
@@ -76,20 +124,51 @@ export function isSpokenNumberConnector(token: string): boolean {
   return token === "and" || token === "en"
 }
 
+/**
+ * Trim a captured tail down to the leading number phrase at its start. A
+ * capture after a cue word runs to the end of the utterance, so trailing
+ * service speech ("hymn 46 then we pray") must not be fed to the number
+ * parser; conversely, filler between the cue and the number ("our next hymn
+ * is number 302") must be skipped. Connector words are phrase-internal only
+ * ("ses en veertig"); at the edges they belong to the surrounding speech.
+ */
+export function extractSpokenNumberPhrase(phrase: string): string {
+  const out: string[] = []
+  for (const token of phrase.split(/\s+/).filter(Boolean)) {
+    if (isSpokenNumberToken(token) || isSpokenNumberConnector(token)) {
+      out.push(token)
+    } else if (out.length > 0) {
+      break
+    }
+  }
+  while (out.length > 0 && isSpokenNumberConnector(out[out.length - 1])) {
+    out.pop()
+  }
+  let start = 0
+  while (start < out.length && isSpokenNumberConnector(out[start])) start++
+  return out.slice(start).join(" ")
+}
+
 function parseUnderHundred(words: string[]): number | null {
   if (words.length === 1) {
-    return ONES[words[0]] ?? TENS[words[0]] ?? null
+    const single = words[0]
+    const exact = Object.hasOwn(ONES, single)
+      ? ONES[single]
+      : Object.hasOwn(TENS, single)
+        ? TENS[single]
+        : parseAfrikaansCompoundNumber(single)
+    return exact ?? null
   }
 
-  if (words.length === 2 && words[0] in TENS && words[1] in ONES) {
+  if (words.length === 2 && Object.hasOwn(TENS, words[0]) && Object.hasOwn(ONES, words[1])) {
     return TENS[words[0]] + ONES[words[1]]
   }
 
   if (
     words.length === 3 &&
-    words[0] in ONES &&
+    Object.hasOwn(ONES, words[0]) &&
     (words[1] === "and" || words[1] === "en") &&
-    words[2] in TENS
+    Object.hasOwn(TENS, words[2])
   ) {
     return TENS[words[2]] + ONES[words[0]]
   }
@@ -98,7 +177,7 @@ function parseUnderHundred(words: string[]): number | null {
 }
 
 export function parsePositiveSpokenNumber(value: string): number | null {
-  const normalized = value.trim().toLowerCase()
+  const normalized = foldDiacritics(value.trim().toLowerCase())
   if (!normalized) return null
 
   if (/^\d+$/.test(normalized)) {
@@ -117,8 +196,7 @@ export function parsePositiveSpokenNumber(value: string): number | null {
   }
 
   if (hundredIndex > 1) return null
-  const multiplier =
-    hundredIndex === 0 ? 1 : (ONES[words[0]] ?? Number.NaN)
+  const multiplier = hundredIndex === 0 ? 1 : (ONES[words[0]] ?? Number.NaN)
   if (!Number.isInteger(multiplier) || multiplier <= 0 || multiplier > 9) {
     return null
   }

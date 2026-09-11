@@ -125,6 +125,16 @@ describe("queue item voice control", () => {
   })
 
   it.each([
+    ["go to item 3 please", 3],
+    ["show item 2 again", 2],
+    ["item number 4 now", 4],
+    ["go to item twelve please", 12],
+    ["item tweeëntwintig", 22],
+  ])("parses %s with polite trailing filler", (text, expected) => {
+    expect(parseQueueItemCommand(text)).toBe(expected)
+  })
+
+  it.each([
     "",
     "item",
     "item 0",
@@ -133,6 +143,9 @@ describe("queue item voice control", () => {
     "item one in our discussion is faith",
     "the first item is prayer",
     "John 3:16",
+    // Polite fillers are stripped at the tail only; mid-phrase words keep
+    // prose rejected.
+    "item one please in our discussion is faith",
   ])("rejects non-command text: %s", (text) => {
     expect(parseQueueItemCommand(text)).toBeNull()
   })

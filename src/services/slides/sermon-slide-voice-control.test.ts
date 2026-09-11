@@ -79,6 +79,48 @@ describe("sermon slide voice control", () => {
     expect(parseSermonSlideCommand("today we talk about grace")).toBeNull()
   })
 
+  it("parses spoken slide numbers directly after the cue", () => {
+    expect(parseSermonSlideCommand("go to slide three")).toEqual({
+      kind: "jump",
+      slideNumber: 3,
+    })
+    expect(parseSermonSlideCommand("slide number three")).toEqual({
+      kind: "jump",
+      slideNumber: 3,
+    })
+    expect(parseSermonSlideCommand("slide twenty one")).toEqual({
+      kind: "jump",
+      slideNumber: 21,
+    })
+    expect(parseSermonSlideCommand("slide drieentwintig")).toEqual({
+      kind: "jump",
+      slideNumber: 23,
+    })
+  })
+
+  it("keeps digit-tail behavior identical to the digits-only parser", () => {
+    expect(parseSermonSlideCommand("slide 3 please")).toEqual({
+      kind: "jump",
+      slideNumber: 3,
+    })
+    expect(parseSermonSlideCommand("slide 2-3")).toEqual({
+      kind: "jump",
+      slideNumber: 2,
+    })
+    expect(parseSermonSlideCommand("slide 1000")).toBeNull()
+    expect(parseSermonSlideCommand("slide 0")).toBeNull()
+    expect(parseSermonSlideCommand("slide 2abc")).toBeNull()
+  })
+
+  it("does not jump on prose that merely contains a number after 'slide'", () => {
+    // "the next slide shows three examples" must keep advancing, not jump.
+    expect(parseSermonSlideCommand("the next slide shows three examples")).toEqual({
+      kind: "next",
+    })
+    expect(parseSermonSlideCommand("slide deck has three parts")).toBeNull()
+    expect(parseSermonSlideCommand("slide shows")).toBeNull()
+  })
+
   it("presents requested active-item slide live", () => {
     expect(handleSermonSlideVoiceControl("slide 2")).toBe(true)
 

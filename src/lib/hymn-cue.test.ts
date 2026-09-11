@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-  extractHymnNumberPhrase,
-  looksLikeHymnCommand,
-  matchHymnCue,
-} from "./hymn-cue"
+import { looksLikeHymnCommand, matchHymnCue } from "./hymn-cue"
 
 describe("looksLikeHymnCommand (transcript_final gate)", () => {
   it("passes the phrasings the 2026-09-11 live session produced", () => {
@@ -21,6 +17,11 @@ describe("looksLikeHymnCommand (transcript_final gate)", () => {
   it("passes cue words followed by filler before the number", () => {
     expect(looksLikeHymnCommand("our next hymn is number 302")).toBe(true)
     expect(looksLikeHymnCommand("let us sing hymn 46 together")).toBe(true)
+  })
+
+  it("passes Afrikaans compound numbers written with a diaeresis", () => {
+    expect(looksLikeHymnCommand("Hymn tweeëntwintig.")).toBe(true)
+    expect(looksLikeHymnCommand("lied drieëntwintig")).toBe(true)
   })
 
   it("keeps existing cue variants passing", () => {
@@ -50,30 +51,5 @@ describe("matchHymnCue", () => {
     expect(matchHymnCue("SDA hymn 100")).toBe("100")
     expect(matchHymnCue("our next hymn is number 302")).toBe("is number 302")
     expect(matchHymnCue("let us pray")).toBeNull()
-  })
-})
-
-describe("extractHymnNumberPhrase", () => {
-  it("keeps the leading number run", () => {
-    expect(extractHymnNumberPhrase("is number 302")).toBe("302")
-    expect(extractHymnNumberPhrase("46 together")).toBe("46")
-    expect(extractHymnNumberPhrase("one hundred")).toBe("one hundred")
-    expect(extractHymnNumberPhrase("ses en veertig")).toBe("ses en veertig")
-  })
-
-  it("stops at the first non-number word once a number started", () => {
-    expect(extractHymnNumberPhrase("46 and then the sermon")).toBe("46")
-    expect(extractHymnNumberPhrase("46 or 53")).toBe("46")
-  })
-
-  it("drops connector words at the phrase edges only", () => {
-    expect(extractHymnNumberPhrase("46 and")).toBe("46")
-    expect(extractHymnNumberPhrase("een en")).toBe("een")
-    expect(extractHymnNumberPhrase("and 46")).toBe("46")
-  })
-
-  it("returns an empty string when no number token is present", () => {
-    expect(extractHymnNumberPhrase("number")).toBe("")
-    expect(extractHymnNumberPhrase("")).toBe("")
   })
 })
