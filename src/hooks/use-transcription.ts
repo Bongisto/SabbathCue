@@ -21,6 +21,7 @@ import {
 import { handleSermonSlideVoiceControl } from "@/services/slides/sermon-slide-voice-control"
 import { handleQueueItemVoiceControl } from "@/services/queue/queue-voice-control"
 import { loadHymnVoiceControl } from "@/services/hymnal/hymn-voice-control-loader"
+import { looksLikeHymnCommand } from "@/lib/hymn-cue"
 import {
   recordWorkflowTrace,
   traceDetectionBatchDetails,
@@ -57,8 +58,6 @@ const MISSING_DEEPGRAM_KEY_MARKER = "No Deepgram API key"
 const MISSING_SONIOX_KEY_MARKER = "No Soniox API key"
 const MISSING_SPEECHMATICS_KEY_MARKER = "No Speechmatics API key"
 const NOT_RUNNING_ERROR = "Transcription is not running"
-const MAYBE_HYMN_CUE_PATTERN =
-  /\b(?:(?:sda|adventist|adventiste|seventh(?:\s|-)?day\s+adventist|sewende(?:\s|-)?dag\s+adventiste)\s+(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke)|(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke))(?:\s+(?:number|nommer))?\s+[a-z0-9]/i
 const BILLING_ERROR_PATTERN =
   /\b(?:402|balance exhausted|insufficient balance|insufficient[_ ]funds|quota|credits?|billing|payment|tokens?|funds?|autopay)\b/i
 const AUTH_ERROR_PATTERN =
@@ -282,7 +281,7 @@ export async function handleTranscriptFinalPayload(
   })
   if (handleSermonSlideVoiceControl(payload.text)) return
   if (handleQueueItemVoiceControl(payload.text)) return
-  if (!MAYBE_HYMN_CUE_PATTERN.test(payload.text)) return
+  if (!looksLikeHymnCommand(payload.text)) return
 
   const { handleHymnVoiceControl } = await loadHymnVoiceControl()
   await handleHymnVoiceControl(payload.text)

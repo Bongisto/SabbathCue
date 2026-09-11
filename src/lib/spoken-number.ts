@@ -60,6 +60,22 @@ const TENS: Record<string, number> = {
   negentig: 90,
 }
 
+const HUNDRED_WORDS = new Set(["hundred", "honderd"])
+
+/** True for any token `parsePositiveSpokenNumber` accepts inside a number
+ *  phrase: digits, English/Afrikaans number words, and "hundred". */
+export function isSpokenNumberToken(token: string): boolean {
+  return (
+    /^\d+$/.test(token) || token in ONES || token in TENS || HUNDRED_WORDS.has(token)
+  )
+}
+
+/** Connector words ("and"/"en") that may sit inside a number phrase but are
+ *  meaningless at its edges ("hymn 46 and then…"). */
+export function isSpokenNumberConnector(token: string): boolean {
+  return token === "and" || token === "en"
+}
+
 function parseUnderHundred(words: string[]): number | null {
   if (words.length === 1) {
     return ONES[words[0]] ?? TENS[words[0]] ?? null

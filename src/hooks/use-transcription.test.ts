@@ -682,6 +682,11 @@ describe("use-transcription", () => {
         "SDA lied 100",
         "Adventiste liedboek 100",
         "Sewendedag Adventiste lied 100",
+        // 2026-09-11 live-session regressions: the "No." abbreviation and
+        // punctuation-glued numbers must still reach the hymn handler.
+        "Hymn No. 46.",
+        "Song No. 53.",
+        "hymn #46",
       ]) {
         handleHymnVoiceControlMock.mockClear()
 

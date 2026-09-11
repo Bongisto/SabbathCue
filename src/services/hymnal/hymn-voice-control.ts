@@ -9,6 +9,7 @@ import {
 import { addRecentHymn } from "@/services/hymnal/hymnal-history"
 import { getHymnByNumber } from "@/services/hymnal/hymnal-repository"
 import { parsePositiveSpokenNumber } from "@/lib/spoken-number"
+import { extractHymnNumberPhrase, matchHymnCue } from "@/lib/hymn-cue"
 import { getBroadcastLiveStore } from "@/stores/broadcast/live-store"
 import { useDetectionStore } from "@/stores/detection-store"
 import { useHymnSlideStore } from "@/stores/hymn-slide-store"
@@ -23,42 +24,17 @@ import type {
 const VALID_HYMN_NUMBERS: Set<number> = new Set(SDA_HYMNAL_INDEX.map((hymn) => hymn.number))
 const DEDUPE_WINDOW_MS = 5000
 
-const HYMN_CUE_WORD_PATTERN =
-  "(?:hymn|hymns|hymnal|hymnals|song|songs|lied|liedere|liedboek|liedboeke)"
-const HYMN_COLLECTION_PATTERN =
-  "(?:sda|adventist|adventiste|seventh(?:\\s|-)?day\\s+adventist|sewende(?:\\s|-)?dag\\s+adventiste)"
-const HYMN_CUE_PATTERN = new RegExp(
-  `\\b(?:${HYMN_COLLECTION_PATTERN}\\s+${HYMN_CUE_WORD_PATTERN}|${HYMN_CUE_WORD_PATTERN})(?:\\s+(?:number|nommer))?\\s+([a-z0-9][a-z0-9\\s-]*)`,
-  "i"
-)
-
 let lastHandled: { hymnNumber: number; at: number } | null = null
-
-function normalizeTranscript(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
 
 function isValidHymnNumber(number: number): boolean {
   return Number.isInteger(number) && number > 0 && VALID_HYMN_NUMBERS.has(number)
 }
 
-function parseNumberPhrase(phrase: string): number | null {
-  return parsePositiveSpokenNumber(phrase)
-}
-
 export function parseHymnCommand(text: string): number | null {
-  const normalized = normalizeTranscript(text)
-  if (!normalized) return null
+  const numberPhrase = matchHymnCue(text)
+  if (numberPhrase === null) return null
 
-  const match = normalized.match(HYMN_CUE_PATTERN)
-  if (!match) return null
-
-  const numberPhrase = match[1].split(/[,.!?;]/)[0]?.trim() ?? ""
-  const number = parseNumberPhrase(numberPhrase)
+  const number = parsePositiveSpokenNumber(extractHymnNumberPhrase(numberPhrase))
   if (number === null || !isValidHymnNumber(number)) return null
 
   return number

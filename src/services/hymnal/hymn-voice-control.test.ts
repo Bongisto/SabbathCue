@@ -109,6 +109,33 @@ describe("hymn voice control", () => {
       expect(parseHymnCommand("Sewendedag Adventiste lied een honderd")).toBe(100)
     })
 
+    it("accepts the No./nr abbreviations STT emits for 'number'", () => {
+      // Verbatim phrasings from the 2026-09-11 live session transcript.
+      expect(parseHymnCommand("Hymn No. 46.")).toBe(46)
+      expect(parseHymnCommand("Hymn No. 1")).toBe(1)
+      expect(parseHymnCommand("Hymn No. 47.")).toBe(47)
+      expect(parseHymnCommand("Hymn No. 100.")).toBe(100)
+      expect(parseHymnCommand("Song No. 53.")).toBe(53)
+      expect(parseHymnCommand("hymn no 46")).toBe(46)
+      expect(parseHymnCommand("hymn nr 46")).toBe(46)
+      expect(parseHymnCommand("lied nr 12")).toBe(12)
+    })
+
+    it("accepts punctuation glued to the cue or number", () => {
+      expect(parseHymnCommand("hymn #46")).toBe(46)
+      expect(parseHymnCommand("hymn: 46")).toBe(46)
+      expect(parseHymnCommand("song #53")).toBe(53)
+    })
+
+    it("accepts service speech after the number", () => {
+      expect(parseHymnCommand("let us sing hymn 46 together")).toBe(46)
+      expect(parseHymnCommand("we will open with hymn 46 this morning")).toBe(46)
+      expect(parseHymnCommand("please turn to song 53 in your hymnal")).toBe(53)
+      expect(parseHymnCommand("our next hymn is number 302")).toBe(302)
+      expect(parseHymnCommand("hymn 46 and then the sermon")).toBe(46)
+      expect(parseHymnCommand("hymn 46 or 53")).toBe(46)
+    })
+
     it("accepts natural service speech around hymn commands", () => {
       expect(parseHymnCommand("can we please open song twelve")).toBe(12)
       expect(parseHymnCommand("we will open with SDA hymn number one hundred")).toBe(100)
@@ -116,12 +143,20 @@ describe("hymn voice control", () => {
 
     it("rejects bare numbers and scripture-like text", () => {
       expect(parseHymnCommand("12")).toBeNull()
+      expect(parseHymnCommand("47.")).toBeNull()
       expect(parseHymnCommand("John 3 16")).toBeNull()
       expect(parseHymnCommand("chapter 3 verse 16")).toBeNull()
     })
 
+    it("rejects cue words without a usable number", () => {
+      expect(parseHymnCommand("hymn number")).toBeNull()
+      expect(parseHymnCommand("song books")).toBeNull()
+      expect(parseHymnCommand("hymn zero")).toBeNull()
+    })
+
     it("rejects out-of-range hymn numbers before loading data", () => {
       expect(parseHymnCommand("hymn 9999")).toBeNull()
+      expect(parseHymnCommand("hymn 696")).toBeNull()
     })
   })
 

@@ -728,7 +728,13 @@ fn is_hymn_or_song_number_command(text: &str) -> bool {
         }
 
         let mut number_start = index + 1;
-        if matches!(tokens.get(number_start), Some(&("number" | "nommer"))) {
+        // "no"/"nr" are the abbreviations STT emits for the spoken word
+        // "number" ("Hymn No. 46"); missing them let hymn commands leak into
+        // live semantic search as keyword noise.
+        if matches!(
+            tokens.get(number_start),
+            Some(&("number" | "nommer" | "no" | "nr"))
+        ) {
             number_start += 1;
         }
 
@@ -2245,6 +2251,12 @@ mod tests {
         // semantic paraphrase search must skip these so it does not flood the
         // detections panel with keyword noise.
         assert!(is_voice_command_utterance("Hymn number 46"));
+        // 2026-09-11 live-session regressions: the "No." abbreviation STT
+        // emits for the spoken word "number" must be a hymn command too, not
+        // semantic-search fodder.
+        assert!(is_voice_command_utterance("Hymn No. 46."));
+        assert!(is_voice_command_utterance("Song No. 53"));
+        assert!(is_voice_command_utterance("lied nr 12"));
         assert!(is_voice_command_utterance(
             "I need the new living translation."
         ));
