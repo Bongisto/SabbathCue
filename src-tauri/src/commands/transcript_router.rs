@@ -435,6 +435,20 @@ mod tests {
     }
 
     #[test]
+    fn genesis_1_1_spoken_citation_final_still_dispatches() {
+        let mut router = TranscriptRouter::default();
+        let text = "and then in genesis chapter 1 verse 1 he says";
+        let partial = router.route(input(TranscriptEventKind::Partial, text));
+        assert!(partial.authoritative_detection.is_some());
+        let fin = router.route(input(TranscriptEventKind::Final, text));
+        assert_eq!(
+            fin.authoritative_detection.as_deref(),
+            Some(text),
+            "2026-09-18 seq=34 must still dispatch"
+        );
+    }
+
+    #[test]
     fn citation_final_after_matching_partial_still_dispatches() {
         // 2026-08-21: John 1:1 stayed suggestion-only because the Soniox
         // endpoint Final never reached detection (duplicate_final of a

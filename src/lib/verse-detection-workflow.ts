@@ -209,9 +209,6 @@ function detectionAllowedBySettings(
   if (!settings.semanticDetectionEnabled) {
     return false
   }
-  // Same floor the detections panel applies (isHiddenBySemanticSettings):
-  // a semantic EGW hit must not change the live output while its card is
-  // filtered out of the panel.
   const floor =
     detection.content_type === "egw"
       ? Math.max(
@@ -268,7 +265,6 @@ function rememberStableDirectCitation(detection: DetectionResult): void {
   ) {
     return
   }
-  // Do not sticky-lock on provisional single-digit partials.
   if (detection.verse >= 1 && detection.verse <= 9) return
   lastStableDirectCitation = {
     book_number: detection.book_number,
@@ -425,7 +421,6 @@ function selectPreviewHit(
     liveScriptureCoords()
   )
   if (!refined) {
-    // Adjacent semantic steal blocked — keep direct-only finalists (may be none).
     return bestDetection(
       aiConfirmed ? [...directHits, aiConfirmed] : directHits
     )
@@ -616,9 +611,7 @@ function discardStaleDetectionBatch(
   return true
 }
 
-export function resetSemanticConfirmationForTests() {
-  // no-op: backend is single presentation authority
-}
+export function resetSemanticConfirmationForTests() {}
 
 export function pendingSemanticConfirmationCountForTests() {
   return 0
@@ -630,7 +623,6 @@ function confirmedSemanticHit(
   if (!detection) {
     return null
   }
-  // Backend authorization is the only presentation commit signal.
   if (!mayPreview(detection)) {
     return null
   }

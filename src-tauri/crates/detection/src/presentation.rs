@@ -153,11 +153,6 @@ pub fn classify_job(
 
 pub fn looks_like_verse_request(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
-    // "There's a verse that says he leadeth me…" is the most common spoken way
-    // operators cite without naming book/chapter. Live 2026-08-24 dropped
-    // Psalm 23 finals (candidates=3..5 then semantic_none) because only the
-    // "show … verse"/"verse about" shapes were recognized, so paraphrased
-    // quotes were judged under the strict quotation contract and rejected.
     let asks = lower.contains("show")
         || lower.contains("talks about")
         || lower.contains("talk about")
@@ -169,9 +164,6 @@ pub fn looks_like_verse_request(text: &str) -> bool {
         || lower.contains("verse where")
         || lower.contains("verse that says")
         || lower.contains("verse which says")
-        // Operators also identify a passage before quoting it: "the verse is
-        // in the book of John, which says ...". Treat that as a request even
-        // when endpointing drops the earlier "there's a verse" clause.
         || (lower.contains("verse")
             && lower.contains("says")
             && (lower.contains("book of") || lower.contains("in the book")))
@@ -224,11 +216,6 @@ fn decide_quotation(evidence: &PresentationEvidence) -> PresentationDecision {
     if !confirmed {
         return PresentationDecision::Reject;
     }
-    // A zero margin means two verses are tied, not that the quote is fake.
-    // Live 2026-08-23 dropped the Ephesians 3:20 final (candidates=2,
-    // semantic_none) because margin 0 failed the same Reject gate as
-    // "no lexical quote". Keep the winner on preview; auto-live still
-    // requires a unique enough top hit.
     let unique_enough = evidence.candidate_margin + f64::EPSILON >= QUOTATION_MIN_MARGIN;
     if evidence.automation_live_enabled && unique_enough {
         PresentationDecision::LiveAuthorized

@@ -29,9 +29,6 @@ pub(crate) fn record_egw_cue(books: &[EgwBook], text: &str, cue_at_ms: &AtomicU6
     crate::commands::detection::note_and_check_egw_cue(books, text, now_ms, cue_at_ms);
 }
 
-/// Check whether the operator has paused detection suggestions.
-/// Uses a blocking lock so the pause flag is authoritative.
-/// The lock is held only for an atomic load, so transcript events are not blocked.
 pub(crate) fn is_detection_paused(app: &AppHandle) -> bool {
     let state: State<'_, Mutex<AppState>> = app.state();
     let paused = match state.lock() {
@@ -65,43 +62,13 @@ pub(crate) const PARTIAL_SEMANTIC_DEBOUNCE: Duration = Duration::from_millis(100
 pub(crate) const PARTIAL_SEMANTIC_MIN_WORDS: usize = 3;
 pub(crate) const LIVE_SEMANTIC_CAP: usize = 3;
 pub(crate) const LIVE_SEMANTIC_OVERLAP_BOOST: f64 = 0.10;
-/// Default minimum confidence for live semantic/FTS detections.
-/// The active value is synced from the app settings; tests use this default.
 #[cfg(test)]
 pub(crate) const LIVE_SEMANTIC_MIN_CONFIDENCE: f64 = 0.70;
 
-/// Maximum trailing words of the rolling transcript window fed to live
-/// semantic + FTS5 detection.
-///
-/// Must fit a spoken verse, not a clause. John 3:16 is ~27 words; Ephesians
-/// 3:20 is ~28. At 12 words the 2026-08-23 session kept only
-/// "shall ever believe in Him should not perish, but have everlasting life."
-/// — overlap 0.78, below fire, so authorize rejected the quotation and Desire
-/// of Ages p.419 (40-word EGW window) replaced it. `trim_to_sentence_start`
-/// already drops the previous sentence, which was the original reason for 12.
 pub(crate) const LIVE_DETECTION_WINDOW_WORDS: usize = 40;
 
-/// How long an identical direct reference stays suppressed after being emitted.
-///
-/// Every dispatched partial re-runs direct detection, so one slowly-spoken
-/// "John 3 verse 16" emits `John 3:1` once per partial while the verse number
-/// is still arriving — 12 times in 2s on 2026-08-04. The frontend store keys
-/// detections by reference so these collapse to one row, but each re-emission
-/// refreshes its `received_at`, keeping a superseded reference as "recent" as
-/// the verse the speaker actually reached.
 pub(crate) const DIRECT_REPEAT_SUPPRESSION: Duration = Duration::from_secs(3);
 
-/// Suppress re-emission of references already sent very recently.
-///
-/// Keyed on the resolved reference rather than the transcript, so a refined
-/// reference (`John 3:16` after `John 3:1`) is always a distinct key and is
-/// never suppressed by its own prefix.
-///
-/// `is_chapter_only` is part of the key: a chapter-only placeholder that
-/// defaults to verse 1 (`Matthew 1:1` at 92%) must not suppress the later full
-/// citation of the same verse (`Matthew 1:1` at 100%). Frontend preview and
-/// auto-live ignore chapter-only hits, so suppressing the upgrade left verse 1
-/// citations with no preview/live path.
 #[derive(Default)]
 pub(crate) struct RecentDirectEmissions {
     seen: std::collections::HashMap<DirectEmissionKey, DirectEmissionState>,
@@ -120,9 +87,6 @@ impl RecentDirectEmissions {
         self.suppress_repeats_with_finality(results, window, now, false);
     }
 
-    /// A final transcript is the first live-authorized form of a citation
-    /// whose partial was suggestion-only. Let that upgrade through even when
-    /// the same reference was emitted provisionally from a partial.
     pub(crate) fn suppress_repeats_final(
         &mut self,
         results: &mut Vec<crate::commands::detection::DetectionResult>,
@@ -139,7 +103,6 @@ impl RecentDirectEmissions {
         now: std::time::Instant,
         from_final: bool,
     ) {
-        // Bound growth on a long service without needing a separate sweep.
         self.seen
             .retain(|_, (seen_at, _)| now.duration_since(*seen_at) < window.saturating_mul(4));
         results.retain(|result| {
@@ -170,27 +133,10 @@ impl RecentDirectEmissions {
     }
 }
 
-/// Maximum trailing words of the rolling window fed to live EGW quote matching.
-///
-/// Same width as the Bible verse window: both need a full spoken sentence
-/// (25–40 words). Adjacent-sentence pollution is handled by
-/// `trim_to_sentence_start` on the Bible path; EGW run-matching ignores
-/// non-matching leading words, so it does not trim.
 pub(crate) const LIVE_EGW_QUOTE_WINDOW_WORDS: usize = 40;
 
-/// Clear the rolling detection window after this much silence between finals.
 pub(crate) const WINDOW_RESET_GAP: Duration = Duration::from_secs(8);
 
-/// Move auto-queue off provisional single-digit citations onto the digit-stable
-/// one in the same batch.
-///
-/// STT partials emit `Matthew 6:3` before `6:33` finishes arriving, so a
-/// single-digit full citation must never auto-fire. If stripping it left the
-/// batch with no auto-queue at all, hand the flag to the strongest multi-digit
-/// citation — live 2026-08-04 left `John 3:16` at `auto_q=false` after `3:1`
-/// consumed the merger's single slot. The re-award still has to clear the
-/// operator's threshold, so a hit the merger would have refused cannot inherit
-/// it (Manual mode sets the threshold to infinity and blocks this entirely).
 pub(crate) fn rebalance_auto_queue_for_digit_growth(
     results: &mut [crate::commands::detection::DetectionResult],
     auto_queue_threshold: f64,
@@ -617,6 +563,23 @@ mod tests {
     }
 
     #[test]
+    fn named_book_verse_one_restarts_reading_on_a_different_book() {
+        let genesis_1_1 = reading_candidate(1, 1, 1, 1.0, false);
+        assert!(
+            should_restart_reading(true, 43, 1, Some(1), &genesis_1_1),
+            "2026-09-18: Genesis 1:1 must leave John 1"
+        );
+    }
+
+    #[test]
+    fn verse_one_without_a_different_book_does_not_leave_john() {
+        let john_1_1 = reading_candidate(43, 1, 1, 1.0, false);
+        assert!(!should_restart_reading(true, 43, 1, Some(2), &john_1_1));
+        let chapter_only = reading_candidate(1, 1, 1, 0.88, true);
+        assert!(!should_restart_reading(true, 43, 1, Some(1), &chapter_only));
+    }
+
+    #[test]
     fn single_digit_full_citation_does_not_reanchor_during_digit_growth() {
         // Live: Matthew 6:1 (chapter-only) then provisional Matthew 6:3 before 6:33.
         let provisional = reading_candidate(40, 6, 3, 1.0, false);
@@ -898,6 +861,50 @@ mod tests {
             repeated_final.is_empty(),
             "only the first final citation may replace the provisional repeat"
         );
+    }
+
+    #[test]
+    fn genesis_1_1_phrase_final_upgrades_the_matching_partial() {
+        let mut recent = RecentDirectEmissions::default();
+        let start = std::time::Instant::now();
+
+        let mut partial = vec![direct_result("Genesis 1:1", 1, 1, 1, false)];
+        recent.suppress_repeats(&mut partial, DIRECT_REPEAT_SUPPRESSION, start);
+        assert_eq!(partial.len(), 1);
+
+        let mut phrase_final = vec![direct_result("Genesis 1:1", 1, 1, 1, false)];
+        recent.suppress_repeats(
+            &mut phrase_final,
+            DIRECT_REPEAT_SUPPRESSION,
+            start + Duration::from_millis(200),
+        );
+        assert!(
+            phrase_final.is_empty(),
+            "a non-final repeat of Genesis 1:1 is the 2026-09-18 miss"
+        );
+
+        let mut recent = RecentDirectEmissions::default();
+        let mut partial = vec![direct_result("Genesis 1:1", 1, 1, 1, false)];
+        recent.suppress_repeats(&mut partial, DIRECT_REPEAT_SUPPRESSION, start);
+        let mut router_final = vec![direct_result("Genesis 1:1", 1, 1, 1, false)];
+        recent.suppress_repeats_final(
+            &mut router_final,
+            DIRECT_REPEAT_SUPPRESSION,
+            start + Duration::from_millis(200),
+        );
+        assert_eq!(
+            router_final.len(),
+            1,
+            "router Final must upgrade Genesis 1:1 even when speech_final is false"
+        );
+
+        let mut again = vec![direct_result("Genesis 1:1", 1, 1, 1, false)];
+        recent.suppress_repeats_final(
+            &mut again,
+            DIRECT_REPEAT_SUPPRESSION,
+            start + Duration::from_millis(400),
+        );
+        assert!(again.is_empty());
     }
 
     #[test]

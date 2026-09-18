@@ -1,9 +1,4 @@
-//! Pure, stateless detection logic peeled out of the live detection loop.
-//!
-//! Nothing here touches `AppHandle`, managed state, or IPC — these are the
-//! transcript-window, reading-mode-decision, and reading-scope-filter helpers
-//! that the live loop in `detection.rs` calls into. Keeping them separate makes
-//! them trivially unit-testable and shrinks the orchestration surface.
+//! Stateless detection helpers used by the live STT loop.
 
 use rhema_detection::{
     decide_presentation, MergedDetection, PresentationEvidence, PresentationGrant, VerseRef,
@@ -16,28 +11,14 @@ pub(crate) struct DirectReadingCandidate {
     pub(crate) is_chapter_only: bool,
 }
 
-/// Return the last `max_words` whitespace-delimited words of `text`, re-joined
-/// with single spaces.
 pub(crate) fn clamp_to_recent_words(text: &str, max_words: usize) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     let start = words.len().saturating_sub(max_words);
     words[start..].join(" ")
 }
 
-/// Minimum words that must remain for `trim_to_sentence_start` to drop a
-/// leading partial sentence. Below this, the mixed window is still a better
-/// query than a fragment.
 pub(crate) const SENTENCE_TRIM_MIN_WORDS: usize = 6;
 
-/// Drop leading partial sentences from a rolling transcript window so the
-/// semantic query starts at a sentence boundary.
-///
-/// The fixed-width window usually straddles two spoken sentences (the tail of
-/// the previous verse plus the head of the current one), which dilutes BM25
-/// and the embedding enough that neither verse surfaces. Trimming to the last
-/// sentence start turns "One, two, testing. The Lord is my shepherd; I shall
-/// not want" into a clean verse query. Keeps the mixed window when fewer than
-/// `min_words` would remain.
 pub(crate) fn trim_to_sentence_start(text: &str, min_words: usize) -> String {
     let mut current = text.trim();
     while let Some(idx) = current.find(['.', '?', '!']) {
@@ -50,22 +31,7 @@ pub(crate) fn trim_to_sentence_start(text: &str, min_words: usize) -> String {
     current.to_string()
 }
 
-/// Strip reference-navigation scaffolding ("chapter", "verse", "it says", and
-/// bare numbers) from a transcript window before it is used to build FTS5 /
-/// vector search queries.
-///
-/// When a preacher reads a reference aloud ("chapter 7 verse 9 it says ...")
-/// those framing words otherwise dominate BM25 matching and pollute the
-/// embedding, surfacing irrelevant verses. The spoken reference itself is
-/// already owned by the direct path, so only the surrounding verse content
-/// should drive paraphrase search. Original casing of kept tokens is preserved;
-/// the displayed transcript is unaffected.
 pub(crate) fn strip_reference_scaffolding(text: &str) -> String {
-    // A request can arrive as its own final before the quoted content (for
-    // example, "there's another verse that says—"). Searching that frame
-    // alone produces an arbitrary semantic hit. Keep only the content after
-    // the request marker; an empty tail is intentionally left empty so the
-    // live worker skips the search.
     let text = if rhema_detection::looks_like_verse_request(text) {
         let lower = text.to_ascii_lowercase();
         [
@@ -156,7 +122,6 @@ pub(crate) fn spoken_book_hint(transcript: &str) -> Option<i32> {
     for book_match in &matches {
         if let Some(vr) = parse_reference(transcript, book_match) {
             if vr.verse_start > 0 {
-                // Complete reference — direct path owns it.
                 return None;
             }
         }
@@ -174,13 +139,6 @@ pub(crate) fn transcript_defers_to_direct(text: &str) -> bool {
     if rhema_detection::is_voice_command_utterance(text) {
         return true;
     }
-    // "There's another verse in Exodus that talks about keeping the Sabbath"
-    // mentions a book and the word "verse", but it is a request for content,
-    // not a citation: the direct path parses no reference out of it and the
-    // semantic pass silently never runs. Live 2026-08-24 seq=222 routed such
-    // a final and then emitted nothing at all. Request phrasing therefore
-    // overrides the reference heuristic; real citations ("John chapter 3
-    // verse 16") contain no request phrasing and still defer.
     if rhema_detection::looks_like_verse_request(text) {
         return false;
     }
@@ -234,13 +192,10 @@ pub(crate) fn grant_for_detection(
     })
 }
 
-/// STT partials often emit the first digit of a multi-digit verse ("verse 3"
-/// before "verse 33"). Those single-digit full citations are provisional.
 pub(crate) fn verse_digits_could_grow(verse: i32) -> bool {
     (1..=9).contains(&verse)
 }
 
-/// True when `longer` is `shorter` with extra trailing digits (3→33, 1→15).
 pub(crate) fn is_digit_prefix_extension(shorter: i32, longer: i32) -> bool {
     if shorter <= 0 || longer <= shorter {
         return false;
@@ -264,7 +219,6 @@ pub(crate) fn direct_reading_candidates(
         })
         .collect();
 
-    // Prefer the digit-stable form when the same batch contains 6:3 and 6:33.
     candidates
         .iter()
         .filter(|candidate| {
@@ -287,12 +241,10 @@ pub(crate) fn choose_reading_candidate(
     candidates: &[DirectReadingCandidate],
     active_scope: Option<(i32, i32)>,
 ) -> Option<DirectReadingCandidate> {
-    // Prefer non-growable full citations over provisional single-digit ones.
     let rank = |candidate: &DirectReadingCandidate| -> (u8, i32) {
         let provisional = u8::from(
             !candidate.is_chapter_only && verse_digits_could_grow(candidate.verse_ref.verse_start),
         );
-        // Lower provisional rank wins; then higher verse number.
         (provisional, -candidate.verse_ref.verse_start)
     };
 
@@ -326,19 +278,7 @@ pub(crate) fn choose_reading_candidate(
     pick_best(candidates)
 }
 
-/// Decide whether a fresh direct detection should (re)start reading mode.
-///
-/// Same book+chapter normally means "already tracking this" — but a specific
-/// verse reference (not a bare chapter default) that names a different verse
-/// than the current position re-anchors reading mode to it. Without this, a
-/// chapter-only hit ("Malachi 3" → 3:1) pins the cursor at verse 1 even after
-/// the speaker announces "verses 16-18", and stray word-overlap can then
-/// false-advance to a nearby low verse. Chapter-only hits never re-anchor, so
-/// this cannot thrash the cursor back to verse 1.
-///
-/// Single-digit full citations are also withheld from re-anchor/start races:
-/// STT often emits Matthew 6:3 before Matthew 6:33. Multi-digit (stable) hits
-/// still re-anchor immediately.
+/// Same-book growable verses wait; a named different book may restart on verse 1.
 pub(crate) fn should_restart_reading(
     active: bool,
     current_book: i32,
@@ -349,9 +289,6 @@ pub(crate) fn should_restart_reading(
     let recent = &candidate.verse_ref;
 
     if !active {
-        // Fresh/paused: only a complete, non-fuzzy citation may start reading
-        // mode. Chapter-only placeholders keep internal context but never
-        // change what the church sees.
         if candidate.is_chapter_only {
             return false;
         }
@@ -365,12 +302,9 @@ pub(crate) fn should_restart_reading(
         if candidate.is_chapter_only {
             return false;
         }
-        // Never re-anchor onto a provisional single-digit full citation.
         if verse_digits_could_grow(recent.verse_start) {
             return false;
         }
-        // Re-anchor only to a specific verse ahead of where we are. Stale STT
-        // windows can replay the original lower verse after reading mode moves on.
         return match current_verse {
             Some(current) => recent.verse_start > current,
             None => true,
@@ -381,49 +315,21 @@ pub(crate) fn should_restart_reading(
         if candidate.is_chapter_only {
             return false;
         }
-        if verse_digits_could_grow(recent.verse_start) {
-            return false;
-        }
-        // Different book — only an explicit, high-confidence citation restarts.
         return candidate.confidence >= 0.90;
     }
 
-    // Same book, different chapter — natural progression, but not for growable.
     if !candidate.is_chapter_only && verse_digits_could_grow(recent.verse_start) {
         return false;
     }
     true
 }
 
-/// No verse match in the reading chapter for this long means the speaker has
-/// likely moved on; the scope may be released by an out-of-scope semantic hit.
 pub(crate) const READING_SCOPE_STALE_SECS: u64 = 20;
 
-/// Short live-speech pause before repeated out-of-scope semantic hits may
-/// release reading scope at the operator's threshold. Single hits still wait
-/// for `READING_SCOPE_STALE_SECS`.
 pub(crate) const READING_SCOPE_LIVE_PAUSE_SECS: u64 = 6;
 
-/// Minimum confidence for an out-of-scope semantic hit to release the reading
-/// scope via the fast consecutive-hit streak (before the scope is stale).
-/// Kept well above `LIVE_SEMANTIC_MIN_CONFIDENCE` so keyword noise never
-/// unlocks the scope mid-reading. The stale-release path uses the operator's
-/// live semantic threshold instead.
 pub(crate) const READING_SCOPE_RELEASE_MIN_CONFIDENCE: f64 = 0.85;
 
-/// While reading mode is advancing, out-of-scope semantic hits are
-/// parallel-passage echoes and stay suppressed. Once the scope is stale (no
-/// verse matched for `READING_SCOPE_STALE_SECS` — including never, when a bare
-/// citation anchored the scope but the speaker moved on without reading), a
-/// semantic hit outside the anchored chapter — a different book, or another
-/// chapter of the same book — means the speaker has moved on and the scope
-/// should be released instead of blanket-suppressing until the reading-mode
-/// timeout.
-///
-/// `min_confidence` is the operator's live semantic threshold: any hit that
-/// clears it would be SHOWN were the scope not active, so it is strong enough
-/// evidence to release a scope that is already stale. (A fixed 0.85 bar here
-/// left real quote-overlap hits at ~0.79 suppressed for the full timeout.)
 pub(crate) fn should_release_stale_reading_scope(
     results: &[crate::commands::detection::DetectionResult],
     scope_book_number: i32,
@@ -436,8 +342,6 @@ pub(crate) fn should_release_stale_reading_scope(
             .is_some()
 }
 
-/// Book+chapter eligible for a repeated-hit live-pause release. The caller must
-/// still require the same out-of-scope scope to repeat before releasing.
 pub(crate) fn live_pause_out_of_scope_bible_book(
     results: &[crate::commands::detection::DetectionResult],
     scope_book_number: i32,
@@ -452,15 +356,8 @@ pub(crate) fn live_pause_out_of_scope_bible_book(
     out_of_scope_bible_book(results, scope_book_number, scope_chapter, min_confidence)
 }
 
-/// Consecutive strong out-of-scope hits on the same book+chapter needed to
-/// release the reading scope before the staleness clock. One echo pass is
-/// noise; a repeat on the same passage means the speaker has moved there.
 pub(crate) const READING_SCOPE_RELEASE_STREAK: u32 = 2;
 
-/// Book+chapter of a semantic Bible hit outside the anchored book+chapter
-/// scope at or above `min_confidence`, if any. Same-book hits in a *different
-/// chapter* count: reading a chapter aloud does not strongly match its
-/// sibling chapters, so such a hit is real navigation, not an echo.
 pub(crate) fn out_of_scope_bible_book(
     results: &[crate::commands::detection::DetectionResult],
     scope_book_number: i32,
@@ -477,9 +374,6 @@ pub(crate) fn out_of_scope_bible_book(
         .map(|result| (result.book_number, result.chapter))
 }
 
-/// Strong out-of-scope hit for the fast streak release, which fires while the
-/// scope is NOT yet stale — the high bar keeps parallel-passage echoes from
-/// unlocking suppression during genuine reading.
 pub(crate) fn strong_out_of_scope_bible_book(
     results: &[crate::commands::detection::DetectionResult],
     scope_book_number: i32,

@@ -27,8 +27,8 @@ use self::detection::{
     WINDOW_RESET_GAP,
 };
 use self::detection_jobs::{
-    enqueue_direct_detection_job, enqueue_final_semantic_job, enqueue_partial_semantic_job,
-    DeepgramSemanticBuffer,
+    direct_job_is_final, enqueue_direct_detection_job, enqueue_final_semantic_job,
+    enqueue_partial_semantic_job, DeepgramSemanticBuffer,
 };
 use self::detection_logic::{
     clamp_to_recent_words, trim_to_sentence_start, SENTENCE_TRIM_MIN_WORDS,
@@ -99,7 +99,6 @@ pub async fn start_transcription(
     // a replacement provider is still being built.
     let fan_session = AudioSessionGuard::claim(session_generation);
 
-    // Build the STT provider.
     let stt_provider = match build_stt_provider(
         provider_name,
         &app,
@@ -121,10 +120,8 @@ pub async fn start_transcription(
 
     audio_active.store(true, Ordering::SeqCst);
 
-    // Prepare channels.
     let (audio_send_tx, audio_send_rx) = crossbeam_channel::bounded::<Vec<i16>>(128);
 
-    // Spawn audio-capture + fan-out thread (cpal `Stream` is !Send).
     let gain_val = gain.unwrap_or(1.0).clamp(0.0, 2.0);
     let gain_handle = live_input_gain();
     set_gain(&gain_handle, gain_val);
@@ -138,7 +135,6 @@ pub async fn start_transcription(
         audio_active.clone(),
     )?;
 
-    // Spawn STT provider and transcript event workers on the tokio runtime.
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<TranscriptEvent>(128);
     let mut task_handles = Vec::new();
 
@@ -148,7 +144,6 @@ pub async fn start_transcription(
     let provider_log_name = stt_provider.name().to_string();
     let provider_log_name_task_a = provider_log_name.clone();
 
-    // Task A: run the STT provider (Deepgram WS+REST or Vosk local).
     task_handles.push(spawn_stt_task("provider", async move {
         let result = stt_provider.start(audio_send_rx, event_tx).await;
         if let Err(e) = result {
@@ -169,7 +164,6 @@ pub async fn start_transcription(
     let partial_semantic_job = Arc::new(Mutex::new(None::<detection_jobs::SemanticJob>));
     let partial_semantic_notify = Arc::new(Notify::new());
 
-    // Background detection channel — direct + reading mode, non-blocking
     let (detect_tx, mut detect_rx) = tokio::sync::mpsc::channel::<(u64, String, bool)>(64);
 
     let detect_sent = Arc::new(AtomicU64::new(0));
@@ -295,13 +289,10 @@ pub async fn start_transcription(
                             );
                         }
 
-                        // Check for voice control commands before normal detection work.
                         if check_stt_voice_command(&event_app, &transcript) {
                             continue;
                         }
 
-                        // Check for translation commands on partials too (cheap string matching)
-                        // This makes translation switching feel instant without waiting for speech_final
                         check_translation_command(&event_app, &transcript);
                         if !is_detection_paused(&event_app) {
                             if let Some(detection_text) = route.authoritative_detection {
@@ -312,7 +303,7 @@ pub async fn start_transcription(
                                     &detect_dropped_evt,
                                     seq,
                                     detection_text,
-                                    false,
+                                    direct_job_is_final(false),
                                     "deepgram_partial",
                                 );
                             }
@@ -385,8 +376,6 @@ pub async fn start_transcription(
                             route.suppress_reason.as_deref().unwrap_or("routed"),
                         );
 
-                        // Emit as permanent transcript segment IMMEDIATELY
-                        // (never blocked by detection work)
                         if route.emit_transcript {
                             let _ = event_app.emit(
                                 EVENT_TRANSCRIPT_FINAL,
@@ -400,12 +389,10 @@ pub async fn start_transcription(
                             );
                         }
 
-                        // Check for voice control commands before normal detection work.
                         if check_stt_voice_command(&event_app, &transcript) {
                             continue;
                         }
 
-                        // Check for translation commands (cheap, <1ms, stays inline)
                         check_translation_command(&event_app, &transcript);
                         let detection_paused = is_detection_paused(&event_app);
                         let semantic_detection_enabled = is_semantic_detection_enabled(&event_app);
@@ -424,8 +411,6 @@ pub async fn start_transcription(
                             t0.elapsed()
                         );
 
-                            // Fire-and-forget: detection runs in background thread pool.
-                            // Event consumer proceeds immediately to next transcript.
                             if let Some(detection_text) = route.authoritative_detection {
                                 record_egw_cue(
                                     &egw_cue_books,
@@ -446,12 +431,10 @@ pub async fn start_transcription(
                                     &detect_dropped_evt,
                                     seq,
                                     detection_text.clone(),
-                                    speech_final,
+                                    direct_job_is_final(true),
                                     "final",
                                 );
 
-                                // Deepgram waits for speech_final before semantic search.
-                                // Non-Deepgram providers keep the rolling final window.
                                 if !final_semantic_allowed {
                                     if semantic_detection_enabled {
                                         log::debug!(
@@ -466,9 +449,6 @@ pub async fn start_transcription(
                                             speech_final,
                                         )
                                     {
-                                        // Deepgram buffers a whole utterance, so
-                                        // this text is already the widest context
-                                        // available for the EGW pass.
                                         let egw_text = semantic_text.clone();
                                         let request_hint =
                                             rhema_detection::looks_like_verse_request(&semantic_text);
@@ -651,7 +631,6 @@ pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), Strin
         return Err("Transcription is not running".into());
     }
 
-    // Setting these flags causes the background threads/tasks to exit.
     app_state.audio_active.store(false, Ordering::SeqCst);
     app_state.invalidate_audio_session();
     let task_handles = app_state.take_stt_task_handles();

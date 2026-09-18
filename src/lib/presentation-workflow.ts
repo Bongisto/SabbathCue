@@ -244,8 +244,6 @@ function commitVersePreviewAndMaybeAutoLive(
 ): void {
   const broadcast = getBroadcastLiveStore()
 
-  // Auto-live turns the live output on (and keeps it following) when the
-  // operator has the auto-live toggle enabled.
   if (options?.autoLive && broadcast.readingModeAutoLive) {
     recordWorkflowTrace("live.auto_commit", "Auto-live committed verse live", {
       liveWasOn: broadcast.isLive,
@@ -336,13 +334,11 @@ export function previewVerseAndMaybeAutoLive(
       pending.chapter === verse.chapter
     ) {
       if (verse.verse === pending.verse) {
-        // Same citation refreshed — keep the existing hold.
         pending.verseData = verse
         pending.options = options
         return
       }
       if (isDigitPrefixExtension(pending.verse, verse.verse)) {
-        // e.g. 6:3 → 6:33. Drop the intermediate and either hold again or commit.
         clearPendingDigitGrowthTimer()
         if (verseDigitsCouldGrow(verse.verse)) {
           scheduleDigitGrowthHold(verse, options)
@@ -351,7 +347,6 @@ export function previewVerseAndMaybeAutoLive(
         commitVersePreviewAndMaybeAutoLive(verse, options)
         return
       }
-      // Same chapter, unrelated verse (3 then 16) — abandon the hold.
       clearPendingDigitGrowthTimer()
     } else if (pending) {
       // New book/chapter while a hold is open — drop the stale hold so it

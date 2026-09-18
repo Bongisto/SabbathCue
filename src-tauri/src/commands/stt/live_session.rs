@@ -94,42 +94,35 @@ fn filter_live_semantic_results_to_reading_scope(
             return results;
         }
 
-    // Live speech often pivots passages after a phrase-length pause. Once the
-    // active chapter has been quiet for that short pause, require two repeated
-    // operator-threshold hits on the same out-of-scope passage before releasing.
-    if let Some((hit_book, hit_chapter)) = live_pause_out_of_scope_bible_book(
-        &results,
-        book_number,
-        chapter,
-        stale_secs,
-        semantic_min_confidence,
-    ) {
-        let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
-        if streak >= READING_SCOPE_RELEASE_STREAK {
-            log::info!(
-                "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
-                 ({stale_secs}s since last verse match; {streak} repeated out-of-scope hits on {hit_book}:{hit_chapter})"
-            );
-            pause_stale_reading_scope(app);
-            return results;
+        if let Some((hit_book, hit_chapter)) = live_pause_out_of_scope_bible_book(
+            &results,
+            book_number,
+            chapter,
+            stale_secs,
+            semantic_min_confidence,
+        ) {
+            let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
+            if streak >= READING_SCOPE_RELEASE_STREAK {
+                log::info!(
+                    "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
+                     ({stale_secs}s since last verse match; {streak} repeated out-of-scope hits on {hit_book}:{hit_chapter})"
+                );
+                pause_stale_reading_scope(app);
+                return results;
+            }
+        } else if let Some((hit_book, hit_chapter)) =
+            strong_out_of_scope_bible_book(&results, book_number, chapter)
+        {
+            let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
+            if streak >= READING_SCOPE_RELEASE_STREAK {
+                log::info!(
+                    "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
+                     ({streak} consecutive strong hits on {hit_book}:{hit_chapter})"
+                );
+                pause_stale_reading_scope(app);
+                return results;
+            }
         }
-    } else if let Some((hit_book, hit_chapter)) =
-        strong_out_of_scope_bible_book(&results, book_number, chapter)
-    {
-        // Faster path than the staleness clock: several consecutive strong hits
-        // on the same out-of-scope passage mean the speaker has moved on. Any
-        // in-scope verse match resets the streak, so echoes during real reading
-        // still get suppressed.
-        let streak = note_out_of_scope_hit(app, hit_book, hit_chapter);
-        if streak >= READING_SCOPE_RELEASE_STREAK {
-            log::info!(
-                "[DET-SEMANTIC] Releasing reading scope {book_name} {chapter} \
-                 ({streak} consecutive strong hits on {hit_book}:{hit_chapter})"
-            );
-            pause_stale_reading_scope(app);
-            return results;
-        }
-    }
     }
 
     let before = results.len();
@@ -262,13 +255,7 @@ fn detect_live_egw_quotes(
     };
 
     crate::commands::detection::dampen_egw_for_low_stt_confidence(&mut results, stt_confidence);
-    // One operator-facing winner per window. Live 2026-08-04 21:32: PP p.325
-    // (correct) co-emitted with Desire of Ages p.327 (wrong book) at lower conf.
     crate::commands::detection::retain_best_egw_quote(&mut results);
-    // Live 2026-08-04 21:32: cue TTL is 90s from the *spoken* attribution.
-    // Multi-quote readings (PP 322 → 324 → 325) outlive that window; once the
-    // clock expired, Bible hybrid re-armed and "apostle Peter" became I Peter
-    // 1:1. Refresh while matches keep landing under an already-live cue.
     refresh_egw_cue_for_surviving_quote(egw_cue_at_ms, now_ms, cue_active, &results);
     mark_egw_auto_queue(app, &mut results);
     (results, cue_active)
@@ -317,6 +304,48 @@ fn note_independent_finals(verse_key: &str, utterance_id: Option<u64>, is_final:
     }
 }
 
+fn authorize_unmatched_results(
+    results: &mut Vec<crate::commands::detection::DetectionResult>,
+    transcript: &str,
+    request_hint: bool,
+    is_final_utterance: bool,
+    utterance_id: Option<u64>,
+    automation_live_enabled: bool,
+) {
+    for result in results.iter_mut() {
+        let grant = rhema_detection::decide_presentation(&rhema_detection::PresentationEvidence {
+            job: if result.source == "direct" {
+                rhema_detection::DetectionJob::Citation
+            } else if request_hint || rhema_detection::looks_like_verse_request(transcript) {
+                rhema_detection::DetectionJob::Request
+            } else {
+                rhema_detection::DetectionJob::Quotation
+            },
+            source_is_direct: result.source == "direct",
+            is_chapter_only: result.is_chapter_only,
+            is_fuzzy_book: result.is_fuzzy_book,
+            is_complete_citation: result.source == "direct"
+                && !result.is_chapter_only
+                && !result.is_fuzzy_book
+                && result.book_number > 0
+                && result.chapter > 0
+                && result.verse > 0,
+            is_final_utterance,
+            has_lexical_quote: result.has_lexical_quote,
+            quote_coverage: 0.0,
+            candidate_margin: 1.0,
+            independent_final_count: note_independent_finals(
+                &result.verse_ref,
+                utterance_id,
+                is_final_utterance,
+            ),
+            automation_live_enabled,
+        });
+        apply_presentation_grant(result, grant, is_final_utterance, utterance_id);
+    }
+    retain_rejected_bible_results(results);
+}
+
 fn authorize_emitted_results(
     results: &mut Vec<crate::commands::detection::DetectionResult>,
     detections: &[rhema_detection::Detection],
@@ -327,49 +356,18 @@ fn authorize_emitted_results(
     automation_live_enabled: bool,
 ) {
     if detections.is_empty() {
-        for result in results.iter_mut() {
-            let grant =
-                rhema_detection::decide_presentation(&rhema_detection::PresentationEvidence {
-                    job: if result.source == "direct" {
-                        rhema_detection::DetectionJob::Citation
-                    } else if request_hint || rhema_detection::looks_like_verse_request(transcript) {
-                        rhema_detection::DetectionJob::Request
-                    } else {
-                        rhema_detection::DetectionJob::Quotation
-                    },
-                    source_is_direct: result.source == "direct",
-                    is_chapter_only: result.is_chapter_only,
-                    is_fuzzy_book: result.is_fuzzy_book,
-                    is_complete_citation: result.source == "direct"
-                        && !result.is_chapter_only
-                        && !result.is_fuzzy_book
-                        && result.book_number > 0
-                        && result.chapter > 0
-                        && result.verse > 0,
-                    is_final_utterance,
-                    has_lexical_quote: result.has_lexical_quote,
-                    quote_coverage: 0.0,
-                    candidate_margin: 1.0,
-                    independent_final_count: note_independent_finals(
-                        &result.verse_ref,
-                        utterance_id,
-                        is_final_utterance,
-                    ),
-                    automation_live_enabled,
-                });
-            apply_presentation_grant(result, grant, is_final_utterance, utterance_id);
-        }
-        retain_rejected_bible_results(results);
+        authorize_unmatched_results(
+            results,
+            transcript,
+            request_hint,
+            is_final_utterance,
+            utterance_id,
+            automation_live_enabled,
+        );
         return;
     }
 
     let semantic_margin = {
-        // Margin must be measured on the same numbers the operator sees.
-        // finalize_live_semantic_results boosts corroborated winners (e.g.
-        // 0.96 → 0.98) while runner-ups stay put; the pre-finalize raw
-        // candidates can be a near-tie (gap < 0.02) that demoted a dominant
-        // final to `suggestion` — live 2026-08-24: John 14:1 at 98% with two
-        // corroborating candidates emitted as suggestion-only.
         let mut semantic: Vec<f64> = results
             .iter()
             .filter(|result| result.source.starts_with("semantic"))
@@ -452,8 +450,6 @@ fn retain_results_allowed_by_bible_mode(
     }
 }
 
-/// Log a direct hit with citation metadata always; include the STT window only
-/// when transcript logging is opted in (debug + `SABBATHCUE_DEBUG_TRANSCRIPTS`).
 fn log_direct_found(
     result: &crate::commands::detection::DetectionResult,
     transcript: &str,
@@ -486,10 +482,141 @@ fn log_direct_found(
     }
 }
 
-/// Drop references already emitted inside `DIRECT_REPEAT_SUPPRESSION`.
-///
-/// A poisoned lock must not silence detection, so recover the guard rather than
-/// bail: losing repeat suppression is far cheaper than losing every hit.
+fn detections_from_merged(
+    merged: &[rhema_detection::MergedDetection],
+) -> Vec<rhema_detection::Detection> {
+    merged
+        .iter()
+        .map(|merged| merged.detection.clone())
+        .collect()
+}
+
+fn authorize_suppress_log_direct(
+    app: &AppHandle,
+    transcript: &str,
+    is_final_transcript: bool,
+    merged: &[rhema_detection::MergedDetection],
+    results: &mut Vec<crate::commands::detection::DetectionResult>,
+    recent: &std::sync::OnceLock<Mutex<RecentDirectEmissions>>,
+    log_suffix: &str,
+) {
+    authorize_emitted_results(
+        results,
+        &detections_from_merged(merged),
+        transcript,
+        false,
+        is_final_transcript,
+        None,
+        is_automation_live_enabled(app),
+    );
+    suppress_repeat_direct_emissions(recent, results, is_final_transcript);
+    for result in results.iter() {
+        log_direct_found(result, transcript, log_suffix);
+    }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "latest-wins fallback keeps seq, transcript, and merger payload explicit"
+)]
+fn fallback_direct_without_db(
+    app: &AppHandle,
+    seq: u64,
+    latest_seq: &Arc<AtomicU64>,
+    transcript: &str,
+    is_final_transcript: bool,
+    merged: &[rhema_detection::MergedDetection],
+    recent: &std::sync::OnceLock<Mutex<RecentDirectEmissions>>,
+    reading_candidates: Vec<DirectReadingCandidate>,
+) -> Vec<DirectReadingCandidate> {
+    if seq < latest_seq.load(Ordering::Acquire) {
+        log::debug!("[DET-DIRECT] Skipping stale emission in fallback path seq={seq}");
+        return Vec::new();
+    }
+    if !is_bible_detection_enabled(app) {
+        return Vec::new();
+    }
+    let results: Vec<crate::commands::detection::DetectionResult> = merged
+        .iter()
+        .map(|m| {
+            let vr = &m.detection.verse_ref;
+            crate::commands::detection::DetectionResult {
+                content_type: "bible".to_string(),
+                verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
+                verse_text: String::new(),
+                book_name: vr.book_name.clone(),
+                book_number: vr.book_number,
+                chapter: vr.chapter,
+                verse: vr.verse_start,
+                confidence: m.detection.confidence,
+                rank_score: m.detection.rank_score(),
+                source: "direct".to_string(),
+                auto_queued: m.auto_queued,
+                transcript_snippet: m.detection.transcript_snippet.clone(),
+                is_chapter_only: m.detection.is_chapter_only,
+                ..crate::commands::detection::DetectionResult::default()
+            }
+        })
+        .collect();
+    let mut results = filter_live_direct_results_to_reading_scope(app, results);
+    authorize_suppress_log_direct(
+        app,
+        transcript,
+        is_final_transcript,
+        merged,
+        &mut results,
+        recent,
+        "(no DB)",
+    );
+    let _ = app.emit("verse_detections", &results);
+    reading_candidates
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "direct emit keeps seq, finality, and timing together"
+)]
+fn emit_fresh_direct(
+    app: &AppHandle,
+    seq: u64,
+    latest_seq: &Arc<AtomicU64>,
+    transcript: &str,
+    is_final_transcript: bool,
+    t0: std::time::Instant,
+    results: &mut Vec<crate::commands::detection::DetectionResult>,
+    mut reading_candidates: Vec<DirectReadingCandidate>,
+) -> Vec<DirectReadingCandidate> {
+    if seq < latest_seq.load(Ordering::Acquire) {
+        log::debug!("[DET-DIRECT] Skipping emission for stale seq={seq}");
+        return Vec::new();
+    }
+    log::info!(
+        "[DET-TRACE] seq={seq} decision=direct emitted={} top={} is_final={} took={:?}",
+        results.len(),
+        results.first().map_or("-", |r| r.verse_ref.as_str()),
+        is_final_transcript,
+        t0.elapsed()
+    );
+    if !is_bible_detection_enabled(app) {
+        retain_results_allowed_by_bible_mode(results, false);
+        reading_candidates.clear();
+    }
+    if results.is_empty() {
+        return reading_candidates;
+    }
+    let _ = app.emit("verse_detections", results.as_slice());
+    if transcript_logging_enabled() {
+        log::info!(
+            "[DET-DIRECT] Detection took {:?} for {:?}",
+            t0.elapsed(),
+            truncate_safe(transcript, 50)
+        );
+    } else {
+        log::info!("[DET-DIRECT] Detection took {:?}", t0.elapsed());
+    }
+    reading_candidates
+}
+
 fn suppress_repeat_direct_emissions(
     slot: &std::sync::OnceLock<Mutex<RecentDirectEmissions>>,
     results: &mut Vec<crate::commands::detection::DetectionResult>,
@@ -521,15 +648,36 @@ fn suppress_repeat_direct_emissions(
     }
 }
 
-/// Run direct (regex/pattern) detection only. Instant, no ONNX.
-/// Uses SEPARATE Mutex<DirectDetector> and Mutex<DetectionMerger> so it
-/// never blocks on the semantic worker, and cooldown state persists across calls.
-/// Returns direct references that are strong enough to hand reading mode to.
-#[expect(
-    clippy::similar_names,
-    clippy::too_many_lines,
-    reason = "direct detection orchestration is intentionally kept together"
-)]
+fn detect_merge_direct(
+    app: &AppHandle,
+    transcript: &str,
+) -> Option<(Vec<rhema_detection::MergedDetection>, f64)> {
+    let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
+    let mut detector = match detector_state.lock() {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("Failed to lock DirectDetector: {e}");
+            return None;
+        }
+    };
+    let direct_results = detector.detect(transcript);
+    drop(detector);
+    if direct_results.is_empty() {
+        return Some((Vec::new(), 0.0));
+    }
+    let merger_state: State<'_, Mutex<DetectionMerger>> = app.state();
+    let mut detection_merger = match merger_state.lock() {
+        Ok(m) => m,
+        Err(e) => {
+            log::error!("Failed to lock DetectionMerger: {e}");
+            return None;
+        }
+    };
+    let auto_queue_threshold = detection_merger.auto_queue_threshold();
+    let merged = detection_merger.merge(direct_results, vec![]);
+    Some((merged, auto_queue_threshold))
+}
+
 pub(crate) fn run_direct_detection(
     app: &AppHandle,
     seq: u64,
@@ -537,15 +685,11 @@ pub(crate) fn run_direct_detection(
     transcript: &str,
     is_final_transcript: bool,
 ) -> Vec<DirectReadingCandidate> {
-    // [DIAG] AppState mutex contention on the direct-detection hot path.
     static LOCK_OK: AtomicU64 = AtomicU64::new(0);
     static LOCK_CONTENDED: AtomicU64 = AtomicU64::new(0);
-    // Repeat suppression outlives individual jobs, so it lives beside them.
     static RECENT_DIRECT: std::sync::OnceLock<Mutex<RecentDirectEmissions>> =
         std::sync::OnceLock::new();
 
-    // Stale detection suppression: if this job's sequence is older than the
-    // latest accepted transcript sequence, skip emission.
     if seq < latest_seq.load(Ordering::Acquire) {
         log::debug!("[DET-DIRECT] Skipping stale job seq={seq}");
         return Vec::new();
@@ -555,106 +699,31 @@ pub(crate) fn run_direct_detection(
         return Vec::new();
     }
     let t0 = std::time::Instant::now();
-    let detector_state: State<'_, Mutex<DirectDetector>> = app.state();
-    let mut detector = match detector_state.lock() {
-        Ok(d) => d,
-        Err(e) => {
-            log::error!("Failed to lock DirectDetector: {e}");
-            return Vec::new();
-        }
-    };
-    let direct_results = detector.detect(transcript);
-    drop(detector); // Release immediately
-
-    if !is_bible_detection_enabled(app) {
-        emit_egw_direct_detections(app, seq, latest_seq, transcript);
+    let Some((merged, auto_queue_threshold)) = detect_merge_direct(app, transcript) else {
         return Vec::new();
-    }
-
-    if direct_results.is_empty() {
-        emit_egw_direct_detections(app, seq, latest_seq, transcript);
-        return Vec::new();
-    }
-
-    // Merge using the managed merger (persists cooldown state across calls,
-    // preventing duplicate emissions when running on both partials and finals)
-    let merger_state: State<'_, Mutex<DetectionMerger>> = app.state();
-    let mut merger = match merger_state.lock() {
-        Ok(m) => m,
-        Err(e) => {
-            log::error!("Failed to lock DetectionMerger: {e}");
-            return Vec::new();
-        }
     };
-    let merged = merger.merge(direct_results, vec![]);
-    // Captured before the guard drops: re-awarding auto-queue below must stay
-    // inside the operator's configured policy.
-    let auto_queue_threshold = merger.auto_queue_threshold();
-    drop(merger);
-    let mut reading_candidates = direct_reading_candidates(&merged, is_final_transcript);
+
     if merged.is_empty() {
         emit_egw_direct_detections(app, seq, latest_seq, transcript);
-        return reading_candidates;
+        return Vec::new();
     }
+    let reading_candidates = direct_reading_candidates(&merged, is_final_transcript);
 
-    // Resolve verse info from DB (needs AppState, but only briefly for DB lookup)
     let app_managed: State<'_, Mutex<AppState>> = app.state();
     let Ok(app_state) = app_managed.lock() else {
         let bad = LOCK_CONTENDED.fetch_add(1, Ordering::Relaxed) + 1;
         let good = LOCK_OK.load(Ordering::Relaxed);
         log::warn!("[DET-DIRECT] AppState lock FAILED (contention) ok={good} contended={bad}");
-
-        // Check for stale sequence BEFORE emitting in fallback path
-        if seq < latest_seq.load(Ordering::Acquire) {
-            log::debug!("[DET-DIRECT] Skipping stale emission in fallback path seq={seq}");
-            return Vec::new();
-        }
-        if !is_bible_detection_enabled(app) {
-            return Vec::new();
-        }
-
-        // AppState is locked, so emit results without verse text.
-        let results: Vec<crate::commands::detection::DetectionResult> = merged
-            .iter()
-            .map(|m| {
-                let vr = &m.detection.verse_ref;
-                crate::commands::detection::DetectionResult {
-                    content_type: "bible".to_string(),
-                    verse_ref: format!("{} {}:{}", vr.book_name, vr.chapter, vr.verse_start),
-                    verse_text: String::new(),
-                    book_name: vr.book_name.clone(),
-                    book_number: vr.book_number,
-                    chapter: vr.chapter,
-                    verse: vr.verse_start,
-                    confidence: m.detection.confidence,
-                    rank_score: m.detection.rank_score(),
-                    source: "direct".to_string(),
-                    auto_queued: m.auto_queued,
-                    transcript_snippet: m.detection.transcript_snippet.clone(),
-                    is_chapter_only: m.detection.is_chapter_only,
-                    ..crate::commands::detection::DetectionResult::default()
-                }
-            })
-            .collect();
-        let mut results = filter_live_direct_results_to_reading_scope(app, results);
-        authorize_emitted_results(
-            &mut results,
-            &merged
-                .iter()
-                .map(|merged| merged.detection.clone())
-            .collect::<Vec<_>>(),
+        return fallback_direct_without_db(
+            app,
+            seq,
+            latest_seq,
             transcript,
-            false,
             is_final_transcript,
-            None,
-            is_automation_live_enabled(app),
+            &merged,
+            &RECENT_DIRECT,
+            reading_candidates,
         );
-        suppress_repeat_direct_emissions(&RECENT_DIRECT, &mut results, is_final_transcript);
-        for r in &results {
-            log_direct_found(r, transcript, "(no DB)");
-        }
-        let _ = app.emit("verse_detections", &results);
-        return reading_candidates;
     };
     let ok = LOCK_OK.fetch_add(1, Ordering::Relaxed) + 1;
     if ok.is_multiple_of(50) {
@@ -674,65 +743,117 @@ pub(crate) fn run_direct_detection(
     if results.len() > egw_start {
         mark_egw_auto_queue(app, &mut results[egw_start..]);
     }
-    if !is_bible_detection_enabled(app) {
-        retain_results_allowed_by_bible_mode(&mut results, false);
-        reading_candidates.clear();
-    }
     let mut results = filter_live_direct_results_to_reading_scope(app, results);
-    authorize_emitted_results(
-        &mut results,
-        &merged
-            .iter()
-            .map(|merged| merged.detection.clone())
-        .collect::<Vec<_>>(),
+    authorize_suppress_log_direct(
+        app,
         transcript,
-        false,
         is_final_transcript,
-        None,
-        is_automation_live_enabled(app),
+        &merged,
+        &mut results,
+        &RECENT_DIRECT,
+        "",
     );
-    suppress_repeat_direct_emissions(&RECENT_DIRECT, &mut results, is_final_transcript);
-
-    for r in &results {
-        log_direct_found(r, transcript, "");
-    }
-
-    // Final stale check before emission
-    if seq < latest_seq.load(Ordering::Acquire) {
-        log::debug!("[DET-DIRECT] Skipping emission for stale seq={seq}");
-        return Vec::new();
-    }
-
-    log::info!(
-        "[DET-TRACE] seq={seq} decision=direct emitted={} top={} took={:?}",
-        results.len(),
-        results.first().map_or("-", |r| r.verse_ref.as_str()),
-        t0.elapsed()
-    );
-    if !is_bible_detection_enabled(app) {
-        retain_results_allowed_by_bible_mode(&mut results, false);
-        reading_candidates.clear();
-    }
-    if results.is_empty() {
-        return reading_candidates;
-    }
-    let _ = app.emit("verse_detections", &results);
-    if transcript_logging_enabled() {
-        log::info!(
-            "[DET-DIRECT] Detection took {:?} for {:?}",
-            t0.elapsed(),
-            truncate_safe(transcript, 50)
-        );
-    } else {
-        log::info!("[DET-DIRECT] Detection took {:?}", t0.elapsed());
-    }
-    reading_candidates
+    emit_fresh_direct(
+        app,
+        seq,
+        latest_seq,
+        transcript,
+        is_final_transcript,
+        t0,
+        &mut results,
+        reading_candidates,
+    )
 }
 
-/// Run hybrid semantic detection combining FTS5 BM25 with vector search.
-/// Uses `spawn_blocking` so mutex locks and DB I/O don't starve the tokio runtime.
+fn emit_explicit_egw_window(
+    app: &AppHandle,
+    seq: u64,
+    latest_seq: &Arc<AtomicU64>,
+    transcript: &str,
+) -> bool {
+    let mut egw_explicit = {
+        let app_managed: State<'_, Mutex<AppState>> = app.state();
+        let Ok(app_state) = app_managed.lock() else {
+            log::error!("[DET-SEMANTIC] AppState lock failed for EGW window catch");
+            return true;
+        };
+        crate::commands::detection::detect_egw_references(&app_state, transcript)
+    };
+    if egw_explicit.is_empty() {
+        return false;
+    }
+    if seq < latest_seq.load(Ordering::Acquire) {
+        return true;
+    }
+    mark_egw_auto_queue(app, &mut egw_explicit);
+    for r in &egw_explicit {
+        log::info!(
+            "[DET-TRACE] seq={seq} decision=egw_explicit reason=window_reference {} ({:.0}%) auto_q={}",
+            r.verse_ref,
+            r.confidence * 100.0,
+            r.auto_queued
+        );
+    }
+    let _ = app.emit("verse_detections", &egw_explicit);
+    true
+}
+
+fn emit_egw_cue_fast_path(
+    app: &AppHandle,
+    seq: u64,
+    latest_seq: &Arc<AtomicU64>,
+    egw_quotes: &[crate::commands::detection::DetectionResult],
+    cue_live: bool,
+    t0: std::time::Instant,
+) -> bool {
+    if is_bible_detection_enabled(app) && !cue_live {
+        return false;
+    }
+    if egw_quotes.is_empty() {
+        log::info!(
+            "[DET-TRACE] seq={seq} decision={} emitted=0 elapsed={:?}",
+            if cue_live {
+                "egw_cue_fast_none"
+            } else {
+                "bible_mode_off_none"
+            },
+            t0.elapsed()
+        );
+        return true;
+    }
+    if seq < latest_seq.load(Ordering::Acquire) {
+        log::info!(
+            "[DET-SEMANTIC] Skipping emission for stale seq={seq} (egw_ready={})",
+            egw_quotes.len()
+        );
+        return true;
+    }
+    for r in egw_quotes {
+        log::info!(
+            "[DET-SEMANTIC] Found: {} ({:.0}% {}) auto_q={}",
+            r.verse_ref,
+            r.confidence * 100.0,
+            r.source,
+            r.auto_queued
+        );
+    }
+    let _ = app.emit("verse_detections", egw_quotes);
+    log::info!(
+        "[DET-TRACE] seq={seq} decision={} emitted={} top={} ({:.0}%) elapsed={:?}",
+        if cue_live {
+            "egw_cue_fast"
+        } else {
+            "bible_mode_off"
+        },
+        egw_quotes.len(),
+        egw_quotes.first().map_or("-", |r| r.verse_ref.as_str()),
+        egw_quotes.first().map_or(0.0, |r| r.confidence) * 100.0,
+        t0.elapsed()
+    );
+    true
+}
+
 #[expect(
-    clippy::too_many_lines,
     clippy::too_many_arguments,
     reason = "live semantic detection coordinates stale checks, explicit EGW routing, and emission in one pipeline"
 )]
@@ -753,54 +874,17 @@ pub(crate) fn run_semantic_detection(
         return;
     }
 
-    // Stale detection suppression: if this job's sequence is older than the
-    // latest accepted transcript sequence, skip emission.
     if seq < latest_seq.load(Ordering::Acquire) {
         log::debug!("[DET-SEMANTIC] Skipping stale job seq={seq}");
         return;
     }
 
-    // Reference and command windows never reach this worker — they are filtered
-    // at enqueue (see `enqueue_*_semantic_job`). Remaining windows are EGW
-    // references or sermon prose.
-    //
-    // Catch Ellen White references that endpointing fragmented across several
-    // finals: the single-final direct pass misses them, but the rolling window
-    // still holds the whole "Book page N paragraph M". Emit the explicit
-    // paragraph and skip fuzzy search.
-    let mut egw_explicit = {
-        let app_managed: State<'_, Mutex<AppState>> = app.state();
-        let Ok(app_state) = app_managed.lock() else {
-            log::error!("[DET-SEMANTIC] AppState lock failed for EGW window catch");
-            return;
-        };
-        crate::commands::detection::detect_egw_references(&app_state, transcript)
-    };
-    if !egw_explicit.is_empty() {
-        if seq < latest_seq.load(Ordering::Acquire) {
-            return;
-        }
-        mark_egw_auto_queue(app, &mut egw_explicit);
-        for r in &egw_explicit {
-            log::info!(
-                "[DET-TRACE] seq={seq} decision=egw_explicit reason=window_reference {} ({:.0}%) auto_q={}",
-                r.verse_ref,
-                r.confidence * 100.0,
-                r.auto_queued
-            );
-        }
-        let _ = app.emit("verse_detections", &egw_explicit);
+    if emit_explicit_egw_window(app, seq, latest_seq, transcript) {
         return;
     }
 
-    // EGW quote matching is BM25 + shared-run (milliseconds). Bible hybrid is
-    // ONNX (~400–1500ms) on the same latest-wins worker. Live 2026-08-04 21:21:
-    // under a live EGW cue the hybrid finished with quotes=1 but seq was already
-    // stale, so emission was dropped for ~7s (no Found) while the operator waited.
-    // Resolve quotes first; when attribution is live, skip hybrid entirely so the
-    // worker stays free for the next partial and ready quotes emit immediately.
     let t0 = std::time::Instant::now();
-    let (mut egw_quotes, cue_active) =
+    let (egw_quotes, cue_active) =
         detect_live_egw_quotes(app, egw_cue_at_ms, egw_transcript, stt_confidence);
     let cue_live =
         cue_active || crate::commands::detection::egw_cue_is_currently_live(egw_cue_at_ms);
@@ -812,153 +896,54 @@ pub(crate) fn run_semantic_detection(
         );
     }
 
-    if !is_bible_detection_enabled(app) || cue_live {
-        if egw_quotes.is_empty() {
-            log::info!(
-                "[DET-TRACE] seq={seq} decision={} emitted=0 elapsed={:?}",
-                if cue_live {
-                    "egw_cue_fast_none"
-                } else {
-                    "bible_mode_off_none"
-                },
-                t0.elapsed()
-            );
-            return;
-        }
-        if seq < latest_seq.load(Ordering::Acquire) {
-            log::info!(
-                "[DET-SEMANTIC] Skipping emission for stale seq={seq} (egw_ready={})",
-                egw_quotes.len()
-            );
-            return;
-        }
-        for r in &egw_quotes {
-            log::info!(
-                "[DET-SEMANTIC] Found: {} ({:.0}% {}) auto_q={}",
-                r.verse_ref,
-                r.confidence * 100.0,
-                r.source,
-                r.auto_queued
-            );
-        }
-        let _ = app.emit("verse_detections", &egw_quotes);
-        log::info!(
-            "[DET-TRACE] seq={seq} decision={} emitted={} top={} ({:.0}%) elapsed={:?}",
-            if cue_live {
-                "egw_cue_fast"
-            } else {
-                "bible_mode_off"
-            },
-            egw_quotes.len(),
-            egw_quotes.first().map_or("-", |r| r.verse_ref.as_str()),
-            egw_quotes.first().map_or(0.0, |r| r.confidence) * 100.0,
-            t0.elapsed()
-        );
+    if emit_egw_cue_fast_path(app, seq, latest_seq, &egw_quotes, cue_live, t0) {
         return;
     }
 
-    // Build the paraphrase query from verse content only — reference framing
-    // ("chapter 7 verse 9 it says") would otherwise dominate BM25 and the
-    // embedding. A window that is nothing but scaffolding is a bare reference
-    // already owned by the direct path, so there is nothing to search.
+    emit_hybrid_semantic(
+        app,
+        seq,
+        latest_seq,
+        transcript,
+        egw_transcript,
+        stt_confidence,
+        is_final,
+        utterance_id,
+        request_hint,
+        egw_quotes,
+        t0,
+    );
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "hybrid emit keeps the live worker payload explicit"
+)]
+fn emit_hybrid_semantic(
+    app: &AppHandle,
+    seq: u64,
+    latest_seq: &Arc<AtomicU64>,
+    transcript: &str,
+    egw_transcript: &str,
+    stt_confidence: f64,
+    is_final: bool,
+    utterance_id: u64,
+    request_hint: bool,
+    mut egw_quotes: Vec<crate::commands::detection::DetectionResult>,
+    t0: std::time::Instant,
+) {
     let query = strip_reference_scaffolding(transcript);
     if query.split_whitespace().count() < FINAL_SEMANTIC_MIN_WORDS {
         log::debug!("[DET-TRACE] seq={seq} skip=semantic reason=scaffolding_only");
         return;
     }
 
-    // A spoken book name is a scope, not a search term. Left in the text it
-    // matches only verses that literally contain the name — which is why
-    // saying "Malachi" surfaced Malachi 1:1, the one verse whose text
-    // contains that word, instead of scoping to the book. Derive from the
-    // raw transcript: scaffolding strip removes reference framing only.
-    let book_hint = spoken_book_hint(transcript);
-
-    if transcript_logging_enabled() {
-        log::info!("[DET-SEMANTIC] Running on: {:?}", truncate_safe(&query, 80));
-    } else {
-        log::info!("[DET-SEMANTIC] Running");
-    }
-
-    // FTS5 BM25 phrase search (~5ms)
-    let (fts_results, active_translation_id) = {
-        let managed: State<'_, Mutex<AppState>> = app.state();
-        let Ok(app_state) = managed.lock() else {
-            log::error!("Failed to lock AppState for FTS5");
-            return;
-        };
-        (
-            app_state
-                .bible_db
-                .as_ref()
-                .and_then(|db| db.search_verses_bm25_scoped(&query, 10, book_hint).ok()),
-            app_state.active_translation_id,
-        )
+    let Some((merged, semantic_min_confidence, fts_len)) =
+        run_hybrid_pipeline(app, seq, transcript, &query, t0)
+    else {
+        return;
     };
 
-    let fts = fts_results.unwrap_or_default();
-    if fts.is_empty() {
-        log::debug!("[DET-SEMANTIC] No FTS5 results, trying vector-only search");
-    } else if let Some(top) = fts.first() {
-        log::debug!(
-            "[DET-SEMANTIC] FTS5 hits={} top={} {}:{} rank={:.3}",
-            fts.len(),
-            top.book_name,
-            top.chapter,
-            top.verse,
-            top.rank
-        );
-    }
-
-    // Use hybrid pipeline: FTS5 + vector search when available.
-    // Even with empty FTS5, vector search can catch paraphrases.
-    let (merged, semantic_ready, paraphrase_enabled, semantic_min_confidence) = {
-        let pipeline_state: State<'_, Mutex<rhema_detection::DetectionPipeline>> = app.state();
-        let Ok(mut pipeline) = pipeline_state.lock() else {
-            log::error!("Failed to lock DetectionPipeline");
-            return;
-        };
-        let semantic_ready = pipeline.has_semantic();
-        let paraphrase_enabled = pipeline.use_synonyms();
-        let semantic_min_confidence = pipeline.semantic_confidence_threshold();
-        let merged = pipeline.process_hybrid_with_fts(&query, &fts);
-        (
-            merged,
-            semantic_ready,
-            paraphrase_enabled,
-            semantic_min_confidence,
-        )
-    };
-
-    log::info!(
-        "[DET-SEMANTIC] Workflow seq={} words={} fts_hits={} vector_ready={} paraphrase={} active_translation_id={} candidates={} elapsed={:?}",
-        seq,
-        transcript.split_whitespace().count(),
-        fts.len(),
-        semantic_ready,
-        paraphrase_enabled,
-        active_translation_id,
-        merged.len(),
-        t0.elapsed()
-    );
-    // Candidate identity is the first question every live-miss investigation
-    // asks: name the top candidates here so the log answers it directly.
-    for (idx, m) in merged.iter().take(5).enumerate() {
-        log::info!(
-            "[DET-SEMANTIC] candidate[{idx}] {} {}:{}:{:?} conf={:.2} src={:?}",
-            m.detection.verse_ref.book_name,
-            m.detection.verse_ref.chapter,
-            m.detection.verse_ref.verse_start,
-            m.detection.verse_id,
-            m.detection.confidence,
-            m.detection.source
-        );
-    }
-
-    // Resolve verse text from DB for merged results. Explicit EGW references
-    // are handled above. EGW quote matches are appended below: BM25 nominates,
-    // but a candidate only survives if a long run of its words was actually
-    // spoken. Flat-confidence BM25 hits are what made this noisy before.
     let app_managed: State<'_, Mutex<AppState>> = app.state();
     let Ok(app_state) = app_managed.lock() else {
         log::error!("Failed to lock AppState for verse resolution");
@@ -978,9 +963,6 @@ pub(crate) fn run_semantic_detection(
         transcript,
         request_hint,
     );
-    // Snapshot before the floor: weakly-embedding verbatim quotes can fall
-    // below `semantic_min_confidence` and vanish, but the EGW scripture-echo
-    // guard still needs them to prove which verse the speaker was quoting.
     let pre_floor_candidates = results.clone();
     let mut results = finalize_live_semantic_results(results, semantic_min_confidence);
     authorize_emitted_results(
@@ -1002,11 +984,6 @@ pub(crate) fn run_semantic_detection(
         }
     }
 
-    // Reuse pre-hybrid EGW quotes (already scored). Without a live cue this is
-    // the fire-band path; drop scripture-echo paragraphs against Bible hits.
-    // When every paragraph is an echo and no verse survived the floor, the
-    // explaining verse is rescued and authorized like any other result
-    // (2026-08-24: "thy rod and thy staff" presented EGW instead of Psalm 23).
     let rescued_verse = crate::commands::detection::drop_egw_quotes_echoing_scripture(
         &mut egw_quotes,
         &results,
@@ -1015,14 +992,8 @@ pub(crate) fn run_semantic_detection(
         false,
     );
     if let Some(verse) = rescued_verse {
-        // The rescue was authorized from its contiguous scripture run. Do not
-        // send it through the ordinary quotation gate again: that gate uses
-        // the pre-floor detection coverage and would reject precisely the
-        // weak-fragment cases this rescue handles.
         results.push(verse);
     }
-    // Prefer EGW first in the emit list so DET-TRACE top and any consumers that
-    // take results[0] do not surface a weaker Bible hit over a stronger quote.
     if !egw_quotes.is_empty() {
         egw_quotes.append(&mut results);
         results = egw_quotes;
@@ -1032,16 +1003,32 @@ pub(crate) fn run_semantic_detection(
         retain_results_allowed_by_bible_mode(&mut results, false);
     }
 
+    emit_semantic_batch(
+        app,
+        seq,
+        latest_seq,
+        results,
+        fts_len,
+        merged.len(),
+        t0,
+    );
+}
+
+fn emit_semantic_batch(
+    app: &AppHandle,
+    seq: u64,
+    latest_seq: &Arc<AtomicU64>,
+    mut results: Vec<crate::commands::detection::DetectionResult>,
+    fts_len: usize,
+    candidate_len: usize,
+    t0: std::time::Instant,
+) {
     if results.is_empty() {
         log::info!(
-            "[DET-TRACE] seq={seq} decision=semantic_none emitted=0 fts_hits={} candidates={}",
-            fts.len(),
-            merged.len()
+            "[DET-TRACE] seq={seq} decision=semantic_none emitted=0 fts_hits={fts_len} candidates={candidate_len}"
         );
         return;
     }
-
-    // Final stale check before emission
     if seq < latest_seq.load(Ordering::Acquire) {
         log::info!(
             "[DET-SEMANTIC] Skipping emission for stale seq={seq} results={}",
@@ -1049,11 +1036,7 @@ pub(crate) fn run_semantic_detection(
         );
         return;
     }
-    // This final is about to emit: mark it as the last *successful* final so
-    // the worker's staleness gate only discards work that was genuinely
-    // superseded by newer successful output (not by mere arrival order).
     latest_seq.fetch_max(seq, Ordering::AcqRel);
-
     for r in &results {
         log::info!(
             "[DET-SEMANTIC] Found: {} ({:.0}% {}) auto_q={} auth={}",
@@ -1080,208 +1063,254 @@ pub(crate) fn run_semantic_detection(
     log::info!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
 }
 
-/// Check reading mode: if active, test transcript against expected verse.
-/// If direct detection just found a new verse, start/restart reading mode.
-/// Returns `true` when reading mode handled the transcript (suppresses semantic).
-#[expect(
-    clippy::too_many_lines,
-    reason = "sequential state-machine logic is clearer in one flow"
-)]
-pub(crate) fn check_reading_mode(
+fn run_hybrid_pipeline(
+    app: &AppHandle,
+    seq: u64,
+    transcript: &str,
+    query: &str,
+    t0: std::time::Instant,
+) -> Option<(Vec<rhema_detection::MergedDetection>, f64, usize)> {
+    let book_hint = spoken_book_hint(transcript);
+    if transcript_logging_enabled() {
+        log::info!("[DET-SEMANTIC] Running on: {:?}", truncate_safe(query, 80));
+    } else {
+        log::info!("[DET-SEMANTIC] Running");
+    }
+    let (fts_results, active_translation_id) = {
+        let managed: State<'_, Mutex<AppState>> = app.state();
+        let Ok(app_state) = managed.lock() else {
+            log::error!("Failed to lock AppState for FTS5");
+            return None;
+        };
+        (
+            app_state
+                .bible_db
+                .as_ref()
+                .and_then(|db| db.search_verses_bm25_scoped(query, 10, book_hint).ok()),
+            app_state.active_translation_id,
+        )
+    };
+    let fts = fts_results.unwrap_or_default();
+    if fts.is_empty() {
+        log::debug!("[DET-SEMANTIC] No FTS5 results, trying vector-only search");
+    } else if let Some(top) = fts.first() {
+        log::debug!(
+            "[DET-SEMANTIC] FTS5 hits={} top={} {}:{} rank={:.3}",
+            fts.len(),
+            top.book_name,
+            top.chapter,
+            top.verse,
+            top.rank
+        );
+    }
+    let (merged, semantic_ready, paraphrase_enabled, semantic_min_confidence) = {
+        let pipeline_state: State<'_, Mutex<rhema_detection::DetectionPipeline>> = app.state();
+        let Ok(mut pipeline) = pipeline_state.lock() else {
+            log::error!("Failed to lock DetectionPipeline");
+            return None;
+        };
+        let semantic_ready = pipeline.has_semantic();
+        let paraphrase_enabled = pipeline.use_synonyms();
+        let semantic_min_confidence = pipeline.semantic_confidence_threshold();
+        let merged = pipeline.process_hybrid_with_fts(query, &fts);
+        (
+            merged,
+            semantic_ready,
+            paraphrase_enabled,
+            semantic_min_confidence,
+        )
+    };
+    log::info!(
+        "[DET-SEMANTIC] Workflow seq={} words={} fts_hits={} vector_ready={} paraphrase={} active_translation_id={} candidates={} elapsed={:?}",
+        seq,
+        transcript.split_whitespace().count(),
+        fts.len(),
+        semantic_ready,
+        paraphrase_enabled,
+        active_translation_id,
+        merged.len(),
+        t0.elapsed()
+    );
+    for (idx, m) in merged.iter().take(5).enumerate() {
+        log::info!(
+            "[DET-SEMANTIC] candidate[{idx}] {} {}:{}:{:?} conf={:.2} src={:?}",
+            m.detection.verse_ref.book_name,
+            m.detection.verse_ref.chapter,
+            m.detection.verse_ref.verse_start,
+            m.detection.verse_id,
+            m.detection.confidence,
+            m.detection.source
+        );
+    }
+    Some((merged, semantic_min_confidence, fts.len()))
+}
+
+fn restart_reading_from_direct(
     app: &AppHandle,
     transcript: &str,
-    direct_candidates: Vec<DirectReadingCandidate>,
+    direct_candidates: &[DirectReadingCandidate],
 ) -> bool {
     use rhema_detection::ReadingMode;
-
-    // If direct detection found a verse, consider starting/restarting reading mode.
-    // BUT: if reading mode is already active on a book/chapter, do NOT restart
-    // on a different book — false positives from bare numbers (e.g., "verse 5"
-    // getting matched as "Job 3:5") would hijack the reading session.
-    if !direct_candidates.is_empty() {
-        let active_scope = {
-            let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-            rm_managed.lock().ok().and_then(|rm| {
-                if rm.is_active() || rm.has_verses() {
-                    Some((rm.current_book(), rm.current_chapter()))
-                } else {
-                    None
-                }
-            })
-        };
-
-        if let Some(candidate) = choose_reading_candidate(&direct_candidates, active_scope) {
-            let recent = candidate.verse_ref.clone();
-
-            let should_start = {
-                let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-                match rm_managed.lock() {
-                    Ok(rm) => should_restart_reading(
-                        rm.is_active(),
-                        rm.current_book(),
-                        rm.current_chapter(),
-                        rm.current_verse(),
-                        &candidate,
-                    ),
-                    Err(_) => false,
-                }
-            };
-
-            if should_start {
-                let chapter_data = {
-                    let t_db = std::time::Instant::now();
-                    let app_managed: State<'_, Mutex<AppState>> = app.state();
-                    // Blocking lock is OK — we're inside spawn_blocking, not on the async runtime.
-                    let Ok(app_state) = app_managed.lock() else {
-                        log::error!("[READING] AppState lock poisoned");
-                        return false;
-                    };
-                    let result = match &app_state.bible_db {
-                        Some(db) => db
-                            .get_chapter(
-                                app_state.active_translation_id,
-                                recent.book_number,
-                                recent.chapter,
-                            )
-                            .ok(),
-                        None => None,
-                    };
-                    log::info!("[READING] get_chapter took {:?}", t_db.elapsed());
-                    result
-                };
-
-                if let Some(chapter_verses) = chapter_data {
-                    let verses: Vec<(i32, String)> = chapter_verses
-                        .into_iter()
-                        .map(|v| (v.verse, v.text))
-                        .collect();
-
-                    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-                    if let Ok(mut rm) = rm_managed.lock() {
-                        rm.start(
-                            recent.book_number,
-                            &recent.book_name,
-                            recent.chapter,
-                            recent.verse_start,
-                            verses,
-                        );
-
-                        // Check if transcript contains "chapter" keyword - if so, expect chapter number next
-                        // This handles "Genesis chapter" → pause → "5" → go to chapter 5
-                        let lower = transcript.to_lowercase();
-                        if lower.contains("chapter")
-                            && !lower.contains("verse")
-                            && !lower.contains("next")
-                            && !lower.contains("previous")
-                        {
-                            rm.set_expecting_chapter();
-                        }
-                    }
-                }
-            }
-        }
+    if direct_candidates.is_empty() {
+        return true;
     }
-
-    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
-
-    // Check for chapter navigation commands (e.g., "let's go to chapter seven").
-    {
-        let chapter_change = {
-            let Ok(mut rm) = rm_managed.lock() else {
-                return false;
-            };
-            if !rm.is_active() && !rm.has_verses() {
-                None
+    let active_scope = {
+        let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+        rm_managed.lock().ok().and_then(|rm| {
+            if rm.is_active() || rm.has_verses() {
+                Some((rm.current_book(), rm.current_chapter()))
             } else {
-                if transcript_logging_enabled() {
-                    log::info!("[READING] Checking chapter command for: {transcript:?}");
-                }
-                rm.check_chapter_command(transcript)
+                None
             }
-        };
-
-        if let Some(change) = chapter_change {
-            let chapter_data = {
-                let t_db = std::time::Instant::now();
-                let app_managed: State<'_, Mutex<AppState>> = app.state();
-                // Blocking lock is OK — we're inside spawn_blocking, not on the async runtime.
-                let Ok(app_state) = app_managed.lock() else {
-                    log::error!("[READING] AppState lock poisoned (chapter nav)");
-                    return false;
-                };
-                let result = match &app_state.bible_db {
-                    Some(db) => db
-                        .get_chapter(
-                            app_state.active_translation_id,
-                            change.book_number,
-                            change.new_chapter,
-                        )
-                        .ok(),
-                    None => None,
-                };
-                log::info!("[READING] get_chapter (nav) took {:?}", t_db.elapsed());
-                result
-            };
-
-            if let Some(chapter_verses) = chapter_data {
-                if !chapter_verses.is_empty() {
-                    let start_verse = change.start_verse.unwrap_or(1);
-
-                    // Find the text for the starting verse
-                    let start_verse_text = chapter_verses
-                        .iter()
-                        .find(|v| v.verse == start_verse)
-                        .map_or_else(|| chapter_verses[0].text.clone(), |v| v.text.clone());
-
-                    let verses: Vec<(i32, String)> = chapter_verses
-                        .into_iter()
-                        .map(|v| (v.verse, v.text))
-                        .collect();
-
-                    if let Ok(mut rm) = rm_managed.lock() {
-                        rm.start(
-                            change.book_number,
-                            &change.book_name,
-                            change.new_chapter,
-                            start_verse,
-                            verses,
-                        );
-                    }
-
-                    if !change.emit_start_verse {
-                        log::info!(
-                            "[READING] Chapter context moved to {} {}; waiting for verse before UI emit",
-                            change.book_name,
-                            change.new_chapter
-                        );
-                        return true;
-                    }
-
-                    // Emit the starting verse of the new chapter
-                    let reference = format!(
-                        "{} {}:{}",
-                        change.book_name, change.new_chapter, start_verse
-                    );
-                    let advance = rhema_detection::ReadingAdvance {
-                        book_number: change.book_number,
-                        book_name: change.book_name.clone(),
-                        chapter: change.new_chapter,
-                        verse: start_verse,
-                        verse_text: start_verse_text.clone(),
-                        reference: reference.clone(),
-                        confidence: 1.0,
-                    };
-                    let _ = app.emit("reading_mode_verse", &advance);
-
-                    return true;
-                }
-            }
+        })
+    };
+    let Some(candidate) = choose_reading_candidate(direct_candidates, active_scope) else {
+        return true;
+    };
+    let recent = candidate.verse_ref.clone();
+    let should_start = {
+        let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+        match rm_managed.lock() {
+            Ok(rm) => should_restart_reading(
+                rm.is_active(),
+                rm.current_book(),
+                rm.current_chapter(),
+                rm.current_verse(),
+                &candidate,
+            ),
+            Err(_) => false,
+        }
+    };
+    if !should_start {
+        return true;
+    }
+    let t_db = std::time::Instant::now();
+    let app_managed: State<'_, Mutex<AppState>> = app.state();
+    let Ok(app_state) = app_managed.lock() else {
+        log::error!("[READING] AppState lock poisoned");
+        return false;
+    };
+    let chapter_data = app_state.bible_db.as_ref().and_then(|db| {
+        db.get_chapter(
+            app_state.active_translation_id,
+            recent.book_number,
+            recent.chapter,
+        )
+        .ok()
+    });
+    log::info!("[READING] get_chapter took {:?}", t_db.elapsed());
+    drop(app_state);
+    let Some(chapter_verses) = chapter_data else {
+        return true;
+    };
+    let verses: Vec<(i32, String)> = chapter_verses
+        .into_iter()
+        .map(|v| (v.verse, v.text))
+        .collect();
+    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+    if let Ok(mut rm) = rm_managed.lock() {
+        rm.start(
+            recent.book_number,
+            &recent.book_name,
+            recent.chapter,
+            recent.verse_start,
+            verses,
+        );
+        let lower = transcript.to_lowercase();
+        if lower.contains("chapter")
+            && !lower.contains("verse")
+            && !lower.contains("next")
+            && !lower.contains("previous")
+        {
+            rm.set_expecting_chapter();
         }
     }
+    true
+}
 
-    // Check reading mode for verse advancement.
-    // Allow check even when paused (has_verses but !active) so "verse N"
-    // commands can re-activate reading mode after timeout.
+fn apply_chapter_navigation(app: &AppHandle, transcript: &str) -> Option<bool> {
+    use rhema_detection::ReadingMode;
+    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
+    let chapter_change = {
+        let Ok(mut rm) = rm_managed.lock() else {
+            return Some(false);
+        };
+        if !rm.is_active() && !rm.has_verses() {
+            None
+        } else {
+            if transcript_logging_enabled() {
+                log::info!("[READING] Checking chapter command for: {transcript:?}");
+            }
+            rm.check_chapter_command(transcript)
+        }
+    };
+    let change = chapter_change?;
+    let t_db = std::time::Instant::now();
+    let app_managed: State<'_, Mutex<AppState>> = app.state();
+    let Ok(app_state) = app_managed.lock() else {
+        log::error!("[READING] AppState lock poisoned (chapter nav)");
+        return Some(false);
+    };
+    let chapter_data = app_state.bible_db.as_ref().and_then(|db| {
+        db.get_chapter(
+            app_state.active_translation_id,
+            change.book_number,
+            change.new_chapter,
+        )
+        .ok()
+    });
+    log::info!("[READING] get_chapter (nav) took {:?}", t_db.elapsed());
+    drop(app_state);
+    let chapter_verses = chapter_data?;
+    if chapter_verses.is_empty() {
+        return None;
+    }
+    let start_verse = change.start_verse.unwrap_or(1);
+    let start_verse_text = chapter_verses
+        .iter()
+        .find(|v| v.verse == start_verse)
+        .map_or_else(|| chapter_verses[0].text.clone(), |v| v.text.clone());
+    let verses: Vec<(i32, String)> = chapter_verses
+        .into_iter()
+        .map(|v| (v.verse, v.text))
+        .collect();
+    if let Ok(mut rm) = rm_managed.lock() {
+        rm.start(
+            change.book_number,
+            &change.book_name,
+            change.new_chapter,
+            start_verse,
+            verses,
+        );
+    }
+    if !change.emit_start_verse {
+        log::info!(
+            "[READING] Chapter context moved to {} {}; waiting for verse before UI emit",
+            change.book_name,
+            change.new_chapter
+        );
+        return Some(true);
+    }
+    let reference = format!(
+        "{} {}:{}",
+        change.book_name, change.new_chapter, start_verse
+    );
+    let advance = rhema_detection::ReadingAdvance {
+        book_number: change.book_number,
+        book_name: change.book_name.clone(),
+        chapter: change.new_chapter,
+        verse: start_verse,
+        verse_text: start_verse_text,
+        reference,
+        confidence: 1.0,
+    };
+    let _ = app.emit("reading_mode_verse", &advance);
+    Some(true)
+}
+
+fn emit_reading_transcript_advance(app: &AppHandle, transcript: &str) -> bool {
+    use rhema_detection::ReadingMode;
+    let rm_managed: &Mutex<ReadingMode> = app.state::<Mutex<ReadingMode>>().inner();
     let advance = {
         let Ok(mut rm) = rm_managed.lock() else {
             return false;
@@ -1291,13 +1320,25 @@ pub(crate) fn check_reading_mode(
         }
         rm.check_transcript(transcript)
     };
-
     if let Some(advance) = advance {
         let _ = app.emit("reading_mode_verse", &advance);
         return true;
     }
-
     false
+}
+
+pub(crate) fn check_reading_mode(
+    app: &AppHandle,
+    transcript: &str,
+    direct_candidates: Vec<DirectReadingCandidate>,
+) -> bool {
+    if !restart_reading_from_direct(app, transcript, &direct_candidates) {
+        return false;
+    }
+    if let Some(handled) = apply_chapter_navigation(app, transcript) {
+        return handled;
+    }
+    emit_reading_transcript_advance(app, transcript)
 }
 
 #[cfg(test)]

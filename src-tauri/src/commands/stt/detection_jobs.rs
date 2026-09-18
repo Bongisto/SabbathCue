@@ -1,9 +1,4 @@
-//! Semantic/direct job scheduling + buffering for the live detection loop.
-//!
-//! This is the "latest-wins slot" and utterance-buffering machinery that the
-//! transcript event loop in `mod.rs` feeds and the detection workers drain. It
-//! owns no `AppHandle` or IPC — only the shared `Arc<Mutex<…>>` slots, the
-//! `Notify`, the mpsc sender, and the atomic counters passed in by the caller.
+//! Latest-wins semantic/direct job scheduling for the live detection loop.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -89,10 +84,6 @@ pub(crate) fn enqueue_final_semantic_job(
         return;
     }
 
-    // Explicit references and voice commands are owned by the direct + command
-    // paths. Skipping the enqueue (rather than suppressing later in the worker)
-    // also prevents these utterances from evicting a pending prose job from the
-    // latest-wins slot, so genuine paraphrase detections still run.
     if transcript_defers_to_direct(&text) {
         log::debug!(
             "[DET-TRACE] seq={seq} skip=semantic_enqueue reason=reference_or_command label=final"
@@ -100,8 +91,6 @@ pub(crate) fn enqueue_final_semantic_job(
         return;
     }
 
-    // Accept the final into the watermark only after every skip gate passed:
-    // a rejected final must never invalidate its predecessor mid-flight.
     final_watermark.fetch_max(seq, Ordering::AcqRel);
 
     let replaced = replace_semantic_job(
@@ -186,6 +175,10 @@ pub(crate) fn enqueue_partial_semantic_job(
     }
 
     notify.notify_one();
+}
+
+pub(crate) fn direct_job_is_final(router_event_is_final: bool) -> bool {
+    router_event_is_final
 }
 
 #[expect(
@@ -357,4 +350,35 @@ pub(crate) fn finalize_live_semantic_results(
     });
     merged.truncate(LIVE_SEMANTIC_CAP);
     merged
+}
+
+#[cfg(test)]
+mod tests {
+    use super::direct_job_is_final;
+
+    #[test]
+    fn router_final_is_direct_job_final_even_when_speech_final_is_false() {
+        assert!(direct_job_is_final(true));
+        assert!(!direct_job_is_final(false));
+    }
+
+    #[test]
+    fn transcript_event_final_enqueues_router_finality_not_speech_final() {
+        let src = include_str!("mod.rs");
+        let Some((_, final_arm)) = src.split_once("TranscriptEvent::Final") else {
+            panic!("TranscriptEvent::Final arm missing");
+        };
+        let Some((_, enqueue)) = final_arm.split_once("enqueue_direct_detection_job") else {
+            panic!("Final arm must enqueue a direct job");
+        };
+        let args = enqueue.split(");").next().expect("enqueue call");
+        assert!(
+            args.contains("direct_job_is_final(true)"),
+            "Final events must enqueue as final even when speech_final is false"
+        );
+        assert!(
+            !args.contains("speech_final"),
+            "speech_final must not be the direct-job finality bit"
+        );
+    }
 }

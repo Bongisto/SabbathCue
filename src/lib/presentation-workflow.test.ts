@@ -304,6 +304,65 @@ describe("presentation workflow", () => {
     vi.useRealTimers()
   })
 
+  it("replaces held John 3:1 with John 3:16 inside the digit-growth window", async () => {
+    vi.useFakeTimers()
+    const { useBibleStore } = await import("@/stores/bible-store")
+    const { useBroadcastStore } = await import("@/stores/broadcast-store")
+    const {
+      DIGIT_GROWTH_HOLD_MS,
+      previewVerseAndMaybeAutoLive,
+      resetDigitGrowthHoldForTests,
+    } = await import("./presentation-workflow")
+
+    useBibleStore.setState({
+      selectedVerse: null,
+      translations: [
+        {
+          id: 1,
+          abbreviation: "KJV",
+          title: "King James Version",
+          language: "en",
+          is_copyrighted: false,
+          is_downloaded: true,
+        },
+      ],
+      activeTranslationId: 1,
+    })
+    useBroadcastStore.setState({
+      isLive: false,
+      readingModeAutoLive: true,
+      liveItem: null,
+      previewItem: null,
+    })
+
+    const john31: Verse = {
+      ...sampleVerse,
+      verse: 1,
+      text: "There was a man of the Pharisees,",
+    }
+    const john316: Verse = {
+      ...sampleVerse,
+      verse: 16,
+      text: "For God so loved the world.",
+    }
+
+    previewVerseAndMaybeAutoLive(john31, { autoLive: true })
+    expect(useBroadcastStore.getState().isLive).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(200)
+    previewVerseAndMaybeAutoLive(john316, { autoLive: true })
+    expect(useBroadcastStore.getState().isLive).toBe(true)
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_name: "John",
+      chapter: 3,
+      verse: 16,
+    })
+    expectBroadcastOutputsFor("John 3:16 (KJV)")
+
+    resetDigitGrowthHoldForTests()
+    vi.useRealTimers()
+  })
+
   it("records a workflow trace entry when a single-digit verse is held", async () => {
     vi.useFakeTimers()
     const { useBroadcastStore } = await import("@/stores/broadcast-store")
