@@ -308,11 +308,8 @@ describe("presentation workflow", () => {
     vi.useFakeTimers()
     const { useBibleStore } = await import("@/stores/bible-store")
     const { useBroadcastStore } = await import("@/stores/broadcast-store")
-    const {
-      DIGIT_GROWTH_HOLD_MS,
-      previewVerseAndMaybeAutoLive,
-      resetDigitGrowthHoldForTests,
-    } = await import("./presentation-workflow")
+    const { previewVerseAndMaybeAutoLive, resetDigitGrowthHoldForTests } =
+      await import("./presentation-workflow")
 
     useBibleStore.setState({
       selectedVerse: null,
