@@ -129,8 +129,7 @@ export function PricingCheckout({ initialCountry }: PricingCheckoutProps) {
         const customerId = await fetchSignedInPaddleCustomerId();
         if (!cancelled) setPaddleCustomerId(customerId);
       } catch {
-        /* optional prefill */
-      }
+              }
     })();
     return () => {
       cancelled = true;

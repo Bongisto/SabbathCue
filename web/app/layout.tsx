@@ -72,7 +72,6 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  // Favicon and apple touch icon are wired from app/icon.png.
   manifest: "/manifest.webmanifest",
 };
 

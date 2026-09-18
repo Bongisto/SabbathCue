@@ -1,4 +1,3 @@
-/** Public Cloudflare R2 bucket for Windows installer binaries. */
 export const R2_PUBLIC_BASE_URL =
   "https://pub-f00266e4b83341dea437c0114752f536.r2.dev" as const;
 
@@ -7,7 +6,6 @@ export const WINDOWS_INSTALLER_VERSION = "0.1.9" as const;
 export const WINDOWS_INSTALLER_R2_OBJECT_KEY =
   "SabbathCue Personal_0.1.9_x64-setup.exe" as const;
 
-/** Filename users see when saving the installer (not the R2 object name). */
 export const WINDOWS_INSTALLER_SAVE_AS = "SabbathCue-Setup.exe" as const;
 
 /** Measured via R2 HEAD on 2026-09-12. */
@@ -55,7 +53,6 @@ export type InstallerDownloadVerification =
   | { ok: true; bytes: number; contentType: string }
   | { ok: false; reason: string };
 
-/** HEAD-check the live R2 object (used in tests and release verification). */
 export async function verifyWindowsInstallerDownload(
   fetchFn: typeof fetch = fetch
 ): Promise<InstallerDownloadVerification> {

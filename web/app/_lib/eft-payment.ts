@@ -32,7 +32,6 @@ function readEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
 }
 
-/** Bank details for South African EFT — set NEXT_PUBLIC_EFT_* on Vercel. */
 export function getEftBankDetails(): EftBankDetails {
   return {
     accountName: readEnv("NEXT_PUBLIC_EFT_ACCOUNT_NAME") || "BongaNdlovu",

@@ -41,7 +41,6 @@ function readYearPriceId(): string {
   return value;
 }
 
-/** Single Pro tier — edit copy here; price IDs come from env at build time. */
 export function getProTier(): Tier {
   return {
     name: "Pro",

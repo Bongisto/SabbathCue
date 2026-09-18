@@ -4,7 +4,6 @@ const COUNTRY_HEADER_CANDIDATES = [
   "x-country-code",
 ] as const;
 
-/** Two-letter ISO country code from edge/CDN headers, or null when unknown. */
 export function detectCountryFromHeaderMap(
   headers: Readonly<Record<string, string | undefined>>
 ): string | null {
@@ -19,12 +18,10 @@ export function detectCountryFromHeaderMap(
   return null;
 }
 
-/** App-side sentinel: never pass this string to Paddle as a country code. */
 export const PADDLE_AUTO_COUNTRY = "OTHERS" as const;
 
 export type PricingCountryInput = string | null | typeof PADDLE_AUTO_COUNTRY;
 
-/** Country code for Paddle PricePreview, or undefined to let Paddle infer from IP. */
 export function resolvePricePreviewCountry(
   country: PricingCountryInput
 ): string | undefined {

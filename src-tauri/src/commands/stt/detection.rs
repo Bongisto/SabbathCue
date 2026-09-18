@@ -343,6 +343,7 @@ mod tests {
             &watermark,
             1,
             "John chapter 8 verse 9".to_string(),
+            "John chapter 8 verse 9",
             "John chapter 8 verse 9".to_string(),
             0.9,
             false,
@@ -377,6 +378,7 @@ mod tests {
             &watermark,
             3,
             "one".to_string(),
+            "one",
             "one".to_string(),
             0.9,
             false,
@@ -395,6 +397,7 @@ mod tests {
             &watermark,
             4,
             "for God so loved the world that he gave his only begotten son".to_string(),
+            "for God so loved the world that he gave his only begotten son",
             "for God so loved the world that he gave his only begotten son".to_string(),
             0.73,
             false,
@@ -757,6 +760,66 @@ mod tests {
     }
 
     #[test]
+    fn genesis_quote_final_enqueues_semantic_even_when_citation_is_still_in_the_window() {
+        use crate::commands::stt::detection_logic::transcript_defers_to_direct as defers;
+
+        let citation = "and then in genesis chapter 1 verse 1 he says";
+        let quote = "In the beginning God created";
+        let joined = format!("{citation} {quote}");
+        assert!(defers(citation));
+        assert!(!defers(quote));
+        assert!(
+            defers(&joined),
+            "the joined window still looks like a complete reference; skip must use the current final, not this string"
+        );
+
+        let notify = Arc::new(Notify::new());
+        let sent = Arc::new(AtomicU64::new(0));
+        let replaced = Arc::new(AtomicU64::new(0));
+        let watermark = Arc::new(AtomicU64::new(0));
+
+        let citation_slot = Arc::new(Mutex::new(None));
+        enqueue_final_semantic_job(
+            &citation_slot,
+            &notify,
+            &sent,
+            &replaced,
+            &watermark,
+            34,
+            citation.to_string(),
+            citation,
+            String::new(),
+            0.99,
+            false,
+        );
+        assert!(
+            take_semantic_job(&citation_slot, "test").is_none(),
+            "citation-only finals must keep skipping semantic"
+        );
+        assert_eq!(watermark.load(Ordering::Relaxed), 0);
+
+        let quote_slot = Arc::new(Mutex::new(None));
+        enqueue_final_semantic_job(
+            &quote_slot,
+            &notify,
+            &sent,
+            &replaced,
+            &watermark,
+            40,
+            joined,
+            quote,
+            String::new(),
+            0.99,
+            false,
+        );
+        assert!(
+            take_semantic_job(&quote_slot, "test").is_some(),
+            "2026-09-18 seq=40: Genesis 1:1 quote final must enqueue semantic while the citation is still in the 4-segment window"
+        );
+        assert_eq!(watermark.load(Ordering::Relaxed), 40);
+    }
+
+    #[test]
     fn live_semantic_workflow_matches_requested_speed_and_result_window() {
         assert_eq!(LIVE_SEMANTIC_CAP, 3);
         assert_eq!(SEMANTIC_WINDOW_SEGMENTS, 4);
@@ -1079,6 +1142,7 @@ mod tests {
                 &watermark,
                 seq,
                 "The Lord is my shepherd I shall not want".to_string(),
+                "The Lord is my shepherd I shall not want",
                 "The Lord is my shepherd I shall not want".to_string(),
                 0.9,
                 false,
@@ -1121,6 +1185,7 @@ mod tests {
             &watermark,
             10,
             "The Lord is my shepherd I shall not want".to_string(),
+            "The Lord is my shepherd I shall not want",
             String::new(),
             0.9,
             false,
@@ -1137,6 +1202,7 @@ mod tests {
             &watermark,
             11,
             "John chapter 3 verse 16".to_string(),
+            "John chapter 3 verse 16",
             String::new(),
             0.9,
             false,
@@ -1687,7 +1753,8 @@ mod tests {
             &replaced,
             &watermark,
             1,
-            semantic_text,
+            semantic_text.clone(),
+            semantic_text.as_str(),
             joined.to_string(),
             0.9,
             true,

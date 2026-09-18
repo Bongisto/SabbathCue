@@ -18,8 +18,7 @@ export function SabbathCueLogo({
   className?: string;
   wordmarkClassName?: string;
   size?: keyof typeof HEIGHT_CLASS;
-  /** Show the SabbathCue wordmark beside the logo mark. */
-  showWordmark?: boolean;
+    showWordmark?: boolean;
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>

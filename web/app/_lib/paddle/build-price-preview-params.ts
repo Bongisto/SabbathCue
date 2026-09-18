@@ -19,7 +19,6 @@ export function buildPricePreviewParams(
   };
 }
 
-/** Fetch both billing intervals in one preview (month + year). */
 export function buildAllPricePreviewParams(
   country: PricingCountryInput
 ): PricePreviewParams {

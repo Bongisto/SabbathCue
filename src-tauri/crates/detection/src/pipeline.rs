@@ -251,10 +251,6 @@ impl DetectionPipeline {
     ///
     /// FTS5-only results are added with rank-derived confidence. Vector and
     /// FTS5 overlap is collapsed into one boosted candidate.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "the hybrid path keeps vector, FTS, overlap, and live-cap gates together"
-    )]
     pub fn process_hybrid_with_fts(
         &mut self,
         text: &str,
@@ -273,24 +269,7 @@ impl DetectionPipeline {
         let semantic_ms = semantic_started.elapsed().as_secs_f64() * 1_000.0;
 
         if fts_results.is_empty() {
-            for detection in &mut semantic_detections {
-                detection.confidence = detection.confidence.min(VECTOR_ONLY_CONFIDENCE_CAP);
-                if let DetectionSource::Semantic { similarity } = &mut detection.source {
-                    *similarity = (*similarity).min(VECTOR_ONLY_CONFIDENCE_CAP);
-                }
-            }
-            let merge_started = Instant::now();
-            let mut merged = self.merger.merge(vec![], semantic_detections);
-            self.prioritize_spoken_book(text, &mut merged);
-            merged.truncate(LIVE_SEMANTIC_CANDIDATE_CAP);
-            let merge_ms = merge_started.elapsed().as_secs_f64() * 1_000.0;
-            log::info!(
-                "[DETECT] path=hybrid_no_fts direct_ms=0.00 semantic_ms={semantic_ms:.2} \
-                 fts_ms=0.00 merge_ms={merge_ms:.2} total_ms={:.2} results={}",
-                total_started.elapsed().as_secs_f64() * 1_000.0,
-                merged.len()
-            );
-            return merged;
+            return self.hybrid_vector_only(text, semantic_detections, semantic_ms, total_started);
         }
 
         let fts_started = Instant::now();
@@ -304,129 +283,15 @@ impl DetectionPipeline {
             .unwrap_or_default()
             .as_millis() as u64;
 
-        let snippet = text.to_string();
-        let mut vector_keys: HashSet<(i32, i32, i32)> = semantic_detections
-            .iter()
-            .map(detection_verse_key)
-            .collect();
         let exact_phrase_keys = exact_quote_keys(text, fts_results);
-        let mut fts_keys: HashSet<(i32, i32, i32)> = HashSet::new();
-
-        for (rank, fts) in fts_results.iter().enumerate() {
-            let Some((confidence, overlap_confidence)) =
-                live_fts_candidate_confidence(text, fts, rank, &exact_phrase_keys)
-            else {
-                continue;
-            };
-            let key = (fts.book_number, fts.chapter, fts.verse);
-            // Quote evidence already has its own calibrated ordering. Keep
-            // concept reranking for paraphrase/event candidates only.
-            // Any verified overlap (min fraction/run/matched) is lexical quote
-            // evidence. Requiring fire-tier 0.90 here left the 2026-08-23
-            // John 3:16 tail (0.78) and Ephesians 3:20 paraphrase (0.86) with
-            // has_lexical_quote=false, so presentation Rejected them.
-            let has_quote_evidence = overlap_confidence.is_some()
-                || exact_quote_confidence(&exact_phrase_keys, fts).is_some()
-                || (exact_phrase_keys.len() <= 1
-                    && short_quote_confidence(text, &fts.text).is_some());
-            let concept_anchor = if has_quote_evidence {
-                None
-            } else {
-                concept_anchor_confidence(text, &fts.text)
-            };
-            // The concept score is an internal rerank signal for paraphrase
-            // and event candidates; quote candidates retain their evidence
-            // confidence so they cannot be displaced by a generic anchor.
-            let anchor_rank_score = if concept_anchor.is_some() {
-                concept_anchor.unwrap_or(confidence)
-            } else {
-                confidence
-            };
-            let confidence = confidence
-                .max(event_anchor_confidence(text, &fts.text).unwrap_or_default())
-                .max(
-                    concept_anchor
-                        .map(|score| score.min(CONCEPT_ANCHOR_CONFIDENCE_CAP))
-                        .unwrap_or_default(),
-                );
-            fts_keys.insert(key);
-            if vector_keys.contains(&key) {
-                if let Some(existing) = semantic_detections
-                    .iter_mut()
-                    .find(|detection| detection_verse_key(detection) == key)
-                {
-                    // Name-only FTS corroboration (Paul+Silas on Acts 15:40) must
-                    // not inherit the quote-overlap boost. Require the spoken
-                    // event terms to actually appear in the verse.
-                    let overlap_boost =
-                        if query_distinctive_content_coverage(text, &fts.text) >= 0.75 {
-                            OVERLAP_CONFIDENCE_BOOST
-                        } else {
-                            0.0
-                        };
-                    existing.confidence = (existing.confidence + overlap_boost)
-                        .min(1.0)
-                        .max(overlap_confidence.unwrap_or(0.0))
-                        .max(confidence);
-                    if let DetectionSource::Semantic { similarity } = &mut existing.source {
-                        *similarity = (*similarity + overlap_boost)
-                            .min(1.0)
-                            .max(overlap_confidence.unwrap_or(0.0))
-                            .max(anchor_rank_score);
-                    }
-                    existing.has_lexical_quote |= has_quote_evidence || fts.is_phrase_match;
-                    existing.quote_coverage = existing
-                        .quote_coverage
-                        .max(overlap_confidence.unwrap_or(0.0));
-                }
-                continue;
-            }
-            log::debug!(
-                "[HYBRID] FTS5 hit: {} {}:{} rank={} conf={:.0}%",
-                fts.book_name,
-                fts.chapter,
-                fts.verse,
-                rank,
-                confidence * 100.0
-            );
-            semantic_detections.push(Detection {
-                verse_ref: VerseRef {
-                    book_number: fts.book_number,
-                    book_name: fts.book_name.clone(),
-                    chapter: fts.chapter,
-                    verse_start: fts.verse,
-                    verse_end: None,
-                },
-                verse_id: None,
-                confidence,
-                source: DetectionSource::Semantic {
-                    similarity: anchor_rank_score.max(confidence),
-                },
-                transcript_snippet: snippet.clone(),
-                detected_at: now,
-                is_chapter_only: false,
-                is_fuzzy_book: false,
-                has_lexical_quote: has_quote_evidence || fts.is_phrase_match,
-                quote_coverage: overlap_confidence.unwrap_or(0.0),
-                candidate_margin: 1.0,
-                utterance_id: None,
-                is_final_utterance: false,
-            });
-            vector_keys.insert(key);
-        }
-
-        // Vector-only survivors (no FTS phrase/AND/OR corroboration) stay in
-        // the review band rather than presenting as mid-80s confident fires.
-        for detection in &mut semantic_detections {
-            let key = detection_verse_key(detection);
-            if fts_keys.contains(&key) {
-                continue;
-            }
-            detection.confidence = detection.confidence.min(VECTOR_ONLY_CONFIDENCE_CAP);
-            if let DetectionSource::Semantic { similarity } = &mut detection.source {
-                *similarity = (*similarity).min(VECTOR_ONLY_CONFIDENCE_CAP);
-            }
-        }
+        let fts_keys = merge_live_fts_candidates(
+            text,
+            fts_results,
+            &mut semantic_detections,
+            now,
+            &exact_phrase_keys,
+        );
+        cap_vector_only_survivors(&mut semantic_detections, &fts_keys);
 
         let fts_ms = fts_started.elapsed().as_secs_f64() * 1_000.0;
 
@@ -448,9 +313,218 @@ impl DetectionPipeline {
         merged
     }
 
+    fn hybrid_vector_only(
+        &mut self,
+        text: &str,
+        mut semantic_detections: Vec<Detection>,
+        semantic_ms: f64,
+        total_started: Instant,
+    ) -> Vec<MergedDetection> {
+        cap_vector_only_survivors(&mut semantic_detections, &HashSet::new());
+        let merge_started = Instant::now();
+        let mut merged = self.merger.merge(vec![], semantic_detections);
+        self.prioritize_spoken_book(text, &mut merged);
+        merged.truncate(LIVE_SEMANTIC_CANDIDATE_CAP);
+        let merge_ms = merge_started.elapsed().as_secs_f64() * 1_000.0;
+        log::info!(
+            "[DETECT] path=hybrid_no_fts direct_ms=0.00 semantic_ms={semantic_ms:.2} \
+             fts_ms=0.00 merge_ms={merge_ms:.2} total_ms={:.2} results={}",
+            total_started.elapsed().as_secs_f64() * 1_000.0,
+            merged.len()
+        );
+        merged
+    }
+
     /// Run a standalone semantic search query (for the search UI).
     pub fn semantic_search(&mut self, query: &str, k: usize) -> Vec<(i64, f64)> {
         self.semantic.search_query(query, k)
+    }
+}
+
+fn cap_vector_only_survivors(
+    detections: &mut [Detection],
+    fts_keys: &HashSet<(i32, i32, i32)>,
+) {
+    for detection in detections {
+        let key = detection_verse_key(detection);
+        if fts_keys.contains(&key) {
+            continue;
+        }
+        detection.confidence = detection.confidence.min(VECTOR_ONLY_CONFIDENCE_CAP);
+        if let DetectionSource::Semantic { similarity } = &mut detection.source {
+            *similarity = (*similarity).min(VECTOR_ONLY_CONFIDENCE_CAP);
+        }
+    }
+}
+
+fn merge_live_fts_candidates(
+    text: &str,
+    fts_results: &[Bm25Result],
+    semantic_detections: &mut Vec<Detection>,
+    now: u64,
+    exact_phrase_keys: &HashSet<(i32, i32, i32)>,
+) -> HashSet<(i32, i32, i32)> {
+    let snippet = text.to_string();
+    let mut vector_keys: HashSet<(i32, i32, i32)> = semantic_detections
+        .iter()
+        .map(detection_verse_key)
+        .collect();
+    let mut fts_keys: HashSet<(i32, i32, i32)> = HashSet::new();
+
+    for (rank, fts) in fts_results.iter().enumerate() {
+        let Some((confidence, overlap_confidence)) =
+            live_fts_candidate_confidence(text, fts, rank, exact_phrase_keys)
+        else {
+            continue;
+        };
+        let key = (fts.book_number, fts.chapter, fts.verse);
+        let (confidence, has_quote_evidence, anchor_rank_score) = live_fts_evidence(
+            text,
+            fts,
+            confidence,
+            overlap_confidence,
+            exact_phrase_keys,
+        );
+        fts_keys.insert(key);
+        if vector_keys.contains(&key) {
+            if let Some(existing) = semantic_detections
+                .iter_mut()
+                .find(|detection| detection_verse_key(detection) == key)
+            {
+                boost_vector_fts_overlap(
+                    existing,
+                    text,
+                    fts,
+                    confidence,
+                    overlap_confidence,
+                    has_quote_evidence,
+                    anchor_rank_score,
+                );
+            }
+            continue;
+        }
+        log::debug!(
+            "[HYBRID] FTS5 hit: {} {}:{} rank={} conf={:.0}%",
+            fts.book_name,
+            fts.chapter,
+            fts.verse,
+            rank,
+            confidence * 100.0
+        );
+        semantic_detections.push(fts_only_detection(
+            fts,
+            snippet.clone(),
+            now,
+            confidence,
+            overlap_confidence,
+            has_quote_evidence,
+            anchor_rank_score,
+        ));
+        vector_keys.insert(key);
+    }
+    fts_keys
+}
+
+fn live_fts_evidence(
+    text: &str,
+    fts: &Bm25Result,
+    confidence: f64,
+    overlap_confidence: Option<f64>,
+    exact_phrase_keys: &HashSet<(i32, i32, i32)>,
+) -> (f64, bool, f64) {
+    // Quote evidence already has its own calibrated ordering. Keep
+    // concept reranking for paraphrase/event candidates only.
+    // Any verified overlap (min fraction/run/matched) is lexical quote
+    // evidence. Requiring fire-tier 0.90 here left the 2026-08-23
+    // John 3:16 tail (0.78) and Ephesians 3:20 paraphrase (0.86) with
+    // has_lexical_quote=false, so presentation Rejected them.
+    let has_quote_evidence = overlap_confidence.is_some()
+        || exact_quote_confidence(exact_phrase_keys, fts).is_some()
+        || (exact_phrase_keys.len() <= 1 && short_quote_confidence(text, &fts.text).is_some());
+    let concept_anchor = if has_quote_evidence {
+        None
+    } else {
+        concept_anchor_confidence(text, &fts.text)
+    };
+    let anchor_rank_score = if concept_anchor.is_some() {
+        concept_anchor.unwrap_or(confidence)
+    } else {
+        confidence
+    };
+    let confidence = confidence
+        .max(event_anchor_confidence(text, &fts.text).unwrap_or_default())
+        .max(
+            concept_anchor
+                .map(|score| score.min(CONCEPT_ANCHOR_CONFIDENCE_CAP))
+                .unwrap_or_default(),
+        );
+    (confidence, has_quote_evidence, anchor_rank_score)
+}
+
+fn boost_vector_fts_overlap(
+    existing: &mut Detection,
+    text: &str,
+    fts: &Bm25Result,
+    confidence: f64,
+    overlap_confidence: Option<f64>,
+    has_quote_evidence: bool,
+    anchor_rank_score: f64,
+) {
+    // Name-only FTS corroboration (Paul+Silas on Acts 15:40) must
+    // not inherit the quote-overlap boost. Require the spoken
+    // event terms to actually appear in the verse.
+    let overlap_boost = if query_distinctive_content_coverage(text, &fts.text) >= 0.75 {
+        OVERLAP_CONFIDENCE_BOOST
+    } else {
+        0.0
+    };
+    existing.confidence = (existing.confidence + overlap_boost)
+        .min(1.0)
+        .max(overlap_confidence.unwrap_or(0.0))
+        .max(confidence);
+    if let DetectionSource::Semantic { similarity } = &mut existing.source {
+        *similarity = (*similarity + overlap_boost)
+            .min(1.0)
+            .max(overlap_confidence.unwrap_or(0.0))
+            .max(anchor_rank_score);
+    }
+    existing.has_lexical_quote |= has_quote_evidence || fts.is_phrase_match;
+    existing.quote_coverage = existing
+        .quote_coverage
+        .max(overlap_confidence.unwrap_or(0.0));
+}
+
+fn fts_only_detection(
+    fts: &Bm25Result,
+    snippet: String,
+    now: u64,
+    confidence: f64,
+    overlap_confidence: Option<f64>,
+    has_quote_evidence: bool,
+    anchor_rank_score: f64,
+) -> Detection {
+    Detection {
+        verse_ref: VerseRef {
+            book_number: fts.book_number,
+            book_name: fts.book_name.clone(),
+            chapter: fts.chapter,
+            verse_start: fts.verse,
+            verse_end: None,
+        },
+        verse_id: None,
+        confidence,
+        source: DetectionSource::Semantic {
+            similarity: anchor_rank_score.max(confidence),
+        },
+        transcript_snippet: snippet,
+        detected_at: now,
+        is_chapter_only: false,
+        is_fuzzy_book: false,
+        has_lexical_quote: has_quote_evidence || fts.is_phrase_match,
+        quote_coverage: overlap_confidence.unwrap_or(0.0),
+        candidate_margin: 1.0,
+        utterance_id: None,
+        is_final_utterance: false,
     }
 }
 

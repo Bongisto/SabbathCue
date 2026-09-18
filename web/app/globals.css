@@ -138,11 +138,6 @@ html.lenis body {
   }
 }
 
-/*
- * Fumadocs theme: align the docs surface with the SabbathCue brand.
- * Uses HSL channel triplets for the fumadocs preset; map to SabbathCue accent
- * (#0099ff) and the same light surface as the marketing site.
- */
 :root {
   --color-fd-background: 210 20% 97%;
   --color-fd-foreground: 0 0% 4%;
@@ -167,25 +162,15 @@ html.lenis body {
   --color-fd-background: 210 20% 97%;
 }
 
-/* Use the same brand sans-serif for docs content */
 .prose,
 [data-fumadocs] {
   font-family: var(--font-sans);
 }
 
-/* Anchor offset for non-Lenis pages (docs) */
 :where(html:not(.lenis)) {
   scroll-padding-top: 5rem;
 }
 
-/*
- * ImageZoom modal backdrop: lift the zoomed image off the page with
- * a translucent dark overlay and a subtle blur instead of the default
- * opaque background. The default fumadocs preset paints the overlay
- * with --color-fd-background â€” using !important to win over the
- * component's side-effect-imported stylesheet (loaded at runtime, so
- * it lands after globals.css in the cascade).
- */
 [data-rmiz-modal-overlay="visible"] {
   background-color: rgba(0, 0, 0, 0.55) !important;
   -webkit-backdrop-filter: blur(6px);

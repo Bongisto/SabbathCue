@@ -10,7 +10,6 @@ export function findThemeById(
   return themes.find((theme) => theme.id === id) ?? themes[0] ?? null
 }
 
-/** Theme an output should use (per-output base theme). */
 export function resolveOutputThemeId(
   state: Pick<BroadcastState, "activeThemeId" | "altActiveThemeId">,
   outputId: string

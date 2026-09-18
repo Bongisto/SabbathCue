@@ -1327,10 +1327,6 @@ const PREMIUM_PEARL_DAWN: BroadcastTheme = {
   transition: { ...MODERN_LIGHT.transition, type: "fade", duration: 520 },
 }
 
-// "Veil" family: a near-full-frame translucent scrim over live video
-// (transparent background + large text box), title-style reference above a
-// centered body with tall line spacing — sized to hold hymn stanzas, single
-// verses, or full paragraphs without reflowing the design.
 const VEIL_LAYOUT: BroadcastTheme["layout"] = {
   anchor: "center",
   offsetX: 0,
@@ -1539,8 +1535,5 @@ export const BUILTIN_THEMES: BroadcastTheme[] = [
   PREMIUM_GILDED_INDIGO,
   PREMIUM_RIVER_STONE,
   PREMIUM_PEARL_DAWN,
-  // Kinetic (moving-background) presets are appended last so existing built-in
-  // theme IDs and ordering are unchanged. Each carries optional `kinetic`
-  // metadata; static themes are untouched.
   ...buildKineticBroadcastThemes(),
 ]

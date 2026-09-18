@@ -71,6 +71,7 @@ pub(crate) fn enqueue_final_semantic_job(
     final_watermark: &Arc<AtomicU64>,
     seq: u64,
     text: String,
+    skip_text: &str,
     egw_text: String,
     stt_confidence: f64,
     request_hint: bool,
@@ -84,7 +85,7 @@ pub(crate) fn enqueue_final_semantic_job(
         return;
     }
 
-    if transcript_defers_to_direct(&text) {
+    if transcript_defers_to_direct(skip_text) {
         log::debug!(
             "[DET-TRACE] seq={seq} skip=semantic_enqueue reason=reference_or_command label=final"
         );

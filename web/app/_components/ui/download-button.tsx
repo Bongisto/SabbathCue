@@ -11,10 +11,6 @@ export function DownloadButton({
   size?: "md" | "lg";
   className?: string;
 }) {
-  // A single Windows installer is shipped for everyone, so the CTA is always
-  // labelled for Windows rather than guessing the visitor's platform.
-  // target="_self" + download keeps the click in the current tab so the
-  // browser triggers a download instead of flashing a blank "_blank" tab.
   const downloadLink = windowsInstallerDownloadLinkProps();
   return (
     <Button

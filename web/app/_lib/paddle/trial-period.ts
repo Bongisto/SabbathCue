@@ -1,4 +1,3 @@
-/** SabbathCue Access prices use a 14-day Paddle trial before the first charge. */
 export const PADDLE_TRIAL_DAYS = 14;
 
 export interface PaddleTrialPeriod {
@@ -15,7 +14,6 @@ export const EXPECTED_PADDLE_TRIAL: Required<
   requires_payment_method: true,
 };
 
-/** True when the price has a 14-day trial with payment method collected at checkout. */
 export function hasExpectedPaddleTrialPeriod(
   trial: PaddleTrialPeriod | null | undefined
 ): boolean {
@@ -27,7 +25,6 @@ export function hasExpectedPaddleTrialPeriod(
   );
 }
 
-/** Price IDs for trial verification scripts — prefer env, sandbox fallback for dev. */
 export function readSabbathCueAccessPriceIds(): {
   month: string;
   year: string;

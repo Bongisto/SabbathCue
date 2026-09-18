@@ -1,6 +1,5 @@
 export const PADDLE_TXN_QUERY_PARAM = "_ptxn";
 
-/** Parse Paddle transaction id from default payment link query (?_ptxn=txn_...). */
 export function parsePtxnFromSearchParams(
   search: string | URLSearchParams
 ): string | null {

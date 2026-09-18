@@ -521,8 +521,7 @@ impl ReadingMode {
                     let next_overlap =
                         word_overlap(&transcript_words, &next.words, next.word_count);
 
-                    // If transcript also matches next verse, advance
-                    if next_overlap >= MIN_WORD_OVERLAP {
+                    if next_overlap > overlap {
                         return self.advance_to(next_idx);
                     }
                 }
@@ -1123,6 +1122,58 @@ mod tests {
         let advance = r.unwrap();
         assert_eq!(advance.verse, 29);
         assert_eq!(advance.reference, "Acts 15:29");
+    }
+
+    #[test]
+    fn quoting_john_1_1_does_not_advance_to_john_1_2() {
+        let mut rm = ReadingMode::new();
+        rm.start(
+            43,
+            "John",
+            1,
+            1,
+            vec![
+                (
+                    1,
+                    "In the beginning was the Word, and the Word was with God, and the Word was God."
+                        .to_string(),
+                ),
+                (2, "The same was in the beginning with God.".to_string()),
+            ],
+        );
+        let advance = rm.check_transcript(
+            "In the beginning was the Word, and the Word was with God, and the Word was God.",
+        );
+        assert!(
+            advance.is_none(),
+            "2026-09-18 11:34:35: quoting John 1:1 must not steal John 1:2, got {:?}",
+            advance.map(|a| a.reference)
+        );
+        assert_eq!(rm.current_verse(), Some(1));
+    }
+
+    #[test]
+    fn quoting_john_1_2_does_advance_from_john_1_1() {
+        let mut rm = ReadingMode::new();
+        rm.start(
+            43,
+            "John",
+            1,
+            1,
+            vec![
+                (
+                    1,
+                    "In the beginning was the Word, and the Word was with God, and the Word was God."
+                        .to_string(),
+                ),
+                (2, "The same was in the beginning with God.".to_string()),
+            ],
+        );
+        let advance = rm.check_transcript("The same was in the beginning with God.");
+        assert!(advance.is_some(), "quoting John 1:2 must still advance");
+        let advance = advance.expect("advance");
+        assert_eq!(advance.verse, 2);
+        assert_eq!(advance.reference, "John 1:2");
     }
 
     #[test]

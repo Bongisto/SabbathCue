@@ -52,8 +52,6 @@ function ThemeCard({
 }) {
   const [isHovered, setIsHovered] = useState(false)
   const isKinetic = Boolean(theme.kinetic)
-  // Bound CPU: a kinetic card only animates when selected or hovered; otherwise
-  // it renders the deterministic static frame. Static themes ignore `animate`.
   const animate = isKinetic && (isSelected || isHovered)
 
   return (
@@ -63,7 +61,6 @@ function ThemeCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => {
-        // Prevent rename exit when card is selected during rename
         if (isRenaming) return
         onSelect()
       }}
@@ -78,7 +75,7 @@ function ThemeCard({
         isSelected && "ring-2 ring-primary"
       )}
     >
-      {/* Thumbnail */}
+      {}
       <div className="relative aspect-video w-full overflow-hidden rounded-lg">
         <CanvasVerse
           theme={theme}
@@ -87,21 +84,21 @@ function ThemeCard({
           animate={animate}
         />
 
-        {/* Kinetic (motion) badge */}
+        {}
         {isKinetic && (
           <Badge className="absolute bottom-1.5 left-1.5 bg-indigo-600 text-[0.5rem] text-foreground hover:bg-indigo-600">
             Kinetic
           </Badge>
         )}
 
-        {/* Active badge */}
+        {}
         {isActive && (
           <Badge className="absolute top-1.5 left-1.5 bg-emerald-600 text-[0.5rem] text-foreground hover:bg-emerald-600">
             Active
           </Badge>
         )}
 
-        {/* Pin icon */}
+        {}
         {theme.pinned && (
           <div className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-background/80">
             <HeartIcon className="size-3 text-primary" strokeWidth={2} />
@@ -109,7 +106,7 @@ function ThemeCard({
         )}
       </div>
 
-      {/* Info */}
+      {}
       <div className="flex min-h-10 items-start gap-1.5 px-0.5">
         <div className="min-w-0 flex-1">
           {isRenaming && !theme.builtin ? (
@@ -149,7 +146,7 @@ function ThemeCard({
           </p>
         </div>
 
-        {/* Tags */}
+        {}
         <div className="flex shrink-0 items-center gap-1">
           {theme.builtin && (
             <Badge variant="outline" className="text-[0.5rem]">
@@ -158,7 +155,7 @@ function ThemeCard({
           )}
         </div>
 
-        {/* More menu */}
+        {}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -249,8 +246,6 @@ export function ThemeLibrary() {
     return result
   }, [themes, search, filter])
 
-  // Kinetic presets are their own selection workflow, kept visually separate
-  // from the static built-in and custom themes.
   const kineticThemes = filteredThemes.filter((t) => Boolean(t.kinetic))
   const builtinThemes = filteredThemes.filter((t) => t.builtin && !t.kinetic)
   const customThemes = filteredThemes.filter((t) => !t.builtin && !t.kinetic)
@@ -267,7 +262,7 @@ export function ThemeLibrary() {
 
   return (
     <div className="controller-sidebar flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-      {/* Header */}
+      {}
       <div className="flex h-14 items-center justify-between border-b border-border px-3">
         <span className="text-lg font-semibold text-foreground">Themes</span>
         <Button onClick={handleNewTheme}>
@@ -276,7 +271,7 @@ export function ThemeLibrary() {
         </Button>
       </div>
 
-      {/* Search */}
+      {}
       <div className="px-3 pt-3 pb-4">
         <div className="relative">
           <SearchIcon className="absolute top-1/2 left-2 size-3 -translate-y-1/2 text-muted-foreground" />
@@ -289,7 +284,7 @@ export function ThemeLibrary() {
         </div>
       </div>
 
-      {/* Filter tabs */}
+      {}
       <Tabs
         value={filter}
         onValueChange={(value) => setFilter(value as FilterTab)}
@@ -311,7 +306,7 @@ export function ThemeLibrary() {
         </TabsList>
       </Tabs>
 
-      {/* Import / Export */}
+      {}
       <div className="flex gap-1.5 px-3 pb-3">
         <Button
           variant="outline"
@@ -362,10 +357,10 @@ export function ThemeLibrary() {
         WebP, GIF, or BMP files.
       </p>
 
-      {/* Theme list */}
+      {}
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-1 px-2 pb-4">
-          {/* Kinetic (moving-background) section */}
+          {}
           {kineticThemes.length > 0 && (
             <>
               <p className="px-1.5 pt-2 pb-1 text-[0.625rem] font-semibold tracking-widest text-muted-foreground uppercase">
@@ -384,7 +379,7 @@ export function ThemeLibrary() {
             </>
           )}
 
-          {/* Built-in section */}
+          {}
           {builtinThemes.length > 0 && (
             <>
               <p className="px-1.5 pt-3 pb-1 text-[0.625rem] font-semibold tracking-widest text-muted-foreground uppercase">
@@ -403,7 +398,7 @@ export function ThemeLibrary() {
             </>
           )}
 
-          {/* Custom section */}
+          {}
           {customThemes.length > 0 && (
             <>
               <p className="px-1.5 pt-3 pb-1 text-[0.625rem] font-semibold tracking-widest text-muted-foreground uppercase">

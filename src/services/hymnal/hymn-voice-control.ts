@@ -71,7 +71,6 @@ async function loadHymn(hymnNumber: number): Promise<LoadedHymn | null> {
   return { hymn, screens, deck }
 }
 
-/** Build the Recent-Detections card payload for a spoken hymn. */
 export function createHymnDetection(hymn: Hymn): DetectionResult {
   return {
     content_type: "hymn",
@@ -100,8 +99,6 @@ export async function handleHymnVoiceControl(text: string): Promise<boolean> {
   if (!loaded) return false
 
   useHymnSlideStore.getState().setDeck(loaded.deck, 0)
-  // Auto-live sends the hymn straight to the live output; otherwise it only
-  // stages to preview for the operator to commit.
   if (getBroadcastLiveStore().readingModeAutoLive) {
     presentItem(loaded.deck[0])
   } else {
@@ -113,7 +110,6 @@ export async function handleHymnVoiceControl(text: string): Promise<boolean> {
   return true
 }
 
-/** Re-preview a hymn from its detection card. */
 export async function previewHymnByNumber(hymnNumber: number): Promise<void> {
   const loaded = await loadHymn(hymnNumber)
   if (!loaded) return
@@ -121,7 +117,6 @@ export async function previewHymnByNumber(hymnNumber: number): Promise<void> {
   selectPreviewItem(loaded.deck[0])
 }
 
-/** Send a hymn live from its detection card. */
 export async function presentHymnByNumber(hymnNumber: number): Promise<void> {
   const loaded = await loadHymn(hymnNumber)
   if (!loaded) return
@@ -129,7 +124,6 @@ export async function presentHymnByNumber(hymnNumber: number): Promise<void> {
   presentItem(loaded.deck[0])
 }
 
-/** Queue a hymn's screens from its detection card. */
 export async function queueHymnByNumber(hymnNumber: number): Promise<void> {
   const loaded = await loadHymn(hymnNumber)
   if (!loaded) return

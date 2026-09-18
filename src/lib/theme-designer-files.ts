@@ -2,10 +2,6 @@ import { open, save } from "@tauri-apps/plugin-dialog"
 import { invokeTauri } from "@/lib/tauri-runtime"
 import type { BroadcastTheme } from "@/types"
 
-/**
- * Opens a native file dialog to pick an image, reads it,
- * and returns a base64 data URL that persists across restarts.
- */
 export async function pickThemeBackgroundImage(): Promise<string | null> {
   const selected = await open({
     multiple: false,
@@ -22,9 +18,6 @@ export async function pickThemeBackgroundImage(): Promise<string | null> {
   return await invokeTauri<string>("read_image_as_data_url", { path })
 }
 
-/**
- * Exports a theme as JSON via native save dialog.
- */
 export async function exportTheme(theme: BroadcastTheme): Promise<void> {
   const path = await save({
     defaultPath: `${theme.name.replace(/[^a-zA-Z0-9-_ ]/g, "")}.json`,
@@ -35,10 +28,6 @@ export async function exportTheme(theme: BroadcastTheme): Promise<void> {
   await invokeTauri("export_theme_to_path", { path, theme })
 }
 
-/**
- * Imports a theme from a JSON file via native open dialog.
- * Returns the parsed theme or null if cancelled/invalid.
- */
 export async function importTheme(): Promise<BroadcastTheme | null> {
   const selected = await open({
     multiple: false,

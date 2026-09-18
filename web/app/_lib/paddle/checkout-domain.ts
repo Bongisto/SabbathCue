@@ -1,6 +1,5 @@
 import { DEFAULT_PUBLIC_SITE_ORIGIN, publicSiteOrigin } from "../site-url";
 
-/** Hostname submitted for Paddle Checkout website approval. */
 export const PADDLE_CHECKOUT_DOMAIN = new URL(
   publicSiteOrigin() || DEFAULT_PUBLIC_SITE_ORIGIN
 ).hostname;

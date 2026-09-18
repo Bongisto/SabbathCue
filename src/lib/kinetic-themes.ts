@@ -6,37 +6,19 @@ import type {
   KineticPattern,
 } from "@/types/broadcast"
 
-// ---------------------------------------------------------------------------
-// Kinetic theme catalog
-//
-// These 25 presets mirror the moving "Kinetic Theme" selector from the
-// SabbathCue HTML prototypes. The first 14 (classical + modern) are canvas-native
-// CSS themes: the four mesh-gradient colors, an accent, the motion envelope
-// (liquidMesh duration + hue/saturation breathing + drift), and an optional
-// overlay pattern (cyberpunk dot-grid, brutalist diagonal stripes). The final 10
-// (nature group) are deterministic particle scenes — rain, snow, leaves, petals,
-// fireflies, stars, pollen and aurora — drawn from the nature-scenes prototype.
-//
-// Fonts are mapped to fonts already bundled with the app (no network fonts) so
-// the workflow stays fully offline. See the plan's APPROVED FONT APPROACH.
-// ---------------------------------------------------------------------------
+// Fonts are mapped to fonts already bundled with the app (no network fonts).
 
 export interface KineticThemePreset {
   presetId: string
-  /** Human label shown in the library (carries the original font intent). */
   name: string
   group: BroadcastKineticTheme["group"]
   backgroundKind: KineticBackgroundKind
-  /** Four mesh-gradient corner colors from the prototype. */
   colors: string[]
   accentColor: string
-  /** Body/verse text color tuned for readability over the moving base. */
   textColor: string
-  /** Bundled family selected to preserve the source design's visual intent. */
   fontFamily: string
   motion: KineticMotion
   pattern?: KineticPattern
-  /** False renders the deterministic time-zero frame and does not start RAF. */
   animate?: boolean
   verseText?: Partial<BroadcastTheme["verseText"]>
   reference?: Partial<BroadcastTheme["reference"]>
@@ -44,8 +26,6 @@ export interface KineticThemePreset {
   hymnPresentation?: BroadcastTheme["hymnPresentation"]
 }
 
-// Default motion envelope from the prototype: animate-mesh-vigorous is a 6s
-// loop, liquidMesh rotates hue up to 25deg and saturates up to 1.3x.
 const MESH_MOTION: KineticMotion = {
   durationMs: 6000,
   driftAmount: 0.6,
@@ -53,7 +33,6 @@ const MESH_MOTION: KineticMotion = {
   saturationBoost: 0.3,
 }
 
-// Modern/geometric presets read as more energetic in the prototype.
 const MODERN_MOTION: KineticMotion = {
   durationMs: 5200,
   driftAmount: 0.85,
@@ -61,12 +40,10 @@ const MODERN_MOTION: KineticMotion = {
   saturationBoost: 0.4,
 }
 
-// Offline font approximations for the prototype's font intents.
 const SERIF = "Source Serif 4 Variable"
 const DISPLAY_SERIF = "DM Serif Display"
 const SANS = "Geist Variable"
 
-// Bundled offline display fonts for the nature scenes (registered in index.css).
 const CINZEL = "Cinzel"
 const PLAYFAIR = "Playfair Display"
 const BEBAS = "Bebas Neue"
@@ -83,9 +60,6 @@ const HYMN_HUMANIST_SANS = "Outfit Variable"
 // own font). System font: available to canvas offline with no loading step.
 const GEORGIA = "Georgia"
 
-// Nature scenes drift slowly and calmly. Particle speed is derived from
-// driftAmount in the renderer; the backdrop barely shifts hue so it reads as a
-// still scene with motion inside it.
 const NATURE_MOTION: KineticMotion = {
   durationMs: 12000,
   driftAmount: 0.5,
@@ -93,8 +67,6 @@ const NATURE_MOTION: KineticMotion = {
   saturationBoost: 0.08,
 }
 
-// KNFC verse-stage scenes: the shimmer rotates once per 18-second loop while
-// the stage colors remain stable.
 const STAGE_MOTION: KineticMotion = {
   durationMs: 18000,
   driftAmount: 0.25,
@@ -110,7 +82,6 @@ const HYMN_MOTION: KineticMotion = {
 }
 
 export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
-  // ---- Classical serif group (fluid waves) -------------------------------
   {
     presetId: "ocean",
     name: "Midnight Ocean (Kinetic)",
@@ -199,7 +170,6 @@ export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
     fontFamily: SERIF,
     motion: MESH_MOTION,
   },
-  // ---- Modern sans / geometric group (active motion) ---------------------
   {
     presetId: "cyberpunk",
     name: "Neon Synthwave (Kinetic)",
@@ -268,7 +238,6 @@ export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
     fontFamily: SANS,
     motion: MODERN_MOTION,
   },
-  // ---- Nature scene group (deterministic canvas particle systems) --------
   {
     presetId: "nature-foliage",
     name: "Whispering Foliage (Kinetic)",
@@ -379,7 +348,6 @@ export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
     fontFamily: CINZEL,
     motion: NATURE_MOTION,
   },
-  // ---- Hymn scenes ported from sabbathcue-hymn-theme ----------------------
   {
     presetId: "hymn-midnight",
     name: "Midnight Sanctuary (Kinetic)",
@@ -598,7 +566,6 @@ export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
       },
     },
   },
-  // ---- Worship scene: Desert Cloth (canvas port of worship_background HTML)
   {
     presetId: "desert-cloth",
     name: "Desert Cloth (Kinetic)",
@@ -617,8 +584,6 @@ export const KINETIC_THEME_PRESETS: KineticThemePreset[] = [
       saturationBoost: 0,
     },
   },
-  // ---- KNFC verse-stage group ---------------------------------------------
-  // colors = [stage-a, stage-b, glow].
   {
     presetId: "stage-navy",
     name: "KNFC Navy Stage (Kinetic)",
@@ -698,9 +663,6 @@ function toKineticMetadata(preset: KineticThemePreset): BroadcastKineticTheme {
   }
 }
 
-// A diagonal gradient mirroring the prototype's 135deg mesh. This is the static
-// fallback background so the theme still renders if kinetic drawing is skipped
-// or fails, and so non-kinetic-aware consumers see a representative frame.
 function fallbackBackground(
   preset: KineticThemePreset
 ): BroadcastTheme["background"] {
@@ -810,9 +772,6 @@ export function buildKineticBroadcastTheme(
   theme.reference = { ...theme.reference, ...preset.reference }
   theme.layout = { ...theme.layout, ...preset.layout }
 
-  // Desert Cloth carries the HTML design's own typography: Georgia italic
-  // cream verse text with ink shadow, then quiet bottom metadata so the
-  // app's reference/title does not compete with the portrait.
   if (preset.presetId === "desert-cloth") {
     theme.verseText = {
       ...theme.verseText,

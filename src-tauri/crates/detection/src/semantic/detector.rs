@@ -85,155 +85,139 @@ impl SemanticDetector {
     /// The returned `Detection` objects have placeholder `VerseRef`
     /// fields (all zeros / empty) — the caller is expected to resolve
     /// them using the `verse_id` from the underlying `SearchResult`.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "semantic detection keeps ensemble and fallback branches together"
-    )]
     pub fn detect(&mut self, text: &str) -> Vec<Detection> {
         if !self.is_ready() {
             return vec![];
         }
 
-        let mut detections = Vec::new();
+        let mut detections = if self.use_synonyms {
+            self.detect_ensemble(text)
+        } else {
+            self.detect_direct_embedding(text)
+        };
+        detections.truncate(MAX_SEMANTIC_DETECTIONS);
+        detections
+    }
 
-        if self.use_synonyms {
-            // Ensemble search: 3 strategies (original + synonym + concept),
-            // run per sentence chunk so a quote wrapped in commentary is
-            // embedded on its own ("Because the Bible says, <quote>. He has
-            // accepted Christ." — the whole utterance dilutes similarity
-            // below the operator threshold). ~3 embed calls per chunk, capped,
-            // and this path runs on speech_final in a background task.
-            let now = Self::timestamp_ms();
-            let chunks = self.chunker.chunk(text);
-            let search_chunks = if chunks.is_empty() {
-                vec![text.to_string()]
-            } else {
-                chunks
-            };
+    fn detect_ensemble(&mut self, text: &str) -> Vec<Detection> {
+        let now = Self::timestamp_ms();
+        let chunks = self.chunker.chunk(text);
+        let search_chunks = if chunks.is_empty() {
+            vec![text.to_string()]
+        } else {
+            chunks
+        };
 
-            let mut best_by_verse: HashMap<i64, Detection> = HashMap::new();
-            for chunk in &search_chunks {
-                match self.ensemble.search(
-                    chunk,
-                    self.embedder.as_ref(),
-                    self.index.as_ref(),
-                    SEMANTIC_SEARCH_K,
-                ) {
-                    Ok(results) => {
-                        // Results are ranked by ensemble score; display the raw
-                        // match strength (best similarity) plus a small bonus
-                        // when strategies agree, so the shown confidence
-                        // reflects how strong the match actually is.
-                        for result in results {
-                            // Gate on the actual match strength, not the
-                            // weighted ensemble score: a verse found only by
-                            // the original strategy caps at 0.7 * similarity,
-                            // so even a verbatim quote (cosine ~1.0) could
-                            // never cross a 0.75 operator threshold. The
-                            // weighted score still drives ranking upstream.
-                            if result.best_similarity >= self.confidence_threshold {
-                                let agreement_bonus = match result.sources.len() {
-                                    0 | 1 => 0.0,
-                                    2 => AGREEMENT_BONUS,
-                                    _ => AGREEMENT_BONUS * 2.0,
-                                };
-                                let confidence = cap_pastoral_prayer_address_confidence(
-                                    chunk,
-                                    (result.best_similarity + agreement_bonus).min(1.0),
-                                );
-                                let entry = best_by_verse.entry(result.verse_id);
-                                match entry {
-                                    std::collections::hash_map::Entry::Occupied(mut existing)
-                                        if existing.get().confidence < confidence =>
-                                    {
-                                        existing.insert(Self::make_detection(
-                                            result.verse_id,
-                                            confidence,
-                                            result.score,
-                                            chunk,
-                                            now,
-                                        ));
-                                    }
-                                    std::collections::hash_map::Entry::Vacant(vacant) => {
-                                        vacant.insert(Self::make_detection(
-                                            result.verse_id,
-                                            confidence,
-                                            result.score,
-                                            chunk,
-                                            now,
-                                        ));
-                                    }
-                                    std::collections::hash_map::Entry::Occupied(_) => {}
+        let mut best_by_verse: HashMap<i64, Detection> = HashMap::new();
+        for chunk in &search_chunks {
+            match self.ensemble.search(
+                chunk,
+                self.embedder.as_ref(),
+                self.index.as_ref(),
+                SEMANTIC_SEARCH_K,
+            ) {
+                Ok(results) => {
+                    for result in results {
+                        if result.best_similarity >= self.confidence_threshold {
+                            let agreement_bonus = match result.sources.len() {
+                                0 | 1 => 0.0,
+                                2 => AGREEMENT_BONUS,
+                                _ => AGREEMENT_BONUS * 2.0,
+                            };
+                            let confidence = cap_pastoral_prayer_address_confidence(
+                                chunk,
+                                (result.best_similarity + agreement_bonus).min(1.0),
+                            );
+                            let entry = best_by_verse.entry(result.verse_id);
+                            match entry {
+                                std::collections::hash_map::Entry::Occupied(mut existing)
+                                    if existing.get().confidence < confidence =>
+                                {
+                                    existing.insert(Self::make_detection(
+                                        result.verse_id,
+                                        confidence,
+                                        result.score,
+                                        chunk,
+                                        now,
+                                    ));
                                 }
+                                std::collections::hash_map::Entry::Vacant(vacant) => {
+                                    vacant.insert(Self::make_detection(
+                                        result.verse_id,
+                                        confidence,
+                                        result.score,
+                                        chunk,
+                                        now,
+                                    ));
+                                }
+                                std::collections::hash_map::Entry::Occupied(_) => {}
                             }
                         }
                     }
-                    Err(e) => {
-                        log::warn!("[SEMANTIC] Ensemble search failed: {e}");
-                    }
+                }
+                Err(e) => {
+                    log::warn!("[SEMANTIC] Ensemble search failed: {e}");
                 }
             }
-            detections.extend(best_by_verse.into_values());
-            detections.sort_by(|a, b| {
-                b.rank_score()
-                    .partial_cmp(&a.rank_score())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+        }
+        let mut detections: Vec<Detection> = best_by_verse.into_values().collect();
+        detections.sort_by(|a, b| {
+            b.rank_score()
+                .partial_cmp(&a.rank_score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        detections
+    }
+
+    fn detect_direct_embedding(&mut self, text: &str) -> Vec<Detection> {
+        let now = Self::timestamp_ms();
+        let mut seen_verse_ids = HashSet::new();
+        let chunks = self.chunker.chunk(text);
+        let search_chunks = if chunks.is_empty() {
+            vec![text.to_string()]
         } else {
-            let now = Self::timestamp_ms();
-            let mut seen_verse_ids = HashSet::new();
-            let chunks = self.chunker.chunk(text);
-            let search_chunks = if chunks.is_empty() {
-                vec![text.to_string()]
+            chunks
+        };
+        let mut detections = Vec::new();
+
+        for chunk in search_chunks {
+            let results = if let Some((_embedding, results)) = self.cache.get(&chunk) {
+                results.clone()
             } else {
-                chunks
-            };
-
-            for chunk in search_chunks {
-                let results = if let Some((_embedding, results)) = self.cache.get(&chunk) {
-                    results.clone()
-                } else {
-                    let Ok(embedding) = self.embedder.embed(&chunk) else {
-                        continue;
-                    };
-                    let Ok(results) = self.index.search(&embedding, SEMANTIC_SEARCH_K) else {
-                        continue;
-                    };
-
-                    self.cache
-                        .insert(chunk.clone(), (embedding, results.clone()));
-                    results
+                let Ok(embedding) = self.embedder.embed(&chunk) else {
+                    continue;
+                };
+                let Ok(results) = self.index.search(&embedding, SEMANTIC_SEARCH_K) else {
+                    continue;
                 };
 
-                for result in &results {
-                    if result.similarity >= self.confidence_threshold
-                        && seen_verse_ids.insert(result.verse_id)
-                    {
-                        let confidence =
-                            cap_pastoral_prayer_address_confidence(&chunk, result.similarity);
-                        detections.push(Self::make_detection(
-                            result.verse_id,
-                            confidence,
-                            result.similarity,
-                            &chunk,
-                            now,
-                        ));
-                    }
+                self.cache
+                    .insert(chunk.clone(), (embedding, results.clone()));
+                results
+            };
+
+            for result in &results {
+                if result.similarity >= self.confidence_threshold
+                    && seen_verse_ids.insert(result.verse_id)
+                {
+                    let confidence =
+                        cap_pastoral_prayer_address_confidence(&chunk, result.similarity);
+                    detections.push(Self::make_detection(
+                        result.verse_id,
+                        confidence,
+                        result.similarity,
+                        &chunk,
+                        now,
+                    ));
                 }
             }
-
-            // Direct-embedding hits arrive per chunk; rank by similarity.
-            detections.sort_by(|a, b| {
-                b.confidence
-                    .partial_cmp(&a.confidence)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
         }
 
-        // Ensemble results keep their score ranking; direct results are sorted
-        // above. Cap to the top semantic suggestions either way.
-        detections.truncate(MAX_SEMANTIC_DETECTIONS);
-
+        detections.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         detections
     }
 

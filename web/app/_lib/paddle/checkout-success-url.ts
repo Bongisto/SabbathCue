@@ -1,6 +1,5 @@
 import type { PaddlePublicConfig } from "./config";
 
-/** Absolute success URL for Paddle overlay checkout (respects Next basePath). */
 export function buildCheckoutSuccessUrl(config: PaddlePublicConfig): string {
   const basePath = config.basePath.replace(/\/$/, "");
   if (typeof window === "undefined") {

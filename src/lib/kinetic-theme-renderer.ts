@@ -3,21 +3,6 @@ import type { HymnPresentationSectionKind } from "@/types/presentation"
 import worshipPortraitUrl from "@/assets/worship-portrait.webp"
 import { drawHymnThemeScene, isHymnThemeScene } from "@/lib/hymn-theme-scenes"
 
-// ---------------------------------------------------------------------------
-// Canvas-native kinetic background renderer
-//
-// Mirrors the HTML prototype's CSS motion (liquidMesh + vigorousDrift + the
-// cyberpunk dot-grid and brutalist diagonal stripes) using only 2D canvas draw
-// calls so the same moving background works for the live output AND the NDI
-// frame path. It is deterministic: a given (theme, timeMs) always produces the
-// same draw calls, which keeps tests stable and makes timeMs=0 a usable static
-// thumbnail frame.
-//
-// No CSS, no DOM measurement, no external images — except the bundled Desert
-// Cloth portrait asset, which is decoded once and skipped until loaded so
-// determinism per (theme, timeMs, assetsLoaded) still holds.
-// ---------------------------------------------------------------------------
-
 const TAU = Math.PI * 2
 
 export function isKineticTheme(
@@ -26,7 +11,6 @@ export function isKineticTheme(
   return Boolean(theme.kinetic && theme.kinetic.animate !== false)
 }
 
-/** Normalized loop position in [0, 1). Stable at timeMs=0; 0 when no duration. */
 export function kineticLoopPhase(timeMs: number, durationMs: number): number {
   if (!Number.isFinite(timeMs) || durationMs <= 0) return 0
   const wrapped = ((timeMs % durationMs) + durationMs) % durationMs
@@ -45,8 +29,6 @@ function drawMeshBase(
   phase: number
 ): void {
   const colors = colorsOf(k)
-  // Rotate the gradient axis over the loop (the prototype shifts
-  // background-position; an angle sweep reads the same on a flat canvas).
   const angle =
     (135 + Math.sin(phase * TAU) * 25 * Math.max(0.1, k.motion.driftAmount)) *
     (Math.PI / 180)
@@ -78,8 +60,7 @@ function drawDriftBlobs(
   const radius = Math.max(width, height) * 0.55
 
   ctx.save()
-  // Soft, additive luminous blobs like the ambient drift layer. Filters are
-  // guarded because some WebViews / test contexts don't support them.
+  // Filters are guarded because some WebViews / test contexts don't support them.
   try {
     ctx.globalAlpha = 0.55
   } catch {
@@ -107,7 +88,6 @@ function drawDriftBlobs(
     ctx.fillRect(0, 0, width, height)
   }
 
-  // Accent glow that breathes with the loop (cyberPulse).
   const pulse = 0.3 + 0.25 * (0.5 + 0.5 * Math.sin(phase * TAU))
   const glowX = width * 0.5 + Math.cos(phase * TAU) * width * 0.18 * drift
   const glowY = height * 0.5 + Math.sin(phase * TAU) * height * 0.18 * drift
@@ -139,7 +119,6 @@ function drawDotGrid(
 ): void {
   const spacing = Math.max(24, Math.round(width / 48))
   const dotRadius = Math.max(1.5, spacing * 0.08)
-  // Scroll the grid diagonally over the loop (gridScroll).
   const shift = (phase * spacing) % spacing
   ctx.save()
   ctx.globalAlpha = 0.5
@@ -168,7 +147,6 @@ function drawDiagonalStripes(
   ctx.save()
   ctx.globalAlpha = 0.08
   ctx.fillStyle = k.accentColor
-  // Diagonal (45deg) stripes as filled parallelograms sweeping across.
   for (let offset = -span; offset < span; offset += period) {
     const x = offset + shift
     ctx.beginPath()
@@ -182,17 +160,7 @@ function drawDiagonalStripes(
   ctx.restore()
 }
 
-// ---------------------------------------------------------------------------
-// Nature scenes
-//
-// Deterministic particle systems (rain, snow, drifting leaves/petals, glowing
-// motes, stars, aurora). Every element's position is a pure function of its
-// index seed and timeMs, so a given (theme, timeMs) always produces the same
-// frame — timeMs=0 is a stable thumbnail — with no per-frame state retained.
-// Only cheap primitives are used (arcs, lines, filled polygons, one gradient);
-// no shadow blur or per-particle gradients, so the 15fps CPU budget holds.
-// ---------------------------------------------------------------------------
-
+// 15fps CPU budget: no shadow blur or per-particle gradients.
 const NATURE_KINDS: ReadonlySet<string> = new Set([
   "foliage",
   "forest",
@@ -206,7 +174,6 @@ const NATURE_KINDS: ReadonlySet<string> = new Set([
   "aurora",
 ])
 
-/** Deterministic [0, 1) hash for a particle index. */
 function srand(n: number): number {
   const x = Math.sin(n * 127.1) * 43758.5453
   return x - Math.floor(x)
@@ -225,12 +192,10 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(int >> 16) & 255, (int >> 8) & 255, int & 255]
 }
 
-/** Overall particle speed multiplier from the preset's drift amount. */
 function driftSpeed(k: BroadcastKineticTheme): number {
   return 0.5 + Math.max(0, k.motion.driftAmount)
 }
 
-/** Calm vertical gradient backdrop behind the particles. */
 function drawNatureBackdrop(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -246,19 +211,10 @@ function drawNatureBackdrop(
   ctx.fillRect(0, 0, width, height)
 }
 
-// --- Static environment layer -----------------------------------------------
-//
-// Each nature scene sits in a painted environment (silhouettes, haze, light
-// shafts, vignette). That layer never animates, so it is painted once to an
-// offscreen canvas and blitted per frame; the gradient-heavy richness costs
-// nothing on the 15fps budget. Without a DOM (tests, NDI edge cases) the same
-// painter runs inline on the target context instead.
-
 function rgba(r: number, g: number, b: number, a: number): string {
   return `rgba(${Math.max(0, Math.min(255, Math.round(r)))}, ${Math.max(0, Math.min(255, Math.round(g)))}, ${Math.max(0, Math.min(255, Math.round(b)))}, ${a})`
 }
 
-/** A soft horizontal ridge/treeline silhouette filled down to the bottom. */
 function paintRidge(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -291,7 +247,6 @@ function paintRidge(
   ctx.fill()
 }
 
-/** Darkened corners so scenes read as lit from within, not flat. */
 function paintVignette(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -312,7 +267,6 @@ function paintVignette(
   ctx.fillRect(0, 0, width, height)
 }
 
-/** Diagonal translucent light shafts from an upper corner. */
 function paintLightShafts(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -325,7 +279,6 @@ function paintLightShafts(
     const topX = width * (0.14 + i * 0.19 + srand(i + 71) * 0.07)
     const spread = width * (0.014 + srand(i + 73) * 0.02)
     const botX = topX + width * 0.16
-    // Fade out before the ground so shafts read as light, not painted wedges.
     const grad = ctx.createLinearGradient(topX, 0, botX, height)
     const alpha = 0.1 - i * 0.018
     grad.addColorStop(0, rgba(tint[0], tint[1], tint[2], alpha))
@@ -344,7 +297,6 @@ function paintLightShafts(
   ctx.restore()
 }
 
-/** Trunk-and-canopy silhouette layers for forest-family scenes. */
 function paintForestEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -353,7 +305,6 @@ function paintForestEnvironment(
   warm: boolean
 ): void {
   const [r, g, b] = hexToRgb(k.accentColor)
-  // Far-to-near tree layers: farther layers are lighter and hazier.
   for (let layer = 0; layer < 3; layer++) {
     const near = layer / 2
     const alpha = 0.14 + near * 0.24
@@ -386,7 +337,6 @@ function paintForestEnvironment(
       ctx.closePath()
       ctx.fillStyle = trunkColor
       ctx.fill()
-      // Branch hints partway up the trunk.
       ctx.strokeStyle = trunkColor
       ctx.lineWidth = Math.max(1, trunkW * 0.4)
       for (let br = 0; br < 2; br++) {
@@ -403,7 +353,6 @@ function paintForestEnvironment(
         ctx.stroke()
       }
     }
-    // Canopy mass hanging from the top of this layer.
     const canopy = ctx.createLinearGradient(
       0,
       0,
@@ -421,7 +370,6 @@ function paintForestEnvironment(
     ctx.fillRect(0, 0, width, height * (0.3 + near * 0.1))
   }
   paintLightShafts(ctx, width, height, warm ? [255, 214, 150] : [214, 240, 200])
-  // Dappled ground shading.
   const ground = ctx.createLinearGradient(0, height * 0.82, 0, height)
   ground.addColorStop(0, "rgba(0, 0, 0, 0)")
   ground.addColorStop(
@@ -432,7 +380,6 @@ function paintForestEnvironment(
   ctx.fillRect(0, height * 0.82, width, height * 0.18)
 }
 
-/** Carpet of settled leaves along the bottom (autumn). */
 function paintLeafCarpet(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -452,7 +399,6 @@ function paintLeafCarpet(
   }
 }
 
-/** Blossom branches reaching in from the top corners. */
 function paintBlossomBranches(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -471,7 +417,6 @@ function paintBlossomBranches(
       const ey = sy + height * (0.08 + srand(seed + 5) * 0.14)
       const cx = sx + dir * width * 0.1
       const cy = sy + height * 0.01
-      // Tapered branch: stroke twice, thick near the trunk-side edge.
       ctx.strokeStyle = branchColor
       ctx.lineWidth = Math.max(2, width * 0.006 * (1 - br * 0.2))
       ctx.beginPath()
@@ -483,7 +428,6 @@ function paintBlossomBranches(
       ctx.moveTo(cx, cy)
       ctx.quadraticCurveTo(cx + dir * width * 0.05, cy + height * 0.02, ex, ey)
       ctx.stroke()
-      // Small twigs with tight blossom tufts hugging the branch line.
       for (let c = 0; c < 9; c++) {
         const p = 0.24 + (c / 9) * 0.76
         const bx =
@@ -511,7 +455,6 @@ function paintBlossomBranches(
   }
 }
 
-/** Heavy cloud bank, misty horizon and wet-ground sheen for rain. */
 function paintRainEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -519,7 +462,6 @@ function paintRainEnvironment(
   k: BroadcastKineticTheme
 ): void {
   const [r, g, b] = hexToRgb(k.accentColor)
-  // Layered cloud bank: overlapping soft ellipses across the top.
   for (let i = 0; i < 12; i++) {
     const x = ((i + srand(i + 301) * 0.9) / 12) * width
     const y = height * (0.02 + srand(i + 303) * 0.1)
@@ -536,14 +478,12 @@ function paintRainEnvironment(
     ctx.fillStyle = cloud
     ctx.fill()
   }
-  // Misty horizon band.
   const mist = ctx.createLinearGradient(0, height * 0.55, 0, height * 0.78)
   mist.addColorStop(0, "rgba(0, 0, 0, 0)")
   mist.addColorStop(0.5, rgba(r * 0.5 + 40, g * 0.5 + 44, b * 0.5 + 52, 0.1))
   mist.addColorStop(1, "rgba(0, 0, 0, 0)")
   ctx.fillStyle = mist
   ctx.fillRect(0, height * 0.55, width, height * 0.23)
-  // Wet ground with a reflective sheen.
   paintRidge(ctx, width, height, {
     baseY: height * 0.9,
     amp: height * 0.008,
@@ -557,7 +497,6 @@ function paintRainEnvironment(
   ctx.fillRect(0, height * 0.9, width, height * 0.1)
 }
 
-/** Moonlit sky, snowy hills and ground band for snow. */
 function paintSnowEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -596,7 +535,6 @@ function paintSnowEnvironment(
   })
 }
 
-/** Milky-way band and horizon silhouette for night skies. */
 function paintNightEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -604,7 +542,6 @@ function paintNightEnvironment(
   k: BroadcastKineticTheme
 ): void {
   const [r, g, b] = hexToRgb(k.accentColor)
-  // Diagonal milky-way glow.
   ctx.save()
   ctx.globalCompositeOperation = "screen"
   const bandGrad = ctx.createLinearGradient(
@@ -621,7 +558,6 @@ function paintNightEnvironment(
   bandGrad.addColorStop(1, "rgba(0, 0, 0, 0)")
   ctx.fillStyle = bandGrad
   ctx.fillRect(0, 0, width, height)
-  // Dust: faint static pinpricks concentrated along the band diagonal.
   for (let i = 0; i < 130; i++) {
     const p = srand(i + 501)
     const bx = width * (0.08 + p * 0.86)
@@ -635,7 +571,6 @@ function paintNightEnvironment(
     ctx.fill()
   }
   ctx.restore()
-  // Horizon treeline.
   paintRidge(ctx, width, height, {
     baseY: height * 0.93,
     amp: height * 0.028,
@@ -645,7 +580,6 @@ function paintNightEnvironment(
   })
 }
 
-/** Dusk treeline and grass edge for fireflies. */
 function paintFirefliesEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -665,7 +599,6 @@ function paintFirefliesEnvironment(
     color: "rgba(4, 10, 8, 0.7)",
     jagged: true,
   })
-  // Static foreground grass blades.
   ctx.strokeStyle = "rgba(3, 8, 6, 0.8)"
   for (let i = 0; i < 30; i++) {
     const x = srand(i + 611) * width
@@ -684,7 +617,6 @@ function paintFirefliesEnvironment(
   }
 }
 
-/** Sunlit rolling hills and flower heads for the meadow. */
 function paintMeadowEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -716,7 +648,6 @@ function paintMeadowEnvironment(
     seed: 709,
     color: rgba(r * 0.38, g * 0.5, b * 0.3, 0.3),
   })
-  // Scattered flower heads near the foreground.
   for (let i = 0; i < 18; i++) {
     const x = srand(i + 721) * width
     const y = height * (0.9 + srand(i + 723) * 0.08)
@@ -731,7 +662,6 @@ function paintMeadowEnvironment(
   }
 }
 
-/** Paint the full static environment for a nature scene onto a context. */
 function paintNatureEnvironment(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -834,8 +764,6 @@ function drawFallingLeaves(
     const fall =
       (srand(i + 3) * range + t * speed * (0.6 + srand(i + 5) * 0.8)) % range
     const y = fall - 40
-    // Periodic wind gusts slide leaves sideways in coherent pushes; nearer
-    // (larger) leaves are pushed harder for parallax.
     const sizeF = 0.7 + srand(i + 13) * 0.6
     const gust =
       Math.pow(0.5 + 0.5 * Math.sin(t * 0.00021 + phase * 0.5), 3) *
@@ -847,16 +775,12 @@ function drawFallingLeaves(
       Math.sin(t * 0.0006 + phase) * swayAmp +
       Math.sin(t * 0.0014 + phase * 0.7) * swayAmp * 0.22
     const s = opts.size * sizeF
-    // Rock around a resting angle instead of spinning like confetti, and
-    // flip about the long axis so leaves periodically turn edge-on.
     const dir = srand(i + 7) > 0.5 ? 1 : -1
     const rot =
       phase + dir * Math.sin(t * 0.0009 + phase * 2) * 0.6 + t * 0.00008 * dir
     const flip = 0.3 + 0.7 * Math.abs(Math.cos(t * 0.0011 + phase * 3))
-    // Smaller leaves read as farther away: fade and desaturate for depth.
     const depth = (sizeF - 0.7) / 0.6
     const alpha = 0.22 + depth * 0.62
-    // Per-leaf shade of the accent so a fall isn't one flat color.
     const shade = 0.7 + srand(i + 23) * 0.5
     const lr = Math.min(255, Math.round(r * shade))
     const lg = Math.min(255, Math.round(g * (0.85 + srand(i + 29) * 0.3)))
@@ -910,7 +834,6 @@ function drawFallingLeaves(
       ctx.quadraticCurveTo(s * 0.05, s * 0.08, 0, s * 1.22)
       ctx.stroke()
       ctx.lineWidth = Math.max(0.45, s * 0.025)
-      // Far leaves are too small/soft to show veins; skip for depth of field.
       for (let vein = 0; vein < (depth > 0.3 ? 3 : 0); vein++) {
         const vy = -s * 0.48 + vein * s * 0.42
         const right = s * (0.3 - vein * 0.045)
@@ -987,8 +910,6 @@ function drawSnow(
     const depth = srand(i + 5)
     const radius = 1 + depth * 3
     const y = (srand(i + 3) * range + t * speed * (0.4 + depth)) % range
-    // Two-harmonic wind gives coherent gusts; deeper (nearer) flakes drift
-    // farther for parallax.
     const wind =
       (Math.sin(t * 0.00025) + 0.55 * Math.sin(t * 0.00047 + 1.7)) * 22 * depth
     const x =
@@ -1022,7 +943,6 @@ function drawSnow(
   }
 }
 
-/** Rising glowing motes — fireflies and drifting pollen. */
 function drawGlowMotes(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1033,7 +953,6 @@ function drawGlowMotes(
 ): void {
   const [r, g, b] = hexToRgb(k.accentColor)
   const isMeadow = k.backgroundKind === "meadow"
-  // Fireflies glow warm amber regardless of how green the accent runs.
   const fr = isMeadow ? r : Math.min(255, Math.round(r * 0.6 + 150))
   const fg = isMeadow ? g : Math.min(255, Math.round(g * 0.6 + 110))
   const fb = isMeadow ? b : Math.round(b * 0.4)
@@ -1047,8 +966,6 @@ function drawGlowMotes(
     const raw =
       (srand(i + 3) * range + t * speed * (0.45 + srand(i + 5) * 0.8)) % range
     const yBase = height - raw
-    // Fireflies wander on Lissajous-like paths (two incommensurate sines per
-    // axis) rather than rising in straight lanes.
     const x =
       srand(i) * width +
       Math.sin(t * 0.0009 + phase) * (isMeadow ? 36 : 30) +
@@ -1096,8 +1013,6 @@ function drawMeadowGrass(
   for (let i = 0; i < 42; i++) {
     const x = srand(i + 101) * width
     const bladeH = height * (0.035 + srand(i + 103) * 0.06)
-    // A traveling sine sends coherent wind waves across the field instead of
-    // each blade wiggling independently.
     const bend =
       (srand(i + 107) - 0.5) * 22 +
       Math.sin(t * 0.0009 - x * 0.012) * 7 +
@@ -1158,7 +1073,6 @@ function drawStars(
   }
 }
 
-/** Flowing translucent light bands over a starfield. */
 function drawAurora(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1173,7 +1087,6 @@ function drawAurora(
   ctx.save()
   ctx.globalCompositeOperation = "screen"
   for (let band = 0; band < bands; band++) {
-    // Real aurorae shift hue with altitude: green low, teal/violet high.
     const hueF = band / (bands - 1)
     const br = Math.round(r * (1 - hueF * 0.5) + 130 * hueF)
     const bg = Math.round(g * (1 - hueF * 0.35))
@@ -1182,8 +1095,6 @@ function drawAurora(
     const amp = 34 + band * 16
     const bandH = height * (0.12 + band * 0.018)
     const phase = band * 1.7
-    // Start the fade well above the wandering top edge so the curtain has no
-    // hard contour and reads as glow, not a painted hill.
     const grad = ctx.createLinearGradient(
       0,
       baseY - amp * 1.9,
@@ -1196,8 +1107,6 @@ function drawAurora(
       1,
       `rgba(${Math.round(br * 0.45)}, ${bg}, ${Math.min(255, Math.round(bb * 1.2))}, 0)`
     )
-    // Feather the curtain: three offset passes at low alpha blur the top edge
-    // so it reads as glow, not a hard contour.
     for (let pass = 0; pass < 3; pass++) {
       const dy = (pass - 1) * bandH * 0.2
       ctx.save()
@@ -1240,7 +1149,6 @@ function drawAurora(
   ctx.restore()
 }
 
-/** Expanding elliptical ripple rings where rain meets the wet ground. */
 function drawRainRipples(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1268,7 +1176,6 @@ function drawRainRipples(
   }
 }
 
-/** Large soft out-of-focus foreground flakes for depth-of-field. */
 function drawSnowBokeh(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1297,7 +1204,6 @@ function drawSnowBokeh(
   }
 }
 
-/** Rare deterministic shooting star streaking across the upper sky. */
 function drawShootingStar(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1390,13 +1296,7 @@ function drawNatureScene(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Desert Cloth worship scene — 1:1 canvas port of worship_background HTML
-// (sand cloth folds + sheen + weave + vignette + glowing cross + portrait).
-// All literal values are transcribed from the HTML's CSS; see the plan's
-// DESIGN FIDELITY SPEC before changing any of them.
-// ---------------------------------------------------------------------------
-
+// DESIGN FIDELITY SPEC: cloth literals are transcribed from the HTML CSS.
 const CLOTH = {
   base: ["#cbab7f", "#b8956a", "#8a6a45"],
   sandGlow: "#f3e3c2",
@@ -1448,7 +1348,7 @@ const GUSTS: GustFrame[][] = [
 ]
 
 interface ClothFold {
-  top: number // fraction of frame height
+  top: number
   light: boolean
   durationMs: number
   delayMs: number
@@ -1507,7 +1407,6 @@ const CLOTH_FOLDS: ClothFold[] = [
   },
 ]
 
-/** y of a CSS cubic-bezier timing function at progress t (Newton refinement). */
 function cubicBezierEase(
   p1x: number,
   p1y: number,
@@ -1689,7 +1588,7 @@ function drawClothCross(
 ): void {
   void width
   const phase = kineticLoopPhase(t, 6000)
-  const wave = 0.5 - 0.5 * Math.cos(phase * TAU) // 0→1→0 ease-in-out loop
+  const wave = 0.5 - 0.5 * Math.cos(phase * TAU)
   const w = clothPx(scale, 96)
   const h = clothPx(scale, 140)
   const bar = clothPx(scale, 18)
@@ -1698,7 +1597,6 @@ function drawClothCross(
   const cx = x + w / 2
   const cy = y + h / 2
 
-  // Halo: pulses opacity .55→.9 and scale 1→1.1 on the same 6s loop.
   const haloR = (Math.max(w, h) / 2 + clothPx(scale, 36)) * (1 + 0.1 * wave)
   ctx.save()
   ctx.globalAlpha = 0.55 + 0.35 * wave
@@ -1709,7 +1607,6 @@ function drawClothCross(
   ctx.fillRect(cx - haloR, cy - haloR, haloR * 2, haloR * 2)
   ctx.restore()
 
-  // Bars: 160deg gold gradient, outer shadow, soft inner highlight stroke.
   ctx.save()
   ctx.shadowColor = "rgba(61,43,23,0.4)"
   ctx.shadowBlur = clothPx(scale, 14)
@@ -1727,8 +1624,8 @@ function drawClothCross(
   grad.addColorStop(1, "#a8834e")
   ctx.fillStyle = grad
   const bars: [number, number, number, number][] = [
-    [cx - bar / 2, y, bar, h], // vertical
-    [x, y + clothPx(scale, 32), w, bar], // horizontal, top at 32px
+    [cx - bar / 2, y, bar, h],
+    [x, y + clothPx(scale, 32), w, bar],
   ]
   for (const [bx, by, bw, bh] of bars) {
     ctx.beginPath()
@@ -1786,7 +1683,6 @@ function requestPortrait(): HTMLImageElement | null {
   return portraitLoaded && portraitImage ? portraitImage : null
 }
 
-/** Left-edge alpha fade (transparent → .85 @22% → 1 @40%), cached once. */
 function maskedPortrait(
   img: HTMLImageElement
 ): HTMLCanvasElement | HTMLImageElement {
@@ -1840,7 +1736,6 @@ function drawClothScene(
   t: number
 ): void {
   const scale = clothScale(width, height)
-  // Base: linear-gradient(135deg, sand-mid 0%, sand 45%, sand-deep 100%).
   const angle = (135 * Math.PI) / 180
   const cx = width / 2
   const cy = height / 2
@@ -1865,8 +1760,6 @@ function drawClothScene(
   drawClothCross(ctx, width, height, t, scale)
 }
 
-// KNFC verse stage: gradient, bottom glow, rotating conic shimmer, and a faint
-// star field masked toward the vertical edges.
 function hexWithAlpha(hex: string, alpha: number): string {
   let value = hex.replace("#", "")
   if (value.length === 3) {
@@ -1970,12 +1863,6 @@ function drawStageScene(
   )
 }
 
-/**
- * Draws the kinetic moving background for `theme` at `timeMs`. Returns `true`
- * when it handled the background (caller should skip the static background) and
- * `false` for non-kinetic themes or when drawing failed (caller falls back to
- * the theme's static `background`).
- */
 export function drawKineticBackground(
   ctx: CanvasRenderingContext2D,
   theme: BroadcastTheme,

@@ -13,7 +13,6 @@ export function ThemeDesigner() {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
   const themes = useBroadcastThemeStore((s) => s.themes)
 
-  // Auto-start editing the first theme when opened if nothing is being edited
   useEffect(() => {
     if (isDesignerOpen && !draftTheme && themes.length > 0) {
       useBroadcastStore.getState().startEditing(themes[0].id)
@@ -54,7 +53,7 @@ export function ThemeDesigner() {
             Theme Designer
           </DialogPrimitive.Title>
 
-          {/* Top bar */}
+          {}
           <div className="controller-headboard flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] px-5">
             <span className="font-serif text-lg tracking-wide text-foreground">
               Theme Designer
@@ -83,7 +82,7 @@ export function ThemeDesigner() {
             </Button>
           </div>
 
-          {/* 3-panel layout */}
+          {}
           <div
             className="min-h-0 flex-1"
             style={{
@@ -91,13 +90,13 @@ export function ThemeDesigner() {
               gridTemplateColumns: "260px 1fr 320px",
             }}
           >
-            {/* Left: Theme Library */}
+            {}
             <ThemeLibrary />
 
-            {/* Center: Design Canvas */}
+            {}
             <DesignCanvas />
 
-            {/* Right: Properties Panel */}
+            {}
             <PropertiesPanel />
           </div>
         </DialogPrimitive.Content>

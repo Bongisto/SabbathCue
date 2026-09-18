@@ -35,7 +35,6 @@ function setStoredIds(key: string, ids: string[]): void {
   try {
     localStorage.setItem(key, JSON.stringify(ids))
   } catch {
-    // Silently fail if localStorage is unavailable
   }
 }
 

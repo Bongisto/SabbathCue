@@ -38,7 +38,6 @@ function readEnvironment(): PaddlePublicEnvironment {
   return value;
 }
 
-/** Fail loudly if Paddle public config is incomplete or invalid. */
 export function requirePaddlePublicConfig(): PaddlePublicConfig {
   const clientToken = readClientToken();
   const environment = readEnvironment();

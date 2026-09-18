@@ -7,7 +7,6 @@ export type PaddleCheckoutEvent = {
   data?: unknown;
 };
 
-/** User-facing message for Paddle.js checkout.error events, or null if unrelated. */
 export function describePaddleCheckoutError(
   event: PaddleCheckoutEvent
 ): string | null {
