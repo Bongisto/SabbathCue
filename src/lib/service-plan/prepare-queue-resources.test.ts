@@ -112,4 +112,60 @@ describe("enqueuePreparedResourcesForItem", () => {
       "[Plan] Media - Welcome"
     )
   })
+
+  it("enqueues sermon slides in attachment.order with slideDeck attached (FU-23)", async () => {
+    const sermonItem: ServiceItem = {
+      id: "item-sermon",
+      order: 0,
+      title: "Sermon",
+      kind: "slide",
+      status: "active",
+      scriptureRefs: [],
+      hymnRefs: [],
+      mediaRefs: [],
+      attachments: [
+        {
+          id: "slide-b",
+          kind: "slide",
+          label: "Point 2",
+          status: "ready",
+          thumbnailUrl: "data:image/png;base64,b",
+          order: 1,
+        },
+        {
+          id: "slide-a",
+          kind: "slide",
+          label: "Point 1",
+          status: "ready",
+          thumbnailUrl: "data:image/png;base64,a",
+          order: 0,
+        },
+        {
+          id: "doc-1",
+          kind: "document",
+          label: "Handout.pdf",
+          status: "pending",
+        },
+      ],
+      checklist: [],
+    }
+
+    const queued = await enqueuePreparedResourcesForItem(sermonItem)
+    const items = useQueueStore.getState().items
+
+    expect(queued).toBe(3)
+    expect(items.map((i) => i.presentation.reference)).toEqual([
+      "[Plan] Sermon - Point 1",
+      "[Plan] Sermon - Point 2",
+      "[Plan] Document - Handout.pdf",
+    ])
+    expect(items[0].slideDeck).toHaveLength(2)
+    expect(items[0].slideDeck?.map((s) => s.slideId)).toEqual(["slide-a", "slide-b"])
+    expect(items[0].slideDeck?.map((s) => s.reference)).toEqual([
+      "[Plan] Sermon - Point 1",
+      "[Plan] Sermon - Point 2",
+    ])
+    expect(items[1].slideDeck).toHaveLength(2)
+    expect(items[2].slideDeck).toBeUndefined()
+  })
 })

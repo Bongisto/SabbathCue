@@ -15,6 +15,8 @@ import {
   tracePresentationDetails,
 } from "@/lib/workflow-trace"
 import { notifyAction } from "@/lib/action-notifications"
+import { buildVideoCommand } from "@/lib/broadcast-video-control"
+import { VIDEO_TRANSPORT_EVENT } from "@/lib/library/library-video"
 import type { BroadcastState } from "@/stores/broadcast-store"
 
 export type BroadcastSyncOptions = { transitionType?: BroadcastTransitionType }
@@ -128,6 +130,26 @@ export const createLiveSlice: StateCreator<
         })
       }
     )
+
+    if (
+      s.isLive &&
+      s.liveItem?.kind === "video" &&
+      s.preferredAudioOutputDeviceId
+    ) {
+      void emitTo(
+        label,
+        VIDEO_TRANSPORT_EVENT,
+        buildVideoCommand({
+          type: "setSinkId",
+          sinkId: s.preferredAudioOutputDeviceId,
+        })
+      ).catch((error) => {
+        console.warn(
+          `[broadcast-store] video sink sync to '${label}' failed`,
+          error
+        )
+      })
+    }
   },
   syncBroadcastOutput: (options) => {
     get().syncBroadcastOutputFor("main", options)

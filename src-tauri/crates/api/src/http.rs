@@ -289,6 +289,36 @@ struct ControlResponse {
     error: Option<String>,
 }
 
+fn validate_normalized_f32(field: &str, value: f32) -> Result<(), CommandError> {
+    if !value.is_finite() {
+        return Err(CommandError::TypeCoercion {
+            expected: format!("finite float in [0.0, 1.0] for {field}"),
+            got: value.to_string(),
+        });
+    }
+    if !(0.0..=1.0).contains(&value) {
+        return Err(CommandError::OutOfRange {
+            value,
+            min: 0.0,
+            max: 1.0,
+        });
+    }
+    Ok(())
+}
+
+fn validate_control_command(command: &RemoteCommand) -> Result<(), CommandError> {
+    match command {
+        RemoteCommand::Opacity(val) => validate_normalized_f32("opacity", *val),
+        RemoteCommand::Confidence(val) => validate_normalized_f32("confidence", *val),
+        RemoteCommand::Next
+        | RemoteCommand::Prev
+        | RemoteCommand::Show
+        | RemoteCommand::Hide
+        | RemoteCommand::Theme(_)
+        | RemoteCommand::OnAir(_) => Ok(()),
+    }
+}
+
 async fn control_handler<S: CommandSink + 'static>(
     AxumState(state): AxumState<Arc<AppState<S>>>,
     headers: HeaderMap,
@@ -303,6 +333,16 @@ async fn control_handler<S: CommandSink + 'static>(
             Json(ControlResponse {
                 success: false,
                 error: Some("Missing or invalid bearer token".to_string()),
+            }),
+        );
+    }
+
+    if let Err(e) = validate_control_command(&request.command) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ControlResponse {
+                success: false,
+                error: Some(e.to_string()),
             }),
         );
     }
@@ -706,6 +746,55 @@ mod tests {
             resp.contains("422 Unprocessable Entity") || resp.contains("400 Bad Request"),
             "Expected JSON rejection, got: {resp}"
         );
+        assert_eq!(sink.command_count(), 0);
+
+        let mut handle = result.handle;
+        handle.stop();
+    }
+
+    #[test]
+    fn validate_control_command_rejects_non_finite_and_out_of_range_floats() {
+        assert!(validate_control_command(&RemoteCommand::Opacity(0.5)).is_ok());
+        assert!(validate_control_command(&RemoteCommand::Confidence(1.0)).is_ok());
+        assert!(validate_control_command(&RemoteCommand::Opacity(f32::NAN)).is_err());
+        assert!(validate_control_command(&RemoteCommand::Confidence(f32::INFINITY)).is_err());
+        assert!(validate_control_command(&RemoteCommand::Opacity(f32::NEG_INFINITY)).is_err());
+        assert!(validate_control_command(&RemoteCommand::Opacity(1.5)).is_err());
+        assert!(validate_control_command(&RemoteCommand::Confidence(-0.1)).is_err());
+    }
+
+    #[tokio::test]
+    async fn control_endpoint_rejects_out_of_range_float_without_dispatch() {
+        let sink = Arc::new(MockSink::new());
+        let status = new_shared_status();
+        let config = HttpConfig {
+            port: 0,
+            host: "127.0.0.1".into(),
+            token: "secret".into(),
+        };
+
+        let result = start_http_server(config, sink.clone(), status)
+            .await
+            .expect("should bind");
+        let port = result.bound_port;
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        for payload in [
+            r#"{"command":"opacity","value":1.5}"#,
+            r#"{"command":"confidence","value":-0.25}"#,
+        ] {
+            let resp = raw_http_request_with_headers(
+                port,
+                "POST",
+                "/api/v1/control",
+                &[("Authorization", "Bearer secret")],
+                Some(payload),
+            )
+            .await;
+            assert!(resp.contains("400 Bad Request"), "Expected 400, got: {resp}");
+            assert!(resp.contains("\"success\":false"));
+        }
         assert_eq!(sink.command_count(), 0);
 
         let mut handle = result.handle;

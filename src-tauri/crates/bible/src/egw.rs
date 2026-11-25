@@ -401,7 +401,7 @@ mod tests {
         let db = test_db();
         let books = db.list_egw_books().unwrap();
         assert!(books.iter().all(|book| book.title != "Hidden Legacy Book"));
-        assert!(db.search_egw("unresolved hidden", 10).unwrap().is_empty());
+        assert_eq!(db.search_egw("unresolved hidden", 10).unwrap(), Vec::new());
         assert!(db.get_egw_paragraph_by_id(3).unwrap().is_none());
     }
 
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn empty_query_returns_no_results() {
         let db = test_db();
-        assert!(db.search_egw("   ", 10).unwrap().is_empty());
+        assert_eq!(db.search_egw("   ", 10).unwrap(), Vec::new());
     }
 
     #[test]

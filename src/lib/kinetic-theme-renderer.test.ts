@@ -290,6 +290,23 @@ describe("drawKineticBackground", () => {
     expect(onLoad).toHaveBeenCalledTimes(1)
     vi.unstubAllGlobals()
   })
+
+  it("returns false cleanly when canvas resolution has zero or negative dimensions (FU-46)", () => {
+    for (const id of ["stage-navy", "hymn-minimal"]) {
+      for (const resolution of [
+        { width: 0, height: 1080 },
+        { width: 1920, height: 0 },
+        { width: 0, height: 0 },
+        { width: -100, height: 1080 },
+      ]) {
+        const theme = { ...preset(id), resolution }
+        const r = createRecorder()
+        expect(drawKineticBackground(r.ctx, theme, 0)).toBe(false)
+        expect(r.fillRects).toBe(0)
+        expect(r.arcs).toBe(0)
+      }
+    }
+  })
 })
 
 describe("full-fidelity hymn scenes", () => {

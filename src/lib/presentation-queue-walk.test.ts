@@ -307,4 +307,54 @@ describe("live arrow navigation across queue items", () => {
     expect(presentQueuedItemAtEnd).not.toHaveBeenCalled()
     expect(useQueueStore.getState().activeIndex).toBe(0)
   })
+
+  it("does not walk the queue when a different hymn or sermon deck is live at boundary (FU-47)", async () => {
+    const queuedHymnDeck = [makeHymnSlide(0), makeHymnSlide(1)]
+    const otherHymnDeck = [
+      {
+        ...makeHymnSlide(0),
+        hymnId: "hymn-99",
+        hymnTitle: "Other Hymn",
+        screenId: "other-hymn-0",
+      },
+    ]
+    seedQueue([
+      {
+        ...hymnQueueItem("hymn-a", queuedHymnDeck[0]!),
+        hymnDeck: queuedHymnDeck,
+      },
+      egwItemB,
+    ])
+    useHymnSlideStore.getState().setDeck(otherHymnDeck, 0)
+    const liveOtherHymn = getPresentationRenderData(otherHymnDeck[0]!)
+    expect(advancePresentationTarget(1, liveOtherHymn, true)).toBe(true)
+    await Promise.resolve()
+    expect(presentQueuedItem).not.toHaveBeenCalled()
+    expect(useQueueStore.getState().activeIndex).toBe(0)
+
+    useQueueStore.getState().clearQueue()
+    const queuedSermon = makeSermonSlide(0)
+    const otherSermon = {
+      ...makeSermonSlide(0),
+      deckId: "deck-other",
+      slideId: "other-slide-0",
+    }
+    seedQueue([
+      {
+        id: "sermon-q",
+        presentation: queuedSermon,
+        confidence: 1,
+        source: "manual",
+        added_at: Date.now(),
+        slideDeck: [queuedSermon],
+      },
+      egwItemB,
+    ])
+    useSermonSlideStore.getState().setDeck([otherSermon], 0, "deck-other")
+    const liveOtherSermon = getPresentationRenderData(otherSermon)
+    expect(advancePresentationTarget(1, liveOtherSermon, true)).toBe(true)
+    await Promise.resolve()
+    expect(presentQueuedItem).not.toHaveBeenCalled()
+    expect(useQueueStore.getState().activeIndex).toBe(0)
+  })
 })

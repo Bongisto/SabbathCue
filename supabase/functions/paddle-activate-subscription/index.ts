@@ -11,6 +11,10 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: corsHeaders })
 }
 
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&")
+}
+
 function requireEnv(name: string): string {
   const value = Deno.env.get(name)?.trim()
   if (!value) throw new Error(`${name} is not configured`)
@@ -46,50 +50,81 @@ const authenticated = withSupabase({ auth: "user" }, async (_request, context) =
     return json({ error: "Not authenticated" }, 401)
   }
 
-  let { data: customerRow, error: customerError } = await context.supabaseAdmin
+  const { data: ownedRows, error: ownedError } = await context.supabaseAdmin
     .from("paddle_customers")
     .select("customer_id")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
-  if (!customerRow && !customerError) {
-    const fallback = await context.supabaseAdmin
-      .from("paddle_customers")
-      .select("customer_id")
-      .ilike("email", email)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    customerRow = fallback.data
-    customerError = fallback.error
+  if (ownedError) {
+    return json({ error: ownedError.message }, 500)
   }
 
-  if (customerError) {
-    return json({ error: customerError.message }, 500)
+  const { data: unlinkedRows, error: unlinkedError } = await context.supabaseAdmin
+    .from("paddle_customers")
+    .select("customer_id, email")
+    .is("user_id", null)
+    .ilike("email", escapeIlikePattern(email))
+    .order("updated_at", { ascending: false })
+
+  if (unlinkedError) {
+    return json({ error: unlinkedError.message }, 500)
   }
-  if (!customerRow?.customer_id) {
+
+  const normalizedEmail = email.toLowerCase()
+  const ownedIds = new Set<string>()
+  const seenCustomerIds = new Set<string>()
+  const customerIds: string[] = []
+
+  for (const row of ownedRows ?? []) {
+    if (typeof row.customer_id === "string" && !seenCustomerIds.has(row.customer_id)) {
+      seenCustomerIds.add(row.customer_id)
+      ownedIds.add(row.customer_id)
+      customerIds.push(row.customer_id)
+    }
+  }
+
+  for (const row of unlinkedRows ?? []) {
+    if (
+      typeof row.customer_id === "string" &&
+      typeof row.email === "string" &&
+      row.email.trim().toLowerCase() === normalizedEmail &&
+      !seenCustomerIds.has(row.customer_id)
+    ) {
+      seenCustomerIds.add(row.customer_id)
+      customerIds.push(row.customer_id)
+    }
+  }
+
+  if (customerIds.length === 0) {
     return json({ error: "No Paddle customer" }, 404)
   }
 
-  const { data: subRow, error: subError } = await context.supabaseAdmin
+  const { data: subRows, error: subError } = await context.supabaseAdmin
     .from("paddle_subscriptions")
     .select(
-      "subscription_id, subscription_status, scheduled_change, scheduled_change_action"
+      "customer_id, subscription_id, subscription_status, scheduled_change, scheduled_change_action"
     )
-    .eq("customer_id", customerRow.customer_id)
+    .in("customer_id", customerIds)
     .eq("subscription_status", "trialing")
     .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   if (subError) {
     return json({ error: subError.message }, 500)
   }
-  if (!subRow?.subscription_id) {
+  if (!subRows || subRows.length === 0) {
     return json({ error: "No trialing subscription" }, 404)
   }
+
+  const isCancelScheduled = (row: (typeof subRows)[number]): boolean =>
+    Boolean(row.scheduled_change && row.scheduled_change_action === "cancel")
+
+  const subRow = [...subRows].sort((a, b) => {
+    const schedDiff = Number(isCancelScheduled(a)) - Number(isCancelScheduled(b))
+    if (schedDiff !== 0) return schedDiff
+    return (ownedIds.has(b.customer_id) ? 1 : 0) - (ownedIds.has(a.customer_id) ? 1 : 0)
+  })[0]
+
   if (subRow.scheduled_change && subRow.scheduled_change_action === "cancel") {
     return json(
       { error: "Cannot activate a subscription scheduled to cancel" },

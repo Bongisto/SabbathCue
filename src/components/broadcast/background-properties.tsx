@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { open } from "@tauri-apps/plugin-dialog"
 import { useBroadcastDesignerStore as useBroadcastStore } from "@/stores/broadcast/designer-store"
 import { pickThemeBackgroundImage } from "@/lib/theme-designer-files"
@@ -9,7 +9,6 @@ import {
 } from "@/lib/powerpoint-import"
 import { PowerPointSlidePicker } from "@/components/broadcast/PowerPointSlidePicker"
 import { Slider } from "@/components/ui/slider"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -18,26 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-
-function parseColorOpacity(color: string): { hex: string; opacity: number } {
-  if (color.length === 9 && color.startsWith("#")) {
-    const alphaHex = color.slice(7, 9)
-    const alpha = parseInt(alphaHex, 16) / 255
-    return { hex: color.slice(0, 7), opacity: Math.round(alpha * 100) }
-  }
-  if (color.length === 7 && color.startsWith("#")) {
-    return { hex: color, opacity: 100 }
-  }
-  return { hex: color || "#000000", opacity: 100 }
-}
-
-function buildColorWithOpacity(hex: string, opacity: number): string {
-  if (opacity >= 100) return hex
-  const alphaHex = Math.round((opacity / 100) * 255)
-    .toString(16)
-    .padStart(2, "0")
-  return `${hex}${alphaHex}`
-}
+import {
+  buildColorWithOpacity,
+  HexColorInput,
+  parseColorOpacity,
+} from "@/components/broadcast/text-properties"
 
 function SolidSection() {
   const draftTheme = useBroadcastStore((s) => s.draftTheme)
@@ -45,24 +29,21 @@ function SolidSection() {
 
   if (!draftTheme) return null
 
+  const { hex: solidColorHex } = parseColorOpacity(draftTheme.background.color)
+
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-xs font-medium text-muted-foreground">Background Color</label>
       <div className="flex items-center gap-2">
         <input
           type="color"
-          value={draftTheme.background.color}
+          value={solidColorHex}
           onChange={(e) => update("background.color", e.target.value)}
           className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
         />
-        <Input
-          value={draftTheme.background.color}
-          onChange={(e) => {
-            const v = e.target.value
-            if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-              update("background.color", v)
-            }
-          }}
+        <HexColorInput
+          value={solidColorHex}
+          onCommit={(v) => update("background.color", v)}
           className="w-24 font-mono"
         />
       </div>
@@ -79,6 +60,8 @@ function GradientSection() {
   const gradient = draftTheme.background.gradient
   const stop0 = gradient.stops[0] ?? { color: "#000000", position: 0 }
   const stop1 = gradient.stops[1] ?? { color: "#ffffff", position: 100 }
+  const { hex: stop0Hex } = parseColorOpacity(stop0.color)
+  const { hex: stop1Hex } = parseColorOpacity(stop1.color, "#ffffff")
 
   return (
     <div className="flex flex-col gap-3">
@@ -122,18 +105,13 @@ function GradientSection() {
         <div className="flex items-center gap-2">
           <input
             type="color"
-            value={stop0.color}
+            value={stop0Hex}
             onChange={(e) => update("background.gradient.stops.0.color", e.target.value)}
             className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
           />
-          <Input
-            value={stop0.color}
-            onChange={(e) => {
-              const v = e.target.value
-              if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                update("background.gradient.stops.0.color", v)
-              }
-            }}
+          <HexColorInput
+            value={stop0Hex}
+            onCommit={(v) => update("background.gradient.stops.0.color", v)}
             className="w-20 font-mono"
           />
         </div>
@@ -156,18 +134,13 @@ function GradientSection() {
         <div className="flex items-center gap-2">
           <input
             type="color"
-            value={stop1.color}
+            value={stop1Hex}
             onChange={(e) => update("background.gradient.stops.1.color", e.target.value)}
             className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
           />
-          <Input
-            value={stop1.color}
-            onChange={(e) => {
-              const v = e.target.value
-              if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                update("background.gradient.stops.1.color", v)
-              }
-            }}
+          <HexColorInput
+            value={stop1Hex}
+            onCommit={(v) => update("background.gradient.stops.1.color", v)}
             className="w-20 font-mono"
           />
         </div>
@@ -194,6 +167,38 @@ function ImageSection() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [importingDeck, setImportingDeck] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const changeImage = async () => {
+    setImportError(null)
+    const startingThemeId = useBroadcastStore.getState().draftTheme?.id
+    try {
+      const dataUrl = await pickThemeBackgroundImage()
+      if (
+        !mountedRef.current ||
+        useBroadcastStore.getState().draftTheme?.id !== startingThemeId
+      ) {
+        return
+      }
+      if (dataUrl) update("background.image.url", dataUrl)
+    } catch (error) {
+      console.error("[background-properties] failed to change image", error)
+      if (mountedRef.current) {
+        setImportError(
+          error instanceof Error
+            ? error.message
+            : "Could not load the selected image."
+        )
+      }
+    }
+  }
 
   const importDeck = async () => {
     setImportError(null)
@@ -247,12 +252,7 @@ function ImageSection() {
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={() => {
-            void (async () => {
-              const dataUrl = await pickThemeBackgroundImage()
-              if (dataUrl) update("background.image.url", dataUrl)
-            })()
-          }}
+          onClick={() => void changeImage()}
         >
           Change Image
         </Button>
@@ -363,14 +363,11 @@ function ImageSection() {
                 }
                 className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
               />
-              <Input
+              <HexColorInput
                 value={tint.hex}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                    update("background.image.tint", buildColorWithOpacity(v, tint.opacity))
-                  }
-                }}
+                onCommit={(v) =>
+                  update("background.image.tint", buildColorWithOpacity(v, tint.opacity))
+                }
                 className="w-20 font-mono"
               />
             </div>
@@ -442,14 +439,9 @@ function TextBoxSection() {
                 onChange={(e) => update("textBox.color", e.target.value)}
                 className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
               />
-              <Input
+              <HexColorInput
                 value={boxColorHex}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                    update("textBox.color", v)
-                  }
-                }}
+                onCommit={(v) => update("textBox.color", v)}
                 className="w-20 font-mono"
               />
             </div>

@@ -1782,6 +1782,9 @@ function drawStageDots(
   radius: number,
   alpha: number
 ): void {
+  if (width <= 0 || height <= 0 || spacing <= 0 || !Number.isFinite(spacing)) {
+    return
+  }
   for (let y = offsetY; y < height; y += spacing) {
     const fade = Math.sin((y / height) * Math.PI)
     if (fade <= 0.01) continue
@@ -1874,6 +1877,14 @@ export function drawKineticBackground(
 
   try {
     const { width, height } = theme.resolution
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      return false
+    }
     const sceneTime = k.animate === false ? 0 : timeMs
 
     if (isHymnThemeScene(k)) {

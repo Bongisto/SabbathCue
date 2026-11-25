@@ -191,6 +191,7 @@ fn emit_egw_direct_detections(
     seq: u64,
     latest_seq: &Arc<AtomicU64>,
     transcript: &str,
+    is_final_transcript: bool,
 ) {
     let app_managed: State<'_, Mutex<AppState>> = app.state();
     let Ok(app_state) = app_managed.lock() else {
@@ -207,6 +208,12 @@ fn emit_egw_direct_detections(
     }
 
     mark_egw_auto_queue(app, &mut results);
+    authorize_egw_results(
+        &mut results,
+        is_final_transcript,
+        None,
+        is_automation_live_enabled(app),
+    );
     for result in &results {
         log::info!(
             "[DET-EGW] Found: {} ({:.0}%) auto_q={}",
@@ -304,6 +311,76 @@ fn note_independent_finals(verse_key: &str, utterance_id: Option<u64>, is_final:
     }
 }
 
+fn authorize_egw_result(
+    result: &mut crate::commands::detection::DetectionResult,
+    is_final_utterance: bool,
+    utterance_id: Option<u64>,
+    automation_live_enabled: bool,
+) {
+    if result.source == "direct" {
+        let qualified = result.egw_paragraph.is_some()
+            && result.book_number > 0
+            && result.chapter > 0
+            && result.verse > 0
+            && !result.is_chapter_only
+            && !result.is_fuzzy_book;
+        let decision = if !qualified {
+            rhema_detection::PresentationDecision::Suggestion
+        } else if is_final_utterance && automation_live_enabled {
+            rhema_detection::PresentationDecision::LiveAuthorized
+        } else {
+            rhema_detection::PresentationDecision::PreviewAuthorized
+        };
+        apply_presentation_grant(
+            result,
+            rhema_detection::PresentationGrant {
+                decision,
+                job: rhema_detection::DetectionJob::Citation,
+            },
+            is_final_utterance,
+            utterance_id,
+        );
+        return;
+    }
+
+    // Verified EGW quotes (`run >= EGW_QUOTE_RUN_FIRE` / confidence >= 0.88,
+    // or prequalified strong cued quotes) may preview; prequalified cued
+    // fire-band hits (`auto_queued == true`) authorize live on final utterances
+    // when live automation is enabled. Lower-confidence cued hints (< 0.88)
+    // remain `Suggestion`, while STT-dampened hits (capped at 0.89 with
+    // `auto_queued == false`) preview without auto-live.
+    let verified_quote = result.egw_paragraph.is_some()
+        && (result.auto_queued || result.confidence + f64::EPSILON >= 0.88);
+    result.authorization = if !verified_quote {
+        rhema_detection::PresentationDecision::Suggestion
+    } else if result.auto_queued && is_final_utterance && automation_live_enabled {
+        rhema_detection::PresentationDecision::LiveAuthorized
+    } else {
+        rhema_detection::PresentationDecision::PreviewAuthorized
+    };
+    result.job = rhema_detection::DetectionJob::Quotation;
+    result.is_final_utterance = is_final_utterance;
+    result.utterance_id = utterance_id;
+}
+
+fn authorize_egw_results(
+    results: &mut [crate::commands::detection::DetectionResult],
+    is_final_utterance: bool,
+    utterance_id: Option<u64>,
+    automation_live_enabled: bool,
+) {
+    for result in results {
+        if result.content_type == "egw" {
+            authorize_egw_result(
+                result,
+                is_final_utterance,
+                utterance_id,
+                automation_live_enabled,
+            );
+        }
+    }
+}
+
 fn authorize_unmatched_results(
     results: &mut Vec<crate::commands::detection::DetectionResult>,
     transcript: &str,
@@ -313,6 +390,15 @@ fn authorize_unmatched_results(
     automation_live_enabled: bool,
 ) {
     for result in results.iter_mut() {
+        if result.content_type == "egw" {
+            authorize_egw_result(
+                result,
+                is_final_utterance,
+                utterance_id,
+                automation_live_enabled,
+            );
+            continue;
+        }
         let grant = rhema_detection::decide_presentation(&rhema_detection::PresentationEvidence {
             job: if result.source == "direct" {
                 rhema_detection::DetectionJob::Citation
@@ -382,6 +468,15 @@ fn authorize_emitted_results(
     };
 
     for result in results.iter_mut() {
+        if result.content_type == "egw" {
+            authorize_egw_result(
+                result,
+                is_final_utterance,
+                utterance_id,
+                automation_live_enabled,
+            );
+            continue;
+        }
         let matched_detection = detections.iter().find(|d| {
             d.verse_ref.book_number == result.book_number
                 && d.verse_ref.chapter == result.chapter
@@ -417,7 +512,8 @@ fn authorize_emitted_results(
                 && !result.is_fuzzy_book
                 && result.book_number > 0
                 && result.chapter > 0
-                && result.verse > 0,
+                && result.verse > 0
+                && matched_detection.is_none_or(rhema_detection::Detection::is_complete_citation),
             is_final_utterance,
             has_lexical_quote: result.has_lexical_quote,
             quote_coverage,
@@ -554,6 +650,7 @@ fn fallback_direct_without_db(
                 auto_queued: m.auto_queued,
                 transcript_snippet: m.detection.transcript_snippet.clone(),
                 is_chapter_only: m.detection.is_chapter_only,
+                is_fuzzy_book: m.detection.is_fuzzy_book,
                 ..crate::commands::detection::DetectionResult::default()
             }
         })
@@ -695,7 +792,7 @@ pub(crate) fn run_direct_detection(
         return Vec::new();
     }
     if !is_bible_detection_enabled(app) {
-        emit_egw_direct_detections(app, seq, latest_seq, transcript);
+        emit_egw_direct_detections(app, seq, latest_seq, transcript, is_final_transcript);
         return Vec::new();
     }
     let t0 = std::time::Instant::now();
@@ -704,7 +801,7 @@ pub(crate) fn run_direct_detection(
     };
 
     if merged.is_empty() {
-        emit_egw_direct_detections(app, seq, latest_seq, transcript);
+        emit_egw_direct_detections(app, seq, latest_seq, transcript, is_final_transcript);
         return Vec::new();
     }
     let reading_candidates = direct_reading_candidates(&merged, is_final_transcript);
@@ -770,6 +867,8 @@ fn emit_explicit_egw_window(
     seq: u64,
     latest_seq: &Arc<AtomicU64>,
     transcript: &str,
+    is_final: bool,
+    utterance_id: u64,
 ) -> bool {
     let mut egw_explicit = {
         let app_managed: State<'_, Mutex<AppState>> = app.state();
@@ -786,6 +885,12 @@ fn emit_explicit_egw_window(
         return true;
     }
     mark_egw_auto_queue(app, &mut egw_explicit);
+    authorize_egw_results(
+        &mut egw_explicit,
+        is_final,
+        Some(utterance_id),
+        is_automation_live_enabled(app),
+    );
     for r in &egw_explicit {
         log::info!(
             "[DET-TRACE] seq={seq} decision=egw_explicit reason=window_reference {} ({:.0}%) auto_q={}",
@@ -879,13 +984,19 @@ pub(crate) fn run_semantic_detection(
         return;
     }
 
-    if emit_explicit_egw_window(app, seq, latest_seq, transcript) {
+    if emit_explicit_egw_window(app, seq, latest_seq, transcript, is_final, utterance_id) {
         return;
     }
 
     let t0 = std::time::Instant::now();
-    let (egw_quotes, cue_active) =
+    let (mut egw_quotes, cue_active) =
         detect_live_egw_quotes(app, egw_cue_at_ms, egw_transcript, stt_confidence);
+    authorize_egw_results(
+        &mut egw_quotes,
+        is_final,
+        Some(utterance_id),
+        is_automation_live_enabled(app),
+    );
     let cue_live =
         cue_active || crate::commands::detection::egw_cue_is_currently_live(egw_cue_at_ms);
     if cue_live {
@@ -1063,6 +1174,40 @@ fn emit_semantic_batch(
     log::info!("[DET-SEMANTIC] Total: {:?}", t0.elapsed());
 }
 
+fn missing_semantic_verse_ids(app: &AppHandle) -> Option<Vec<i64>> {
+    let pipeline_state: State<'_, Mutex<rhema_detection::DetectionPipeline>> = app.state();
+    match pipeline_state.lock() {
+        Ok(pipeline) if pipeline.has_semantic() && !pipeline.has_semantic_verse_refs() => {
+            Some(pipeline.semantic_verse_ids())
+        }
+        _ => None,
+    }
+}
+
+fn apply_resolved_semantic_refs(
+    pipeline: &mut rhema_detection::DetectionPipeline,
+    resolved_verse_refs: Option<Vec<rhema_bible::VerseRefRecord>>,
+) {
+    let Some(records) = resolved_verse_refs else {
+        return;
+    };
+    if records.is_empty() || pipeline.has_semantic_verse_refs() {
+        return;
+    }
+    pipeline.set_semantic_verse_refs(records.into_iter().map(|record| {
+        (
+            record.verse_id,
+            rhema_detection::VerseRef {
+                book_number: record.book_number,
+                book_name: record.book_name,
+                chapter: record.chapter,
+                verse_start: record.verse,
+                verse_end: None,
+            },
+        )
+    }));
+}
+
 fn run_hybrid_pipeline(
     app: &AppHandle,
     seq: u64,
@@ -1076,18 +1221,29 @@ fn run_hybrid_pipeline(
     } else {
         log::info!("[DET-SEMANTIC] Running");
     }
-    let (fts_results, active_translation_id) = {
+    let missing_verse_ids = missing_semantic_verse_ids(app);
+    let (fts_results, active_translation_id, resolved_verse_refs) = {
         let managed: State<'_, Mutex<AppState>> = app.state();
         let Ok(app_state) = managed.lock() else {
             log::error!("Failed to lock AppState for FTS5");
             return None;
         };
+        let resolved_verse_refs = missing_verse_ids
+            .as_deref()
+            .filter(|ids| !ids.is_empty())
+            .and_then(|ids| {
+                app_state
+                    .bible_db
+                    .as_ref()
+                    .and_then(|db| db.resolve_verse_refs(ids).ok())
+            });
         (
             app_state
                 .bible_db
                 .as_ref()
                 .and_then(|db| db.search_verses_bm25_scoped(query, 10, book_hint).ok()),
             app_state.active_translation_id,
+            resolved_verse_refs,
         )
     };
     let fts = fts_results.unwrap_or_default();
@@ -1109,6 +1265,7 @@ fn run_hybrid_pipeline(
             log::error!("Failed to lock DetectionPipeline");
             return None;
         };
+        apply_resolved_semantic_refs(&mut pipeline, resolved_verse_refs);
         let semantic_ready = pipeline.has_semantic();
         let paraphrase_enabled = pipeline.use_synonyms();
         let semantic_min_confidence = pipeline.semantic_confidence_threshold();
@@ -1382,5 +1539,234 @@ mod bible_mode_tests {
         retain_results_allowed_by_bible_mode(&mut results, true);
 
         assert_eq!(results.len(), 2);
+    }
+
+    fn egw_paragraph(page: i32, paragraph_num: i32) -> rhema_bible::EgwParagraph {
+        rhema_bible::EgwParagraph {
+            id: i64::from(page * 100 + paragraph_num),
+            book_number: 1,
+            book_title: "Patriarchs and Prophets".to_string(),
+            chapter: 1,
+            chapter_title: "Why Was Sin Permitted?".to_string(),
+            paragraph: paragraph_num,
+            page,
+            page_paragraph: paragraph_num,
+            text: "God is love.".to_string(),
+        }
+    }
+
+    fn egw_direct_result(page: i32, paragraph_num: i32, auto_queued: bool) -> DetectionResult {
+        DetectionResult {
+            content_type: "egw".to_string(),
+            verse_ref: format!("Patriarchs and Prophets p.{page} par.{paragraph_num}"),
+            verse_text: "God is love.".to_string(),
+            book_name: "Patriarchs and Prophets".to_string(),
+            book_number: 1,
+            chapter: page,
+            verse: paragraph_num,
+            confidence: 0.94,
+            rank_score: 0.94,
+            source: "direct".to_string(),
+            auto_queued,
+            transcript_snippet: "Patriarchs and Prophets page 29 paragraph 2".to_string(),
+            egw_paragraph: Some(egw_paragraph(page, paragraph_num)),
+            ..DetectionResult::default()
+        }
+    }
+
+    #[test]
+    fn vf01_authorizes_egw_direct_quotes_and_hints_properly() {
+        use super::{authorize_egw_results, authorize_emitted_results};
+        use rhema_detection::{DetectionJob, PresentationDecision};
+
+        // 1. Explicit EGW direct ref: final+auto -> LiveAuthorized; partial -> PreviewAuthorized.
+        let mut final_direct = vec![egw_direct_result(29, 2, true)];
+        authorize_egw_results(&mut final_direct, true, Some(7), true);
+        assert_eq!(
+            final_direct[0].authorization,
+            PresentationDecision::LiveAuthorized
+        );
+        assert_eq!(final_direct[0].job, DetectionJob::Citation);
+        assert!(final_direct[0].auto_queued);
+
+        let mut partial_direct = vec![egw_direct_result(29, 2, true)];
+        authorize_egw_results(&mut partial_direct, false, Some(7), true);
+        assert_eq!(
+            partial_direct[0].authorization,
+            PresentationDecision::PreviewAuthorized
+        );
+        assert_eq!(partial_direct[0].job, DetectionJob::Citation);
+        assert!(!partial_direct[0].auto_queued);
+
+        // Also verified through authorize_emitted_results (mixed direct Bible + EGW batch).
+        let mut mixed = vec![egw_direct_result(29, 2, true)];
+        authorize_emitted_results(
+            &mut mixed,
+            &[],
+            "Patriarchs and Prophets p. 29 par. 2",
+            false,
+            true,
+            Some(8),
+            true,
+        );
+        assert_eq!(mixed[0].authorization, PresentationDecision::LiveAuthorized);
+        assert_eq!(mixed[0].job, DetectionJob::Citation);
+
+        // 2. Verified cued fire-band EGW quote (`auto_queued: true`):
+        // final + automation_live_enabled -> LiveAuthorized; partial / manual -> PreviewAuthorized.
+        let mut cued_fire_quote = DetectionResult {
+            content_type: "egw".to_string(),
+            verse_ref: "Patriarchs and Prophets p.322 par.1".to_string(),
+            verse_text: "God is love.".to_string(),
+            book_name: "Patriarchs and Prophets".to_string(),
+            book_number: 1,
+            chapter: 322,
+            verse: 1,
+            confidence: 0.95,
+            rank_score: 0.95,
+            source: "semantic".to_string(),
+            auto_queued: true,
+            egw_paragraph: Some(egw_paragraph(322, 1)),
+            ..DetectionResult::default()
+        };
+        authorize_egw_results(std::slice::from_mut(&mut cued_fire_quote), true, Some(9), true);
+        assert_eq!(
+            cued_fire_quote.authorization,
+            PresentationDecision::LiveAuthorized
+        );
+        assert_eq!(cued_fire_quote.job, DetectionJob::Quotation);
+        assert!(cued_fire_quote.auto_queued);
+
+        let mut partial_fire_quote = cued_fire_quote.clone();
+        authorize_egw_results(std::slice::from_mut(&mut partial_fire_quote), false, Some(9), true);
+        assert_eq!(
+            partial_fire_quote.authorization,
+            PresentationDecision::PreviewAuthorized
+        );
+        assert_eq!(partial_fire_quote.job, DetectionJob::Quotation);
+
+        let mut manual_fire_quote = cued_fire_quote.clone();
+        authorize_egw_results(std::slice::from_mut(&mut manual_fire_quote), true, Some(9), false);
+        assert_eq!(
+            manual_fire_quote.authorization,
+            PresentationDecision::PreviewAuthorized
+        );
+
+        // 3. Verified non-auto-queued EGW quote (run 6..7 / 0.88 or STT-dampened 0.89) -> PreviewAuthorized.
+        let mut preview_quote = DetectionResult {
+            confidence: 0.89,
+            rank_score: 0.76,
+            auto_queued: false,
+            ..cued_fire_quote.clone()
+        };
+        authorize_egw_results(std::slice::from_mut(&mut preview_quote), true, Some(9), true);
+        assert_eq!(
+            preview_quote.authorization,
+            PresentationDecision::PreviewAuthorized
+        );
+        assert_eq!(preview_quote.job, DetectionJob::Quotation);
+
+        // 4. Lower-confidence EGW hint stays Suggestion.
+        let mut hint = DetectionResult {
+            confidence: 0.78,
+            rank_score: 0.78,
+            auto_queued: false,
+            ..cued_fire_quote
+        };
+        authorize_egw_results(std::slice::from_mut(&mut hint), true, Some(10), true);
+        assert_eq!(hint.authorization, PresentationDecision::Suggestion);
+        assert_eq!(hint.job, DetectionJob::Quotation);
+    }
+
+    #[test]
+    fn db09_authorize_emitted_results_caps_ambiguous_and_context_resolved_at_suggestion() {
+        use super::authorize_emitted_results;
+        use rhema_detection::{Detection, DetectionSource, PresentationDecision, VerseRef};
+
+        let amb_detection = Detection {
+            verse_ref: VerseRef {
+                book_number: 43,
+                book_name: "John".to_string(),
+                chapter: 1,
+                verse_start: 23,
+                verse_end: None,
+            },
+            confidence: 0.85,
+            source: DetectionSource::DirectReference,
+            is_ambiguous: true,
+            ..Detection::default()
+        };
+        let ctx_detection = Detection {
+            verse_ref: VerseRef {
+                book_number: 43,
+                book_name: "John".to_string(),
+                chapter: 3,
+                verse_start: 17,
+                verse_end: None,
+            },
+            confidence: 0.85,
+            source: DetectionSource::DirectReference,
+            is_context_resolved: true,
+            ..Detection::default()
+        };
+        let fuzzy_detection = Detection {
+            verse_ref: VerseRef {
+                book_number: 58,
+                book_name: "Hebrews".to_string(),
+                chapter: 11,
+                verse_start: 1,
+                verse_end: None,
+            },
+            confidence: 0.90,
+            source: DetectionSource::DirectReference,
+            is_fuzzy_book: true,
+            ..Detection::default()
+        };
+        let mut results = vec![
+            DetectionResult {
+                verse_ref: "John 1:23".to_string(),
+                book_name: "John".to_string(),
+                book_number: 43,
+                chapter: 1,
+                verse: 23,
+                confidence: 0.85,
+                source: "direct".to_string(),
+                ..DetectionResult::default()
+            },
+            DetectionResult {
+                verse_ref: "John 3:17".to_string(),
+                book_name: "John".to_string(),
+                chapter: 3,
+                verse: 17,
+                confidence: 0.85,
+                source: "direct".to_string(),
+                ..DetectionResult::default()
+            },
+            DetectionResult {
+                verse_ref: "Hebrews 11:1".to_string(),
+                book_name: "Hebrews".to_string(),
+                chapter: 11,
+                verse: 1,
+                confidence: 0.90,
+                source: "direct".to_string(),
+                is_fuzzy_book: true,
+                ..DetectionResult::default()
+            },
+        ];
+        authorize_emitted_results(
+            &mut results,
+            &[amb_detection, ctx_detection, fuzzy_detection],
+            "John 1 2 3 / verse 17 / Hebrws 11:1",
+            false,
+            true,
+            None,
+            true,
+        );
+        // Fuzzy book detection is Rejected & filtered out of Bible results;
+        // ambiguous and context-resolved stay Suggestion (never LiveAuthorized).
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .all(|r| r.authorization == PresentationDecision::Suggestion));
     }
 }

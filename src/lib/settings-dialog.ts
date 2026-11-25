@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
+import { useServicePlanStore } from "@/stores/service-plan-store"
 
 export type SettingsSection =
   | "audio"
@@ -38,6 +39,7 @@ const useSettingsNavigationStore = create<SettingsNavigationState>((set) => ({
 export function openSettings(section?: SettingsSection) {
   const nav = useSettingsNavigationStore.getState()
   nav.openSettings(section)
+  useServicePlanStore.getState().closePlanner()
   useDashboardWorkspaceStore.getState().setWorkspace("settings")
 }
 

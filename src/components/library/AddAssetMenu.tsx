@@ -1,4 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog"
+import { toast } from "sonner"
 import {
   FileImageIcon,
   FileUpIcon,
@@ -49,38 +50,44 @@ export function AddAssetMenu({ onCreateSong }: AddAssetMenuProps) {
   const hymnDeck = useHymnSlideStore((state) => state.deck)
 
   const importImage = async () => {
-    const selected = await open({
-      multiple: false,
-      filters: [
-        {
-          name: "Images",
-          extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"],
-        },
-      ],
-    })
-    if (typeof selected !== "string") return
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: "Images",
+            extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"],
+          },
+        ],
+      })
+      if (typeof selected !== "string") return
 
-    const [saved, dataUrl] = await Promise.all([
-      saveLibraryImage(selected),
-      readImageThumbnail(selected),
-    ])
-    const thumbnail = await downscaleImageToThumbnail(
-      dataUrl,
-      LIBRARY_PRESENTATION_IMAGE_MAX_SIZE
-    )
-    addAsset({
-      id: crypto.randomUUID(),
-      name: saved.fileName.replace(/\.[^.]+$/, ""),
-      type: "image",
-      collectionIds: [],
-      fileName: saved.fileName,
-      width: saved.width,
-      height: saved.height,
-      mimeType: saved.mimeType,
-      thumbnail,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    })
+      const [saved, dataUrl] = await Promise.all([
+        saveLibraryImage(selected),
+        readImageThumbnail(selected),
+      ])
+      const thumbnail = await downscaleImageToThumbnail(
+        dataUrl,
+        LIBRARY_PRESENTATION_IMAGE_MAX_SIZE
+      )
+      addAsset({
+        id: crypto.randomUUID(),
+        name: saved.fileName.replace(/\.[^.]+$/, ""),
+        type: "image",
+        collectionIds: [],
+        fileName: saved.fileName,
+        width: saved.width,
+        height: saved.height,
+        mimeType: saved.mimeType,
+        thumbnail,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not import image."
+      )
+    }
   }
 
   const saveTheme = () => {
@@ -110,56 +117,94 @@ export function AddAssetMenu({ onCreateSong }: AddAssetMenuProps) {
   }
 
   const importPowerPoint = async () => {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: "PowerPoint", extensions: POWERPOINT_EXTENSIONS }],
-    })
-    if (typeof selected !== "string") return
-    const slides = await importPowerPointSlides(selected)
-    addAsset(createSlideTemplateAsset(slides))
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "PowerPoint", extensions: POWERPOINT_EXTENSIONS }],
+      })
+      if (typeof selected !== "string") return
+      const slides = await importPowerPointSlides(selected)
+      if (slides.length === 0) {
+        toast.error("No slides were found in that presentation.")
+        return
+      }
+      addAsset(createSlideTemplateAsset(slides))
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not import PowerPoint."
+      )
+    }
   }
 
   const importVideo = async () => {
-    const selected = await pickLibraryVideoPath()
-    if (!selected) return
-    const validated = await validateLibraryVideoPath(selected)
-    const metadata = await readVideoMetadata(convertTauriFileSrc(selected))
-    addAsset({
-      id: crypto.randomUUID(),
-      name: validated.label.replace(/\.[^.]+$/, ""),
-      type: "video",
-      source: "local",
-      collectionIds: [],
-      filePath: selected,
-      mimeType: validated.mimeType,
-      durationMs: metadata.durationMs,
-      width: metadata.width,
-      height: metadata.height,
-      thumbnail: metadata.thumbnail,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    })
+    try {
+      const selected = await pickLibraryVideoPath()
+      if (!selected) return
+      const validated = await validateLibraryVideoPath(selected)
+      const metadata = await readVideoMetadata(convertTauriFileSrc(selected))
+      addAsset({
+        id: crypto.randomUUID(),
+        name: validated.label.replace(/\.[^.]+$/, ""),
+        type: "video",
+        source: "local",
+        collectionIds: [],
+        filePath: selected,
+        mimeType: validated.mimeType,
+        durationMs: metadata.durationMs,
+        width: metadata.width,
+        height: metadata.height,
+        thumbnail: metadata.thumbnail,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not import video."
+      )
+    }
   }
 
   const addVideoUrl = async () => {
-    const url = window.prompt("Paste a direct HTTPS .mp4 or .webm URL")
-    if (!url || !isProgressiveVideoUrl(url)) return
-    const metadata = await readVideoMetadata(url)
-    addAsset({
-      id: crypto.randomUUID(),
-      name: url.split("/").pop()?.replace(/\.[^.]+$/, "") || "Video URL",
-      type: "video",
-      source: "url",
-      collectionIds: [],
-      url,
-      mimeType: url.toLowerCase().endsWith(".webm") ? "video/webm" : "video/mp4",
-      durationMs: metadata.durationMs,
-      width: metadata.width,
-      height: metadata.height,
-      thumbnail: metadata.thumbnail,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    })
+    try {
+      const rawUrl = window.prompt("Paste a direct HTTPS .mp4 or .webm URL")
+      const trimmedUrl = rawUrl?.trim()
+      if (!trimmedUrl) return
+      if (!isProgressiveVideoUrl(trimmedUrl)) {
+        toast.error("Enter a valid HTTPS .mp4 or .webm URL.")
+        return
+      }
+      const parsed = new URL(trimmedUrl)
+      const pathname = parsed.pathname.toLowerCase()
+      const rawFileName = parsed.pathname.split("/").filter(Boolean).pop() ?? ""
+      const decodedName = (() => {
+        try {
+          return decodeURIComponent(rawFileName)
+        } catch {
+          return rawFileName
+        }
+      })()
+      const displayName = decodedName.replace(/\.[^.]+$/, "") || "Video URL"
+      const metadata = await readVideoMetadata(trimmedUrl)
+      addAsset({
+        id: crypto.randomUUID(),
+        name: displayName,
+        type: "video",
+        source: "url",
+        collectionIds: [],
+        url: trimmedUrl,
+        mimeType: pathname.endsWith(".webm") ? "video/webm" : "video/mp4",
+        durationMs: metadata.durationMs,
+        width: metadata.width,
+        height: metadata.height,
+        thumbnail: metadata.thumbnail,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not add video URL."
+      )
+    }
   }
 
   const addYoutubeLink = () => {

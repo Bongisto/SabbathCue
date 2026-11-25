@@ -1,10 +1,19 @@
-import type { ComponentType } from "react"
-import { FolderIcon, ImageIcon, LayoutTemplateIcon, MusicIcon, PaletteIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { useRef, useState, type ComponentType } from "react"
+import {
+  FolderIcon,
+  ImageIcon,
+  LayoutTemplateIcon,
+  MusicIcon,
+  PaletteIcon,
+  PlusIcon,
+  Trash2Icon,
+  VideoIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useLibraryStore } from "@/stores/library-store"
-import type { LibraryAssetType } from "@/types/library"
+import type { LibraryAssetType, LibraryCollection } from "@/types/library"
 
 export type LibraryFilter = "all" | LibraryAssetType | `collection:${string}`
 
@@ -23,7 +32,78 @@ const TYPE_FILTERS: Array<{
   { id: "image", label: "Images", icon: ImageIcon },
   { id: "song", label: "Songs", icon: MusicIcon },
   { id: "slide-template", label: "Slide Templates", icon: LayoutTemplateIcon },
+  { id: "video", label: "Videos", icon: VideoIcon },
 ]
+
+function CollectionRow({
+  collection,
+  selected,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  collection: LibraryCollection
+  selected: boolean
+  onSelect: () => void
+  onRename: (name: string) => void
+  onDelete: () => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const draftRef = useRef<string | null>(null)
+
+  const updateDraft = (value: string | null) => {
+    draftRef.current = value
+    setDraft(value)
+  }
+
+  const commitDraft = () => {
+    const next = draftRef.current
+    if (next === null) return
+    updateDraft(null)
+    const trimmed = next.trim()
+    if (trimmed && trimmed !== collection.name) {
+      onRename(trimmed)
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        "group grid grid-cols-[1fr_auto] items-center gap-1 rounded-md px-1 py-1",
+        selected && "bg-[var(--accent-glow)]",
+      )}
+    >
+      <Input
+        value={draft ?? collection.name}
+        aria-label={`Rename ${collection.name}`}
+        onFocus={onSelect}
+        onChange={(event) => updateDraft(event.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault()
+            commitDraft()
+            event.currentTarget.blur()
+          } else if (event.key === "Escape") {
+            event.preventDefault()
+            updateDraft(null)
+            event.currentTarget.blur()
+          }
+        }}
+        className="h-7 border-0 bg-transparent px-1 text-xs"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Delete ${collection.name}`}
+        onClick={onDelete}
+      >
+        <Trash2Icon className="size-3" />
+      </Button>
+    </div>
+  )
+}
 
 export function CollectionSidebar({
   filter,
@@ -79,32 +159,17 @@ export function CollectionSidebar({
           {collections.map((collection) => {
             const selected = filter === `collection:${collection.id}`
             return (
-              <div
+              <CollectionRow
                 key={collection.id}
-                className={cn(
-                  "group grid grid-cols-[1fr_auto] items-center gap-1 rounded-md px-1 py-1",
-                  selected && "bg-[var(--accent-glow)]",
-                )}
-              >
-                <Input
-                  value={collection.name}
-                  aria-label={`Rename ${collection.name}`}
-                  onFocus={() => onFilterChange(`collection:${collection.id}`)}
-                  onChange={(event) =>
-                    renameCollection(collection.id, event.target.value)
-                  }
-                  className="h-7 border-0 bg-transparent px-1 text-xs"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`Delete ${collection.name}`}
-                  onClick={() => deleteCollection(collection.id)}
-                >
-                  <Trash2Icon className="size-3" />
-                </Button>
-              </div>
+                collection={collection}
+                selected={selected}
+                onSelect={() => onFilterChange(`collection:${collection.id}`)}
+                onRename={(name) => renameCollection(collection.id, name)}
+                onDelete={() => {
+                  if (selected) onFilterChange("all")
+                  deleteCollection(collection.id)
+                }}
+              />
             )
           })}
         </div>

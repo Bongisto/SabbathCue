@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE } from "./_lib/site";
+import { publicSiteOrigin } from "./_lib/site-url";
 
 export const dynamic = "force-static";
 
@@ -55,6 +55,7 @@ const AI_USER_INITIATED = [
 ];
 
 export default function robots(): MetadataRoute.Robots {
+  const siteOrigin = publicSiteOrigin();
   const allowed = [
     ...TRADITIONAL_SEARCH,
     ...AI_TRAINING,
@@ -67,7 +68,7 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "*", allow: "/" },
       ...allowed.map((userAgent) => ({ userAgent, allow: "/" })),
     ],
-    sitemap: `${SITE.url}/sitemap.xml`,
-    host: SITE.url,
+    sitemap: `${siteOrigin}/sitemap.xml`,
+    host: siteOrigin,
   };
 }

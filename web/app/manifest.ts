@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE } from "./_lib/site";
+import { SITE, publicBasePath } from "./_lib/site";
 
 export const dynamic = "force-static";
 
@@ -8,12 +8,8 @@ export const dynamic = "force-static";
  * manifest URLs — they carry the prefix by hand. Same rule as next.config.ts:
  * GitHub Pages serves under /SabbathCue, Vercel sets NEXT_PUBLIC_BASE_PATH="".
  */
-const basePath =
-  process.env.NEXT_PUBLIC_BASE_PATH !== undefined
-    ? process.env.NEXT_PUBLIC_BASE_PATH.trim().replace(/\/$/, "")
-    : "/SabbathCue";
-
 export default function manifest(): MetadataRoute.Manifest {
+  const basePath = publicBasePath();
   return {
     name: SITE.name,
     short_name: SITE.name,

@@ -1,6 +1,6 @@
 use crate::db::BibleDb;
 use crate::error::BibleError;
-use crate::models::{Book, SearchVerse, Translation, Verse};
+use crate::models::{Book, SearchVerse, Translation, Verse, VerseRefRecord};
 
 impl BibleDb {
     /// Look up a verse by its database primary key (verses.id).
@@ -245,6 +245,42 @@ impl BibleDb {
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
+
+    /// Resolve canonical `(book_number, book_name, chapter, verse)` coordinates
+    /// for a batch of vector `verse_id` values.
+    pub fn resolve_verse_refs(&self, verse_ids: &[i64]) -> Result<Vec<VerseRefRecord>, BibleError> {
+        const CHUNK_SIZE: usize = 900;
+
+        if verse_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.conn()?;
+        let mut records = Vec::with_capacity(verse_ids.len());
+        for chunk in verse_ids.chunks(CHUNK_SIZE) {
+            let placeholders = std::iter::repeat_n("?", chunk.len())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "SELECT id, book_number, book_name, chapter, verse FROM verses WHERE id IN ({placeholders})"
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let params = rusqlite::params_from_iter(chunk.iter().copied());
+            let rows = stmt.query_map(params, |row: &rusqlite::Row| {
+                Ok(VerseRefRecord {
+                    verse_id: row.get(0)?,
+                    book_number: row.get(1)?,
+                    book_name: row.get(2)?,
+                    chapter: row.get(3)?,
+                    verse: row.get(4)?,
+                })
+            })?;
+            for row in rows {
+                records.push(row?);
+            }
+        }
+        Ok(records)
+    }
 }
 
 #[cfg(test)]
@@ -336,5 +372,21 @@ mod lookup_tests {
         let books = db.list_books(1).unwrap();
         assert_eq!(books.len(), 1);
         assert_eq!(books[0].book_number, 43);
+    }
+
+    #[test]
+    fn resolve_verse_refs_maps_ids_to_coordinates() {
+        let db = fixture_db();
+        let refs = db.resolve_verse_refs(&[1, 3, 999]).unwrap();
+        assert_eq!(refs.len(), 2);
+        assert!(refs.iter().any(|r| {
+            r.verse_id == 1
+                && r.book_number == 43
+                && r.book_name == "John"
+                && r.chapter == 3
+                && r.verse == 16
+        }));
+        assert!(refs.iter().any(|r| r.verse_id == 3 && r.verse == 16));
+        assert_eq!(db.resolve_verse_refs(&[]).unwrap(), Vec::new());
     }
 }

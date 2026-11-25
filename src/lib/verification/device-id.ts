@@ -14,7 +14,12 @@ export interface InstallationIdentity {
 }
 
 function getStore(): Promise<Store> {
-  storePromise ??= load(STORE_FILE, { autoSave: false, defaults: {} })
+  storePromise ??= load(STORE_FILE, { autoSave: false, defaults: {} }).catch(
+    (error) => {
+      storePromise = null
+      throw error
+    }
+  )
   return storePromise
 }
 
@@ -62,7 +67,10 @@ export async function getOrCreateDeviceId(): Promise<string> {
 }
 
 export function getOrCreateInstallationIdentity(): Promise<InstallationIdentity> {
-  identityPromise ??= loadInstallationIdentity()
+  identityPromise ??= loadInstallationIdentity().catch((error) => {
+    identityPromise = null
+    throw error
+  })
   return identityPromise
 }
 

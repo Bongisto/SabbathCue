@@ -30,11 +30,6 @@ export function PaddleSubscribeButton({
   const [loading, setLoading] = useState(false)
   const [ready, setReady] = useState(false)
 
-  useEffect(() => {
-    if (!isPaddleCheckoutConfigured()) return
-    void getPaddleInstance().then((paddle) => setReady(Boolean(paddle)))
-  }, [])
-
   // Callers pass inline arrows, so keep the latest handler in a ref and
   // subscribe once instead of re-registering on every render.
   const onCompletedRef = useRef(onCompleted)
@@ -46,12 +41,18 @@ export function PaddleSubscribeButton({
     if (!isPaddleCheckoutConfigured()) return
     let cancelled = false
     let unsubscribe: (() => void) | null = null
-    void getPaddleInstance().then((paddle) => {
-      if (cancelled || !paddle) return
-      unsubscribe = onCheckoutCompleted(paddle, () => {
-        onCompletedRef.current?.()
+    void getPaddleInstance()
+      .then((paddle) => {
+        if (cancelled) return
+        setReady(Boolean(paddle))
+        if (!paddle) return
+        unsubscribe = onCheckoutCompleted(paddle, () => {
+          onCompletedRef.current?.()
+        })
       })
-    })
+      .catch(() => {
+        if (!cancelled) setReady(false)
+      })
     return () => {
       cancelled = true
       unsubscribe?.()
@@ -62,10 +63,19 @@ export function PaddleSubscribeButton({
 
   async function handleClick() {
     setLoading(true)
-    await ensureFreshAuthSession()
-    const result = await openSubscriptionCheckout({ email, userId })
-    setLoading(false)
-    if (!result.ok) toast.error(result.message)
+    try {
+      try {
+        await ensureFreshAuthSession()
+      } catch {
+        // Proceed to checkout even if session refresh throws.
+      }
+      const result = await openSubscriptionCheckout({ email, userId })
+      if (!result.ok) toast.error(result.message)
+    } catch {
+      toast.error("Could not open checkout.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

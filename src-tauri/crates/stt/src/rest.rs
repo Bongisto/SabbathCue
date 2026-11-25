@@ -3,21 +3,42 @@
 //! Buffers audio and periodically POSTs to the Deepgram REST endpoint.
 //! Produces the same `TranscriptEvent` types as the WebSocket client.
 
+use std::time::Duration;
+
 use crate::deepgram::{append_deepgram_base_query, append_deepgram_keyterms};
 use crate::error::SttError;
 use crate::types::{SttConfig, TranscriptEvent, Word};
+
+const REST_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const REST_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct DeepgramRestClient {
     config: SttConfig,
     client: reqwest::Client,
 }
 
+fn build_http_client() -> Result<reqwest::Client, SttError> {
+    reqwest::Client::builder()
+        .connect_timeout(REST_CONNECT_TIMEOUT)
+        .timeout(REST_REQUEST_TIMEOUT)
+        .build()
+        .map_err(|e| SttError::ConnectionFailed(format!("Failed to build REST client: {e}")))
+}
+
 impl DeepgramRestClient {
-    pub fn new(config: SttConfig) -> Self {
-        Self {
+    pub fn try_new(config: SttConfig) -> Result<Self, SttError> {
+        Ok(Self {
             config,
-            client: reqwest::Client::new(),
-        }
+            client: build_http_client()?,
+        })
+    }
+
+    pub fn new(config: SttConfig) -> Self {
+        let client = build_http_client().unwrap_or_else(|e| {
+            log::warn!("[STT-REST] Falling back to default reqwest client: {e}");
+            reqwest::Client::new()
+        });
+        Self { config, client }
     }
 
     /// Transcribe a chunk of raw PCM audio (i16 LE samples, mono, 16kHz).
@@ -29,6 +50,19 @@ impl DeepgramRestClient {
         reason = "audio sample count fits comfortably in f64"
     )]
     pub async fn transcribe(&self, samples: &[i16]) -> Result<Vec<TranscriptEvent>, SttError> {
+        if self.config.api_key.trim().is_empty() {
+            return Err(SttError::ApiKeyMissing);
+        }
+        if self
+            .config
+            .api_key
+            .bytes()
+            .any(|b| b == b'\r' || b == b'\n' || b == 0)
+        {
+            return Err(SttError::ConnectionFailed(
+                "Invalid Deepgram API key header".to_string(),
+            ));
+        }
         if samples.is_empty() {
             return Ok(vec![]);
         }
@@ -183,5 +217,37 @@ mod tests {
         assert!(pairs.contains(&("numerals".into(), "true".into())));
         assert!(pairs.contains(&("language".into(), "en".into())));
         assert!(pairs.contains(&("keyterm".into(), "Jesus".into())));
+    }
+
+    #[test]
+    fn try_new_builds_client_with_timeouts() {
+        let client = DeepgramRestClient::try_new(SttConfig {
+            api_key: "test".into(),
+            ..SttConfig::default()
+        });
+        assert!(client.is_ok());
+    }
+
+    #[tokio::test]
+    async fn transcribe_rejects_empty_and_control_char_api_keys() {
+        let missing = DeepgramRestClient::try_new(SttConfig {
+            api_key: "   ".into(),
+            ..SttConfig::default()
+        })
+        .unwrap();
+        assert!(matches!(
+            missing.transcribe(&[1, 2, 3]).await,
+            Err(SttError::ApiKeyMissing)
+        ));
+
+        let bad_header = DeepgramRestClient::try_new(SttConfig {
+            api_key: "bad\nkey".into(),
+            ..SttConfig::default()
+        })
+        .unwrap();
+        assert!(matches!(
+            bad_header.transcribe(&[1, 2, 3]).await,
+            Err(SttError::ConnectionFailed(msg)) if msg.contains("API key")
+        ));
     }
 }

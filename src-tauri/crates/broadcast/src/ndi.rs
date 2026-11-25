@@ -226,6 +226,7 @@ impl NdiRuntime {
         &mut self,
         session_id: String,
         request: NdiStartRequest,
+        library_path: Option<&Path>,
     ) -> Result<NdiSessionInfo, NdiError> {
         // Stop existing session with this ID if running
         if let Some(existing) = self.sessions.remove(&session_id) {
@@ -237,7 +238,7 @@ impl NdiRuntime {
             "NDI[{session_id}]: starting session '{}'",
             request.source_name
         );
-        let session = ActiveNdiSession::create(request)?;
+        let session = ActiveNdiSession::create(request, library_path)?;
         let info = session.info.clone();
         log::info!(
             "NDI[{session_id}]: session active — {}x{} @ {}fps",
@@ -389,14 +390,17 @@ impl ActiveNdiSession {
         clippy::needless_pass_by_value,
         reason = "request fields are destructured and moved into the session"
     )]
-    fn create(request: NdiStartRequest) -> Result<Self, NdiError> {
+    fn create(
+        request: NdiStartRequest,
+        preferred_library_path: Option<&Path>,
+    ) -> Result<Self, NdiError> {
         let source_name = request.source_name.trim().to_string();
         if source_name.is_empty() {
             return Err(NdiError::EmptySourceName);
         }
 
-        let library_path = resolve_library_path()?;
-        // SAFETY: library_path was validated to exist by resolve_library_path()
+        let library_path = resolve_library_path_with_override(preferred_library_path)?;
+        // SAFETY: library_path was validated to exist by resolve_library_path_with_override()
         let library = unsafe { Library::new(&library_path) }
             .map_err(|e| NdiError::LibraryLoad(e.to_string()))?;
 
@@ -547,6 +551,15 @@ impl Drop for ActiveNdiSession {
         // destroyed when the last session drops.
         ndi_runtime_release(self.ndi_destroy);
     }
+}
+
+fn resolve_library_path_with_override(
+    preferred_path: Option<&Path>,
+) -> Result<PathBuf, NdiError> {
+    if let Some(path) = preferred_path.filter(|path| path.exists()) {
+        return Ok(path.to_path_buf());
+    }
+    resolve_library_path()
 }
 
 fn resolve_library_path() -> Result<PathBuf, NdiError> {
@@ -820,5 +833,32 @@ mod tests {
             after, before,
             "32 concurrent session lifetimes must restore the runtime refcount"
         );
+    }
+
+    #[test]
+    fn resolve_library_path_with_override_uses_existing_preferred_path() {
+        let dir = std::env::temp_dir().join(format!(
+            "sabbathcue-ndi-override-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let fake_dll = dir.join("Processing.NDI.Lib.x64.dll");
+        std::fs::write(&fake_dll, b"stub").expect("write stub dll");
+
+        let resolved =
+            resolve_library_path_with_override(Some(&fake_dll)).expect("should use preferred path");
+        assert_eq!(resolved, fake_dll);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_library_path_with_override_ignores_missing_preferred_path() {
+        let missing = std::env::temp_dir().join("sabbathcue-ndi-definitely-missing.dll");
+        let resolved = resolve_library_path_with_override(Some(&missing));
+        if let Ok(path) = resolved {
+            assert_ne!(path, missing, "must fall back instead of returning a missing path");
+        }
     }
 }

@@ -13,14 +13,102 @@ import { CanvasPresentation } from "@/components/ui/canvas-verse"
 import { presentQueuedItem, previewQueuedItem } from "@/lib/queue-presentation"
 import { cn } from "@/lib/utils"
 import { selectActiveTheme, useBroadcastStore } from "@/stores/broadcast-store"
+import { useBroadcastLiveStore } from "@/stores/broadcast/live-store"
 import { useQueueStore } from "@/stores/queue-store"
 import {
   getPresentationRenderData,
   getReferenceFromItem,
+  getVerseFromItem,
   type PresentationItem,
   type PresentationRenderData,
   type QueueItem,
 } from "@/types"
+
+function scriptureMatchesQueueItem(
+  renderData: PresentationRenderData,
+  queueItem: QueueItem
+): boolean {
+  if (renderData.kind !== "scripture") return false
+  const verse = getVerseFromItem(queueItem)
+  const liveVerse = renderData.scripture
+  if (!verse || !liveVerse) return false
+  return (
+    liveVerse.book_number === verse.book_number &&
+    liveVerse.chapter === verse.chapter &&
+    liveVerse.verse === verse.verse
+  )
+}
+
+function hymnMatchesQueueItem(
+  renderData: PresentationRenderData,
+  queueItem: QueueItem
+): boolean {
+  if (renderData.kind !== "hymn" || queueItem.presentation.kind !== "hymn") {
+    return false
+  }
+  const screenId = renderData.hymnSlide?.screenId
+  if (queueItem.hymnDeck?.length) {
+    return Boolean(
+      screenId && queueItem.hymnDeck.some((s) => s.screenId === screenId)
+    )
+  }
+  if (screenId && queueItem.presentation.screenId === screenId) return true
+  return Boolean(
+    renderData.hymnTitle &&
+      renderData.hymnTitle === queueItem.presentation.hymnTitle
+  )
+}
+
+function slideDeckMatchesQueueItem(
+  renderData: PresentationRenderData,
+  queueItem: QueueItem
+): boolean {
+  if (
+    renderData.kind !== "slideDeck" ||
+    queueItem.presentation.kind !== "slideDeck"
+  ) {
+    return false
+  }
+  const slideId = renderData.hymnSlide?.screenId
+  if (queueItem.slideDeck?.length) {
+    return Boolean(
+      slideId && queueItem.slideDeck.some((s) => s.slideId === slideId)
+    )
+  }
+  return Boolean(slideId && queueItem.presentation.slideId === slideId)
+}
+
+function renderItemMatchesQueueItem(
+  renderData: PresentationRenderData | null,
+  queueItem: QueueItem
+): boolean {
+  if (!renderData) return false
+  const presentation = queueItem.presentation
+
+  switch (presentation.kind) {
+    case "scripture":
+      return scriptureMatchesQueueItem(renderData, queueItem)
+    case "hymn":
+      return hymnMatchesQueueItem(renderData, queueItem)
+    case "slideDeck":
+      return slideDeckMatchesQueueItem(renderData, queueItem)
+    case "egw":
+      return (
+        renderData.kind === "egw" &&
+        renderData.egwParagraph?.id === presentation.paragraph.id
+      )
+    case "video":
+      return (
+        renderData.kind === "video" &&
+        renderData.video?.videoId === presentation.videoId
+      )
+    case "media":
+      return (
+        renderData.kind === "media" &&
+        renderData.reference === presentation.reference
+      )
+  }
+}
 
 export function kindLabel(kind: PresentationItem["kind"]): string {
   if (kind === "slideDeck") return "Slide"
@@ -121,6 +209,10 @@ export function QueueSorterCard({
   onSelectClick: (id: string, mods: { ctrl: boolean; shift: boolean }) => void
 }) {
   const { ref, handleRef, isDragging } = useSortable({ id: item.id, index })
+  const isLive = useBroadcastLiveStore((s) => s.isLive)
+  const liveQueueItemId = useBroadcastLiveStore((s) => s.liveQueueItemId)
+  const liveItem = useBroadcastLiveStore((s) => s.liveItem)
+  const previewItem = useBroadcastLiveStore((s) => s.previewItem)
 
   const renderData = useMemo(
     () => getPresentationRenderData(item.presentation),
@@ -129,6 +221,21 @@ export function QueueSorterCard({
   const label = slideLabel(item.presentation)
   const reference = getReferenceFromItem(item)
   const orderLabel = String(index + 1).padStart(2, "0")
+  const isCardLive =
+    isLive &&
+    (liveQueueItemId === item.id ||
+      (liveQueueItemId === null &&
+        isActive &&
+        renderItemMatchesQueueItem(liveItem, item)))
+  const isCardPreview =
+    !isCardLive && isActive && renderItemMatchesQueueItem(previewItem, item)
+  const statusBadge = isCardLive
+    ? "Live"
+    : isCardPreview
+      ? "Preview"
+      : isActive
+        ? "Selected"
+        : null
 
   const preview = () => {
     useQueueStore.getState().setActive(index)
@@ -182,12 +289,12 @@ export function QueueSorterCard({
           </Badge>
         </div>
 
-        {isActive ? (
+        {statusBadge ? (
           <Badge
-            variant="default"
+            variant={isCardLive ? "default" : "secondary"}
             className="absolute right-1 top-1 px-1.5 text-[10px] font-bold tracking-wide uppercase"
           >
-            Live
+            {statusBadge}
           </Badge>
         ) : null}
 

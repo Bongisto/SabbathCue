@@ -149,11 +149,15 @@ fn spawn_audio_reader(
     audio_rx: Receiver<Vec<i16>>,
     audio_tx: mpsc::Sender<AudioCommand>,
     cancelled: Arc<AtomicBool>,
+    reader_stop: Arc<AtomicBool>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::task::spawn_blocking(move || {
         let mut batch = Vec::with_capacity(BATCH_SAMPLES * 2);
         let mut sequence = 0_u64;
         loop {
+            if reader_stop.load(Ordering::SeqCst) || audio_tx.is_closed() {
+                return;
+            }
             if cancelled.load(Ordering::SeqCst) {
                 let _ = audio_tx.blocking_send(AudioCommand::Finish(sequence));
                 return;
@@ -196,6 +200,20 @@ fn spawn_audio_reader(
             }
         }
     })
+}
+
+/// Ensures the blocking audio reader stops and its task handle is aborted on
+/// every exit path from `try_connect` (including early `?` returns).
+struct AudioReaderGuard {
+    stop: Arc<AtomicBool>,
+    handle: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for AudioReaderGuard {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        self.handle.abort();
+    }
 }
 
 pub(crate) fn build_start_payload(config: &SttConfig) -> serde_json::Value {
@@ -401,7 +419,17 @@ impl SpeechmaticsClient {
         connection_health.mark_connected();
 
         let (audio_tx, mut audio_commands) = mpsc::channel::<AudioCommand>(64);
-        let audio_reader = spawn_audio_reader(audio_rx, audio_tx, self.cancelled.clone());
+        let reader_stop = Arc::new(AtomicBool::new(false));
+        let audio_reader = spawn_audio_reader(
+            audio_rx,
+            audio_tx,
+            self.cancelled.clone(),
+            reader_stop.clone(),
+        );
+        let audio_reader_guard = AudioReaderGuard {
+            stop: reader_stop,
+            handle: audio_reader,
+        };
 
         let mut finishing = false;
         let mut finish_deadline = None;
@@ -441,7 +469,6 @@ impl SpeechmaticsClient {
                         let (events, ended) = parse_response(&text, &mut utterance)?;
                         for event in events {
                             if event_tx.send(event).await.is_err() {
-                                audio_reader.abort();
                                 return Ok(());
                             }
                         }
@@ -452,17 +479,14 @@ impl SpeechmaticsClient {
                         break;
                     }
                     Some(Ok(Message::Close(close))) => {
-                        audio_reader.abort();
                         return Err(SttError::ConnectionFailed(format!("Speechmatics closed: {close:?}")));
                     }
                     Some(Ok(_)) => {}
                     Some(Err(error)) => {
-                        audio_reader.abort();
                         return Err(SttError::ConnectionFailed(error.to_string()));
                     }
                     None if finishing => break,
                     None => {
-                        audio_reader.abort();
                         return Err(SttError::ConnectionFailed("Speechmatics connection ended".into()));
                     }
                 }
@@ -472,7 +496,7 @@ impl SpeechmaticsClient {
         for event in utterance.take_final().unwrap_or_default() {
             let _ = event_tx.send(event).await;
         }
-        audio_reader.abort();
+        drop(audio_reader_guard);
         let _ = write.close().await;
         let _ = event_tx.send(TranscriptEvent::Disconnected).await;
         Ok(())
@@ -725,5 +749,54 @@ mod tests {
             started.elapsed() < Duration::from_secs(2),
             "timeout must not use the live 15s budget in tests"
         );
+    }
+
+    #[tokio::test]
+    async fn audio_reader_exits_when_reader_stop_is_set() {
+        let (_audio_feed_tx, audio_rx) = crossbeam_channel::bounded::<Vec<i16>>(4);
+        let (audio_tx, _audio_commands) = mpsc::channel::<AudioCommand>(4);
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let reader_stop = Arc::new(AtomicBool::new(false));
+
+        let handle = spawn_audio_reader(audio_rx, audio_tx, cancelled, reader_stop.clone());
+        reader_stop.store(true, Ordering::SeqCst);
+
+        tokio::time::timeout(Duration::from_secs(1), handle)
+            .await
+            .expect("reader should stop promptly when reader_stop is set")
+            .expect("reader task should not panic");
+    }
+
+    #[tokio::test]
+    async fn audio_reader_exits_when_audio_tx_is_closed() {
+        let (_audio_feed_tx, audio_rx) = crossbeam_channel::bounded::<Vec<i16>>(4);
+        let (audio_tx, audio_commands) = mpsc::channel::<AudioCommand>(4);
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let reader_stop = Arc::new(AtomicBool::new(false));
+
+        let handle = spawn_audio_reader(audio_rx, audio_tx, cancelled, reader_stop);
+        drop(audio_commands);
+
+        tokio::time::timeout(Duration::from_secs(1), handle)
+            .await
+            .expect("reader should exit promptly when audio_tx closes")
+            .expect("reader task should not panic");
+    }
+
+    #[tokio::test]
+    async fn audio_reader_guard_sets_stop_flag_and_aborts_on_drop() {
+        let (_audio_feed_tx, audio_rx) = crossbeam_channel::bounded::<Vec<i16>>(4);
+        let (audio_tx, _audio_commands) = mpsc::channel::<AudioCommand>(4);
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let reader_stop = Arc::new(AtomicBool::new(false));
+
+        let handle = spawn_audio_reader(audio_rx, audio_tx, cancelled, reader_stop.clone());
+        let guard = AudioReaderGuard {
+            stop: reader_stop.clone(),
+            handle,
+        };
+        drop(guard);
+
+        assert!(reader_stop.load(Ordering::SeqCst));
     }
 }

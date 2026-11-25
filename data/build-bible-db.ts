@@ -109,10 +109,14 @@ type ParsedOsis = { book: number; chapter: number; verse: number }
 type ParsedOsisRange = { start: ParsedOsis; end: ParsedOsis }
 
 function resetDatabase(): Database {
-  try {
-    unlinkSync(DB_PATH)
-  } catch {
-    // The database may not exist yet on a fresh build.
+  for (const filePath of [DB_PATH, `${DB_PATH}-wal`, `${DB_PATH}-shm`]) {
+    try {
+      unlinkSync(filePath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error
+      }
+    }
   }
   return new Database(DB_PATH, { create: true })
 }

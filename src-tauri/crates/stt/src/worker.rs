@@ -17,6 +17,8 @@ use crate::types::{TranscriptEvent, Word};
 
 const CHECK_READY_TIMEOUT: Duration = Duration::from_secs(20);
 const WORKER_MONITOR_INTERVAL: Duration = Duration::from_millis(50);
+const WORKER_EXIT_GRACE: Duration = Duration::from_millis(500);
+const MAX_PREFLIGHT_STDERR_BYTES: usize = 64 * 1024;
 const PREFLIGHT_CACHE_TTL: Duration = Duration::from_secs(600);
 
 type PreflightCacheKey = (String, PathBuf, PathBuf);
@@ -232,6 +234,11 @@ pub(crate) fn worker_command(worker_path: &Path) -> Command {
         command.arg(&worker_path);
         command
     };
+    // Ensure UTF-8 stdio on Windows for both raw Python scripts and bundled
+    // PyInstaller workers so non-ASCII transcripts never fail cp1252 encoding
+    // or emit invalid UTF-8 bytes to Rust's BufReader::lines().
+    command.env("PYTHONUTF8", "1");
+    command.env("PYTHONIOENCODING", "utf-8");
     suppress_console_window(&mut command);
     command
 }
@@ -289,6 +296,37 @@ fn stderr_suffix(stderr: &str) -> String {
     }
 }
 
+/// Continuously drain a preflight worker's `stderr` pipe on a background thread
+/// so verbose startup logs (e.g. Kaldi/Vosk model loading) can never fill the
+/// OS pipe buffer (~4 KB on Windows) and deadlock the child before it emits
+/// `ready`, while keeping retained bytes strictly bounded.
+fn spawn_preflight_stderr_drain(
+    label: &'static str,
+    mut stderr: ChildStderr,
+) -> Result<std::thread::JoinHandle<Vec<u8>>, SttError> {
+    std::thread::Builder::new()
+        .name(format!("{}-preflight-stderr", label.to_ascii_lowercase()))
+        .spawn(move || {
+            let mut captured = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                match stderr.read(&mut chunk) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        let remaining = MAX_PREFLIGHT_STDERR_BYTES.saturating_sub(captured.len());
+                        if remaining > 0 {
+                            captured.extend_from_slice(&chunk[..n.min(remaining)]);
+                        }
+                    }
+                }
+            }
+            captured
+        })
+        .map_err(|e| {
+            SttError::ConnectionFailed(format!("failed to spawn {label} preflight stderr: {e}"))
+        })
+}
+
 #[expect(
     clippy::too_many_lines,
     reason = "Worker preflight has a linear process lifecycle with tightly coupled cleanup"
@@ -340,6 +378,10 @@ pub(crate) fn check_ready(
         terminate_child(label, &mut child);
         SttError::ConnectionFailed(format!("failed to open {label} preflight stdout"))
     })?;
+    let stderr = child.stderr.take().ok_or_else(|| {
+        terminate_child(label, &mut child);
+        SttError::ConnectionFailed(format!("failed to open {label} preflight stderr"))
+    })?;
     let (event_tx, event_rx) = std::sync::mpsc::channel::<WorkerEvent>();
     let reader = std::thread::Builder::new()
         .name(format!("{}-preflight-reader", label.to_ascii_lowercase()))
@@ -355,6 +397,14 @@ pub(crate) fn check_ready(
             terminate_child(label, &mut child);
             SttError::ConnectionFailed(format!("failed to spawn {label} preflight reader: {e}"))
         })?;
+    let stderr_reader = match spawn_preflight_stderr_drain(label, stderr) {
+        Ok(handle) => handle,
+        Err(error) => {
+            terminate_child(label, &mut child);
+            let _ = reader.join();
+            return Err(error);
+        }
+    };
 
     let mut ready = false;
     let deadline = started_at + CHECK_READY_TIMEOUT;
@@ -367,6 +417,7 @@ pub(crate) fn check_ready(
             Ok(WorkerEvent::Error { message }) => {
                 terminate_child(label, &mut child);
                 let _ = reader.join();
+                let _ = stderr_reader.join();
                 return Err(SttError::ConnectionFailed(message));
             }
             Ok(WorkerEvent::Partial { .. } | WorkerEvent::Final { .. })
@@ -375,12 +426,9 @@ pub(crate) fn check_ready(
         }
 
         if let Ok(Some(status)) = child.try_wait() {
-            let stderr = child.stderr.take().map_or_else(String::new, |stderr| {
-                let mut bytes = Vec::new();
-                let _ = BufReader::new(stderr).read_to_end(&mut bytes);
-                first_nonempty_lines(&bytes, 6)
-            });
             let _ = reader.join();
+            let stderr_bytes = stderr_reader.join().unwrap_or_default();
+            let stderr = first_nonempty_lines(&stderr_bytes, 6);
             return Err(SttError::ConnectionFailed(format!(
                 "{label} worker preflight exited before ready with status {status}.{}",
                 stderr_suffix(&stderr)
@@ -390,6 +438,7 @@ pub(crate) fn check_ready(
         if Instant::now() >= deadline {
             terminate_child(label, &mut child);
             let _ = reader.join();
+            let _ = stderr_reader.join();
             return Err(SttError::ConnectionFailed(format!(
                 "{label} worker did not report ready within {} seconds",
                 CHECK_READY_TIMEOUT.as_secs()
@@ -397,17 +446,9 @@ pub(crate) fn check_ready(
         }
     }
 
-    let stderr = if ready {
-        String::new()
-    } else {
-        child.stderr.take().map_or_else(String::new, |stderr| {
-            let mut bytes = Vec::new();
-            let _ = BufReader::new(stderr).read_to_end(&mut bytes);
-            first_nonempty_lines(&bytes, 6)
-        })
-    };
     terminate_child(label, &mut child);
     let _ = reader.join();
+    let stderr_bytes = stderr_reader.join().unwrap_or_default();
     if ready {
         log::info!(
             "{label} worker readiness check passed in {}ms",
@@ -416,6 +457,7 @@ pub(crate) fn check_ready(
         record_preflight_success(label, model_path, worker_path);
         Ok(())
     } else {
+        let stderr = first_nonempty_lines(&stderr_bytes, 6);
         Err(SttError::ConnectionFailed(format!(
             "{label} worker exited without reporting ready.{}",
             stderr_suffix(&stderr)
@@ -510,14 +552,57 @@ pub(crate) fn write_samples(
 pub(crate) async fn stop_writer(
     label: &'static str,
     writer: tokio::task::JoinHandle<Result<(), SttError>>,
-) {
+) -> Result<(), SttError> {
     match tokio::time::timeout(Duration::from_secs(2), writer).await {
-        Ok(Ok(Ok(()))) => {}
-        Ok(Ok(Err(e))) => log::warn!("{label} writer exited with error: {e}"),
-        Ok(Err(e)) => log::warn!("{label} writer task failed: {e}"),
+        Ok(Ok(Ok(()))) => Ok(()),
+        Ok(Ok(Err(e))) => {
+            log::warn!("{label} writer exited with error: {e}");
+            Err(e)
+        }
+        Ok(Err(e)) => {
+            log::warn!("{label} writer task failed: {e}");
+            Err(SttError::ConnectionFailed(format!(
+                "{label} writer task failed: {e}"
+            )))
+        }
         Err(_) => {
             log::warn!("{label} writer did not stop promptly; terminating worker process");
+            Ok(())
         }
+    }
+}
+
+async fn wait_for_child_exit_after_writer(
+    label: &'static str,
+    cancelled: &AtomicBool,
+    child: &mut Child,
+) -> Result<(), SttError> {
+    let deadline = Instant::now() + WORKER_EXIT_GRACE;
+    loop {
+        if cancelled.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if status.success() {
+                    return Ok(());
+                }
+                return Err(SttError::ConnectionFailed(format!(
+                    "{label} worker exited unexpectedly with status {status}"
+                )));
+            }
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    return Ok(());
+                }
+            }
+            Err(e) => {
+                return Err(SttError::ConnectionFailed(format!(
+                    "failed to inspect {label} worker process: {e}"
+                )));
+            }
+        }
+        tokio::time::sleep(WORKER_MONITOR_INTERVAL).await;
     }
 }
 
@@ -528,21 +613,29 @@ pub(crate) async fn wait_for_worker_shutdown(
     writer: &tokio::task::JoinHandle<Result<(), SttError>>,
 ) -> Result<(), SttError> {
     loop {
-        if cancelled.load(Ordering::SeqCst) || writer.is_finished() {
+        if cancelled.load(Ordering::SeqCst) {
             return Ok(());
         }
 
+        let writer_finished = writer.is_finished();
         let Some(child) = process.child_mut() else {
             return Ok(());
         };
 
         match child.try_wait() {
             Ok(Some(status)) => {
+                if writer_finished && status.success() {
+                    return Ok(());
+                }
                 return Err(SttError::ConnectionFailed(format!(
                     "{label} worker exited unexpectedly with status {status}"
                 )));
             }
-            Ok(None) => {}
+            Ok(None) => {
+                if writer_finished {
+                    return wait_for_child_exit_after_writer(label, cancelled, child).await;
+                }
+            }
             Err(e) => {
                 return Err(SttError::ConnectionFailed(format!(
                     "failed to inspect {label} worker process: {e}"
@@ -748,5 +841,100 @@ mod tests {
             5,
             "blank partials and bad JSON must be skipped"
         );
+    }
+
+    #[test]
+    fn worker_command_sets_utf8_python_env_vars() {
+        for path in [
+            Path::new("C:/app/scripts/worker.py"),
+            Path::new("C:/app/scripts/worker.exe"),
+        ] {
+            let command = worker_command(path);
+            let envs: Vec<(String, Option<String>)> = command
+                .get_envs()
+                .map(|(k, v)| {
+                    (
+                        k.to_string_lossy().into_owned(),
+                        v.map(|val| val.to_string_lossy().into_owned()),
+                    )
+                })
+                .collect();
+            assert!(
+                envs.iter()
+                    .any(|(k, v)| k == "PYTHONUTF8" && v.as_deref() == Some("1")),
+                "PYTHONUTF8=1 must be set for {}",
+                path.display()
+            );
+            assert!(
+                envs.iter()
+                    .any(|(k, v)| k == "PYTHONIOENCODING" && v.as_deref() == Some("utf-8")),
+                "PYTHONIOENCODING=utf-8 must be set for {}",
+                path.display()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn wait_for_worker_shutdown_reports_crash_after_writer_finishes() {
+        let mut command = if cfg!(windows) {
+            let mut cmd = Command::new("cmd");
+            cmd.args(["/C", "exit", "1"]);
+            cmd
+        } else {
+            let mut cmd = Command::new("sh");
+            cmd.args(["-c", "exit 1"]);
+            cmd
+        };
+        let child = command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn exit-1 child");
+
+        let reader = std::thread::spawn(|| {});
+        let stderr_reader = std::thread::spawn(|| {});
+        let mut process = WorkerProcess::new("Test", child, reader, stderr_reader);
+        let cancelled = AtomicBool::new(false);
+        let writer = tokio::spawn(async {
+            Err(SttError::SendError("broken pipe".to_string()))
+        });
+        // Ensure writer finishes before wait_for_worker_shutdown inspects it.
+        while !writer.is_finished() {
+            tokio::task::yield_now().await;
+        }
+
+        let result = wait_for_worker_shutdown("Test", &cancelled, &mut process, &writer).await;
+        assert!(
+            result.is_err(),
+            "non-zero worker exit must not be swallowed when writer finished first"
+        );
+    }
+
+    #[test]
+    fn preflight_stderr_drain_prevents_pipe_deadlock_and_bounds_capture() {
+        let mut command = if cfg!(windows) {
+            let mut cmd = Command::new("cmd");
+            cmd.args(["/C", "for /L %i in (1,1,400) do @echo stderr-line-0123456789 1>&2"]);
+            cmd
+        } else {
+            let mut cmd = Command::new("sh");
+            cmd.args(["-c", "i=0; while [ $i -lt 400 ]; do echo stderr-line-0123456789 1>&2; i=$((i+1)); done"]);
+            cmd
+        };
+        let mut child = command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn stderr emitter");
+
+        let stderr = child.stderr.take().expect("piped stderr");
+        let drain = spawn_preflight_stderr_drain("Test", stderr).expect("spawn drain");
+        let status = child.wait().expect("child should exit without deadlocking");
+        assert!(status.success());
+        let captured = drain.join().expect("drain thread should join");
+        assert!(captured.len() > 4096);
+        assert!(captured.len() <= MAX_PREFLIGHT_STDERR_BYTES);
     }
 }

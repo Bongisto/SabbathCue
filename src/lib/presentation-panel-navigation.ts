@@ -281,9 +281,32 @@ function queueWalkMatcher(
   targetItem: PresentationRenderData | null
 ): ((item: QueueItem) => boolean) | null {
   const deckKind = presentationDeckKind(targetItem)
-  if (deckKind === "hymn") return (item) => item.presentation.kind === "hymn"
+  if (deckKind === "hymn") {
+    const screenId = presentationDeckSlideId(targetItem)
+    const hymnTitle = targetItem?.hymnTitle?.trim()
+    if (!screenId && !hymnTitle) return null
+    return (item) => {
+      if (item.presentation.kind !== "hymn") return false
+      if (item.hymnDeck?.length) {
+        return Boolean(
+          screenId &&
+            item.hymnDeck.some((slide) => slide.screenId === screenId)
+        )
+      }
+      if (screenId && item.presentation.screenId === screenId) return true
+      return Boolean(hymnTitle && item.presentation.hymnTitle === hymnTitle)
+    }
+  }
   if (deckKind === "slideDeck") {
-    return (item) => item.presentation.kind === "slideDeck"
+    const slideId = presentationDeckSlideId(targetItem)
+    if (!slideId) return null
+    return (item) => {
+      if (item.presentation.kind !== "slideDeck") return false
+      if (item.slideDeck?.length) {
+        return item.slideDeck.some((slide) => slide.slideId === slideId)
+      }
+      return item.presentation.slideId === slideId
+    }
   }
   if (deckKind === "egw") {
     const paragraphId = egwParagraphFromTarget(targetItem)?.id ?? -1

@@ -487,4 +487,39 @@ describe("settings store", () => {
     expect(useSettingsStore.getState().aiRankingProvider).toBe("cerebras")
     expect(mockSet).toHaveBeenCalledWith("aiRankingProvider", "cerebras")
   })
+
+  it("normalizes unsupported sttLanguage to en when switching providers", async () => {
+    const { useSettingsStore } = await import("./settings-store")
+
+    useSettingsStore.getState().setSttProvider("soniox")
+    useSettingsStore.getState().setSttLanguage("af")
+    expect(useSettingsStore.getState().sttLanguage).toBe("af")
+
+    useSettingsStore.getState().setSttProvider("deepgram")
+    expect(useSettingsStore.getState().sttProvider).toBe("deepgram")
+    expect(useSettingsStore.getState().sttLanguage).toBe("en")
+
+    useSettingsStore.getState().setSttLanguage("es")
+    expect(useSettingsStore.getState().sttLanguage).toBe("es")
+
+    useSettingsStore.getState().setSttProvider("vosk")
+    expect(useSettingsStore.getState().sttProvider).toBe("vosk")
+    expect(useSettingsStore.getState().sttLanguage).toBe("en")
+  })
+
+  it("normalizes incompatible persisted sttLanguage during hydration", async () => {
+    mockGet.mockImplementation(async (key: string) => {
+      if (key === "sttProvider") return "deepgram"
+      if (key === "sttLanguage") return "af"
+      return null
+    })
+
+    const { hydrateSettings, useSettingsStore } =
+      await import("./settings-store")
+    await hydrateSettings()
+
+    const state = useSettingsStore.getState()
+    expect(state.sttProvider).toBe("deepgram")
+    expect(state.sttLanguage).toBe("en")
+  })
 })

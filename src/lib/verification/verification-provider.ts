@@ -5,6 +5,7 @@ import {
   signOut as supabaseSignOut,
   signUpWithEmail,
 } from "@/lib/supabase/auth"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import {
   registerDevice,
   type RegisterDeviceResult,
@@ -83,6 +84,17 @@ function emptySnapshot(
     verifiedEmail: null,
     isChurchOrganization: false,
     churchName: null,
+  }
+}
+
+function trialExpiredSnapshot(
+  userId: string,
+  email: string | null | undefined
+): VerificationStateSnapshot {
+  return {
+    ...emptySnapshot("error", ACCESS_ENDED_MESSAGE, "trial_expired"),
+    verifiedUserId: userId,
+    verifiedEmail: email ?? null,
   }
 }
 
@@ -188,7 +200,7 @@ async function completeVerification(
     }
 
     if (registration.code === "trial_expired") {
-      return emptySnapshot("error", ACCESS_ENDED_MESSAGE, "trial_expired")
+      return trialExpiredSnapshot(userId, email)
     }
 
     const message = registration.message ?? "Device registration failed."
@@ -229,22 +241,34 @@ async function completeVerification(
 }
 
 /**
- * Offline fallback requires an unexpired server-signed activation lease.
+ * Offline fallback requires an unexpired server-signed activation lease bound
+ * to this installation's local hardware/keychain identity.
  */
-async function offlineGraceSnapshot(): Promise<VerificationStateSnapshot | null> {
+async function offlineGraceSnapshot(
+  expectedUserId?: string
+): Promise<VerificationStateSnapshot | null> {
   const session = await getSessionMetadata()
   if (!session) return null
 
+  if (expectedUserId && session.verifiedUserId !== expectedUserId) {
+    return null
+  }
+
   if (!session.activationLease) return null
+  const identity = await getOrCreateInstallationIdentity().catch(() => null)
+  if (!identity) return null
   const lease = await verifyActivationLease(
     session.activationLease,
-    session.verifiedUserId,
-    session.verifiedDeviceId,
+    expectedUserId ?? session.verifiedUserId,
+    identity.deviceId,
     now()
   )
   if (!lease) return null
 
-  return snapshotFromSession(session)
+  return snapshotFromSession({
+    ...session,
+    verifiedDeviceId: identity.deviceId,
+  })
 }
 
 export async function loadCachedVerification(): Promise<VerificationStateSnapshot> {
@@ -272,7 +296,7 @@ export async function loadCachedVerification(): Promise<VerificationStateSnapsho
     restored.email
   )
   if (snapshot.status === "error" && snapshot.errorCode === "network") {
-    const grace = await offlineGraceSnapshot()
+    const grace = await offlineGraceSnapshot(restored.userId)
     return grace ?? snapshot
   }
   return snapshot
@@ -290,7 +314,7 @@ export async function signIn(
   return completeVerification(
     result.userId,
     result.accessTokenExpiresAt,
-    result.email
+    result.email ?? (email.trim() || null)
   )
 }
 
@@ -314,13 +338,20 @@ export async function signUp(
   return completeVerification(
     result.userId,
     result.accessTokenExpiresAt,
-    result.email
+    result.email ?? (email.trim() || null)
   )
 }
 
 export async function signOut(): Promise<VerificationStateSnapshot> {
-  await supabaseSignOut()
-  await clearSessionMetadata()
+  try {
+    await supabaseSignOut()
+  } finally {
+    try {
+      await clearSessionMetadata()
+    } catch (error) {
+      console.warn("[verification] clear session metadata failed", error)
+    }
+  }
   return emptySnapshot("required")
 }
 
@@ -333,7 +364,8 @@ export async function clearVerification(): Promise<VerificationStateSnapshot> {
 }
 
 async function heartbeatBlockFor(
-  registration: Exclude<RegisterDeviceResult, { ok: true }>
+  registration: Exclude<RegisterDeviceResult, { ok: true }>,
+  cached?: Pick<VerificationSession, "verifiedUserId" | "verifiedEmail">
 ): Promise<VerificationStateSnapshot | null> {
   const details =
     registration.code === "suspended"
@@ -363,30 +395,83 @@ async function heartbeatBlockFor(
                 : null
   if (!details) return null
   await clearSessionMetadata()
+  if (registration.code === "trial_expired" && cached) {
+    return trialExpiredSnapshot(cached.verifiedUserId, cached.verifiedEmail)
+  }
   return emptySnapshot("error", details[0], details[1])
+}
+
+async function hasInMemoryAccessToken(): Promise<boolean> {
+  try {
+    const { data, error } = await getSupabaseClient().auth.getSession()
+    if (error) return false
+    return Boolean(data.session?.access_token)
+  } catch {
+    return false
+  }
+}
+
+function offlineHeartbeatExpirySnapshot(
+  cached: VerificationSession
+): VerificationStateSnapshot | null {
+  const timestamp = now()
+  if (cached.accessExpiresAt !== null && cached.accessExpiresAt <= timestamp) {
+    return trialExpiredSnapshot(cached.verifiedUserId, cached.verifiedEmail)
+  }
+  if (cached.offlineGraceExpiresAt <= timestamp) {
+    return emptySnapshot(
+      "error",
+      "Unable to verify your session offline. Connect to the internet and try again.",
+      "network"
+    )
+  }
+  return null
+}
+
+async function getMatchingSessionMetadata(
+  expectedUserId: string
+): Promise<VerificationSession | null> {
+  const session = await getSessionMetadata()
+  if (!session || session.verifiedUserId !== expectedUserId) {
+    return null
+  }
+  return session
 }
 
 /**
  * Periodic re-registration while the app is running. Returns a blocking
- * snapshot when access was revoked mid-session; null means no state
- * change (transient network failures never kick an active session).
+ * snapshot when access was revoked mid-session or offline access/grace
+ * expires; null means no state change while still within an active offline
+ * grace window.
  */
 export async function heartbeatDeviceRegistration(): Promise<VerificationStateSnapshot | null> {
   if (!isTauriRuntime()) return null
 
   const cached = await getSessionMetadata()
   if (!cached) return emptySnapshot("required")
-  if (
-    now() > cached.accessTokenExpiresAt - ACCESS_TOKEN_REFRESH_SKEW_MS
-  ) {
+  const needsSessionRefresh =
+    now() > cached.accessTokenExpiresAt - ACCESS_TOKEN_REFRESH_SKEW_MS ||
+    !(await hasInMemoryAccessToken())
+  if (needsSessionRefresh) {
     const restored = await restoreSession()
     if (!restored.ok) {
-      if (restored.code === "network") return null
+      if (restored.code === "network") {
+        return offlineHeartbeatExpirySnapshot(cached)
+      }
+      const latest = await getSessionMetadata()
+      if (latest && latest.verifiedUserId !== cached.verifiedUserId) {
+        return null
+      }
       await Promise.allSettled([clearToken(), clearSessionMetadata()])
       return emptySnapshot("required")
     }
+    if (restored.userId !== cached.verifiedUserId) {
+      return null
+    }
+    const latest = await getMatchingSessionMetadata(cached.verifiedUserId)
+    if (!latest) return null
     await setSessionMetadata({
-      ...cached,
+      ...latest,
       accessTokenExpiresAt: restored.accessTokenExpiresAt,
     })
   }
@@ -402,8 +487,12 @@ export async function heartbeatDeviceRegistration(): Promise<VerificationStateSn
   )
 
   if (!registration.ok) {
-    const blockingSnapshot = await heartbeatBlockFor(registration)
+    if (!(await getMatchingSessionMetadata(cached.verifiedUserId))) {
+      return null
+    }
+    const blockingSnapshot = await heartbeatBlockFor(registration, cached)
     if (blockingSnapshot) return blockingSnapshot
+    return offlineHeartbeatExpirySnapshot(cached)
   }
 
   if (registration.ok) {
@@ -414,14 +503,16 @@ export async function heartbeatDeviceRegistration(): Promise<VerificationStateSn
       now()
     )
     if (!lease) {
-      await clearSessionMetadata()
+      if (await getMatchingSessionMetadata(cached.verifiedUserId)) {
+        await clearSessionMetadata()
+      }
       return emptySnapshot(
         "error",
         "The activation service returned an invalid offline lease.",
         "unknown"
       )
     }
-    const session = await getSessionMetadata()
+    const session = await getMatchingSessionMetadata(cached.verifiedUserId)
     if (session) {
       const timestamp = now()
       await setSessionMetadata({

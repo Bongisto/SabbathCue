@@ -98,7 +98,8 @@ async function resolveScriptureRef(ref: ScriptureRef): Promise<Verse | null> {
 function queuePreparedItem(
   presentation: PresentationItem,
   hymnGroup?: QueueItem["hymnGroup"],
-  hymnDeck?: QueueItem["hymnDeck"]
+  hymnDeck?: QueueItem["hymnDeck"],
+  slideDeck?: QueueItem["slideDeck"]
 ): void {
   const preparedReference = planReference(presentation.reference)
   const preparedHymnDeck: HymnPresentationItemData[] | undefined =
@@ -106,6 +107,10 @@ function queuePreparedItem(
       ...slide,
       reference: planReference(slide.reference),
     }))
+  const preparedSlideDeck = slideDeck?.map((slide) => ({
+    ...slide,
+    reference: planReference(slide.reference),
+  }))
   const item: QueueItem = {
     id: crypto.randomUUID(),
     presentation: {
@@ -117,6 +122,7 @@ function queuePreparedItem(
     added_at: Date.now(),
     hymnGroup,
     hymnDeck: preparedHymnDeck,
+    slideDeck: preparedSlideDeck,
   }
   useQueueStore.getState().addItem(item)
 }
@@ -189,14 +195,12 @@ export async function enqueuePreparedResourcesForItem(
   }
 
   const slideDeck = buildSermonSlideDeck(item)
+  for (const slide of slideDeck) {
+    queuePreparedItem(slide, undefined, undefined, slideDeck)
+    queued += 1
+  }
   for (const attachment of item.attachments) {
-    if (attachment.kind === "slide") {
-      const slide = slideDeck.find((s) => s.slideId === attachment.id)
-      if (slide) {
-        queuePreparedItem(slide)
-        queued += 1
-      }
-    } else if (attachment.kind === "deck" || attachment.kind === "document") {
+    if (attachment.kind === "deck" || attachment.kind === "document") {
       queuePreparedItem(createMediaPresentation(attachment, "document"))
       queued += 1
     }

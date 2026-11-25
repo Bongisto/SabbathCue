@@ -61,6 +61,9 @@ impl TranscriptRouter {
                 .confidence
                 .is_some_and(|c| c > 0.0 && c < min_final_confidence)
         {
+            self.last_partial = None;
+            self.command_dispatched_on_partial = false;
+            self.saw_partial_since_final = false;
             return suppressed("low_confidence");
         }
 
@@ -84,7 +87,9 @@ impl TranscriptRouter {
             let complete_command = !complete_reference
                 && rhema_detection::is_complete_verse_navigation_command(cleaned);
             let dispatch_command = complete_command && !self.command_dispatched_on_partial;
-            self.command_dispatched_on_partial = complete_command;
+            if dispatch_command {
+                self.command_dispatched_on_partial = true;
+            }
             return TranscriptRoute {
                 emit_transcript: true,
                 authoritative_detection: (complete_reference || dispatch_command)
@@ -844,6 +849,42 @@ mod tests {
                 .suppress_reason
                 .as_deref(),
             Some("noise_label")
+        );
+    }
+
+    #[test]
+    fn partial_command_extended_by_trailing_words_does_not_dispatch_twice_on_final() {
+        let mut router = TranscriptRouter::default();
+
+        let cmd_partial = router.route(input(TranscriptEventKind::Partial, "next verse"));
+        assert_eq!(
+            cmd_partial.authoritative_detection.as_deref(),
+            Some("next verse")
+        );
+
+        // Trailing speech causes the partial to no longer match the exact command;
+        // command_dispatched_on_partial must remain armed until finalization.
+        let extended_partial =
+            router.route(input(TranscriptEventKind::Partial, "next verse and"));
+        assert!(extended_partial.authoritative_detection.is_none());
+
+        let reparsed_partial =
+            router.route(input(TranscriptEventKind::Partial, "next verse please"));
+        assert!(reparsed_partial.authoritative_detection.is_none());
+
+        let fin = router.route(input(TranscriptEventKind::Final, "Next verse."));
+        assert!(fin.emit_transcript);
+        assert!(fin.authoritative_detection.is_none());
+        assert_eq!(
+            fin.suppress_reason.as_deref(),
+            Some("command_dispatched_on_partial")
+        );
+
+        // Once finalized, a subsequent utterance may dispatch again.
+        let next_utterance = router.route(input(TranscriptEventKind::Partial, "next verse"));
+        assert_eq!(
+            next_utterance.authoritative_detection.as_deref(),
+            Some("next verse")
         );
     }
 }

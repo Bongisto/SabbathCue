@@ -12,6 +12,8 @@ export interface ActivationLeaseClaims {
   accessExpiresAt: number | null
 }
 
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
+
 function decodeBase64(value: string, urlSafe = false): ArrayBuffer {
   const normalized = urlSafe
     ? value.replaceAll("-", "+").replaceAll("_", "/")
@@ -61,7 +63,7 @@ export async function verifyActivationLeaseWithKey(
     claims.userId !== expectedUserId ||
     claims.deviceId !== expectedDeviceId ||
     claims.expiresAt <= timestamp ||
-    claims.issuedAt > timestamp + 60_000 ||
+    claims.issuedAt > timestamp + MAX_CLOCK_SKEW_MS ||
     (claims.accessExpiresAt !== null && claims.accessExpiresAt <= timestamp)
   ) {
     return null

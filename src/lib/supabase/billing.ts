@@ -293,7 +293,9 @@ export function formatSubscriptionStatusLabel(
       : when.toLocaleDateString()
     const action = summary.scheduledChangeAction
     if (action === "pause") return `Pauses on ${label}`
-    return `Cancels on ${label}`
+    if (action === "resume") return `Resumes on ${label}`
+    if (!action || action === "cancel") return `Cancels on ${label}`
+    return `Scheduled change on ${label}`
   }
   switch (summary.subscriptionStatus) {
     case "active":

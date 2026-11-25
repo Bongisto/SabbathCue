@@ -24,6 +24,11 @@ pub trait VectorIndex: Send + Sync {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Unique verse IDs stored in this index (empty when unknown).
+    fn unique_verse_ids(&self) -> Vec<i64> {
+        Vec::new()
+    }
 }
 
 /// Stub index that always returns empty results.

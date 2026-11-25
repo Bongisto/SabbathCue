@@ -349,3 +349,75 @@ describe("getGhostSuggestionSuffix", () => {
     expect(getGhostSuggestionSuffix("John", "")).toBeNull()
   })
 })
+
+describe("cross-translation Arabic-numbered and accented books (FU-06)", () => {
+  const webBooks: Book[] = [
+    {
+      id: 62,
+      translation_id: 2,
+      book_number: 62,
+      name: "1 John",
+      abbreviation: "1John",
+      testament: "NT",
+    },
+    {
+      id: 46,
+      translation_id: 2,
+      book_number: 46,
+      name: "1 Corinthians",
+      abbreviation: "1Cor",
+      testament: "NT",
+    },
+  ]
+
+  const afrBooks: Book[] = [
+    {
+      id: 27,
+      translation_id: 3,
+      book_number: 27,
+      name: "Daniël",
+      abbreviation: "Dan",
+      testament: "OT",
+    },
+    {
+      id: 62,
+      translation_id: 3,
+      book_number: 62,
+      name: "1 Johannes",
+      abbreviation: "1Joh",
+      testament: "NT",
+    },
+  ]
+
+  it("resolves Arabic-numbered WEB books across all stages", () => {
+    const stage1 = getAutocompleteSuggestion("1", webBooks)
+    expect(stage1.matchedBook?.name).toBe("1 John")
+    expect(stage1.suggestion).toBe("1 John 1:1")
+
+    const stage2 = getAutocompleteSuggestion("1 John 3", webBooks)
+    expect(stage2.matchedBook?.name).toBe("1 John")
+    expect(stage2.stage).toBe("chapter")
+    expect(stage2.suggestion).toBe("1 John 3:1")
+    expect(getTabNavigationResult("1 John 3", stage2.suggestion)).toBe("1 John 3:")
+
+    const complete = getAutocompleteSuggestion("1 John 3:16", webBooks)
+    expect(complete.stage).toBe("complete")
+    expect(complete.matchedBook?.name).toBe("1 John")
+    expect(complete.chapter).toBe(3)
+    expect(complete.verse).toBe(16)
+  })
+
+  it("matches accented Afrikaans books with or without diacritics and handles Stage 2 Tab", () => {
+    const accented = getAutocompleteSuggestion("Daniël 2:44", afrBooks)
+    expect(accented.stage).toBe("complete")
+    expect(accented.matchedBook?.name).toBe("Daniël")
+    expect(accented.chapter).toBe(2)
+    expect(accented.verse).toBe(44)
+
+    const unfolded = getAutocompleteSuggestion("Daniel 2", afrBooks)
+    expect(unfolded.stage).toBe("chapter")
+    expect(unfolded.matchedBook?.name).toBe("Daniël")
+
+    expect(getTabNavigationResult("Daniël 2", "Daniël 2:1")).toBe("Daniël 2:")
+  })
+})

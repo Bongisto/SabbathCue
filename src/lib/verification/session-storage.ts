@@ -8,7 +8,12 @@ const METADATA_KEY = "metadata"
 let storePromise: Promise<Store> | null = null
 
 function getStore(): Promise<Store> {
-  storePromise ??= load(STORE_FILE, { autoSave: false, defaults: {} })
+  storePromise ??= load(STORE_FILE, { autoSave: false, defaults: {} }).catch(
+    (error) => {
+      storePromise = null
+      throw error
+    }
+  )
   return storePromise
 }
 

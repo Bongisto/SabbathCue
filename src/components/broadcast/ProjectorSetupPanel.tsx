@@ -97,6 +97,10 @@ export function ProjectorSetupPanel() {
   const handleToggleEnabledEvent = useEffectEvent(model.handleToggleEnabled)
 
   useEffect(() => {
+    if (!open) {
+      pendingEnableRef.current = null
+      return
+    }
     const pendingEnable = pendingEnableRef.current
     if (pendingEnable === null) return
     if (model.selectedMonitor !== pendingEnable.monitorKey) return
@@ -111,7 +115,7 @@ export function ProjectorSetupPanel() {
         // The model surfaces the error; keep the pending target so a later retry
         // still uses the intended monitor/fullscreen pair.
       })
-  }, [model.projectorFullscreen, model.selectedMonitor])
+  }, [open, model.projectorFullscreen, model.selectedMonitor])
 
   const isLive = model.enabled
   const readiness = deriveProjectorReadiness({ monitors, remembered, isLive })
@@ -141,6 +145,21 @@ export function ProjectorSetupPanel() {
     }
   }
 
+  function handleManualMonitorChange(value: string): void {
+    pendingEnableRef.current = null
+    model.handleMonitorChange(value)
+  }
+
+  function handleManualFullscreenChange(checked: boolean): void {
+    pendingEnableRef.current = null
+    model.handleProjectorFullscreenChange(checked)
+  }
+
+  function handleManualToggleEnabled(value: boolean): void {
+    pendingEnableRef.current = null
+    void model.handleToggleEnabled(value)
+  }
+
   async function identify(): Promise<void> {
     try {
       await invokeTauri("flash_monitor_labels", { durationMs: 4000 })
@@ -156,7 +175,7 @@ export function ProjectorSetupPanel() {
 
   function onPrimary(): void {
     if (copy.primaryKind === "restore") goLive()
-    else if (copy.primaryKind === "hide") void model.handleToggleEnabled(false)
+    else if (copy.primaryKind === "hide") handleManualToggleEnabled(false)
     else if (copy.primaryKind === "open-display-settings")
       void openDisplaySettings()
   }
@@ -169,7 +188,13 @@ export function ProjectorSetupPanel() {
         : PlayIcon
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) pendingEnableRef.current = null
+        setOpen(nextOpen)
+      }}
+    >
       <DialogContent
         data-tour="projector-setup-panel"
         className="gap-4 sm:max-w-[460px]"
@@ -236,7 +261,7 @@ export function ProjectorSetupPanel() {
                 checked={model.enabled}
                 disabled={model.enabledPending || (!model.enabled && !canEnable)}
                 title={blockedReason ?? undefined}
-                onCheckedChange={(value) => void model.handleToggleEnabled(value)}
+                onCheckedChange={handleManualToggleEnabled}
               />
             </div>
           </div>
@@ -251,7 +276,7 @@ export function ProjectorSetupPanel() {
           <label className="text-xs text-muted-foreground">Projector screen</label>
           <Select
             value={model.selectedMonitor}
-            onValueChange={model.handleMonitorChange}
+            onValueChange={handleManualMonitorChange}
             disabled={settingsLocked || monitors.length === 0}
           >
             <SelectTrigger
@@ -294,7 +319,7 @@ export function ProjectorSetupPanel() {
             <Switch
               checked={model.projectorFullscreen}
               disabled={settingsLocked}
-              onCheckedChange={model.handleProjectorFullscreenChange}
+              onCheckedChange={handleManualFullscreenChange}
             />
           </label>
         </div>

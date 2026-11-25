@@ -22,6 +22,9 @@ const MAX_PDF_SIZE_BYTES: u64 = 200 * 1024 * 1024;
 /// Maximum time to wait for a single `LibreOffice` conversion.
 const CONVERSION_TIMEOUT: Duration = Duration::from_secs(120);
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
+/// Cap retained `stderr` bytes while still draining the pipe to EOF so verbose
+/// child processes can never deadlock on a full OS pipe buffer (~4 KB on Windows).
+const MAX_CAPTURED_STDERR_BYTES: usize = 64 * 1024;
 const SUPPORTED_DECK_EXTENSIONS: &[&str] = &["ppt", "pptx"];
 
 /// Error returned when `LibreOffice` cannot be located. Names the override env
@@ -88,6 +91,31 @@ fn validate_deck_path(path: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(path))
 }
 
+/// Continuously drain piped `stderr` on a background thread into a bounded
+/// buffer so `soffice` cannot block on a full OS pipe buffer while converting.
+fn spawn_bounded_stderr_drain(
+    mut stderr: std::process::ChildStderr,
+) -> Result<std::thread::JoinHandle<Vec<u8>>, std::io::Error> {
+    std::thread::Builder::new()
+        .name("soffice-stderr-drain".into())
+        .spawn(move || {
+            let mut captured = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                match stderr.read(&mut chunk) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        let remaining = MAX_CAPTURED_STDERR_BYTES.saturating_sub(captured.len());
+                        if remaining > 0 {
+                            captured.extend_from_slice(&chunk[..n.min(remaining)]);
+                        }
+                    }
+                }
+            }
+            captured
+        })
+}
+
 /// Run `LibreOffice` headless to convert `input` into a PDF inside `out_dir`.
 fn run_soffice(soffice: &Path, input: &Path, out_dir: &Path) -> Result<(), String> {
     let mut command = Command::new(soffice);
@@ -107,6 +135,15 @@ fn run_soffice(soffice: &Path, input: &Path, out_dir: &Path) -> Result<(), Strin
         .spawn()
         .map_err(|e| format!("Failed to launch LibreOffice: {e}"))?;
 
+    let stderr_drain = match child.stderr.take().map(spawn_bounded_stderr_drain).transpose() {
+        Ok(drain) => drain,
+        Err(e) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!("Failed to monitor LibreOffice stderr: {e}"));
+        }
+    };
+
     let deadline = Instant::now() + CONVERSION_TIMEOUT;
     let status = loop {
         match child.try_wait() {
@@ -119,7 +156,11 @@ fn run_soffice(soffice: &Path, input: &Path, out_dir: &Path) -> Result<(), Strin
                 }
                 std::thread::sleep(POLL_INTERVAL);
             }
-            Err(e) => return Err(format!("LibreOffice wait failed: {e}")),
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("LibreOffice wait failed: {e}"));
+            }
         }
     };
 
@@ -127,10 +168,10 @@ fn run_soffice(soffice: &Path, input: &Path, out_dir: &Path) -> Result<(), Strin
         return Ok(());
     }
 
-    let mut stderr = String::new();
-    if let Some(mut handle) = child.stderr.take() {
-        let _ = handle.read_to_string(&mut stderr);
-    }
+    let stderr_bytes = stderr_drain
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let stderr = String::from_utf8_lossy(&stderr_bytes);
     let detail = first_nonempty_line(&stderr).unwrap_or_else(|| format!("exit {status}"));
     Err(format!("LibreOffice could not convert the deck: {detail}"))
 }
@@ -289,5 +330,32 @@ mod tests {
             "Symlinked paths are not allowed"
         );
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn bounded_stderr_drain_prevents_pipe_deadlock_and_bounds_capture() {
+        let mut command = if cfg!(windows) {
+            let mut cmd = Command::new("cmd");
+            cmd.args(["/C", "for /L %i in (1,1,400) do @echo soffice-stderr-0123456789 1>&2"]);
+            cmd
+        } else {
+            let mut cmd = Command::new("sh");
+            cmd.args(["-c", "i=0; while [ $i -lt 400 ]; do echo soffice-stderr-0123456789 1>&2; i=$((i+1)); done"]);
+            cmd
+        };
+        let mut child = command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn stderr emitter");
+
+        let stderr = child.stderr.take().expect("piped stderr");
+        let drain = spawn_bounded_stderr_drain(stderr).expect("spawn drain");
+        let status = child.wait().expect("child should exit without deadlocking");
+        assert!(status.success());
+        let captured = drain.join().expect("drain thread should join");
+        assert!(captured.len() > 4096);
+        assert!(captured.len() <= MAX_CAPTURED_STDERR_BYTES);
     }
 }

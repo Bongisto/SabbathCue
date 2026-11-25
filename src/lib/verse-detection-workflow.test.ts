@@ -2035,4 +2035,83 @@ describe("verse detection workflow", () => {
       "John 3:16 (KJV)"
     )
   })
+
+  it("keeps preview-authorized EGW detections in preview even when readingModeAutoLive is on", async () => {
+    useBroadcastStore.setState({
+      isLive: false,
+      readingModeAutoLive: true,
+      liveItem: null,
+      previewItem: null,
+    })
+
+    await handleVerseDetections([
+      makeDetection({
+        content_type: "egw",
+        verse_ref: "Patriarchs and Prophets p.29 par.2",
+        verse_text: "The history of the great conflict.",
+        book_name: "Patriarchs and Prophets",
+        book_number: 1,
+        chapter: 29,
+        verse: 2,
+        confidence: 0.88,
+        source: "semantic",
+        auto_queued: false,
+        authorization: "preview-authorized",
+        egw_paragraph: {
+          id: 12,
+          book_number: 1,
+          book_title: "Patriarchs and Prophets",
+          chapter: 1,
+          chapter_title: "Why Was Sin Permitted?",
+          paragraph: 2,
+          page: 29,
+          page_paragraph: 2,
+          text: "The history of the great conflict.",
+        },
+      }),
+    ])
+
+    expect(useBroadcastStore.getState().isLive).toBe(false)
+    expect(useBroadcastStore.getState().liveItem).toBeNull()
+    expect(useBroadcastStore.getState().previewItem).toMatchObject({
+      kind: "egw",
+      reference: "Patriarchs and Prophets p.29 par.2",
+    })
+  })
+
+  it("does not let a suggestion-tier AI winner shadow a preview-authorized semantic finalist", async () => {
+    const suggestionWinner = makeDetection({
+      source: "semantic",
+      confidence: 0.9,
+      verse_ref: "Acts 12:5",
+      book_name: "Acts",
+      book_number: 44,
+      chapter: 12,
+      verse: 5,
+      auto_queued: false,
+      authorization: "suggestion",
+      has_lexical_quote: true,
+    })
+    const authorizedCandidate = makeDetection({
+      source: "semantic",
+      confidence: 0.87,
+      verse_ref: "Acts 16:25",
+      book_name: "Acts",
+      book_number: 44,
+      chapter: 16,
+      verse: 25,
+      auto_queued: false,
+      authorization: "preview-authorized",
+      has_lexical_quote: true,
+    })
+    scheduleRankingMock.mockResolvedValue(suggestionWinner)
+
+    await handleVerseDetections([suggestionWinner, authorizedCandidate])
+
+    expect(useBibleStore.getState().selectedVerse).toMatchObject({
+      book_number: 44,
+      chapter: 16,
+      verse: 25,
+    })
+  })
 })

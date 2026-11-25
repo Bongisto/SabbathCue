@@ -138,10 +138,13 @@ export function Dashboard() {
   }, [hydrateAccent])
 
   useEffect(() => {
-    if (plannerOpen && workspace !== "service-plans") {
+    if (
+      plannerOpen &&
+      useDashboardWorkspaceStore.getState().workspace !== "service-plans"
+    ) {
       setWorkspace("service-plans")
     }
-  }, [plannerOpen, setWorkspace, workspace])
+  }, [plannerOpen, setWorkspace])
 
   useLayoutEffect(() => {
     const scrollContainer = workspaceScrollRef.current

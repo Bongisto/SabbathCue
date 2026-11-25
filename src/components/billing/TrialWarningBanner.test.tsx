@@ -26,11 +26,20 @@ vi.mock("@/stores/verification-store", () => {
 const fetchMyBillingSummary = vi.fn()
 vi.mock("@/lib/supabase/billing", () => ({
   fetchMyBillingSummary: () => fetchMyBillingSummary(),
+  createCustomerPortalSession: vi.fn(),
 }))
 
 vi.mock("@/components/billing/PaddleSubscribeButton", () => ({
-  PaddleSubscribeButton: ({ label }: { label?: string }) => (
-    <button type="button">{label ?? "Subscribe"}</button>
+  PaddleSubscribeButton: ({
+    label,
+    onCompleted,
+  }: {
+    label?: string
+    onCompleted?: () => void
+  }) => (
+    <button type="button" onClick={() => onCompleted?.()}>
+      {label ?? "Subscribe"}
+    </button>
   ),
 }))
 
@@ -126,7 +135,7 @@ describe("TrialWarningBanner", () => {
     })
 
     expect(container.textContent).toBe("")
-    expect(localStorage.getItem("sabbathcue.trial-warning-dismissed")).toBe(
+    expect(localStorage.getItem("sabbathcue.trial-warning-dismissed:user-123")).toBe(
       dismissalDayKey(Date.now())
     )
   })
@@ -152,7 +161,7 @@ describe("TrialWarningBanner", () => {
       dismiss?.click()
     })
 
-    expect(localStorage.getItem("sabbathcue.trial-warning-dismissed")).toBe(
+    expect(localStorage.getItem("sabbathcue.trial-warning-dismissed:user-123")).toBe(
       dismissalDayKey(afterMidnight)
     )
     expect(container.textContent).toBe("")
@@ -189,7 +198,7 @@ describe("TrialWarningBanner", () => {
   // to hear about it on day 2 and day 1.
   it("returns the next day after being dismissed", async () => {
     localStorage.setItem(
-      "sabbathcue.trial-warning-dismissed",
+      "sabbathcue.trial-warning-dismissed:user-123",
       dismissalDayKey(Date.now() - DAY)
     )
     fetchMyBillingSummary.mockResolvedValue({ ok: true, summary: summary() })
@@ -205,5 +214,72 @@ describe("TrialWarningBanner", () => {
 
     expect(fetchMyBillingSummary).not.toHaveBeenCalled()
     expect(container.textContent).toBe("")
+  })
+
+  it("renders Manage subscription for trial_converting and payment_failed and Subscribe with onCompleted for access_ending (FU-35)", async () => {
+    fetchMyBillingSummary.mockResolvedValue({ ok: true, summary: summary() })
+    await render()
+    expect(container.textContent).toContain("Manage subscription")
+    expect(container.textContent).not.toContain("Subscribe")
+
+    fetchMyBillingSummary.mockResolvedValue({
+      ok: true,
+      summary: summary({ subscriptionStatus: "past_due" }),
+    })
+    verificationState.verifiedUserId = "user-past-due"
+    await render()
+    expect(container.textContent).toContain("Manage subscription")
+
+    fetchMyBillingSummary.mockResolvedValue({
+      ok: true,
+      summary: summary({ subscriptionId: null, subscriptionStatus: null }),
+    })
+    verificationState.verifiedUserId = "user-eft"
+    await render()
+    expect(container.textContent).toContain("Subscribe")
+    expect(container.textContent).not.toContain("Manage subscription")
+
+    fetchMyBillingSummary.mockClear()
+    const subscribeBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Subscribe"
+    )
+    expect(subscribeBtn).toBeTruthy()
+    await act(async () => {
+      subscribeBtn?.click()
+    })
+    expect(fetchMyBillingSummary).toHaveBeenCalledTimes(1)
+  })
+
+  it("scopes dismissal per user and clears/cancels stale summary across user switches (FU-35)", async () => {
+    let resolveFirst!: (val: unknown) => void
+    fetchMyBillingSummary.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFirst = resolve
+      })
+    )
+    await render()
+
+    // Switch to another user before first fetch resolves; first user's result must be ignored
+    verificationState.verifiedUserId = "user-456"
+    fetchMyBillingSummary.mockResolvedValueOnce({
+      ok: true,
+      summary: summary({ subscriptionStatus: "active" }),
+    })
+    await render()
+
+    await act(async () => {
+      resolveFirst({ ok: true, summary: summary() })
+    })
+    expect(container.textContent).toBe("")
+
+    // Dismiss for user-456 does not hide user-789
+    localStorage.setItem(
+      "sabbathcue.trial-warning-dismissed:user-456",
+      dismissalDayKey(Date.now())
+    )
+    verificationState.verifiedUserId = "user-789"
+    fetchMyBillingSummary.mockResolvedValueOnce({ ok: true, summary: summary() })
+    await render()
+    expect(container.textContent).toContain("Your trial ends")
   })
 })

@@ -21,6 +21,19 @@ interface ServiceAttachmentValidation {
 interface MediaAttachmentsEditorProps {
   attachments: ServiceAttachment[]
   onChange: (attachments: ServiceAttachment[]) => void
+  onAppend?: (
+    buildAttachments: (current: ServiceAttachment[]) => ServiceAttachment[]
+  ) => void
+}
+
+function rejectionMessage(reason: unknown): string | null {
+  if (reason instanceof Error) return reason.message.trim() || null
+  if (typeof reason === "string") return reason.trim() || null
+  if (reason && typeof reason === "object" && "message" in reason) {
+    const message = (reason as { message?: unknown }).message
+    if (typeof message === "string" && message.trim()) return message.trim()
+  }
+  return null
 }
 
 async function createAttachmentFromPath(
@@ -43,6 +56,7 @@ async function createAttachmentFromPath(
 export function MediaAttachmentsEditor({
   attachments,
   onChange,
+  onAppend,
 }: MediaAttachmentsEditorProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [documentLimitLabel, setDocumentLimitLabel] = useState(() =>
@@ -50,9 +64,19 @@ export function MediaAttachmentsEditor({
   )
 
   useEffect(() => {
-    void loadServiceAttachmentLimits().then((limits) => {
-      setDocumentLimitLabel(formatAttachmentLimit("document", limits))
-    })
+    let cancelled = false
+    void loadServiceAttachmentLimits()
+      .then((limits) => {
+        if (!cancelled && limits) {
+          setDocumentLimitLabel(formatAttachmentLimit("document", limits))
+        }
+      })
+      .catch((error) => {
+        console.warn("[media-attachments] could not load attachment limits", error)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const attachFiles = async () => {
@@ -90,16 +114,37 @@ export function MediaAttachmentsEditor({
     const selectedAttachments = results.flatMap((result) =>
       result.status === "fulfilled" ? [result.value] : []
     )
-    const failedCount = results.length - selectedAttachments.length
+    const rejections = results.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : []
+    )
 
     if (selectedAttachments.length > 0) {
-      onChange([...attachments, ...selectedAttachments])
+      if (onAppend) {
+        onAppend(() => selectedAttachments)
+      } else {
+        onChange([...attachments, ...selectedAttachments])
+      }
     }
-    if (failedCount > 0) {
-      const limits = await loadServiceAttachmentLimits()
-      setErrorMessage(
-        attachmentSizeLimitError("document", limits, failedCount, "PDF"),
-      )
+    if (rejections.length > 0) {
+      const messages = [
+        ...new Set(
+          rejections
+            .map(rejectionMessage)
+            .filter((msg): msg is string => Boolean(msg))
+        ),
+      ]
+      if (messages.length > 0) {
+        setErrorMessage(
+          rejections.length > 1 && messages.length > 1
+            ? `${rejections.length} PDFs could not be added: ${messages.join("; ")}`
+            : messages.join("; ")
+        )
+      } else {
+        const limits = await loadServiceAttachmentLimits()
+        setErrorMessage(
+          attachmentSizeLimitError("document", limits, rejections.length, "PDF")
+        )
+      }
     }
   }
 

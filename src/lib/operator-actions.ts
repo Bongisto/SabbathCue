@@ -29,8 +29,12 @@ export function pauseReadingModeAutoLive(): void {
 }
 
 export function toggleTranscription(): void {
-  if (useTranscriptStore.getState().isTranscribing) {
+  const { isTranscribing, connectionStatus } = useTranscriptStore.getState()
+  if (isTranscribing) {
     void transcriptionActions.stop()
+    return
+  }
+  if (connectionStatus === "connecting") {
     return
   }
 

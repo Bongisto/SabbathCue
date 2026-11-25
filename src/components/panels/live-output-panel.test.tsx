@@ -246,6 +246,36 @@ describe("LiveOutputPanel fullscreen chrome contract", () => {
     expect(panel.dataset.fullscreenLayout).toBeUndefined()
     expect(document.body.dataset.liveOutputFullscreen).toBeUndefined()
   })
+
+  it("exits Tauri window fullscreen when unmounted while fullscreen (FU-37)", async () => {
+    renderPanel()
+    const button = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Enter fullscreen"]',
+    )
+    expect(button).not.toBeNull()
+
+    await act(async () => {
+      button?.click()
+    })
+    setWindowFullscreenMock.mockClear()
+
+    act(() => {
+      root.unmount()
+    })
+
+    expect(setWindowFullscreenMock).toHaveBeenCalledWith(false)
+  })
+
+  it("does not exit Tauri window fullscreen on unmount when not fullscreen (FU-37)", () => {
+    renderPanel()
+    setWindowFullscreenMock.mockClear()
+
+    act(() => {
+      root.unmount()
+    })
+
+    expect(setWindowFullscreenMock).not.toHaveBeenCalled()
+  })
 })
 
 describe("fullscreen stylesheet contract", () => {

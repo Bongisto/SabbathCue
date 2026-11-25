@@ -36,7 +36,10 @@ use self::detection_logic::{
 use self::live_session::{check_reading_mode, run_direct_detection};
 use self::provider::build_stt_provider;
 use self::session::AudioSessionGuard;
-use self::tasks::{live_input_gain, spawn_latest_wins_semantic_worker, spawn_stt_task};
+use self::tasks::{
+    is_current_session, live_input_gain, spawn_latest_wins_semantic_worker, spawn_provider_task,
+    spawn_stt_task, ProviderSessionContext,
+};
 use self::utils::{
     average_word_confidence, final_semantic_detection_allowed_by_settings,
     partial_semantic_detection_enabled_for_provider, to_word_payloads, transcript_logging_enabled,
@@ -67,21 +70,29 @@ pub async fn start_transcription(
     stt_language: Option<String>,
     low_power: Option<bool>,
 ) -> Result<(), String> {
-    let (stt_active, audio_active, session_generation) = {
+    // Claim active state and a fresh session generation atomically under the
+    // state mutex so a concurrent stop/restart always produces a distinct
+    // generation that fences this start across `build_stt_provider().await`.
+    let (stt_active, audio_active, session_generation, fan_session, my_generation) = {
         let app_state = state.lock().map_err(|e| e.to_string())?;
+        if app_state
+            .stt_active
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return Err("Transcription is already running".into());
+        }
+        let session_generation = app_state.audio_session_generation.clone();
+        let fan_session = AudioSessionGuard::claim(session_generation.clone());
+        let my_generation = session_generation.load(Ordering::SeqCst);
         (
             app_state.stt_active.clone(),
             app_state.audio_active.clone(),
-            app_state.audio_session_generation.clone(),
+            session_generation,
+            fan_session,
+            my_generation,
         )
     };
-
-    if stt_active
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
-    {
-        return Err("Transcription is already running".into());
-    }
 
     live_session::reset_evidence_ledger();
 
@@ -94,10 +105,6 @@ pub async fn start_transcription(
             detector.set_stt_language(stt_language);
         };
     }
-
-    // Claim before provider setup so an old native fanout cannot resume while
-    // a replacement provider is still being built.
-    let fan_session = AudioSessionGuard::claim(session_generation);
 
     let stt_provider = match build_stt_provider(
         provider_name,
@@ -113,12 +120,35 @@ pub async fn start_transcription(
             log::error!(
                 "[STT] start_transcription failed to build provider {provider_name}: {error}"
             );
-            stt_active.store(false, Ordering::SeqCst);
+            if let Ok(app_state) = state.lock() {
+                if fan_session.is_current() {
+                    app_state.stt_active.store(false, Ordering::SeqCst);
+                }
+            } else if fan_session.is_current() {
+                stt_active.store(false, Ordering::SeqCst);
+            }
             return Err(error);
         }
     };
 
-    audio_active.store(true, Ordering::SeqCst);
+    {
+        let app_state = match state.lock() {
+            Ok(guard) => guard,
+            Err(e) => {
+                if fan_session.is_current() {
+                    stt_active.store(false, Ordering::SeqCst);
+                }
+                return Err(e.to_string());
+            }
+        };
+        if !fan_session.is_current() || !app_state.stt_active.load(Ordering::SeqCst) {
+            log::info!(
+                "[STT] start_transcription superseded while building provider {provider_name}; aborting stale start"
+            );
+            return Err("Transcription start was cancelled".into());
+        }
+        app_state.audio_active.store(true, Ordering::SeqCst);
+    }
 
     let (audio_send_tx, audio_send_rx) = crossbeam_channel::bounded::<Vec<i16>>(128);
 
@@ -138,25 +168,22 @@ pub async fn start_transcription(
     let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<TranscriptEvent>(128);
     let mut task_handles = Vec::new();
 
-    let conn_active = stt_active.clone();
-    let conn_audio_active = audio_active.clone();
-    let provider_app = app.clone();
     let provider_log_name = stt_provider.name().to_string();
-    let provider_log_name_task_a = provider_log_name.clone();
-
-    task_handles.push(spawn_stt_task("provider", async move {
-        let result = stt_provider.start(audio_send_rx, event_tx).await;
-        if let Err(e) = result {
-            log::error!("[STT-{provider_log_name_task_a}] Provider failed: {e}");
-            let _ = provider_app.emit("stt_error", e.to_string());
-            let _ = provider_app.emit("stt_disconnected", ());
-        }
-        conn_active.store(false, Ordering::SeqCst);
-        conn_audio_active.store(false, Ordering::SeqCst);
-        log::info!("[STT-{provider_log_name_task_a}] Provider task exited");
-    }));
+    task_handles.push(spawn_provider_task(
+        app.clone(),
+        stt_provider,
+        audio_send_rx,
+        event_tx,
+        ProviderSessionContext {
+            stt_active: stt_active.clone(),
+            audio_active: audio_active.clone(),
+            session_generation: session_generation.clone(),
+            generation: my_generation,
+        },
+    ));
 
     let evt_active = stt_active.clone();
+    let evt_session_generation = session_generation.clone();
     let event_app = app.clone();
 
     let final_semantic_job = Arc::new(Mutex::new(None::<detection_jobs::SemanticJob>));
@@ -247,7 +274,9 @@ pub async fn start_transcription(
         let mut transcript_connection_open = true;
 
         while let Some(event) = event_rx.recv().await {
-            if !evt_active.load(Ordering::SeqCst) {
+            if !evt_active.load(Ordering::SeqCst)
+                || !is_current_session(&evt_session_generation, my_generation)
+            {
                 break;
             }
 
@@ -602,13 +631,29 @@ pub async fn start_transcription(
     }));
 
     let stale_handles = match state.lock() {
-        Ok(mut app_state) => app_state.replace_stt_task_handles(task_handles),
+        Ok(mut app_state) => {
+            if !is_current_session(&session_generation, my_generation)
+                || !app_state.stt_active.load(Ordering::SeqCst)
+            {
+                drop(app_state);
+                for handle in task_handles {
+                    handle.abort();
+                }
+                log::info!(
+                    "[STT] start_transcription superseded before committing tasks; aborted stale session"
+                );
+                return Err("Transcription start was cancelled".into());
+            }
+            app_state.replace_stt_task_handles(task_handles)
+        }
         Err(e) => {
             for handle in task_handles {
                 handle.abort();
             }
-            stt_active.store(false, Ordering::SeqCst);
-            audio_active.store(false, Ordering::SeqCst);
+            if is_current_session(&session_generation, my_generation) {
+                stt_active.store(false, Ordering::SeqCst);
+                audio_active.store(false, Ordering::SeqCst);
+            }
             return Err(e.to_string());
         }
     };
@@ -626,25 +671,34 @@ pub fn set_input_gain(gain: f32) {
     set_gain(&handle, gain);
 }
 
-/// Stop the transcription pipeline (audio capture + STT provider).
-#[tauri::command]
-pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
-    let mut app_state = state.lock().map_err(|e| e.to_string())?;
-
-    if !app_state.stt_active.swap(false, Ordering::SeqCst) {
-        return Err("Transcription is not running".into());
-    }
-
-    app_state.audio_active.store(false, Ordering::SeqCst);
-    app_state.invalidate_audio_session();
-    let task_handles = app_state.take_stt_task_handles();
-    drop(app_state);
+/// Tear down an active transcription session: clear active flags, retire the
+/// audio fanout generation, abort spawned STT/detection/semantic tasks, and
+/// reset the live evidence ledger. Returns `true` if an active session stopped.
+pub(super) fn stop_active_transcription(state: &Mutex<AppState>) -> Result<bool, String> {
+    let task_handles = {
+        let mut app_state = state.lock().map_err(|e| e.to_string())?;
+        if !app_state.stt_active.swap(false, Ordering::SeqCst) {
+            return Ok(false);
+        }
+        app_state.audio_active.store(false, Ordering::SeqCst);
+        app_state.invalidate_audio_session();
+        app_state.take_stt_task_handles()
+    };
 
     for handle in task_handles {
         handle.abort();
     }
 
     live_session::reset_evidence_ledger();
+    Ok(true)
+}
+
+/// Stop the transcription pipeline (audio capture + STT provider).
+#[tauri::command]
+pub fn stop_transcription(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
+    if !stop_active_transcription(&state)? {
+        return Err("Transcription is not running".into());
+    }
 
     log::info!("Transcription stop requested");
     Ok(())

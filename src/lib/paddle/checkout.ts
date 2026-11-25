@@ -4,7 +4,7 @@ import {
   priceIdForInterval,
   type BillingInterval,
 } from "@/lib/paddle/config"
-import { getPaddleInstance } from "@/lib/paddle/client"
+import * as paddleClient from "@/lib/paddle/client"
 
 export interface OpenSubscriptionCheckoutOptions {
   email: string
@@ -24,7 +24,12 @@ export async function openSubscriptionCheckout(
     }
   }
 
-  const paddle = await getPaddleInstance()
+  let paddle: Paddle | undefined
+  try {
+    paddle = await paddleClient.getPaddleInstance()
+  } catch {
+    return { ok: false, message: "Could not load the checkout service." }
+  }
   if (!paddle) {
     return { ok: false, message: "Could not load the checkout service." }
   }
@@ -59,10 +64,17 @@ export async function openSubscriptionCheckout(
 // unsubscribing would tear down the callback for everyone still listening.
 const completionHandlers = new Set<() => void>()
 let eventCallbackInstalled = false
+let installedPaddle: Paddle | null = null
+
+paddleClient.onPaddleInstanceInvalidated?.(() => {
+  eventCallbackInstalled = false
+  installedPaddle = null
+})
 
 export function resetCheckoutSubscribersForTests(): void {
   completionHandlers.clear()
   eventCallbackInstalled = false
+  installedPaddle = null
 }
 
 export function onCheckoutCompleted(
@@ -71,8 +83,9 @@ export function onCheckoutCompleted(
 ): () => void {
   completionHandlers.add(handler)
 
-  if (!eventCallbackInstalled) {
+  if (!eventCallbackInstalled || installedPaddle !== paddle) {
     eventCallbackInstalled = true
+    installedPaddle = paddle
     paddle.Update({
       eventCallback: (event: { name?: string }) => {
         if (event.name !== "checkout.completed") return

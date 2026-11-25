@@ -491,6 +491,33 @@ describe("preferSpokenBook", () => {
     }
     expect(sent.candidates.map((c) => c.id)).toEqual(["2:20:8", "5:5:12"])
   })
+
+  it("matches accented Afrikaans book names against diacritic-folded transcripts (FU-28)", () => {
+    const accentedBooks = [
+      { book_name: "Esegiël", book_number: 26, query: "esegiel" },
+      { book_name: "Daniël", book_number: 27, query: "daniel" },
+      { book_name: "Joël", book_number: 29, query: "joel" },
+      { book_name: "1 Korintiërs", book_number: 46, query: "1 korintiers" },
+      { book_name: "2 Korintiërs", book_number: 47, query: "2 korintiers" },
+      { book_name: "Galasiërs", book_number: 48, query: "galasiers" },
+      { book_name: "Effesiërs", book_number: 49, query: "effesiers" },
+      { book_name: "Hebreërs", book_number: 58, query: "hebreers" },
+    ]
+    for (const { book_name, book_number, query } of accentedBooks) {
+      const target = semantic({
+        book_name,
+        book_number,
+        chapter: 2,
+        verse: 1,
+        verse_ref: `${book_name} 2:1`,
+      })
+      const promoted = preferSpokenBook(
+        [deut, target],
+        `kom ons lees uit ${query} hoofstuk twee`
+      )
+      expect(promoted.map((d) => d.book_number)).toEqual([book_number, 5])
+    }
+  })
 })
 
 describe("pickRankingTranscript", () => {

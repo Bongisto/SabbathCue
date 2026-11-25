@@ -141,6 +141,8 @@ export function useBroadcastOutputRuntime({
 }: UseBroadcastOutputRuntimeOptions): void {
   const latestData = useRef<BroadcastPayload | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const onPayloadChangeRef = useRef(onPayloadChange)
+  const ndiConfigReceivedRef = useRef(false)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
   const ndiConfigRef = useRef<NdiConfigEventPayload>(DEFAULT_NDI_CONFIG)
   const ndiCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -160,11 +162,8 @@ export function useBroadcastOutputRuntime({
   const lastKineticPushRef = useRef(0)
 
   useEffect(() => {
-    canvasRef.current = canvas
-    return () => {
-      if (canvasRef.current === canvas) canvasRef.current = null
-    }
-  }, [canvas])
+    onPayloadChangeRef.current = onPayloadChange
+  }, [onPayloadChange])
 
   const logDebug = useCallback((message: string, meta?: unknown) => {
     if (!import.meta.env.DEV) return
@@ -221,6 +220,14 @@ export function useBroadcastOutputRuntime({
     canvas.height = source.height
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(source, 0, 0)
+  }, [])
+
+  const resetCanvasBlack = useCallback(() => {
+    const target = canvasRef.current
+    if (!target) return
+    target.width = 1920
+    target.height = 1080
+    fillBlack(target)
   }, [])
 
   const draw = useCallback(() => {
@@ -542,8 +549,7 @@ export function useBroadcastOutputRuntime({
   ])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    lastRenderKeyRef.current = null
+    canvasRef.current = canvas
     if (canvas) {
       const latestPayload = latestData.current
       if (latestPayload && transitionFrameRef.current === null) {
@@ -552,13 +558,21 @@ export function useBroadcastOutputRuntime({
         renderPayloadToCanvas(target, latestPayload)
         drawRenderedCanvas(target)
       } else {
-        canvas.width = 1920
-        canvas.height = 1080
-        fillBlack(canvas)
+        resetCanvasBlack()
       }
     }
+    return () => {
+      if (canvasRef.current === canvas) canvasRef.current = null
+    }
+  }, [canvas, drawRenderedCanvas, renderPayloadToCanvas, resetCanvasBlack])
+
+  useEffect(() => {
+    let cancelled = false
+    ndiConfigReceivedRef.current = false
+    lastRenderKeyRef.current = null
 
     const applyPayload = (payload: BroadcastPayload) => {
+      if (cancelled) return
       const renderKey = `${getBroadcastRenderKey(payload.theme, payload.item)}:${payload.opacity ?? 1}`
 
       if (lastRenderKeyRef.current === renderKey) {
@@ -572,7 +586,7 @@ export function useBroadcastOutputRuntime({
       const previousPayload = latestData.current
       lastRenderKeyRef.current = renderKey
       latestData.current = payload
-      onPayloadChange?.(payload)
+      onPayloadChangeRef.current?.(payload)
       preloadBackgroundImage(payload.theme)
       preloadSlideImage(payload.item)
       logDebug("Received broadcast payload", {
@@ -607,6 +621,8 @@ export function useBroadcastOutputRuntime({
       unlistenNdiConfig = currentWindow.listen<NdiConfigEventPayload>(
         "broadcast:ndi-config",
         (event) => {
+          if (cancelled) return
+          ndiConfigReceivedRef.current = true
           ndiConfigRef.current = event.payload
           logDebug("Received broadcast:ndi-config", event.payload)
           if (event.payload.active) pushNdiBurst()
@@ -627,7 +643,7 @@ export function useBroadcastOutputRuntime({
       { outputId },
     )
       .then((status) => {
-        if (!status?.active) return
+        if (cancelled || ndiConfigReceivedRef.current || !status?.active) return
         ndiConfigRef.current = {
           active: true,
           fps: status.fps,
@@ -641,15 +657,20 @@ export function useBroadcastOutputRuntime({
       })
 
     return () => {
+      cancelled = true
       delete window.__SABBATHCUE_BROADCAST_TEST__
       cancelTransition()
       cancelKineticLoop()
       ndiBurstTimersRef.current.forEach(clearTimeout)
       ndiBurstTimersRef.current = []
-      unlisten?.then((fn) => fn())
-      unlistenNdiConfig?.then((fn) => fn())
+      void unlisten?.then((fn) => fn()).catch((error) => {
+        logDebug("Failed to clean up verse-update listener", error)
+      })
+      void unlistenNdiConfig?.then((fn) => fn()).catch((error) => {
+        logDebug("Failed to clean up ndi-config listener", error)
+      })
     }
-  }, [animatePayload, cancelKineticLoop, cancelTransition, canvas, drawRenderedCanvas, logDebug, onPayloadChange, outputId, preloadBackgroundImage, preloadSlideImage, pushNdiBurst, renderPayloadToCanvas, syncKineticLoop])
+  }, [animatePayload, cancelKineticLoop, cancelTransition, logDebug, outputId, preloadBackgroundImage, preloadSlideImage, pushNdiBurst, syncKineticLoop])
 
   useEffect(() => {
     const timer = setInterval(() => {

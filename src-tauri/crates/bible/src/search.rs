@@ -556,23 +556,23 @@ impl BibleDb {
         let term_count = query_terms(query).count();
         log::debug!("[FTS5-BM25] phrase tier: {term_count} terms");
         let (spans, end_n) = build_phrase_spans_with_end_count(query);
-        let mut all_results = Vec::new();
+        let mut topic_results = Vec::new();
         for topic_query in build_topic_phrase_queries(query) {
-            all_results.extend(run_fts_query(
+            topic_results.extend(run_fts_query(
                 &conn,
                 &topic_query,
                 fetch_limit,
                 false,
-                true,
+                false,
                 book_hint,
             )?);
         }
-        if all_results.is_empty() {
-            for span in spans.iter().take(end_n) {
-                all_results = run_fts_query(&conn, span, fetch_limit, false, true, book_hint)?;
-                if !all_results.is_empty() {
-                    break;
-                }
+
+        let mut all_results = Vec::new();
+        for span in spans.iter().take(end_n) {
+            all_results = run_fts_query(&conn, span, fetch_limit, false, true, book_hint)?;
+            if !all_results.is_empty() {
+                break;
             }
         }
         if all_results.is_empty() {
@@ -612,6 +612,10 @@ impl BibleDb {
                 )?);
             }
         }
+
+        // Preserve grounded topic anchors ahead of broad OR fallback while
+        // keeping transcript phrase/AND matching independent of topic hits.
+        all_results.extend(topic_results);
 
         // Tier 3: OR with stop words filtered, capped at 10 terms (~10-30ms)
         if dedup_count(&all_results) < limit {
@@ -800,7 +804,7 @@ mod tests {
 
     #[test]
     fn phrase_spans_are_bounded_and_skip_short_input() {
-        assert!(build_phrase_spans("only two").is_empty());
+        assert_eq!(build_phrase_spans("only two"), Vec::<String>::new());
         assert!(
             build_phrase_spans(&"word ".repeat(60)).len() <= MAX_PHRASE_SPANS + MAX_INTERIOR_SPANS
         );
@@ -1243,7 +1247,7 @@ mod tests {
         );
         assert_eq!(
             build_topic_phrase_queries("John the Baptist baptizing Jesus"),
-            vec!["baptized Jesus", "baptized of him", "\"baptized\""]
+            vec!["baptized Jesus", "baptized of him"]
         );
         assert_eq!(
             build_topic_phrase_queries(
@@ -1259,7 +1263,7 @@ mod tests {
         );
         assert_eq!(
             build_topic_phrase_queries("Jesus said Lazarus come out with a loud voice"),
-            vec!["Lazarus come forth", "Lazarus", "loud voice Lazarus"]
+            vec!["Lazarus come forth", "loud voice Lazarus"]
         );
         assert_eq!(
             build_topic_phrase_queries("Joseph thrown into a well"),
@@ -1340,5 +1344,50 @@ mod tests {
             }
         }
         assert!(duplicates.is_empty(), "duplicate entries: {duplicates:?}");
+    }
+
+    #[test]
+    fn db05_topic_queries_do_not_self_trigger_or_block_verbatim_phrases() {
+        assert_eq!(
+            build_topic_phrase_queries("walking through the storm of life"),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            build_topic_phrase_queries("please stay calm today"),
+            Vec::<String>::new()
+        );
+
+        let db = fixture_db();
+        {
+            let conn = db.conn().unwrap();
+            conn.execute_batch(
+                "INSERT INTO verses VALUES
+                   (10, 1, 40, 'Matthew', 'Matt', 3, 13, 'Then cometh Jesus from Galilee to Jordan unto John, to be baptized of him.'),
+                   (11, 1, 42, 'Luke', 'Luke', 7, 29, 'And all the people that heard him, and the publicans, justified God, being baptized with the baptism of John.'),
+                   (12, 1, 41, 'Mark', 'Mark', 4, 39, 'And he arose, and rebuked the wind, and said unto the sea, Peace, be still. And the wind ceased, and there was a great calm.');
+                 INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses WHERE id IN (10, 11, 12);",
+            )
+            .unwrap();
+        }
+
+        // Verbatim quote containing "baptized" must still hit Tier 1 exact phrase on Luke 7:29.
+        let verbatim = db
+            .search_verses_bm25("justified God being baptized with the baptism of John", 10)
+            .unwrap();
+        assert!(!verbatim.is_empty());
+        assert_eq!(verbatim[0].book_number, 42);
+        assert_eq!(verbatim[0].chapter, 7);
+        assert_eq!(verbatim[0].verse, 29);
+        assert!(verbatim[0].is_phrase_match);
+
+        // Topic retrieval still finds Matthew 3:13, marked as non-phrase (`is_phrase_match = false`).
+        let topic = db
+            .search_verses_bm25("the verse where John the Baptist baptizes Jesus", 10)
+            .unwrap();
+        let matthew = topic
+            .iter()
+            .find(|r| r.book_number == 40 && r.chapter == 3 && r.verse == 13)
+            .expect("topic retrieval must find Matthew 3:13");
+        assert!(!matthew.is_phrase_match);
     }
 }

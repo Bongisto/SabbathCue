@@ -1,6 +1,26 @@
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { runContextVerseSearch } from "./use-context-verse-search"
+import {
+  CONTEXT_SEARCH_DEBOUNCE_MS,
+  CONTEXT_SEARCH_TRANSLATION_DEBOUNCE_MS,
+  runContextVerseSearch,
+  useContextVerseSearch,
+} from "./use-context-verse-search"
+import { useBibleStore } from "@/stores/bible-store"
 import type { SemanticSearchResult } from "@/types"
+
+const mockInvoke = vi.fn()
+
+vi.mock("@/lib/tauri-runtime", () => ({
+  isTauriRuntime: () => true,
+  invokeTauri: (...args: unknown[]) => mockInvoke(...args),
+}))
+
+vi.mock("@/lib/context-search", () => ({
+  mergeContextSearchResults: (primary: SemanticSearchResult[]) => primary,
+  searchContextWithFuse: vi.fn().mockResolvedValue([]),
+}))
 
 const backendResult: SemanticSearchResult = {
   verse_ref: "John 3:16",
@@ -102,5 +122,81 @@ describe("runContextVerseSearch", () => {
     })
 
     expect(setSemanticResults).toHaveBeenCalledWith([])
+  })
+})
+
+describe("useContextVerseSearch hook (FL-20)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useBibleStore.setState({ activeTranslationId: 1, semanticResults: [] })
+  })
+
+  it("keeps the 280ms typing debounce instead of overriding with 120ms", async () => {
+    vi.useFakeTimers()
+    mockInvoke.mockResolvedValue([backendResult])
+
+    const { result, unmount } = renderHook(() =>
+      useContextVerseSearch({ activeTab: "context", activeTranslationId: 1 }),
+    )
+
+    act(() => {
+      result.current.handleContextSearch("for god so loved")
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CONTEXT_SEARCH_TRANSLATION_DEBOUNCE_MS + 10)
+    })
+    expect(mockInvoke).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(
+        CONTEXT_SEARCH_DEBOUNCE_MS - CONTEXT_SEARCH_TRANSLATION_DEBOUNCE_MS,
+      )
+      await Promise.resolve()
+    })
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+
+    unmount()
+    vi.useRealTimers()
+  })
+
+  it("cancels pending timers, ignores in-flight results, and clears semanticResults in clearContextQuery", async () => {
+    vi.useFakeTimers()
+    let resolveSearch!: (value: SemanticSearchResult[]) => void
+    mockInvoke.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve
+        }),
+    )
+
+    useBibleStore.setState({ semanticResults: [backendResult] })
+    const { result, unmount } = renderHook(() =>
+      useContextVerseSearch({ activeTab: "context", activeTranslationId: 1 }),
+    )
+
+    act(() => {
+      result.current.handleContextSearch("shepherd")
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CONTEXT_SEARCH_DEBOUNCE_MS)
+    })
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      result.current.clearContextQuery()
+    })
+    expect(result.current.contextQuery).toBe("")
+    expect(useBibleStore.getState().semanticResults).toEqual([])
+
+    await act(async () => {
+      resolveSearch([backendResult])
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(useBibleStore.getState().semanticResults).toEqual([])
+
+    unmount()
+    vi.useRealTimers()
   })
 })

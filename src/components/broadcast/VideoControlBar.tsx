@@ -238,9 +238,13 @@ export function VideoControlBar({ item }: VideoControlBarProps) {
   const lastMainUpdateAtRef = useRef(0)
 
   useEffect(() => {
-    const unlisten = listen<VideoTimeUpdatePayload>(
+    let cancelled = false
+    let unlisten: (() => void) | undefined
+
+    void listen<VideoTimeUpdatePayload>(
       VIDEO_TIMEUPDATE_EVENT,
       (event) => {
+        if (cancelled) return
         const { outputId } = event.payload
         if (outputId === "main") {
           lastMainUpdateAtRef.current = Date.now()
@@ -258,8 +262,22 @@ export function VideoControlBar({ item }: VideoControlBarProps) {
         }
       },
     )
+      .then((fn) => {
+        if (cancelled) {
+          fn()
+        } else {
+          unlisten = fn
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn("[video-control-bar] failed to listen for timeupdate", error)
+        }
+      })
+
     return () => {
-      void unlisten.then((fn) => fn())
+      cancelled = true
+      unlisten?.()
     }
   }, [])
 
@@ -271,6 +289,8 @@ export function VideoControlBar({ item }: VideoControlBarProps) {
     setLoadingDevices(true)
     try {
       setDevices(await listAudioOutputDevices())
+    } catch (error) {
+      console.warn("[video-control-bar] failed to list audio outputs", error)
     } finally {
       setLoadingDevices(false)
     }

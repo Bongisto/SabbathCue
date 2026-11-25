@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useBroadcastThemeDesignerStore as useBroadcastStore } from "@/stores/broadcast/theme-designer-store"
 import { CanvasVerse } from "@/components/ui/canvas-verse"
 import { Input } from "@/components/ui/input"
@@ -51,8 +51,25 @@ function ThemeCard({
   onSelect: () => void
 }) {
   const [isHovered, setIsHovered] = useState(false)
+  const renameInputRef = useRef<HTMLInputElement>(null)
+  const enteringRenameRef = useRef(false)
+  const cancelRenameRef = useRef(false)
   const isKinetic = Boolean(theme.kinetic)
   const animate = isKinetic && (isSelected || isHovered)
+
+  useEffect(() => {
+    if (!isRenaming || !enteringRenameRef.current) return
+    const timer = window.setTimeout(() => {
+      enteringRenameRef.current = false
+      if (
+        renameInputRef.current &&
+        document.activeElement !== renameInputRef.current
+      ) {
+        renameInputRef.current.focus()
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isRenaming])
 
   return (
     <div
@@ -111,11 +128,17 @@ function ThemeCard({
         <div className="min-w-0 flex-1">
           {isRenaming && !theme.builtin ? (
             <Input
+              ref={renameInputRef}
               autoFocus
               defaultValue={theme.name}
               className="h-6 text-xs"
               onClick={(e) => e.stopPropagation()}
               onBlur={(e) => {
+                if (enteringRenameRef.current) return
+                if (cancelRenameRef.current) {
+                  cancelRenameRef.current = false
+                  return
+                }
                 const value = e.target.value.trim()
                 if (value && value !== theme.name) {
                   useBroadcastStore.getState().renameTheme(theme.id, value)
@@ -124,13 +147,17 @@ function ThemeCard({
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  const value = (e.target as HTMLInputElement).value.trim()
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const value = e.currentTarget.value.trim()
                   if (value && value !== theme.name) {
                     useBroadcastStore.getState().renameTheme(theme.id, value)
                   }
                   useBroadcastStore.getState().setRenamingTheme(null)
-                }
-                if (e.key === "Escape") {
+                } else if (e.key === "Escape") {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  cancelRenameRef.current = true
                   useBroadcastStore.getState().setRenamingTheme(null)
                 }
               }}
@@ -167,7 +194,20 @@ function ThemeCard({
               <MoreHorizontalIcon className="size-3" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-50">
+          <DropdownMenuContent
+            align="end"
+            className="w-50"
+            onCloseAutoFocus={(e) => {
+              if (
+                enteringRenameRef.current ||
+                useBroadcastStore.getState().renamingThemeId === theme.id
+              ) {
+                e.preventDefault()
+                enteringRenameRef.current = false
+                renameInputRef.current?.focus()
+              }
+            }}
+          >
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation()
@@ -201,6 +241,8 @@ function ThemeCard({
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation()
+                    enteringRenameRef.current = true
+                    cancelRenameRef.current = false
                     useBroadcastStore.getState().setRenamingTheme(theme.id)
                   }}
                 >

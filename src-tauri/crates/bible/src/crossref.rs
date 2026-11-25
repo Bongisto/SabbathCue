@@ -67,6 +67,6 @@ mod tests {
     #[test]
     fn empty_when_no_match() {
         let db = test_db();
-        assert!(db.get_cross_references(2, 2, 2).unwrap().is_empty());
+        assert_eq!(db.get_cross_references(2, 2, 2).unwrap(), Vec::new());
     }
 }

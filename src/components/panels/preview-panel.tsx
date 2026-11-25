@@ -50,6 +50,69 @@ function previewVideoSrc(item: PresentationRenderData): string | null {
   return null
 }
 
+function PreviewStage({
+  previewItem,
+  activeTheme,
+  previewVideoWrapRef,
+  attachPreviewVideo,
+  previewVideoPaused,
+  togglePreviewVideo,
+}: {
+  previewItem: PresentationRenderData | null
+  activeTheme: ReturnType<typeof selectActiveTheme>
+  previewVideoWrapRef: React.RefObject<HTMLDivElement | null>
+  attachPreviewVideo: (el: HTMLVideoElement | null) => void
+  previewVideoPaused: boolean
+  togglePreviewVideo: () => void
+}) {
+  const videoSrc = previewItem?.kind === "video" ? previewVideoSrc(previewItem) : null
+
+  return (
+    <div
+      data-slot="preview-stage"
+      className="flex min-h-0 flex-1 items-center justify-center p-4"
+    >
+      {previewItem?.kind === "video" && videoSrc ? (
+        previewItem.video?.source === "youtube" ? (
+          <iframe
+            title={previewItem.reference}
+            src={videoSrc}
+            allow="autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+            className="aspect-video max-h-full w-full rounded-md border border-[var(--border-subtle)] bg-black"
+          />
+        ) : (
+          <div
+            ref={previewVideoWrapRef}
+            className="relative aspect-video max-h-full w-full rounded-md border border-[var(--border-subtle)] bg-black"
+          >
+            <video
+              key={videoSrc ?? previewItem.video?.videoId}
+              ref={attachPreviewVideo}
+              src={videoSrc}
+              poster={previewItem.video?.poster}
+              className="h-full w-full object-contain"
+            />
+            <VideoOverlayControls
+              paused={previewVideoPaused}
+              onTogglePlay={togglePreviewVideo}
+              fullscreenTarget={() => previewVideoWrapRef.current}
+            />
+          </div>
+        )
+      ) : previewItem && activeTheme ? (
+        <CanvasPresentation theme={activeTheme} item={previewItem} />
+      ) : (
+        <PanelEmptyState
+          icon={<MonitorIcon className="size-8" />}
+          title="No item selected"
+          description="Detected verses, searched passages, hymns, and song slides appear here before going live."
+        />
+      )}
+    </div>
+  )
+}
+
 export function PreviewPanel({ className }: { className?: string }) {
   const activeTranslationId = useBibleStore((s) => s.activeTranslationId)
   const previewItem = useBroadcastLiveStore((s) => s.previewItem)
@@ -71,11 +134,14 @@ export function PreviewPanel({ className }: { className?: string }) {
     setPreviewVideoPaused(el ? el.paused : true)
     if (!el) return
     const update = () => setPreviewVideoPaused(el.paused)
+    const handleEmptied = () => setPreviewVideoPaused(true)
     el.addEventListener("play", update)
     el.addEventListener("pause", update)
+    el.addEventListener("emptied", handleEmptied)
     previewVideoCleanupRef.current = () => {
       el.removeEventListener("play", update)
       el.removeEventListener("pause", update)
+      el.removeEventListener("emptied", handleEmptied)
     }
   }, [])
 
@@ -221,47 +287,14 @@ export function PreviewPanel({ className }: { className?: string }) {
         </div>
       </div>
 
-      <div
-        data-slot="preview-stage"
-        className="flex min-h-0 flex-1 items-center justify-center p-4"
-      >
-        {previewItem?.kind === "video" && previewVideoSrc(previewItem) ? (
-          previewItem.video?.source === "youtube" ? (
-            <iframe
-              title={previewItem.reference}
-              src={previewVideoSrc(previewItem) ?? undefined}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-              className="aspect-video max-h-full w-full rounded-md border border-[var(--border-subtle)] bg-black"
-            />
-          ) : (
-            <div
-              ref={previewVideoWrapRef}
-              className="relative aspect-video max-h-full w-full rounded-md border border-[var(--border-subtle)] bg-black"
-            >
-              <video
-                ref={attachPreviewVideo}
-                src={previewVideoSrc(previewItem) ?? undefined}
-                poster={previewItem.video?.poster}
-                className="h-full w-full object-contain"
-              />
-              <VideoOverlayControls
-                paused={previewVideoPaused}
-                onTogglePlay={togglePreviewVideo}
-                fullscreenTarget={() => previewVideoWrapRef.current}
-              />
-            </div>
-          )
-        ) : previewItem && activeTheme ? (
-          <CanvasPresentation theme={activeTheme} item={previewItem} />
-        ) : (
-          <PanelEmptyState
-            icon={<MonitorIcon className="size-8" />}
-            title="No item selected"
-            description="Detected verses, searched passages, hymns, and song slides appear here before going live."
-          />
-        )}
-      </div>
+      <PreviewStage
+        previewItem={previewItem}
+        activeTheme={activeTheme}
+        previewVideoWrapRef={previewVideoWrapRef}
+        attachPreviewVideo={attachPreviewVideo}
+        previewVideoPaused={previewVideoPaused}
+        togglePreviewVideo={togglePreviewVideo}
+      />
     </div>
   )
 }

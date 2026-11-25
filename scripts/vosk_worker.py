@@ -12,11 +12,26 @@ import json
 import sys
 
 
+def configure_utf8_stdio() -> None:
+    """Force UTF-8 stdio so Windows cp1252 pipes never fail on non-ASCII text."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
 def emit(payload: dict) -> None:
-    print(json.dumps(payload, ensure_ascii=False), flush=True)
+    # `ensure_ascii=True` emits valid pure-ASCII UTF-8 JSON even under `python -I`
+    # or non-reconfigurable Windows pipes; Rust `serde_json` decodes `\uXXXX`
+    # back to exact Unicode strings.
+    print(json.dumps(payload, ensure_ascii=True), flush=True)
 
 
 def main() -> int:
+    configure_utf8_stdio()
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True)
     parser.add_argument("--sample-rate", type=int, default=16000)

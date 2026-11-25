@@ -439,6 +439,34 @@ describe("formatSubscriptionStatusLabel", () => {
     expect(label).toMatch(/^Cancels on /)
   })
 
+  it("branches scheduled pause and resume actions cleanly (FU-29)", async () => {
+    const { formatSubscriptionStatusLabel } = await import(
+      "@/lib/supabase/billing"
+    )
+    expect(
+      formatSubscriptionStatusLabel({
+        ...base,
+        scheduledChange: "2026-09-01T00:00:00Z",
+        scheduledChangeAction: "pause",
+      })
+    ).toMatch(/^Pauses on /)
+    expect(
+      formatSubscriptionStatusLabel({
+        ...base,
+        subscriptionStatus: "paused",
+        scheduledChange: "2026-09-01T00:00:00Z",
+        scheduledChangeAction: "resume",
+      })
+    ).toMatch(/^Resumes on /)
+    expect(
+      formatSubscriptionStatusLabel({
+        ...base,
+        scheduledChange: "2026-09-01T00:00:00Z",
+        scheduledChangeAction: "cancel",
+      })
+    ).toMatch(/^Cancels on /)
+  })
+
   it("falls back to 'soon' when the scheduled change is unparseable", async () => {
     const { formatSubscriptionStatusLabel } = await import(
       "@/lib/supabase/billing"

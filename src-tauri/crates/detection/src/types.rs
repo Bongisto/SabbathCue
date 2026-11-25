@@ -37,6 +37,16 @@ pub struct Detection {
     /// canonical or alias automaton hit. Never action-authorizing.
     #[serde(default)]
     pub is_fuzzy_book: bool,
+    /// True when the citation is ambiguous (e.g. an unpunctuated three-number
+    /// fragment with competing verse candidates). Visible as a suggestion,
+    /// never auto-live.
+    #[serde(default)]
+    pub is_ambiguous: bool,
+    /// True when the book name was inferred from mutable conversation context
+    /// rather than spoken in this reference. Visible as a suggestion, never
+    /// auto-live.
+    #[serde(default)]
+    pub is_context_resolved: bool,
     /// True when a distinctive contiguous quote span was verified against verse text.
     #[serde(default)]
     pub has_lexical_quote: bool,
@@ -67,6 +77,8 @@ impl Detection {
     pub fn is_complete_citation(&self) -> bool {
         !self.is_chapter_only
             && !self.is_fuzzy_book
+            && !self.is_ambiguous
+            && !self.is_context_resolved
             && self.verse_ref.book_number > 0
             && self.verse_ref.chapter > 0
             && self.verse_ref.verse_start > 0
@@ -91,6 +103,8 @@ impl Default for Detection {
             detected_at: 0,
             is_chapter_only: false,
             is_fuzzy_book: false,
+            is_ambiguous: false,
+            is_context_resolved: false,
             has_lexical_quote: false,
             quote_coverage: 0.0,
             candidate_margin: 1.0,

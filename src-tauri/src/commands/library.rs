@@ -3,7 +3,7 @@
     reason = "Tauri command extractors require pass-by-value"
 )]
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
 use tauri::AppHandle;
@@ -79,14 +79,55 @@ fn chrono_like_timestamp() -> u128 {
         .map_or(0, |duration| duration.as_millis())
 }
 
+fn is_windows_reserved_device_name(file_name: &str) -> bool {
+    let stem = file_name.split('.').next().unwrap_or("").trim();
+    matches!(
+        stem.to_ascii_uppercase().as_str(),
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
+    )
+}
+
 fn safe_library_file_name(file_name: &str) -> Result<&str, String> {
     if file_name.trim().is_empty()
         || file_name.contains('/')
         || file_name.contains('\\')
+        || file_name.contains(':')
+        || file_name.contains('\0')
         || file_name.contains("..")
+        || is_windows_reserved_device_name(file_name)
     {
         return Err("Invalid library file name".into());
     }
+
+    let mut components = Path::new(file_name).components();
+    if !matches!(
+        (components.next(), components.next()),
+        (Some(Component::Normal(_)), None)
+    ) {
+        return Err("Invalid library file name".into());
+    }
+
     Ok(file_name)
 }
 
@@ -223,9 +264,30 @@ mod tests {
 
     #[test]
     fn rejects_unsafe_delete_file_names() {
+        assert!(safe_library_file_name("").is_err());
+        assert!(safe_library_file_name("   ").is_err());
+        assert!(safe_library_file_name(".").is_err());
+        assert!(safe_library_file_name("..").is_err());
         assert!(safe_library_file_name("../x.png").is_err());
         assert!(safe_library_file_name("folder/x.png").is_err());
+        assert!(safe_library_file_name("folder\\x.png").is_err());
+        assert!(safe_library_file_name("D:evil.png").is_err());
+        assert!(safe_library_file_name("C:evil.png").is_err());
+        assert!(safe_library_file_name("x.png:stream").is_err());
+        assert!(safe_library_file_name("x.png\0").is_err());
+        assert!(safe_library_file_name("CON").is_err());
+        assert!(safe_library_file_name("con.png").is_err());
+        assert!(safe_library_file_name("PRN.jpg").is_err());
+        assert!(safe_library_file_name("AUX").is_err());
+        assert!(safe_library_file_name("nul.webp").is_err());
+        assert!(safe_library_file_name("COM1").is_err());
+        assert!(safe_library_file_name("com9.png").is_err());
+        assert!(safe_library_file_name("LPT1.gif").is_err());
+        assert!(safe_library_file_name("lpt9").is_err());
         assert!(safe_library_file_name("x.png").is_ok());
+        assert!(safe_library_file_name("console.png").is_ok());
+        assert!(safe_library_file_name("com10.png").is_ok());
+        assert!(safe_library_file_name("1700000000000-0123456789abcdef.png").is_ok());
     }
 
     #[test]

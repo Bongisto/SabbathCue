@@ -99,4 +99,44 @@ describe("activation lease verification", () => {
       )
     ).resolves.toBeNull()
   })
+
+  it("accepts a lease issued up to 300s ahead of client clock (server clock skew)", async () => {
+    const now = Date.now()
+    const { lease, publicKey } = await createLease({
+      issuedAt: now + 5 * 60 * 1000,
+      expiresAt: now + 10 * 60 * 1000,
+      accessExpiresAt: now + 10 * 60 * 1000,
+    })
+
+    const result = await verifyActivationLeaseWithKey(
+      lease,
+      publicKey,
+      "user-1",
+      "device-1",
+      now
+    )
+
+    expect(result).toEqual(
+      expect.objectContaining({ userId: "user-1", deviceId: "device-1" })
+    )
+  })
+
+  it("rejects a lease issued more than 300s ahead of client clock", async () => {
+    const now = Date.now()
+    const { lease, publicKey } = await createLease({
+      issuedAt: now + 5 * 60 * 1000 + 1,
+      expiresAt: now + 10 * 60 * 1000,
+      accessExpiresAt: now + 10 * 60 * 1000,
+    })
+
+    await expect(
+      verifyActivationLeaseWithKey(
+        lease,
+        publicKey,
+        "user-1",
+        "device-1",
+        now
+      )
+    ).resolves.toBeNull()
+  })
 })

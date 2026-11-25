@@ -161,4 +161,75 @@ describe("service plan live effects", () => {
     )
     expect(getHymnByNumber).not.toHaveBeenCalled()
   })
+
+  it("clears stale hymn deck when switching to a non-hymn item (FU-27)", async () => {
+    buildSermonSlideDeck.mockReturnValue([])
+    const { syncActiveServiceItemPresentations } = await import("./service-plan-live-effects")
+
+    await syncActiveServiceItemPresentations({
+      id: "item-general",
+      order: 0,
+      title: "Prayer",
+      kind: "general",
+      status: "active",
+      scriptureRefs: [],
+      hymnRefs: [],
+      mediaRefs: [],
+      attachments: [],
+      checklist: [],
+    })
+
+    expect(hymnSetDeck).toHaveBeenCalledWith([], 0)
+    expect(sermonClear).toHaveBeenCalled()
+  })
+
+  it("discards stale hymn loads when a newer item syncs while loading (FU-27)", async () => {
+    let resolveHymn!: (value: unknown) => void
+    getHymnByNumber.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveHymn = resolve
+      }),
+    )
+    buildSermonSlideDeck.mockReturnValue([])
+    const { syncActiveServiceItemPresentations } = await import("./service-plan-live-effects")
+
+    const slowHymnSync = syncActiveServiceItemPresentations({
+      id: "item-hymn",
+      order: 0,
+      title: "Hymn",
+      kind: "hymn",
+      status: "active",
+      scriptureRefs: [],
+      hymnRefs: [{ hymnNumber: 1 }],
+      mediaRefs: [],
+      attachments: [],
+      checklist: [],
+    })
+
+    const slide = { id: "slide-1", reference: "Slide 1" }
+    buildSermonSlideDeck.mockReturnValue([slide])
+    await syncActiveServiceItemPresentations({
+      id: "item-sermon",
+      order: 1,
+      title: "Sermon",
+      kind: "slide",
+      status: "active",
+      scriptureRefs: [],
+      hymnRefs: [],
+      mediaRefs: [],
+      attachments: [],
+      checklist: [],
+    })
+
+    hymnSetDeck.mockClear()
+    selectPreviewItem.mockClear()
+    generateHymnScreens.mockReturnValue([{ id: "s1" }])
+    createHymnPresentationItem.mockReturnValue({ kind: "hymn", reference: "Old Hymn" })
+
+    resolveHymn({ id: "hymn-1", number: 1, title: "Old Hymn", sections: [] })
+    await slowHymnSync
+
+    expect(hymnSetDeck).not.toHaveBeenCalled()
+    expect(selectPreviewItem).not.toHaveBeenCalled()
+  })
 })

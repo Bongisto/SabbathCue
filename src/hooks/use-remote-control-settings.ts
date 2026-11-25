@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { invokeTauri } from "@/lib/tauri-runtime"
+import { invokeTauri, isTauriRuntime } from "@/lib/tauri-runtime"
 
 export interface RemoteStatus {
   running: boolean
@@ -141,6 +141,7 @@ export function useRemoteControlSettings() {
   const logIdRef = useRef(0)
 
   useEffect(() => {
+    if (!isTauriRuntime()) return
     const interval = setInterval(async () => {
       const statuses = await fetchRemoteStatuses()
       if (statuses.osc) {
@@ -160,23 +161,34 @@ export function useRemoteControlSettings() {
   }, [])
 
   useEffect(() => {
+    if (!isTauriRuntime()) return
     let cancelled = false
     const unlisteners: (() => void)[] = []
 
     async function setup() {
       const { listen } = await import("@tauri-apps/api/event")
+      if (cancelled) return
 
       for (const event of REMOTE_EVENTS) {
+        if (cancelled) return
         const unlisten = await listen(event, () => {
           if (cancelled) return
           const entry = createCommandLogEntry(logIdRef.current++, event)
           setCommandLog((prev) => [entry, ...prev].slice(0, COMMAND_LOG_LIMIT))
         })
+        if (cancelled) {
+          unlisten()
+          return
+        }
         unlisteners.push(unlisten)
       }
     }
 
-    void setup()
+    void setup().catch((error) => {
+      if (!cancelled) {
+        console.warn("[remote-control-settings] failed to attach listeners", error)
+      }
+    })
     return () => {
       cancelled = true
       unlisteners.forEach((fn) => fn())

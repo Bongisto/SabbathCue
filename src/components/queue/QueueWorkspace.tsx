@@ -110,6 +110,31 @@ function EmergencySlidePanel() {
   )
 }
 
+export function computeFallbackInsertAt(
+  orderedIds: string[],
+  movingIds: string[],
+  sourceId: string,
+  targetIndex: number
+): number {
+  const moving = new Set(movingIds)
+  const remaining = orderedIds.filter((id) => !moving.has(id))
+  const reordered = [...orderedIds]
+  const fromIndex = reordered.indexOf(sourceId)
+  if (fromIndex !== -1) {
+    reordered.splice(fromIndex, 1)
+    const clampedTarget = Math.max(0, Math.min(targetIndex, reordered.length))
+    reordered.splice(clampedTarget, 0, sourceId)
+    const precedingOtherSelected = reordered
+      .slice(0, clampedTarget)
+      .filter((id) => id !== sourceId && moving.has(id)).length
+    return Math.max(
+      0,
+      Math.min(targetIndex - precedingOtherSelected, remaining.length)
+    )
+  }
+  return Math.max(0, Math.min(targetIndex, remaining.length))
+}
+
 export function QueueWorkspace() {
   const items = useQueueStore((s) => s.items)
   const activeIndex = useQueueStore((s) => s.activeIndex)
@@ -182,9 +207,12 @@ export function QueueWorkspace() {
       const movingIds = selected.has(sourceId)
         ? orderedIds.filter((id) => selected.has(id))
         : [sourceId]
-      const moving = new Set(movingIds)
-      const remaining = orderedIds.filter((id) => !moving.has(id))
-      const insertAt = Math.max(0, Math.min(source.index, remaining.length))
+      const insertAt = computeFallbackInsertAt(
+        orderedIds,
+        movingIds,
+        sourceId,
+        source.index
+      )
       useQueueStore.getState().moveItems(movingIds, insertAt)
     }
   }

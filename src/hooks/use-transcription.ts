@@ -154,44 +154,88 @@ export function classifyTranscriptionIssue(
   }
 }
 
+let startGeneration = 0
+let startInFlightPromise: Promise<boolean> | null = null
+let startInFlightGeneration = 0
+
+function invalidateStartGeneration(): void {
+  startGeneration += 1
+}
+
 export const transcriptionActions = {
-  async start(
+  start(
     onMissingApiKey?: (provider: SttProvider) => void
   ): Promise<boolean> {
+    if (startInFlightPromise && startInFlightGeneration === startGeneration) {
+      return startInFlightPromise
+    }
     const transcript = useTranscriptStore.getState()
+    if (
+      transcript.connectionStatus === "connecting" ||
+      transcript.isTranscribing
+    ) {
+      return Promise.resolve(false)
+    }
+
+    const generation = ++startGeneration
     transcript.setConnectionStatus("connecting")
     transcript.clearIssue()
 
     const settings = useSettingsStore.getState()
-    try {
-      await invokeTauri("start_transcription", {
-        deviceId: settings.audioDeviceId,
-        gain: settings.gain,
-        provider: settings.sttProvider,
-        sttLanguage: settings.sttLanguage,
-        lowPower: settings.lowPowerMode,
-      })
-      transcript.setTranscribing(true)
-      transcript.clearIssue()
-      return true
-    } catch (e) {
-      const msg = String(e)
-      const issue = classifyTranscriptionIssue(msg, settings.sttProvider)
-      transcript.setConnectionStatus("error")
-      transcript.setIssue(issue)
-      if (issue.kind === "missing_api_key" && onMissingApiKey) {
-        onMissingApiKey(issue.provider)
-      } else {
-        toast.error(issue.title, {
-          description: issue.description,
-          id: STT_STATUS_TOAST_ID,
+    let run: Promise<boolean> | null = null
+    run = (async (): Promise<boolean> => {
+      try {
+        await invokeTauri("start_transcription", {
+          deviceId: settings.audioDeviceId,
+          gain: settings.gain,
+          provider: settings.sttProvider,
+          sttLanguage: settings.sttLanguage,
+          lowPower: settings.lowPowerMode,
         })
+        const latest = useTranscriptStore.getState()
+        if (
+          generation !== startGeneration ||
+          latest.connectionStatus === "error" ||
+          latest.connectionStatus === "disconnected"
+        ) {
+          return false
+        }
+        latest.setTranscribing(true)
+        latest.clearIssue()
+        return true
+      } catch (e) {
+        if (generation !== startGeneration) {
+          return false
+        }
+        const msg = String(e)
+        const issue = classifyTranscriptionIssue(msg, settings.sttProvider)
+        const latest = useTranscriptStore.getState()
+        latest.setConnectionStatus("error")
+        latest.setIssue(issue)
+        if (issue.kind === "missing_api_key" && onMissingApiKey) {
+          onMissingApiKey(issue.provider)
+        } else {
+          toast.error(issue.title, {
+            description: issue.description,
+            id: STT_STATUS_TOAST_ID,
+          })
+        }
+        return false
+      } finally {
+        if (startInFlightPromise === run) {
+          startInFlightPromise = null
+        }
       }
-      return false
-    }
+    })()
+
+    startInFlightPromise = run
+    startInFlightGeneration = generation
+    return run
   },
 
   async stop(): Promise<void> {
+    invalidateStartGeneration()
+    startInFlightPromise = null
     const transcript = useTranscriptStore.getState()
     try {
       await invokeTauri("stop_transcription")
@@ -296,6 +340,7 @@ export function useTranscriptionEventBridge() {
     transcript.clearIssue()
   })
   useTauriEvent("stt_disconnected", () => {
+    invalidateStartGeneration()
     recordWorkflowTrace("transcription.disconnected", "STT disconnected")
     const transcript = useTranscriptStore.getState()
     transcript.setTranscribing(false)
@@ -305,6 +350,7 @@ export function useTranscriptionEventBridge() {
   })
   useTauriEvent<string>("stt_voice_control", (command) => {
     if (command === "stop") {
+      invalidateStartGeneration()
       const transcript = useTranscriptStore.getState()
       transcript.setTranscribing(false)
       transcript.setPartial("")
@@ -312,6 +358,7 @@ export function useTranscriptionEventBridge() {
     }
   })
   useTauriEvent<string>("stt_error", (msg) => {
+    invalidateStartGeneration()
     recordWorkflowTrace("transcription.error", "STT error", { message: msg })
     const provider = useSettingsStore.getState().sttProvider
     const issue = classifyTranscriptionIssue(msg, provider)
@@ -398,7 +445,12 @@ export function useTranscriptionEventBridge() {
   })
 
   useTauriEvent<TranscriptPartialPayload>("transcript_final", (payload) => {
-    void handleTranscriptFinalPayload(payload)
+    void handleTranscriptFinalPayload(payload).catch((error) => {
+      console.warn(
+        "[transcription] failed to handle final transcript payload",
+        error
+      )
+    })
   })
 
   useTauriEvent<{ rms: number; peak: number }>("audio_level", (payload) => {

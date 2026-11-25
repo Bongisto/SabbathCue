@@ -3,6 +3,7 @@
     reason = "Tauri command extractors require pass-by-value"
 )]
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -308,10 +309,63 @@ pub async fn close_broadcast_window(
     Ok(())
 }
 
+static IDENTIFY_OVERLAY_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+fn identify_overlay_label(generation: u64, index: usize) -> String {
+    format!("identify-{generation}-{index}")
+}
+
+fn is_current_identify_generation(counter: &AtomicU64, generation: u64) -> bool {
+    counter.load(Ordering::SeqCst) == generation
+}
+
 fn close_identify_overlays(overlays: &mut Vec<tauri::WebviewWindow>) {
     for window in overlays.drain(..) {
         let _ = window.close();
     }
+}
+
+fn build_identify_overlay(
+    app: &tauri::AppHandle,
+    generation: u64,
+    index: usize,
+    pos: tauri::PhysicalPosition<i32>,
+    size: tauri::PhysicalSize<u32>,
+) -> Result<tauri::WebviewWindow, String> {
+    let label = identify_overlay_label(generation, index);
+    let url = format!(
+        "identify.html?n={}&w={}&h={}",
+        index + 1,
+        size.width,
+        size.height
+    );
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App(url.into()))
+        .title("Identify display")
+        .position(f64::from(pos.x), f64::from(pos.y))
+        .inner_size(f64::from(size.width), f64::from(size.height))
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    if let Err(error) = window
+        .set_position(tauri::Position::Physical(pos))
+        .map_err(|e| e.to_string())
+        .and_then(|()| {
+            window
+                .set_size(tauri::Size::Physical(size))
+                .map_err(|e| e.to_string())
+        })
+        .and_then(|()| window.show().map_err(|e| e.to_string()))
+    {
+        let _ = window.close();
+        return Err(error);
+    }
+
+    Ok(window)
 }
 
 /// Briefly flash a large number on every connected display so the operator can
@@ -323,76 +377,45 @@ pub async fn flash_monitor_labels(
     duration_ms: Option<u64>,
 ) -> Result<(), String> {
     let duration = duration_ms.unwrap_or(4000).clamp(500, 15_000);
-    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let generation = IDENTIFY_OVERLAY_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
 
+    for (existing_label, window) in app.webview_windows() {
+        if existing_label.starts_with("identify-") {
+            let _ = window.close();
+        }
+    }
+
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
     let mut overlays: Vec<tauri::WebviewWindow> = Vec::new();
     for (index, monitor) in monitors.iter().enumerate() {
-        let pos = monitor.position();
-        let size = monitor.size();
-        let label = format!("identify-{index}");
-
-        if let Some(existing) = app.get_webview_window(&label) {
-            let _ = existing.close();
+        if !is_current_identify_generation(&IDENTIFY_OVERLAY_GENERATION, generation) {
+            close_identify_overlays(&mut overlays);
+            return Ok(());
         }
-
-        let url = format!(
-            "identify.html?n={}&w={}&h={}",
-            index + 1,
-            size.width,
-            size.height
-        );
-        let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
-            .title("Identify display")
-            .position(f64::from(pos.x), f64::from(pos.y))
-            .inner_size(f64::from(size.width), f64::from(size.height))
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .focused(false)
-            .visible(false)
-            .build()
-            .map_err(|e| e.to_string());
-
-        let window = match window {
-            Ok(window) => window,
+        match build_identify_overlay(&app, generation, index, *monitor.position(), *monitor.size()) {
+            Ok(window) => overlays.push(window),
             Err(error) => {
                 close_identify_overlays(&mut overlays);
                 return Err(error);
             }
-        };
+        }
+    }
 
-        if let Err(error) = window
-            .set_position(tauri::Position::Physical(*pos))
-            .map_err(|e| e.to_string())
-        {
-            let _ = window.close();
-            close_identify_overlays(&mut overlays);
-            return Err(error);
-        }
-        if let Err(error) = window
-            .set_size(tauri::Size::Physical(*size))
-            .map_err(|e| e.to_string())
-        {
-            let _ = window.close();
-            close_identify_overlays(&mut overlays);
-            return Err(error);
-        }
-        if let Err(error) = window.show().map_err(|e| e.to_string()) {
-            let _ = window.close();
-            close_identify_overlays(&mut overlays);
-            return Err(error);
-        }
-        overlays.push(window);
+    if !is_current_identify_generation(&IDENTIFY_OVERLAY_GENERATION, generation) {
+        close_identify_overlays(&mut overlays);
+        return Ok(());
     }
 
     log::info!(
-        "[BROADCAST] flash_monitor_labels count={} duration_ms={}",
+        "[BROADCAST] flash_monitor_labels generation={generation} count={} duration_ms={duration}",
         overlays.len(),
-        duration
     );
 
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(duration));
+        if !is_current_identify_generation(&IDENTIFY_OVERLAY_GENERATION, generation) {
+            return;
+        }
         for window in overlays {
             let _ = window.close();
         }
@@ -402,20 +425,36 @@ pub async fn flash_monitor_labels(
 }
 
 #[tauri::command]
-pub fn start_ndi(
+pub async fn start_ndi(
+    app: tauri::AppHandle,
     output_id: String,
-    runtime: State<'_, Mutex<NdiRuntime>>,
     request: NdiStartRequest,
 ) -> Result<NdiSessionInfo, String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime.start(output_id, request).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        let preferred_library = crate::asset_paths::ndi_library_path(&app);
+        let library_path = preferred_library
+            .exists()
+            .then_some(preferred_library.as_path());
+        let runtime = app.state::<Mutex<NdiRuntime>>();
+        let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
+        runtime
+            .start(output_id, request, library_path)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("NDI start task failed: {e}"))?
 }
 
 #[tauri::command]
-pub fn stop_ndi(output_id: String, runtime: State<'_, Mutex<NdiRuntime>>) -> Result<(), String> {
-    let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
-    runtime.stop(&output_id);
-    Ok(())
+pub async fn stop_ndi(app: tauri::AppHandle, output_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let runtime = app.state::<Mutex<NdiRuntime>>();
+        let mut runtime = runtime.lock().map_err(|e| e.to_string())?;
+        runtime.stop(&output_id);
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("NDI stop task failed: {e}"))?
 }
 
 #[derive(Serialize)]
@@ -427,41 +466,59 @@ pub struct NdiStatusResponse {
 }
 
 #[tauri::command]
-pub fn get_ndi_status(
+pub async fn get_ndi_status(
+    app: tauri::AppHandle,
     output_id: String,
-    runtime: State<'_, Mutex<NdiRuntime>>,
 ) -> Result<Option<NdiStatusResponse>, String> {
-    let runtime = runtime.lock().map_err(|e| e.to_string())?;
-    match runtime.current_info(&output_id) {
-        Some(info) => Ok(Some(NdiStatusResponse {
-            active: true,
-            width: info.width,
-            height: info.height,
-            fps: info.fps,
-        })),
-        None => Ok(None),
-    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let runtime = app.state::<Mutex<NdiRuntime>>();
+        let runtime = runtime.lock().map_err(|e| e.to_string())?;
+        match runtime.current_info(&output_id) {
+            Some(info) => Ok(Some(NdiStatusResponse {
+                active: true,
+                width: info.width,
+                height: info.height,
+                fps: info.fps,
+            })),
+            None => Ok(None),
+        }
+    })
+    .await
+    .map_err(|e| format!("NDI status task failed: {e}"))?
 }
 
 #[tauri::command]
-pub fn push_ndi_frame(
-    runtime: State<'_, Mutex<NdiRuntime>>,
+pub async fn push_ndi_frame(
+    app: tauri::AppHandle,
     request: Request<'_>,
 ) -> Result<(), String> {
-    let frame = ndi_raw_frame_from_request(&request)?;
-    // Take only a session handle and release the runtime-wide lock before
-    // the frame conversion + FFI submit: start/stop/status and the other
-    // output's sends no longer queue behind this frame.
-    let session = {
-        let runtime = runtime.lock().map_err(|e| e.to_string())?;
-        runtime.session_handle(&frame.output_id)
+    let (output_id, width, height, rgba_data) = {
+        let frame = ndi_raw_frame_from_request(&request)?;
+        (
+            frame.output_id,
+            frame.width,
+            frame.height,
+            frame.rgba_data.to_vec(),
+        )
     };
-    let Some(session) = session else {
-        return Err("NDI session is not active".to_string());
-    };
-    session
-        .send_frame_rgba(frame.width, frame.height, frame.rgba_data)
-        .map_err(|e| e.to_string())
+    // Take only a session handle inside spawn_blocking and release the
+    // runtime-wide lock before frame conversion + FFI submit so neither the
+    // UI loop nor the other output queues behind this send.
+    tauri::async_runtime::spawn_blocking(move || {
+        let session = {
+            let runtime = app.state::<Mutex<NdiRuntime>>();
+            let runtime = runtime.lock().map_err(|e| e.to_string())?;
+            runtime.session_handle(&output_id)
+        };
+        let Some(session) = session else {
+            return Err("NDI session is not active".to_string());
+        };
+        session
+            .send_frame_rgba(width, height, &rgba_data)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("NDI send task failed: {e}"))?
 }
 
 fn ndi_raw_frame_from_request<'a>(request: &'a Request<'_>) -> Result<NdiRawFrame<'a>, String> {
@@ -619,5 +676,22 @@ mod tests {
     fn validate_ndi_frame_payload_rejects_zero_dimensions() {
         let err = validate_ndi_frame_payload(0, 2, &[]).unwrap_err();
         assert_eq!(err, "Invalid NDI frame dimensions: 0x2");
+    }
+
+    #[test]
+    fn identify_overlay_labels_and_generation_guard_isolate_retriggered_overlays() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        assert_ne!(
+            super::identify_overlay_label(1, 0),
+            super::identify_overlay_label(2, 0)
+        );
+        assert_eq!(super::identify_overlay_label(2, 1), "identify-2-1");
+
+        let counter = AtomicU64::new(1);
+        assert!(super::is_current_identify_generation(&counter, 1));
+        counter.fetch_add(1, Ordering::SeqCst);
+        assert!(!super::is_current_identify_generation(&counter, 1));
+        assert!(super::is_current_identify_generation(&counter, 2));
     }
 }

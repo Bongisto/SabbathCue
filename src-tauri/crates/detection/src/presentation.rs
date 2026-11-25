@@ -142,7 +142,7 @@ pub fn classify_job(
     looks_like_request: bool,
     has_lexical_quote: bool,
 ) -> DetectionJob {
-    if source_is_direct && !looks_like_request {
+    if source_is_direct {
         return DetectionJob::Citation;
     }
     if looks_like_request && !has_lexical_quote {
@@ -422,6 +422,8 @@ mod tests {
         assert_eq!(classify_job(false, true, false), DetectionJob::Request);
         assert_eq!(classify_job(false, false, true), DetectionJob::Quotation);
         assert_eq!(classify_job(true, false, false), DetectionJob::Citation);
+        assert_eq!(classify_job(true, true, false), DetectionJob::Citation);
+        assert_eq!(classify_job(true, true, true), DetectionJob::Citation);
         assert!(looks_like_verse_request(
             "show me the verse about Paul and Silas singing in prison"
         ));
@@ -443,6 +445,37 @@ mod tests {
         assert!(!looks_like_verse_request(
             "the Lord is my shepherd I shall not want"
         ));
+    }
+
+    #[test]
+    fn direct_citation_phrased_as_request_keeps_citation_authorization_contract() {
+        let complete = PresentationEvidence {
+            job: classify_job(true, true, false),
+            source_is_direct: true,
+            is_chapter_only: false,
+            is_fuzzy_book: false,
+            is_complete_citation: true,
+            is_final_utterance: true,
+            has_lexical_quote: false,
+            quote_coverage: 0.0,
+            candidate_margin: 1.0,
+            independent_final_count: 1,
+            automation_live_enabled: true,
+        };
+        let complete_grant = decide_presentation(&complete);
+        assert_eq!(complete_grant.job, DetectionJob::Citation);
+        assert_eq!(complete_grant.decision, PresentationDecision::LiveAuthorized);
+        assert!(complete_grant.may_start_reading());
+        assert!(complete_grant.may_auto_queue());
+
+        let incomplete = PresentationEvidence {
+            is_complete_citation: false,
+            ..complete
+        };
+        let incomplete_grant = decide_presentation(&incomplete);
+        assert_eq!(incomplete_grant.job, DetectionJob::Citation);
+        assert_eq!(incomplete_grant.decision, PresentationDecision::Suggestion);
+        assert!(!incomplete_grant.may_preview());
     }
 
     #[test]

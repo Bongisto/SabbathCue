@@ -6,8 +6,6 @@ import type {
 } from "@/types"
 import {
   computeVerseLayoutMetrics,
-  calculateMaxAvailableVerseHeight,
-  calculateScaledFontSize,
   wrapText,
   textForPresentation,
   referenceForPresentation,
@@ -131,20 +129,6 @@ function renderPresentationImpl(
   const referenceRect = metrics.referenceRect
   const verseRect = metrics.verseRect
   if (verseRect) {
-    const maxAvailableVerseHeight = calculateMaxAvailableVerseHeight(
-      scaledTheme,
-      metrics.textRect,
-      referenceRect?.height ?? 0
-    )
-
-    const scaledFontSize = calculateScaledFontSize(
-      ctx,
-      scaledTheme,
-      data,
-      metrics.textRect.width,
-      maxAvailableVerseHeight
-    )
-
     drawHymnSectionLabel(
       ctx,
       scaledTheme,
@@ -160,7 +144,7 @@ function renderPresentationImpl(
       metrics.textRect.x,
       metrics.textRect.width,
       verseRect.y,
-      scaledFontSize
+      metrics.scaledFontSize
     )
   }
   if (referenceRect) {

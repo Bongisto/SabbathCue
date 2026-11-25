@@ -129,8 +129,7 @@ function LiveVideoMedia({
       <video
         key={videoSrc}
         ref={setVideoElement}
-        src={videoSrc}
-        poster={item.video?.poster}
+        playsInline
         className="h-full w-full object-contain"
       />
       <VideoOverlayControls
@@ -373,6 +372,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
   const previewItem = useBroadcastLiveStore((s) => s.previewItem)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isFullscreenLayout, setIsFullscreenLayout] = useState(false)
+  const isFullscreenRef = useRef(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
   const visibleItem = useMemo(
@@ -387,6 +387,7 @@ export function LiveOutputPanel({ className }: { className?: string }) {
         fullscreen,
         { setFullscreen: tauriWindowFullscreen },
         (next) => {
+          isFullscreenRef.current = next
           setIsFullscreen(next)
           setIsFullscreenLayout(next)
         }
@@ -397,6 +398,20 @@ export function LiveOutputPanel({ className }: { className?: string }) {
       })
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (isFullscreenRef.current) {
+        isFullscreenRef.current = false
+        void Promise.resolve(tauriWindowFullscreen(false)).catch((error) =>
+          console.warn(
+            "[live-output] exit fullscreen on unmount failed",
+            error
+          )
+        )
+      }
+    }
+  }, [])
 
   const toggleFullscreen = () => setPanelFullscreen(!isFullscreen)
 

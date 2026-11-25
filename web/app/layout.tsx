@@ -1,14 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import "./globals.css";
-import { SITE } from "./_lib/site";
+import { SITE, publicBasePath } from "./_lib/site";
+import { publicSiteOrigin } from "./_lib/site-url";
 import { StructuredData } from "./_components/seo/structured-data";
 
 const TITLE = `${SITE.name} — AI Bible verse detection for live sermons`;
 const OG_TITLE = `${SITE.name} — ${SITE.tagline}`;
+const siteOrigin = publicSiteOrigin();
+const basePath = publicBasePath();
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE.url),
+  metadataBase: new URL(siteOrigin),
   title: {
     default: TITLE,
     template: `%s — ${SITE.name}`,
@@ -51,7 +54,7 @@ export const metadata: Metadata = {
     title: OG_TITLE,
     description: SITE.description,
     siteName: SITE.name,
-    url: SITE.url,
+    url: siteOrigin,
     locale: SITE.locale,
   },
   twitter: {
@@ -72,7 +75,7 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  manifest: "/manifest.webmanifest",
+  manifest: `${basePath}/manifest.webmanifest`,
 };
 
 export const viewport: Viewport = {
@@ -106,6 +109,7 @@ export default function RootLayout({
           search={{
             options: {
               type: "static",
+              api: `${basePath}/api/search`,
             },
           }}
         >

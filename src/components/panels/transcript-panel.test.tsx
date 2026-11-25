@@ -181,4 +181,39 @@ describe("TranscriptPanel", () => {
       })
     ).toBe(false)
   })
+
+  it("disables starting transcription again while connecting", () => {
+    transcriptionState.connectionStatus = "connecting"
+    transcriptionState.isTranscribing = false
+
+    render(<TranscriptPanel />)
+    const button = screen.getByRole("button", { name: /connecting/i })
+    expect((button as HTMLButtonElement).disabled).toBe(true)
+
+    fireEvent.click(button)
+    expect(startTranscriptionMock).not.toHaveBeenCalled()
+  })
+
+  it("keeps jump-to-latest and top fade overlay anchored outside the scroll container", () => {
+    transcriptionState.segments = [segment("seg-1", "first line")]
+    const { container } = render(<TranscriptPanel />)
+    const scroll = transcriptScroll(container)
+
+    setScrollMetrics(scroll, {
+      scrollHeight: 400,
+      clientHeight: 100,
+      scrollTop: 20,
+    })
+    fireEvent.scroll(scroll)
+
+    const jumpBtn = screen.getByRole("button", { name: /jump to latest/i })
+    expect(scroll.contains(jumpBtn)).toBe(false)
+    expect(jumpBtn.parentElement).toBe(scroll.parentElement)
+    expect(scroll.parentElement?.className).toContain("relative")
+    expect(scroll.parentElement?.className).not.toContain("overflow-y-auto")
+
+    const fadeOverlay = scroll.parentElement?.querySelector(".pointer-events-none")
+    expect(fadeOverlay).toBeInstanceOf(HTMLElement)
+    expect(scroll.contains(fadeOverlay as HTMLElement)).toBe(false)
+  })
 })

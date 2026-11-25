@@ -19,6 +19,7 @@ export interface VerseLayoutMetrics {
   textRect: VerseLayoutRect
   referenceRect: VerseLayoutRect | null
   verseRect: VerseLayoutRect | null
+  scaledFontSize: number
 }
 
 export function wrapText(
@@ -281,6 +282,9 @@ function buildScaledTheme(
     ...theme.layout,
     offsetX: theme.layout.offsetX * scale,
     offsetY: theme.layout.offsetY * scale,
+    ...(theme.layout.referenceGap !== undefined
+      ? { referenceGap: theme.layout.referenceGap * scale }
+      : {}),
     padding: {
       top: theme.layout.padding.top * scale,
       right: theme.layout.padding.right * scale,
@@ -352,7 +356,11 @@ export function calculateMaxAvailableVerseHeight(
 
   switch (theme.reference.position) {
     case "above":
-      return textRect.height - referenceHeight
+      return (
+        textRect.height -
+        referenceHeight -
+        (theme.hymnPresentation?.titleOnly ? referenceGap : 0)
+      )
     case "below":
       return textRect.height - referenceHeight - referenceGap
     case "inline":
@@ -379,12 +387,19 @@ export function calculateScaledFontSize(
   maxHeight: number
 ): number {
   const originalFontSize = theme.verseText.fontSize
-  const minFontSize = Math.max(8, originalFontSize * 0.3) // Don't go below 30% of original or 8px
+  const minFontSize = Math.min(
+    originalFontSize,
+    Math.max(8, originalFontSize * 0.3)
+  ) // Don't go below 30% of original or 8px (without upscaling small themes)
+
+  if (measureVerseHeight(ctx, theme, verse, textRectWidth).height <= maxHeight) {
+    return originalFontSize
+  }
 
   // Binary search for optimal font size
   let low = minFontSize
   let high = originalFontSize
-  let bestFit = originalFontSize
+  let bestFit = minFontSize
 
   while (low <= high) {
     const mid = Math.floor((low + high) / 2)
@@ -589,6 +604,7 @@ export function computeVerseLayoutMetrics(
       textRect,
       referenceRect: null,
       verseRect: null,
+      scaledFontSize: scaledTheme.verseText.fontSize,
     }
   }
 
@@ -608,7 +624,29 @@ export function computeVerseLayoutMetrics(
     0,
     scaledTheme.layout.referenceGap ?? scaledTheme.reference.fontSize * 0.5
   )
-  const verseMetrics = measureVerseHeight(ctx, scaledTheme, verse, textRect.width)
+  const maxAvailableVerseHeight = calculateMaxAvailableVerseHeight(
+    scaledTheme,
+    textRect,
+    referenceHeight
+  )
+  const scaledFontSize = calculateScaledFontSize(
+    ctx,
+    scaledTheme,
+    verse,
+    textRect.width,
+    maxAvailableVerseHeight
+  )
+  const fittedTheme =
+    scaledFontSize === scaledTheme.verseText.fontSize
+      ? scaledTheme
+      : {
+          ...scaledTheme,
+          verseText: {
+            ...scaledTheme.verseText,
+            fontSize: scaledFontSize,
+          },
+        }
+  const verseMetrics = measureVerseHeight(ctx, fittedTheme, verse, textRect.width)
   const verseHeight = verseMetrics.height
   const verseDrawX = alignX(
     verseAlign === "justify" ? "left" : verseAlign,
@@ -703,5 +741,12 @@ export function computeVerseLayoutMetrics(
     )
   }
 
-  return { scaledTheme, textAreaRect, textRect, referenceRect, verseRect }
+  return {
+    scaledTheme,
+    textAreaRect,
+    textRect,
+    referenceRect,
+    verseRect,
+    scaledFontSize,
+  }
 }

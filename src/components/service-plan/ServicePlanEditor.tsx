@@ -118,14 +118,15 @@ export function ServicePlanEditor() {
         </div>
 
         <ServiceItemDetailsPanel
+          key={selectedItem?.id ?? "empty"}
           item={selectedItem}
           serviceContext={serviceContext}
           onPatchItem={(patch) => {
             if (!selectedItem) return
             updateItem(selectedItem.id, patch)
           }}
-          onEnqueuePrepared={() => void enqueuePreparedResources()}
-          onPracticePreview={() => void practicePreviewActiveItem()}
+          onEnqueuePrepared={(itemId) => void enqueuePreparedResources(itemId)}
+          onPracticePreview={(itemId) => void practicePreviewActiveItem(itemId)}
         />
       </div>
 

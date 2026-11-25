@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { invokeTauri } from "@/lib/tauri-runtime"
-import { listen } from "@tauri-apps/api/event"
+import { useTauriEvent } from "@/hooks/use-tauri-event"
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,6 @@ import {
 import { BroadcastOutputCard } from "@/components/broadcast/BroadcastOutputCard"
 import { useAssets } from "@/hooks/use-assets"
 import { useBroadcastOutputSettings } from "@/hooks/use-broadcast-output-settings"
-import { useBroadcastLiveStore } from "@/stores/broadcast/live-store"
 import { useBroadcastMonitorStore } from "@/stores/broadcast/monitor-store"
 import { CastIcon, MonitorIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -118,42 +117,19 @@ export function BroadcastSettings({
     return () => clearTimeout(timeoutId)
   }, [open, fetchMonitors])
 
-  useEffect(() => {
+  useTauriEvent("broadcast:output-ready", () => {
     if (!open) return
-
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-    const unlistenPromise = listen("broadcast:output-ready", () => {
-      useBroadcastLiveStore.getState().syncBroadcastOutput()
-      syncMainNdiConfigToOutput(
-        mainNdiActive,
-        mainNdiFrameRate,
-        mainNdiResolution,
-      )
-      syncAltNdiConfigToOutput(
-        altNdiActive,
-        altNdiFrameRate,
-        altNdiResolution,
-      )
-      timeoutId = setTimeout(() => {
-        useBroadcastLiveStore.getState().syncBroadcastOutput()
-      }, 150)
-    })
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId)
-      void unlistenPromise.then((unlisten) => unlisten())
-    }
-  }, [
-    open,
-    syncMainNdiConfigToOutput,
-    mainNdiActive,
-    mainNdiFrameRate,
-    mainNdiResolution,
-    syncAltNdiConfigToOutput,
-    altNdiActive,
-    altNdiFrameRate,
-    altNdiResolution,
-  ])
+    syncMainNdiConfigToOutput(
+      mainNdiActive,
+      mainNdiFrameRate,
+      mainNdiResolution,
+    )
+    syncAltNdiConfigToOutput(
+      altNdiActive,
+      altNdiFrameRate,
+      altNdiResolution,
+    )
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -17,6 +17,9 @@ describe("looksLikeHymnCommand (transcript_final gate)", () => {
   it("passes cue words followed by filler before the number", () => {
     expect(looksLikeHymnCommand("our next hymn is number 302")).toBe(true)
     expect(looksLikeHymnCommand("let us sing hymn 46 together")).toBe(true)
+    expect(looksLikeHymnCommand("open your hymnals and turn to 302")).toBe(true)
+    expect(looksLikeHymnCommand("sing hymn twenty-five")).toBe(true)
+    expect(looksLikeHymnCommand("sing hymn one hundred twenty-five")).toBe(true)
   })
 
   it("passes Afrikaans compound numbers written with a diaeresis", () => {

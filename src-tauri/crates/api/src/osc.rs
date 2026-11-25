@@ -8,6 +8,7 @@ use rosc::{OscMessage, OscPacket};
 use crate::coerce::parse_osc;
 use crate::dispatch::{CommandDispatcher, CommandSink};
 use crate::error::CommandError;
+use crate::http::{new_shared_http_token, SharedHttpToken};
 
 /// Configuration for the OSC listener.
 #[derive(Debug, Clone)]
@@ -61,19 +62,21 @@ impl Drop for OscHandle {
 pub struct OscStartResult {
     pub handle: OscHandle,
     pub bound_port: u16,
+    pub token: SharedHttpToken,
 }
 
-/// Start the OSC UDP listener on a dedicated thread.
+/// Start the OSC UDP listener on a dedicated thread using the token in `config`.
 ///
 /// The listener binds to `config.host:config.port`, reads incoming UDP packets,
 /// decodes OSC messages, parses them into `RemoteCommand` via `parse_osc`,
 /// and dispatches through the provided `CommandSink`.
 ///
-/// Returns a handle that can be used to stop the listener, plus the actual bound port.
+/// Returns a handle that can be used to stop the listener, the actual bound port,
+/// and the live shared token cell so token rotations take effect immediately.
 ///
 /// # Errors
 ///
-/// Returns `CommandError::DispatchFailed` if the UDP socket cannot bind.
+/// Returns `CommandError::DispatchFailed` if the token is missing or the UDP socket cannot bind.
 pub fn start_osc_listener<S>(
     config: OscConfig,
     sink: Arc<S>,
@@ -87,21 +90,61 @@ where
     // output with a single UDP packet.
     let Some(token) = config
         .token
-        .filter(|token| !token.trim().is_empty())
         .map(|token| token.trim().to_string())
+        .filter(|token| !token.is_empty())
     else {
         return Err(CommandError::DispatchFailed(
             "OSC token is required (refusing to start unauthenticated)".to_string(),
         ));
     };
 
-    let bind_addr = format!("{}:{}", config.host, config.port);
+    let shared_token = new_shared_http_token(token);
+    start_osc_inner(&config.host, config.port, sink, shared_token)
+}
+
+/// Start the OSC UDP listener sharing an existing live [`SharedHttpToken`] cell
+/// (for example the same cell owned by the HTTP server) so token rotations
+/// apply atomically to OSC authentication as well.
+///
+/// # Errors
+///
+/// Returns `CommandError::DispatchFailed` if the token is empty or the UDP socket cannot bind.
+pub fn start_osc_listener_with_token<S>(
+    config: &OscConfig,
+    sink: Arc<S>,
+    shared_token: SharedHttpToken,
+) -> Result<OscStartResult, CommandError>
+where
+    S: CommandSink + 'static,
+{
+    start_osc_inner(&config.host, config.port, sink, shared_token)
+}
+
+fn start_osc_inner<S>(
+    host: &str,
+    port: u16,
+    sink: Arc<S>,
+    shared_token: SharedHttpToken,
+) -> Result<OscStartResult, CommandError>
+where
+    S: CommandSink + 'static,
+{
+    let token_is_empty = shared_token
+        .try_read()
+        .is_ok_and(|guard| guard.trim().is_empty());
+    if token_is_empty {
+        return Err(CommandError::DispatchFailed(
+            "OSC token is required (refusing to start unauthenticated)".to_string(),
+        ));
+    }
+
+    let bind_addr = format!("{host}:{port}");
 
     let socket = UdpSocket::bind(&bind_addr).map_err(|e| {
         CommandError::DispatchFailed(format!("Failed to bind OSC on {bind_addr}: {e}"))
     })?;
 
-    let bound_port = socket.local_addr().map_or(config.port, |a| a.port());
+    let bound_port = socket.local_addr().map_or(port, |a| a.port());
 
     // Non-blocking with a short timeout so we can check the active flag
     socket
@@ -110,6 +153,7 @@ where
 
     let active = Arc::new(AtomicBool::new(true));
     let thread_active = active.clone();
+    let thread_token = shared_token.clone();
 
     let thread = std::thread::Builder::new()
         .name("osc-listener".into())
@@ -156,7 +200,10 @@ where
                     }
                 };
 
-                handle_packet(&packet, &*sink, &token);
+                // Clone the current live token and drop the read guard before
+                // dispatching so token rotation never contends on sink work.
+                let current_token = thread_token.blocking_read().clone();
+                handle_packet(&packet, &*sink, &current_token);
             }
 
             log::info!("OSC listener stopped");
@@ -169,6 +216,7 @@ where
             thread: Some(thread),
         },
         bound_port,
+        token: shared_token,
     })
 }
 
@@ -190,9 +238,14 @@ fn handle_packet(packet: &OscPacket, sink: &dyn CommandSink, token: &str) {
 /// header equivalent of HTTP's bearer token). Authorized messages have the
 /// token stripped before parsing so the command grammar is unchanged.
 fn handle_message(msg: &OscMessage, sink: &dyn CommandSink, token: &str) {
+    let expected = token.trim();
+    if expected.is_empty() {
+        log::warn!("OSC message rejected: empty server token for {}", msg.addr);
+        return;
+    }
     let mut args = msg.args.iter();
     let authorized = matches!(args.next(), Some(rosc::OscType::String(provided))
-        if crate::http::constant_time_eq(provided.as_bytes(), token.as_bytes()));
+        if crate::http::constant_time_eq(provided.as_bytes(), expected.as_bytes()));
     if !authorized {
         log::warn!(
             "OSC message rejected: missing or invalid token for {}",
@@ -413,5 +466,71 @@ mod tests {
         });
         handle_packet(&bundle, &sink, TEST_TOKEN);
         assert_eq!(sink.command_count(), 2);
+    }
+
+    #[test]
+    fn osc_listener_honors_live_token_rotation() {
+        let sink = Arc::new(MockSink::new());
+        let shared = new_shared_http_token(TEST_TOKEN.to_string());
+        let config = OscConfig {
+            port: 0,
+            host: "127.0.0.1".into(),
+            token: None,
+        };
+
+        let result = start_osc_listener_with_token(&config, sink.clone(), shared.clone())
+            .expect("should bind with shared token");
+        let port = result.bound_port;
+        let send_socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+
+        let send_with_token = |token: &str| {
+            let msg = OscMessage {
+                addr: "/sabbathcue/next".into(),
+                args: vec![rosc::OscType::String(token.to_string())],
+            };
+            let encoded = rosc::encoder::encode(&OscPacket::Message(msg)).unwrap();
+            send_socket
+                .send_to(&encoded, format!("127.0.0.1:{port}"))
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(150));
+        };
+
+        send_with_token(TEST_TOKEN);
+        assert_eq!(sink.command_count(), 1, "initial token should be accepted");
+
+        *shared.blocking_write() = "rotated-remote-token".to_string();
+
+        send_with_token(TEST_TOKEN);
+        assert_eq!(
+            sink.command_count(),
+            1,
+            "old token must be rejected immediately after rotation"
+        );
+
+        send_with_token("rotated-remote-token");
+        assert_eq!(
+            sink.command_count(),
+            2,
+            "rotated token must be accepted immediately without restarting OSC"
+        );
+
+        let mut handle = result.handle;
+        handle.stop();
+    }
+
+    #[test]
+    fn start_osc_listener_with_token_rejects_empty_shared_token() {
+        let sink = Arc::new(MockSink::new());
+        let shared = new_shared_http_token("   ".to_string());
+        let config = OscConfig {
+            port: 0,
+            host: "127.0.0.1".into(),
+            token: None,
+        };
+        let result = start_osc_listener_with_token(&config, sink, shared);
+        assert!(
+            result.is_err(),
+            "OSC must refuse to start with an empty shared token"
+        );
     }
 }

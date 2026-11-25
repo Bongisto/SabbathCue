@@ -34,12 +34,18 @@ export function useDeepgramKeySettings() {
 
   const [switchingStt, setSwitchingStt] = useState(false)
 
+  const handleKeySaved = useCallback(async () => {
+    if (sttProvider !== "deepgram") return
+    await restartActiveTranscriptionIfNeeded()
+  }, [sttProvider])
+
   const keySettings = useApiKeySettings({
     hasKey: hasDeepgramApiKey,
     setHasKey: setHasDeepgramApiKey,
     save: saveDeepgramApiKey,
     clear: clearDeepgramApiKey,
     validate: deepgramKeyActions.validateApiKey,
+    onSaved: handleKeySaved,
   })
 
   const restartActiveTranscription = useCallback(async () => {

@@ -160,5 +160,25 @@ describe("bible store persistence", () => {
       )
       warnSpy.mockRestore()
     })
+
+    it("catches debounced store.set and store.save rejections without throwing", async () => {
+      vi.useFakeTimers()
+      mockSet.mockRejectedValueOnce(new Error("write failed"))
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+      const { initBiblePersistence, useBibleStore } = await import(
+        "./bible-store"
+      )
+
+      await initBiblePersistence()
+      useBibleStore.getState().setActiveTranslation(7)
+      await vi.advanceTimersByTimeAsync(500)
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[bible] Failed to persist activeTranslationId",
+        expect.any(Error)
+      )
+      warnSpy.mockRestore()
+      vi.useRealTimers()
+    })
   })
 })

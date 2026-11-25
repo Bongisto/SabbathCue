@@ -74,13 +74,21 @@ export function deriveTrialWarning(
     return { kind: "cancel_scheduled", ...base }
   }
 
+  if (summary.scheduledChangeAction === "pause") {
+    return { kind: "access_ending", ...base }
+  }
+
   if (summary.subscriptionStatus === "trialing") {
     return { kind: "trial_converting", ...base }
   }
 
-  // No subscription but access is set: an admin comp, pilot extension, or an
-  // EFT payment granted via admin_set_access. Nothing will renew it.
-  if (!summary.subscriptionId) {
+  // No active renewing subscription (comped/EFT, or former subscriber whose
+  // canceled/paused subscriptionId stayed on file): nothing will renew it.
+  if (
+    !summary.subscriptionId ||
+    summary.subscriptionStatus === "canceled" ||
+    summary.subscriptionStatus === "paused"
+  ) {
     return { kind: "access_ending", ...base }
   }
 

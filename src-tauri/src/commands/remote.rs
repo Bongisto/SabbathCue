@@ -1,11 +1,12 @@
 use std::sync::{Arc, Mutex};
 
+use serde::Deserialize as _;
 use tauri::{AppHandle, Emitter, State};
 
 use rhema_api::{
-    new_shared_status, start_http_server, start_osc_listener, update_shared_http_token,
-    CommandError, CommandSink, HttpConfig, HttpHandle, OscConfig, OscHandle, SharedHttpToken,
-    SharedStatus,
+    new_shared_status, start_http_server, start_osc_listener, start_osc_listener_with_token,
+    update_shared_http_token, CommandError, CommandSink, HttpConfig, HttpHandle, OscConfig,
+    OscHandle, SharedHttpToken, SharedStatus,
 };
 
 use super::validation::{
@@ -63,6 +64,7 @@ impl CommandSink for TauriSink {
 pub struct OscRuntime {
     handle: Option<OscHandle>,
     bound_port: Option<u16>,
+    token: Option<SharedHttpToken>,
 }
 
 impl OscRuntime {
@@ -70,6 +72,7 @@ impl OscRuntime {
         Self {
             handle: None,
             bound_port: None,
+            token: None,
         }
     }
 }
@@ -85,8 +88,17 @@ impl Default for OscRuntime {
 pub async fn start_osc(
     app: AppHandle,
     state: State<'_, Mutex<OscRuntime>>,
+    http_state: State<'_, Mutex<HttpRuntime>>,
     port: Option<u16>,
 ) -> Result<u16, String> {
+    // Reuse the HTTP runtime's live token cell when HTTP is already running so
+    // both servers share the exact same Arc<RwLock<String>>. Drop the HTTP lock
+    // before acquiring the OSC lock to avoid any lock-ordering cycle.
+    let shared_http_token = {
+        let http_runtime = http_state.lock().map_err(|e| e.to_string())?;
+        http_runtime.shared_token()
+    };
+
     let mut runtime = state.lock().map_err(|e| e.to_string())?;
 
     if runtime.handle.is_some() {
@@ -107,11 +119,17 @@ pub async fn start_osc(
     };
 
     let sink = Arc::new(TauriSink { app });
-    let result = start_osc_listener(config, sink).map_err(|e| e.to_string())?;
+    let result = if let Some(shared_token) = shared_http_token {
+        start_osc_listener_with_token(&config, sink, shared_token)
+    } else {
+        start_osc_listener(config, sink)
+    }
+    .map_err(|e| e.to_string())?;
 
     let bound_port = result.bound_port;
     runtime.handle = Some(result.handle);
     runtime.bound_port = Some(bound_port);
+    runtime.token = Some(result.token);
 
     log::info!("OSC listener started on port {bound_port}");
     Ok(bound_port)
@@ -125,6 +143,7 @@ pub async fn stop_osc(state: State<'_, Mutex<OscRuntime>>) -> Result<(), String>
         match runtime.handle.take() {
             Some(handle) => {
                 runtime.bound_port = None;
+                runtime.token = None;
                 handle
             }
             None => return Err("OSC listener is not running".into()),
@@ -185,6 +204,10 @@ impl HttpRuntime {
 
     pub fn shared_status(&self) -> SharedStatus {
         self.status.clone()
+    }
+
+    fn shared_token(&self) -> Option<SharedHttpToken> {
+        self.token.clone()
     }
 }
 
@@ -270,19 +293,32 @@ pub async fn stop_http(state: State<'_, Mutex<HttpRuntime>>) -> Result<(), Strin
     }
 }
 
-/// Rotate the remote HTTP token and apply it to a running HTTP server.
+/// Rotate the remote control token and apply it to any running HTTP and OSC servers.
 #[tauri::command]
 pub async fn rotate_remote_http_token(
     state: State<'_, Mutex<HttpRuntime>>,
+    osc_state: State<'_, Mutex<OscRuntime>>,
 ) -> Result<String, String> {
     let token = secrets::rotate_remote_http_token()?;
-    let shared_token = {
+    let http_token = {
         let runtime = state.lock().map_err(|e| e.to_string())?;
         runtime.token.clone()
     };
+    let osc_token = {
+        let runtime = osc_state.lock().map_err(|e| e.to_string())?;
+        runtime.token.clone()
+    };
 
-    if let Some(shared_token) = shared_token {
-        update_shared_http_token(&shared_token, token.clone()).await;
+    if let Some(shared_token) = http_token.as_ref() {
+        update_shared_http_token(shared_token, token.clone()).await;
+    }
+    if let Some(shared_token) = osc_token.as_ref() {
+        let same_cell = http_token
+            .as_ref()
+            .is_some_and(|http| Arc::ptr_eq(http, shared_token));
+        if !same_cell {
+            update_shared_http_token(shared_token, token.clone()).await;
+        }
     }
 
     Ok(token)
@@ -302,44 +338,97 @@ pub async fn get_http_status(state: State<'_, Mutex<HttpRuntime>>) -> Result<Htt
     })
 }
 
+fn deserialize_optional_nullable_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(deserializer).map(Some)
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteStatusUpdate {
+    #[serde(default, alias = "on_air")]
+    on_air: Option<bool>,
+    #[serde(
+        default,
+        alias = "active_theme",
+        deserialize_with = "deserialize_optional_nullable_string"
+    )]
+    active_theme: Option<Option<String>>,
+    #[serde(
+        default,
+        alias = "live_verse",
+        deserialize_with = "deserialize_optional_nullable_string"
+    )]
+    live_verse: Option<Option<String>>,
+    #[serde(default, alias = "queue_length")]
+    queue_length: Option<usize>,
+    #[serde(default, alias = "confidence_threshold")]
+    confidence_threshold: Option<f32>,
+}
+
+fn apply_remote_status_update(
+    snapshot: &mut rhema_api::StatusSnapshot,
+    update: RemoteStatusUpdate,
+) -> Result<(), String> {
+    if let Some(v) = update.on_air {
+        snapshot.on_air = v;
+    }
+    if let Some(v) = update.active_theme {
+        match v {
+            Some(theme) => {
+                bounded_text(&theme, "active_theme", MAX_STATUS_TEXT_BYTES)?;
+                snapshot.active_theme = Some(theme);
+            }
+            None => snapshot.active_theme = None,
+        }
+    }
+    if let Some(v) = update.live_verse {
+        match v {
+            Some(verse) => {
+                bounded_text(&verse, "live_verse", MAX_STATUS_TEXT_BYTES)?;
+                snapshot.live_verse = Some(verse);
+            }
+            None => snapshot.live_verse = None,
+        }
+    }
+    if let Some(v) = update.queue_length {
+        if v > MAX_QUEUE_LENGTH {
+            return Err(format!("queue_length must be <= {MAX_QUEUE_LENGTH}"));
+        }
+        snapshot.queue_length = v;
+    }
+    if let Some(v) = update.confidence_threshold {
+        snapshot.confidence_threshold = valid_confidence_threshold(v)?;
+    }
+
+    Ok(())
+}
+
 /// Update the status snapshot from the frontend.
 #[tauri::command]
 pub async fn update_remote_status(
     state: State<'_, Mutex<HttpRuntime>>,
-    on_air: Option<bool>,
-    active_theme: Option<String>,
-    live_verse: Option<String>,
-    queue_length: Option<usize>,
-    confidence_threshold: Option<f32>,
+    request: tauri::ipc::Request<'_>,
 ) -> Result<(), String> {
+    let update = match request.body() {
+        tauri::ipc::InvokeBody::Json(value) => RemoteStatusUpdate::deserialize(value)
+            .map_err(|e| format!("Invalid remote status payload: {e}"))?,
+        tauri::ipc::InvokeBody::Raw(_) => {
+            return Err("update_remote_status expects a JSON body".to_string());
+        }
+    };
+
     let status = {
         let runtime = state.lock().map_err(|e| e.to_string())?;
         runtime.shared_status()
     };
 
     let mut snapshot = status.write().await;
-    if let Some(v) = on_air {
-        snapshot.on_air = v;
-    }
-    if let Some(v) = active_theme {
-        bounded_text(&v, "active_theme", MAX_STATUS_TEXT_BYTES)?;
-        snapshot.active_theme = Some(v);
-    }
-    if let Some(v) = live_verse {
-        bounded_text(&v, "live_verse", MAX_STATUS_TEXT_BYTES)?;
-        snapshot.live_verse = Some(v);
-    }
-    if let Some(v) = queue_length {
-        if v > MAX_QUEUE_LENGTH {
-            return Err(format!("queue_length must be <= {MAX_QUEUE_LENGTH}"));
-        }
-        snapshot.queue_length = v;
-    }
-    if let Some(v) = confidence_threshold {
-        snapshot.confidence_threshold = valid_confidence_threshold(v)?;
-    }
-
-    Ok(())
+    apply_remote_status_update(&mut snapshot, update)
 }
 
 #[derive(serde::Serialize)]
@@ -350,8 +439,9 @@ pub struct HttpStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::map_backend_remote_action;
-    use rhema_api::CommandError;
+    use super::{apply_remote_status_update, map_backend_remote_action, RemoteStatusUpdate};
+    use rhema_api::{CommandError, StatusSnapshot};
+    use serde::Deserialize as _;
 
     #[test]
     fn maps_show_and_hide_actions() {
@@ -379,5 +469,46 @@ mod tests {
         assert!(
             matches!(err, CommandError::DispatchFailed(message) if message.contains("Unknown backend action"))
         );
+    }
+
+    #[test]
+    fn update_remote_status_preserves_omitted_and_clears_explicit_null() {
+        let mut snapshot = StatusSnapshot::default();
+
+        let initial_json = serde_json::json!({
+            "onAir": true,
+            "activeTheme": "Classic Dark",
+            "liveVerse": "John 3:16",
+            "queueLength": 2,
+            "confidenceThreshold": 0.75
+        });
+        let initial = RemoteStatusUpdate::deserialize(&initial_json).unwrap();
+        apply_remote_status_update(&mut snapshot, initial).unwrap();
+        assert!(snapshot.on_air);
+        assert_eq!(snapshot.active_theme.as_deref(), Some("Classic Dark"));
+        assert_eq!(snapshot.live_verse.as_deref(), Some("John 3:16"));
+
+        // Omitted optional fields must preserve existing values.
+        let omitted_json = serde_json::json!({
+            "onAir": false
+        });
+        let omitted = RemoteStatusUpdate::deserialize(&omitted_json).unwrap();
+        apply_remote_status_update(&mut snapshot, omitted).unwrap();
+        assert!(!snapshot.on_air);
+        assert_eq!(snapshot.active_theme.as_deref(), Some("Classic Dark"));
+        assert_eq!(snapshot.live_verse.as_deref(), Some("John 3:16"));
+
+        // Explicit JSON null must clear live_verse and active_theme.
+        let cleared_json = serde_json::json!({
+            "onAir": false,
+            "activeTheme": null,
+            "liveVerse": null,
+            "queueLength": 0,
+            "confidenceThreshold": 0.75
+        });
+        let cleared = RemoteStatusUpdate::deserialize(&cleared_json).unwrap();
+        apply_remote_status_update(&mut snapshot, cleared).unwrap();
+        assert_eq!(snapshot.active_theme, None);
+        assert_eq!(snapshot.live_verse, None);
     }
 }

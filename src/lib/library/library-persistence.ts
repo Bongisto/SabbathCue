@@ -16,7 +16,12 @@ let storePromise: Promise<Store> | null = null
 
 function libraryStore(): Promise<Store> {
   if (!storePromise) {
-    storePromise = load("library.json", { autoSave: false, defaults: {} })
+    storePromise = load("library.json", { autoSave: false, defaults: {} }).catch(
+      (error) => {
+        storePromise = null
+        throw error
+      },
+    )
   }
   return storePromise
 }

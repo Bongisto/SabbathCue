@@ -47,19 +47,58 @@ export function normalizeInput(input: string): string {
   return trimmed
 }
 
+function foldDiacritics(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+}
+
 /**
- * Find matching book by name or abbreviation (case insensitive)
+ * Canonicalize a book name or query prefix for cross-translation matching:
+ * fold diacritics, collapse whitespace, lowercase, and unify leading Arabic
+ * ("1", "2", "3") and Roman ("I ", "II", "III") book numbers.
+ */
+function normalizeBookText(value: string): string {
+  const folded = foldDiacritics(value)
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+  const arabicMatch = folded.match(/^([123])(?:\s+(.*)|([\p{L}].*))?$/u)
+  if (arabicMatch) {
+    const rest = arabicMatch[2] ?? arabicMatch[3]
+    return rest ? `${arabicMatch[1]} ${rest}` : arabicMatch[1]
+  }
+  const romanMatch = folded.match(/^(iii|ii|i)(?:\s+(.*))?$/)
+  if (romanMatch) {
+    const numeral = romanMatch[1]
+    const rest = romanMatch[2]
+    // Leave bare "i" untouched so it can still match "Isaiah" as well as "I ..."
+    if (numeral === "i" && rest === undefined) {
+      return folded
+    }
+    const digit = numeral === "iii" ? "3" : numeral === "ii" ? "2" : "1"
+    return rest ? `${digit} ${rest}` : digit
+  }
+  return folded
+}
+
+/**
+ * Find matching book by name or abbreviation (case- and diacritic-insensitive,
+ * supporting both Arabic and Roman leading book numbers).
  */
 export function findMatchingBook(
   bookInput: string,
   books: Book[]
 ): Book | undefined {
-  const normalized = bookInput.toLowerCase()
-  return books.find(
-    (b) =>
-      b.name.toLowerCase().startsWith(normalized) ||
-      b.abbreviation.toLowerCase().startsWith(normalized)
-  )
+  const normalized = normalizeBookText(bookInput)
+  if (!normalized) return undefined
+  return books.find((b) => {
+    const name = normalizeBookText(b.name)
+    const abbr = normalizeBookText(b.abbreviation)
+    return (
+      name.startsWith(normalized) ||
+      abbr.startsWith(normalized) ||
+      foldDiacritics(b.name).trim().toLowerCase().startsWith(normalized)
+    )
+  })
 }
 
 /**
@@ -79,14 +118,14 @@ export function getAutocompleteSuggestion(
 
   // Check if it's just a number (for numbered books like "1", "2", "3")
   if (/^\d+$/.test(trimmed)) {
+    const numPrefix = normalizeBookText(trimmed) + " "
     const matchingBook = books.find((b) =>
-      b.name.startsWith(normalizedInput + " ")
+      normalizeBookText(b.name).startsWith(numPrefix)
     )
 
     if (matchingBook) {
-      const remainder = matchingBook.name.slice(normalizedInput.length)
       return {
-        suggestion: normalizedInput + remainder + " 1:1",
+        suggestion: matchingBook.name + " 1:1",
         matchedBook: matchingBook,
         chapter: 1,
         verse: 1,
@@ -96,9 +135,9 @@ export function getAutocompleteSuggestion(
   }
 
   // Parse: "NumberedBook Chapter:Verse" or "BookName Chapter:Verse"
-  // Match patterns like: "I J", "I John", "John", "John 3", "John 3:16"
+  // Match patterns like: "I J", "1 John", "Daniël 2:44", "John 3", "John 3:16"
   const match = normalizedInput.match(
-    /^([IVX]+\s+[a-zA-Z]+|[IVX]+\s+[a-zA-Z\s]+|[a-zA-Z\s]+?)\s*(\d+)?:?(\d+)?$/
+    /^((?:(?:[IVX]+|[123])\s+)?[\p{L}\s]+?)\s*(?:(\d+)(?::(\d+)?)?)?$/iu
   )
 
   if (!match) {
@@ -190,7 +229,7 @@ export function getTabNavigationResult(
 
   // Extract the full book name from the suggestion
   const bookNameMatch = suggestionTrimmed.match(
-    /^(([IVX]+\s+)?[a-zA-Z\s]+)\s+\d+:\d+$/
+    /^(((?:[IVX]+|[123])\s+)?[\p{L}\s]+)\s+\d+:\d+$/iu
   )
 
   if (bookNameMatch) {
@@ -215,7 +254,7 @@ export function getTabNavigationResult(
     // Stage 2: Has chapter -> advance to chapter with colon
     if (hasChapter) {
       const chapterMatch = suggestionTrimmed.match(
-        /^(([IVX]+\s+)?[a-zA-Z\s]+\s+\d+):\d+$/
+        /^(((?:[IVX]+|[123])\s+)?[\p{L}\s]+\s+\d+):\d+$/iu
       )
       if (chapterMatch) {
         return chapterMatch[1] + ":"

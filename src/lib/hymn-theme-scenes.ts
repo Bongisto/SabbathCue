@@ -415,10 +415,13 @@ function drawMinimalGrid(
   width: number,
   height: number
 ): void {
+  const spacing = width * (84 / 1920)
+  if (width <= 0 || height <= 0 || spacing <= 0 || !Number.isFinite(spacing)) {
+    return
+  }
   ctx.save()
   ctx.strokeStyle = "rgba(255, 255, 255, 0.018)"
   ctx.lineWidth = 1
-  const spacing = width * (84 / 1920)
   for (let x = 0; x <= width; x += spacing) {
     ctx.beginPath()
     ctx.moveTo(x, 0)
@@ -821,6 +824,14 @@ export function drawHymnThemeScene(
   timeMs: number,
   sectionKind?: HymnPresentationSectionKind
 ): boolean {
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return false
+  }
   const refrain = isRefrain(sectionKind)
   switch (k.backgroundKind) {
     case "hymn-midnight":

@@ -44,7 +44,13 @@ function activationChallenge(body: ActivationRequest): string {
 }
 
 async function verifyInstallationProof(body: ActivationRequest): Promise<boolean> {
-  if (Math.abs(Date.now() - body.challengeTimestamp) > MAX_CHALLENGE_AGE_MS) return false
+  if (
+    typeof body.challengeTimestamp !== "number" ||
+    !Number.isFinite(body.challengeTimestamp) ||
+    Math.abs(Date.now() - body.challengeTimestamp) > MAX_CHALLENGE_AGE_MS
+  ) {
+    return false
+  }
   const key = await crypto.subtle.importKey(
     "spki",
     decodeBase64(body.publicKey),
@@ -90,7 +96,11 @@ type RpcCaller = (
 
 async function readActivationRequest(request: Request): Promise<ActivationRequest | Response> {
   try {
-    return (await request.json()) as ActivationRequest
+    const parsed = await request.json()
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return json({ message: "Invalid activation request." }, 400)
+    }
+    return parsed as ActivationRequest
   } catch {
     return json({ message: "Invalid activation request." }, 400)
   }

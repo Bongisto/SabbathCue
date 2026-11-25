@@ -163,4 +163,23 @@ describe("library store", () => {
       hydrated: true,
     })
   })
+
+  it("continues persisting later updates after a saveLibrarySnapshot failure", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    saveLibrarySnapshot
+      .mockRejectedValueOnce(new Error("disk lock"))
+      .mockResolvedValueOnce(undefined)
+
+    useLibraryStore.getState().addAsset(imageAsset("first"))
+    await flushPersistence()
+    await Promise.resolve()
+
+    useLibraryStore.getState().addAsset(imageAsset("second"))
+    await flushPersistence()
+    await Promise.resolve()
+
+    expect(saveLibrarySnapshot).toHaveBeenCalledTimes(2)
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
 })

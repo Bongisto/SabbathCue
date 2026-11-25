@@ -66,6 +66,13 @@ let hydrationPromise: Promise<void> | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let focusListenersActive = false
 let suspensionCheckPromise: Promise<void> | null = null
+let sessionEpoch = 0
+
+function advanceSessionEpoch(): number {
+  sessionEpoch += 1
+  suspensionCheckPromise = null
+  return sessionEpoch
+}
 
 function stopHeartbeat(): void {
   if (heartbeatTimer !== null) {
@@ -77,19 +84,24 @@ function stopHeartbeat(): void {
 
 function runSuspensionCheck(): Promise<void> {
   if (suspensionCheckPromise) return suspensionCheckPromise
+  const epoch = sessionEpoch
 
-  suspensionCheckPromise = (async () => {
+  const currentCheck = (async () => {
     const snapshot = await heartbeatDeviceRegistration()
+    if (epoch !== sessionEpoch) return
     if (snapshot) applySnapshot(snapshot)
   })()
     .catch(() => {
       // Transient heartbeat failures never kick an active session.
     })
     .finally(() => {
-      suspensionCheckPromise = null
+      if (suspensionCheckPromise === currentCheck) {
+        suspensionCheckPromise = null
+      }
     })
 
-  return suspensionCheckPromise
+  suspensionCheckPromise = currentCheck
+  return currentCheck
 }
 
 function handleFocusVerification(): void {
@@ -141,6 +153,42 @@ function applySnapshot(snapshot: VerificationStateSnapshot): void {
   useVerificationStore.setState({ ...snapshot, isHydrated: true })
 }
 
+async function runSignOutTransition(
+  action: () => Promise<VerificationStateSnapshot>
+): Promise<void> {
+  const epoch = advanceSessionEpoch()
+  useVerificationStore.setState({
+    status: "checking",
+    error: null,
+    errorCode: null,
+  })
+  stopHeartbeat()
+  try {
+    const snapshot = await action()
+    if (epoch === sessionEpoch) {
+      applySnapshot(snapshot)
+    }
+  } catch (error) {
+    if (epoch !== sessionEpoch) return
+    stopHeartbeat()
+    useVerificationStore.setState({
+      status: "error",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
+      verifiedEmail: null,
+      isChurchOrganization: false,
+      churchName: null,
+      error: String(error),
+      errorCode: "unknown",
+      isHydrated: true,
+    })
+  }
+}
+
 export const useVerificationStore = create<VerificationStore>(() => ({
   status: "checking",
   verifiedUserId: null,
@@ -157,27 +205,32 @@ export const useVerificationStore = create<VerificationStore>(() => ({
 
   hydrate: async () => {
     if (hydrationPromise) return hydrationPromise
+    const epoch = advanceSessionEpoch()
     hydrationPromise = (async () => {
       try {
-        applySnapshot(
-          await withStartupVerificationTimeout(loadCachedVerification)
+        const snapshot = await withStartupVerificationTimeout(
+          loadCachedVerification
         )
+        if (epoch === sessionEpoch) applySnapshot(snapshot)
       } catch (error) {
-        applyVerificationFailure(error)
+        if (epoch === sessionEpoch) applyVerificationFailure(error)
       }
     })()
     return hydrationPromise
   },
 
   signIn: async (email, password) => {
+    const epoch = advanceSessionEpoch()
     useVerificationStore.setState({
       status: "checking",
       error: null,
       errorCode: null,
     })
     try {
-      applySnapshot(await providerSignIn(email, password))
+      const snapshot = await providerSignIn(email, password)
+      if (epoch === sessionEpoch) applySnapshot(snapshot)
     } catch (error) {
+      if (epoch !== sessionEpoch) return
       stopHeartbeat()
       useVerificationStore.setState({
         status: "error",
@@ -189,14 +242,17 @@ export const useVerificationStore = create<VerificationStore>(() => ({
   },
 
   signUp: async (email, password, profile) => {
+    const epoch = advanceSessionEpoch()
     useVerificationStore.setState({
       status: "checking",
       error: null,
       errorCode: null,
     })
     try {
-      applySnapshot(await providerSignUp(email, password, profile))
+      const snapshot = await providerSignUp(email, password, profile)
+      if (epoch === sessionEpoch) applySnapshot(snapshot)
     } catch (error) {
+      if (epoch !== sessionEpoch) return
       stopHeartbeat()
       useVerificationStore.setState({
         status: "error",
@@ -207,38 +263,24 @@ export const useVerificationStore = create<VerificationStore>(() => ({
     }
   },
 
-  signOut: async () => {
-    useVerificationStore.setState({
-      status: "checking",
-      error: null,
-      errorCode: null,
-    })
-    stopHeartbeat()
-    applySnapshot(await providerSignOut())
-  },
+  signOut: () => runSignOutTransition(providerSignOut),
 
   refresh: async () => {
+    const epoch = advanceSessionEpoch()
     useVerificationStore.setState({
       status: "checking",
       error: null,
       errorCode: null,
     })
     try {
-      applySnapshot(await withStartupVerificationTimeout(refreshVerification))
+      const snapshot = await withStartupVerificationTimeout(refreshVerification)
+      if (epoch === sessionEpoch) applySnapshot(snapshot)
     } catch (error) {
-      applyVerificationFailure(error)
+      if (epoch === sessionEpoch) applyVerificationFailure(error)
     }
   },
 
-  clear: async () => {
-    useVerificationStore.setState({
-      status: "checking",
-      error: null,
-      errorCode: null,
-    })
-    stopHeartbeat()
-    applySnapshot(await clearVerification())
-  },
+  clear: () => runSignOutTransition(clearVerification),
 }))
 
 export function hydrateVerification(): Promise<void> {
@@ -254,4 +296,5 @@ export function resetVerificationStoreForTests(): void {
   hydrationPromise = null
   stopHeartbeat()
   suspensionCheckPromise = null
+  sessionEpoch = 0
 }

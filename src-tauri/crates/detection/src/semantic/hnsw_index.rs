@@ -9,6 +9,8 @@
 //! This module is only compiled when the `vector-search` feature is enabled.
 
 #[cfg(feature = "vector-search")]
+use std::collections::HashSet;
+#[cfg(feature = "vector-search")]
 use std::io::{Read, Seek};
 #[cfg(feature = "vector-search")]
 use std::path::Path;
@@ -141,6 +143,12 @@ impl HnswVectorIndex {
                     embeddings_path.display()
                 ))
             })?;
+        if let Some(index) = embeddings.iter().position(|value| !value.is_finite()) {
+            return Err(DetectionError::Internal(format!(
+                "embeddings {} contains non-finite value at float {index}",
+                embeddings_path.display()
+            )));
+        }
 
         let index = Self::finish_load(Vectors::F32(embeddings), ids_path, dim, num_vectors, None)?;
         log::info!("HnswVectorIndex loaded: {num_vectors} vectors, dim={dim}");
@@ -259,6 +267,16 @@ impl HnswVectorIndex {
                 embedding.len()
             )));
         }
+        if let Some((vec_idx, comp_idx)) = embeddings.iter().enumerate().find_map(|(vi, embedding)| {
+            embedding
+                .iter()
+                .position(|value| !value.is_finite())
+                .map(|ci| (vi, ci))
+        }) {
+            return Err(DetectionError::Internal(format!(
+                "embedding {vec_idx} component {comp_idx} is not finite"
+            )));
+        }
 
         let flat: Vec<f32> = embeddings.into_iter().flatten().collect();
 
@@ -324,6 +342,11 @@ impl VectorIndex for HnswVectorIndex {
                 self.dimension
             )));
         }
+        if let Some(index) = query.iter().position(|value| !value.is_finite()) {
+            return Err(DetectionError::Internal(format!(
+                "query component {index} is not finite"
+            )));
+        }
 
         let n = self.verse_ids.len();
         if n == 0 {
@@ -350,19 +373,38 @@ impl VectorIndex for HnswVectorIndex {
                 .collect(),
         };
 
-        // Only k results are returned, so select them in O(n) rather than
-        // sorting all n, then order just the survivors.
-        scores.select_nth_unstable_by(k - 1, rank);
-        scores.truncate(k);
-        scores.sort_unstable_by(rank);
+        // Deduplicate by verse_id while keeping each verse's highest cosine
+        // similarity across multi-translation corpus entries.
+        let candidate_k = k.saturating_mul(6).clamp(k, n);
+        if candidate_k < n {
+            scores.select_nth_unstable_by(candidate_k - 1, rank);
+        }
+        scores[..candidate_k].sort_unstable_by(rank);
 
-        let results: Vec<SearchResult> = scores
-            .into_iter()
-            .map(|(index, similarity)| SearchResult {
-                verse_id: self.verse_ids[index],
-                similarity: f64::from(similarity),
-            })
-            .collect();
+        let mut seen = HashSet::with_capacity(k);
+        let mut results = Vec::with_capacity(k);
+        let mut start = 0;
+        let mut end = candidate_k;
+        loop {
+            for &(index, similarity) in &scores[start..end] {
+                let verse_id = self.verse_ids[index];
+                if seen.insert(verse_id) {
+                    results.push(SearchResult {
+                        verse_id,
+                        similarity: f64::from(similarity),
+                    });
+                    if results.len() == k {
+                        break;
+                    }
+                }
+            }
+            if results.len() == k || end >= n {
+                break;
+            }
+            scores[end..].sort_unstable_by(rank);
+            start = end;
+            end = n;
+        }
 
         log::debug!(
             "[VECTOR] search n={n} k={k} took {:?}",
@@ -374,6 +416,14 @@ impl VectorIndex for HnswVectorIndex {
 
     fn len(&self) -> usize {
         self.verse_ids.len()
+    }
+
+    fn unique_verse_ids(&self) -> Vec<i64> {
+        let mut unique = HashSet::new();
+        unique.extend(self.verse_ids.iter().copied());
+        let mut ids: Vec<i64> = unique.into_iter().collect();
+        ids.sort_unstable();
+        ids
     }
 }
 
@@ -432,13 +482,22 @@ fn dot_q8(query: &[f32], stored: &[i8], scale: f32) -> f32 {
     (lanes.iter().sum::<f32>() + tail) * scale
 }
 
+#[cfg(feature = "vector-search")]
+fn normalize_score(score: f32) -> f32 {
+    if score.is_finite() {
+        score
+    } else {
+        f32::NEG_INFINITY
+    }
+}
+
 /// Rank by descending similarity, breaking ties by index so the top-k order is
 /// deterministic — the previous full unstable sort left tied scores in an
 /// arbitrary order.
 #[cfg(feature = "vector-search")]
 fn rank(a: &(usize, f32), b: &(usize, f32)) -> std::cmp::Ordering {
-    b.1.partial_cmp(&a.1)
-        .unwrap_or(std::cmp::Ordering::Equal)
+    normalize_score(b.1)
+        .total_cmp(&normalize_score(a.1))
         .then(a.0.cmp(&b.0))
 }
 
@@ -675,5 +734,96 @@ mod tests {
         let index = HnswVectorIndex::load(&embeddings_path, &ids_path, dim).expect("load legacy");
 
         assert_eq!(index.len(), 1);
+    }
+
+    #[test]
+    fn duplicate_verse_ids_deduplicate_keeping_max_similarity() {
+        let dim = 4;
+        // Five corpus entries sharing verse_id=42 plus one distinct verse_id=99.
+        let vectors = vec![
+            vec![0.9, 0.435_889_9, 0.0, 0.0],
+            vec![0.8, 0.6, 0.0, 0.0],
+            vec![0.7, 0.714_142_8, 0.0, 0.0],
+            vec![0.6, 0.8, 0.0, 0.0],
+            vec![0.5, 0.866_025_4, 0.0, 0.0],
+            vec![0.85, 0.526_782_7, 0.0, 0.0],
+        ];
+        let ids = vec![42, 42, 42, 42, 42, 99];
+        let index = HnswVectorIndex::from_vecs(vectors, ids, dim).expect("build index");
+        let query = [1.0, 0.0, 0.0, 0.0];
+
+        let results = index.search(&query, 2).expect("search");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].verse_id, 42);
+        assert!((results[0].similarity - 0.9).abs() < 1e-4);
+        assert_eq!(results[1].verse_id, 99);
+        assert!((results[1].similarity - 0.85).abs() < 1e-4);
+        assert_eq!(index.unique_verse_ids(), vec![42, 99]);
+    }
+
+    #[test]
+    fn rank_orders_nan_and_non_finite_scores_with_strict_weak_ordering() {
+        let mut scores = vec![
+            (0, f32::NAN),
+            (1, 0.75),
+            (2, f32::INFINITY),
+            (3, f32::NEG_INFINITY),
+            (4, 0.90),
+            (5, f32::NAN),
+            (6, -0.0),
+            (7, 0.0),
+        ];
+
+        scores.select_nth_unstable_by(2, rank);
+        scores[..3].sort_unstable_by(rank);
+        scores[3..].sort_unstable_by(rank);
+
+        let mut full_sorted = vec![
+            (0, f32::NAN),
+            (1, 0.75),
+            (2, f32::INFINITY),
+            (3, f32::NEG_INFINITY),
+            (4, 0.90),
+            (5, f32::NAN),
+            (6, -0.0),
+            (7, 0.0),
+        ];
+        full_sorted.sort_unstable_by(rank);
+
+        assert_eq!(
+            full_sorted.iter().map(|&(idx, _)| idx).collect::<Vec<_>>(),
+            vec![4, 1, 7, 6, 0, 2, 3, 5]
+        );
+        assert_eq!(scores[0].0, 4);
+        assert_eq!(scores[1].0, 1);
+    }
+
+    #[test]
+    fn from_vecs_load_f32_and_search_reject_non_finite_inputs() {
+        let from_vecs_err = HnswVectorIndex::from_vecs(vec![vec![1.0, f32::NAN]], vec![1], 2)
+            .expect_err("from_vecs must reject NaN");
+        assert!(from_vecs_err.to_string().contains("not finite"));
+
+        let dir = tempfile::tempdir().expect("temp dir");
+        let embeddings_path = dir.path().join("nan-f32.bin");
+        let ids_path = dir.path().join("nan-ids.bin");
+        let bad_vecs = [1.0f32, f32::NAN];
+        std::fs::write(&embeddings_path, bytemuck::cast_slice(&bad_vecs))
+            .expect("write f32 embeddings");
+        write_ids(&ids_path, &[10]);
+        let load_err = HnswVectorIndex::load(&embeddings_path, &ids_path, 2)
+            .expect_err("load_f32 must reject NaN");
+        assert!(load_err.to_string().contains("non-finite"));
+
+        let index = HnswVectorIndex::from_vecs(vec![vec![1.0, 0.0]], vec![1], 2).unwrap();
+        let nan_query_err = index
+            .search(&[f32::NAN, 0.0], 1)
+            .expect_err("search must reject NaN query");
+        assert!(nan_query_err.to_string().contains("not finite"));
+
+        let inf_query_err = index
+            .search(&[f32::INFINITY, 0.0], 1)
+            .expect_err("search must reject infinite query");
+        assert!(inf_query_err.to_string().contains("not finite"));
     }
 }

@@ -356,6 +356,15 @@ pub enum ScanOutcome {
     Continue,
 }
 
+pub fn parse_decision(content: &str) -> ScanOutcome {
+    let trimmed = content.trim();
+    let mut chars = trimmed.chars();
+    match (chars.next(), chars.next()) {
+        (Some(letter), None) if LETTERS.contains(&letter) => ScanOutcome::Selected(letter),
+        _ => ScanOutcome::Abstain,
+    }
+}
+
 #[derive(Default)]
 pub struct SseLetterScanner {
     buffer: String,
@@ -367,6 +376,7 @@ impl SseLetterScanner {
     /// `buffer` between calls, so chunks may split lines or JSON anywhere.
     pub fn push(&mut self, chunk: &str) -> ScanOutcome {
         self.buffer.push_str(chunk);
+        let mut saw_done = false;
         while let Some(newline) = self.buffer.find('\n') {
             let line: String = self.buffer.drain(..=newline).collect();
             let line = line.trim();
@@ -375,7 +385,8 @@ impl SseLetterScanner {
             };
             let payload = payload.trim();
             if payload == "[DONE]" {
-                return ScanOutcome::Abstain;
+                saw_done = true;
+                break;
             }
             let Ok(event) = serde_json::from_str::<serde_json::Value>(payload) else {
                 continue;
@@ -384,13 +395,14 @@ impl SseLetterScanner {
                 continue;
             };
             self.content.push_str(token);
-            if let Some(first) = self.content.trim().chars().next() {
-                if LETTERS.contains(&first) {
-                    return ScanOutcome::Selected(first);
-                }
-                // 'N' or any protocol violation: abstain, never guess.
-                return ScanOutcome::Abstain;
-            }
+        }
+
+        let trimmed = self.content.trim();
+        if !trimmed.is_empty() {
+            return parse_decision(trimmed);
+        }
+        if saw_done {
+            return ScanOutcome::Abstain;
         }
         ScanOutcome::Continue
     }
@@ -982,5 +994,39 @@ mod tests {
         assert!(map_cerebras_validation_status(403).is_err());
         assert!(map_cerebras_validation_status(429).is_err());
         assert!(map_cerebras_validation_status(500).is_err());
+    }
+
+    #[test]
+    fn scanner_abstains_on_verbose_prose_starting_with_candidate_letter() {
+        for text in [
+            "Answer: none",
+            "Cannot determine from speech",
+            "NONE",
+            "A. Acts 16:25 is close",
+            "B because Paul was praying",
+        ] {
+            let mut scanner = SseLetterScanner::default();
+            assert_eq!(
+                scanner.push(&sse(text)),
+                ScanOutcome::Abstain,
+                "verbose/non-letter response must abstain: {text}"
+            );
+        }
+
+        let mut split_prose = SseLetterScanner::default();
+        assert_eq!(
+            split_prose.push(&format!("{}{}", sse("A"), sse("nswer: none"))),
+            ScanOutcome::Abstain
+        );
+    }
+
+    #[test]
+    fn parse_decision_requires_exact_single_candidate_letter() {
+        assert_eq!(parse_decision(" A "), ScanOutcome::Selected('A'));
+        assert_eq!(parse_decision("H"), ScanOutcome::Selected('H'));
+        assert_eq!(parse_decision("N"), ScanOutcome::Abstain);
+        assert_eq!(parse_decision("NONE"), ScanOutcome::Abstain);
+        assert_eq!(parse_decision("Answer: none"), ScanOutcome::Abstain);
+        assert_eq!(parse_decision("Cannot determine"), ScanOutcome::Abstain);
     }
 }

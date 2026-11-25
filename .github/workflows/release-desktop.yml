@@ -280,8 +280,10 @@ jobs:
           }
 
           $tag = "v$version"
-          $assetName = $setupExe.Name
-          $downloadUrl = "https://github.com/Bongisto/sabbathcue-releases/releases/download/$tag/$assetName"
+          # GitHub Releases normalizes uploaded asset filenames by replacing spaces
+          # and other disallowed characters with dots.
+          $releaseAssetName = [regex]::Replace($setupExe.Name, '[^A-Za-z0-9._-]+', '.')
+          $downloadUrl = "https://github.com/Bongisto/sabbathcue-releases/releases/download/$tag/$([System.Uri]::EscapeDataString($releaseAssetName))"
           $signature = (Get-Content $sigPath -Raw).Trim()
 
           $latest = [ordered]@{
@@ -298,7 +300,7 @@ jobs:
 
           $latestPath = Join-Path $bundleRoot "latest.json"
           $latest | ConvertTo-Json -Depth 6 | Set-Content -Path $latestPath -Encoding utf8
-          Write-Host "Wrote $latestPath for $assetName"
+          Write-Host "Wrote $latestPath for $releaseAssetName"
 
       - name: Verify updater artifacts
         shell: pwsh
@@ -310,13 +312,20 @@ jobs:
             exit 1
           }
 
+          $latest = Get-Content $latestPath -Raw | ConvertFrom-Json
+          $updaterUrl = $latest.platforms.'windows-x86_64'.url
+          if ([string]::IsNullOrWhiteSpace($updaterUrl) -or $updaterUrl -match '\s' -or -not [System.Uri]::IsWellFormedUriString($updaterUrl, [System.UriKind]::Absolute)) {
+            Write-Error "Invalid updater URL in latest.json: $updaterUrl"
+            exit 1
+          }
+
           $sigFiles = Get-ChildItem -Path $bundleRoot -Recurse -Filter "*.sig"
           if ($sigFiles.Count -eq 0) {
             Write-Error "No .sig files found under $bundleRoot"
             exit 1
           }
 
-          Write-Host "Found $($sigFiles.Count) signature file(s) and latest.json"
+          Write-Host "Found $($sigFiles.Count) signature file(s) and latest.json ($updaterUrl)"
 
       - name: Generate checksums
         run: |
@@ -380,11 +389,43 @@ jobs:
           if ($releaseExists) {
             Write-Host "Release $tag already exists; uploading assets with --clobber"
             gh release upload $tag --repo $repo --clobber @assetArgs
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          } else {
+            gh release create $tag `
+              --repo $repo `
+              --title "SabbathCue $version" `
+              --notes "Windows installers for SabbathCue $version. Auto-update is supported via the NSIS .exe (recommended). MSI is provided as an alternate installer." `
+              @assetArgs
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+          $releaseJson = gh api "repos/$repo/releases/tags/$tag"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to fetch published GitHub Release metadata for $tag"
             exit $LASTEXITCODE
           }
 
-          gh release create $tag `
-            --repo $repo `
-            --title "SabbathCue $version" `
-            --notes "Windows installers for SabbathCue $version. Auto-update is supported via the NSIS .exe (recommended). MSI is provided as an alternate installer." `
-            @assetArgs
+          $releaseData = $releaseJson | ConvertFrom-Json
+          $uploadedExe = $releaseData.assets |
+            Where-Object { $_.name -like "*-setup.exe" } |
+            Select-Object -First 1
+          if (-not $uploadedExe -or [string]::IsNullOrWhiteSpace($uploadedExe.browser_download_url)) {
+            Write-Error "Uploaded *-setup.exe asset not found on GitHub Release $tag"
+            exit 1
+          }
+
+          $latestPath = Join-Path $bundleRoot "latest.json"
+          $latest = Get-Content $latestPath -Raw | ConvertFrom-Json
+          if ($latest.platforms.'windows-x86_64'.url -ne $uploadedExe.browser_download_url) {
+            Write-Host "Syncing latest.json updater URL to GitHub Release asset URL: $($uploadedExe.browser_download_url)"
+            $latest.platforms.'windows-x86_64'.url = $uploadedExe.browser_download_url
+            $latest | ConvertTo-Json -Depth 6 | Set-Content -Path $latestPath -Encoding utf8
+            gh release upload $tag --repo $repo --clobber $latestPath
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }

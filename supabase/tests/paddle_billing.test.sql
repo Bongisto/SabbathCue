@@ -482,6 +482,138 @@ END
 $$;
 
 
+-- Stale out-of-order transaction.completed webhooks must not revert a newer
+-- customer email (BW-06).
+DO $$
+DECLARE
+  v_email text;
+BEGIN
+  PERFORM set_config('request.jwt.claim.role', '', true);
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+
+  PERFORM public.paddle_process_customer_event(
+    'evt_txn_order_new', 'customer.updated', now(),
+    'ctm_txn_order', 'newer.email@example.com');
+
+  PERFORM public.paddle_process_transaction_event(
+    'evt_txn_order_old', 'transaction.completed', now() - interval '1 hour',
+    'ctm_txn_order', 'older.email@example.com', NULL);
+
+  SELECT email INTO v_email
+  FROM public.paddle_customers WHERE customer_id = 'ctm_txn_order';
+  PERFORM test_assert(v_email = 'newer.email@example.com',
+    'stale transaction event does not revert a newer customer email');
+
+  INSERT INTO test_results VALUES
+    ('stale_transaction_event_preserves_newer_email', true, NULL);
+EXCEPTION WHEN others THEN
+  INSERT INTO test_results VALUES
+    ('stale_transaction_event_preserves_newer_email', false, SQLERRM);
+END
+$$;
+
+
+-- Reassigning a customer email must recalculate the previous user's access and
+-- clear user_id when the new email has no account (BW-07).
+DO $$
+DECLARE
+  v_user_a uuid;
+  v_user_b uuid;
+  v_access_a timestamptz;
+  v_access_b timestamptz;
+  v_linked_user uuid;
+BEGIN
+  INSERT INTO auth.users (email) VALUES ('reassigned.a@example.com')
+  RETURNING id INTO v_user_a;
+  INSERT INTO auth.users (email) VALUES ('reassigned.b@example.com')
+  RETURNING id INTO v_user_b;
+
+  PERFORM public.paddle_process_subscription_event(
+    'evt_reassign_sub', 'subscription.created', now() - interval '2 minutes',
+    'sub_reassign', 'ctm_reassign', 'reassigned.a@example.com', v_user_a,
+    'active', 'pri_1', 'pro_1', now() + interval '30 days', NULL);
+
+  PERFORM public.paddle_process_customer_event(
+    'evt_reassign_to_b', 'customer.updated', now() - interval '1 minute',
+    'ctm_reassign', 'reassigned.b@example.com');
+
+  SELECT access_expires_at INTO v_access_a
+  FROM public.account_flags WHERE user_id = v_user_a;
+  SELECT access_expires_at INTO v_access_b
+  FROM public.account_flags WHERE user_id = v_user_b;
+
+  PERFORM test_assert(v_access_a <= now() + interval '1 minute',
+    'previous user loses paddle-granted access on customer reassignment');
+  PERFORM test_assert(v_access_b > now() + interval '29 days',
+    'new user receives paddle-granted access on customer reassignment');
+
+  PERFORM public.paddle_process_customer_event(
+    'evt_reassign_to_none', 'customer.updated', now(),
+    'ctm_reassign', 'unregistered.owner@example.com');
+
+  SELECT user_id INTO v_linked_user
+  FROM public.paddle_customers WHERE customer_id = 'ctm_reassign';
+  SELECT access_expires_at INTO v_access_b
+  FROM public.account_flags WHERE user_id = v_user_b;
+
+  PERFORM test_assert(v_linked_user IS NULL,
+    'customer user_id clears to NULL when reassigned to an unregistered email');
+  PERFORM test_assert(v_access_b <= now() + interval '1 minute',
+    'previous user loses paddle-granted access when reassigned to unregistered email');
+
+  INSERT INTO test_results VALUES
+    ('customer_reassignment_recalculates_old_user_and_clears_unmatched', true, NULL);
+EXCEPTION WHEN others THEN
+  INSERT INTO test_results VALUES
+    ('customer_reassignment_recalculates_old_user_and_clears_unmatched', false, SQLERRM);
+END
+$$;
+
+
+-- get_my_billing_summary must rank owned rows ahead of NULL user_id rows and
+-- aggregate subscriptions across all customer rows owned by the user (BW-08).
+DO $$
+DECLARE
+  v_user uuid;
+  v_summary jsonb;
+BEGIN
+  INSERT INTO auth.users (email) VALUES ('multi.customer@example.com')
+  RETURNING id INTO v_user;
+
+  INSERT INTO public.paddle_customers (
+    customer_id, email, user_id, last_event_occurred_at, updated_at
+  ) VALUES
+    ('ctm_mc_owned_active', 'multi.customer@example.com', v_user, now(), now()),
+    ('ctm_mc_unlinked_newer', 'multi.customer@example.com', NULL, now() + interval '1 minute', now() + interval '1 minute'),
+    ('ctm_mc_owned_newer_canceled', 'multi.customer@example.com', v_user, now() + interval '2 minutes', now() + interval '2 minutes');
+
+  INSERT INTO public.paddle_subscriptions (
+    subscription_id, customer_id, subscription_status, last_event_occurred_at, updated_at
+  ) VALUES
+    ('sub_mc_active', 'ctm_mc_owned_active', 'active', now(), now()),
+    ('sub_mc_canceled', 'ctm_mc_owned_newer_canceled', 'canceled', now() + interval '2 minutes', now() + interval '2 minutes');
+
+  PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
+  v_summary := public.get_my_billing_summary();
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+
+  PERFORM test_assert(v_summary->>'paddle_customer_id' = 'ctm_mc_owned_active',
+    'summary returns the customer holding the active subscription');
+  PERFORM test_assert(v_summary->>'subscription_id' = 'sub_mc_active',
+    'summary finds active subscription across multiple customer rows');
+  PERFORM test_assert(v_summary->>'subscription_status' = 'active',
+    'summary surfaces active status instead of newer canceled/unlinked customer');
+
+  INSERT INTO test_results VALUES
+    ('billing_summary_prefers_owned_and_aggregates_all_customers', true, NULL);
+EXCEPTION WHEN others THEN
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  INSERT INTO test_results VALUES
+    ('billing_summary_prefers_owned_and_aggregates_all_customers', false, SQLERRM);
+END
+$$;
+
+
 \echo ''
 SELECT
   CASE WHEN passed THEN 'ok  ' ELSE 'FAIL' END AS result,

@@ -133,9 +133,28 @@ describe("search-panel-state", () => {
       expect(resolveEffectiveVerseId(100, chapter, chapter[0])).toBe(100)
     })
 
-    it("remaps by verse number after translation reload", () => {
+    it("remaps by book, chapter, and verse after translation reload", () => {
       const selectedVerse = { ...chapter[0], id: 999 }
       expect(resolveEffectiveVerseId(999, chapter, selectedVerse)).toBe(100)
+    })
+
+    it("does not remap when verse number matches in a different book or chapter", () => {
+      const otherBookVerse: Verse = {
+        ...chapter[0],
+        id: 999,
+        book_number: 1,
+        book_name: "Genesis",
+        book_abbreviation: "Gen",
+        chapter: 1,
+      }
+      expect(resolveEffectiveVerseId(999, chapter, otherBookVerse)).toBeNull()
+
+      const otherChapterVerse: Verse = {
+        ...chapter[0],
+        id: 998,
+        chapter: 1,
+      }
+      expect(resolveEffectiveVerseId(998, chapter, otherChapterVerse)).toBeNull()
     })
 
     it("returns null when nothing is selected", () => {

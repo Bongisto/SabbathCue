@@ -28,7 +28,7 @@ pub static GROUNDED_REQUEST_REGISTRY: &[GroundedRequestCandidate] = &[
     GroundedRequestCandidate {
         topic_id: "jesus_calms_storm",
         trigger_keywords: &["storm", "tempest", "wind", "calm"],
-        secondary_keywords: &["boat", "ship", "sea", "calm", "waves", "storm"],
+        secondary_keywords: &["boat", "ship", "sea", "waves"],
         fts_queries: &["rebuked the wind", "peace be still", "great calm", "wind ceased"],
         expected_references: &["Mark 4:39", "Matthew 8:26", "Luke 8:24"],
     },
@@ -36,7 +36,7 @@ pub static GROUNDED_REQUEST_REGISTRY: &[GroundedRequestCandidate] = &[
         topic_id: "lazarus_resurrection",
         trigger_keywords: &["lazarus"],
         secondary_keywords: &["come out", "come forth", "grave", "dead", "tomb", "loud voice"],
-        fts_queries: &["Lazarus come forth", "Lazarus", "loud voice Lazarus"],
+        fts_queries: &["Lazarus come forth", "loud voice Lazarus"],
         expected_references: &["John 11:43"],
     },
     GroundedRequestCandidate {
@@ -50,7 +50,7 @@ pub static GROUNDED_REQUEST_REGISTRY: &[GroundedRequestCandidate] = &[
         topic_id: "baptism_of_jesus",
         trigger_keywords: &["baptiz", "baptism"],
         secondary_keywords: &["jesus", "john", "jordan"],
-        fts_queries: &["baptized Jesus", "baptized of him", "\"baptized\""],
+        fts_queries: &["baptized Jesus", "baptized of him"],
         expected_references: &["Matthew 3:13", "Mark 1:9", "Luke 3:21"],
     },
     GroundedRequestCandidate {

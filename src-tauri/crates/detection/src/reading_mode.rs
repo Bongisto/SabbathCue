@@ -179,6 +179,7 @@ impl ReadingMode {
         self.verses = loaded;
         self.last_match_time = Instant::now();
         self.accumulated_text.clear();
+        self.bare_number_context = BareNumberContext::None;
         self.reset_out_of_scope_streak();
     }
 
@@ -271,6 +272,7 @@ impl ReadingMode {
         self.active = false;
         self.verses.clear();
         self.accumulated_text.clear();
+        self.bare_number_context = BareNumberContext::None;
     }
 
     /// Check if the transcript contains a chapter navigation command.
@@ -469,24 +471,24 @@ impl ReadingMode {
     ///
     /// Automatically deactivates after timeout.
     pub fn check_transcript(&mut self, text: &str) -> Option<ReadingAdvance> {
-        if !self.active || self.verses.is_empty() {
+        if self.verses.is_empty() {
             return None;
         }
 
         // Check timeout — but don't clear verses, just pause.
         // This allows "verse N" references to re-activate.
-        if self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS && self.active {
+        if self.active && self.last_match_time.elapsed().as_millis() > READING_MODE_TIMEOUT_MS {
             log::info!("[READING] Timeout — pausing (toggle still on, verses retained)");
             self.pause();
         }
 
         // Check for explicit verse number references like "verse three", "verse 4".
         // This works even when paused (timed out) — it re-activates reading mode.
-        if !self.verses.is_empty() {
-            if let Some(advance) = self.check_verse_number_reference(text) {
-                self.active = true; // Re-activate if paused
-                return Some(advance);
-            }
+        if let Some(advance) = self.check_verse_number_reference(text) {
+            self.active = true; // Re-activate if paused
+            self.last_match_time = Instant::now();
+            self.reset_out_of_scope_streak();
+            return Some(advance);
         }
 
         if !self.active {
@@ -872,14 +874,79 @@ fn parse_number_token(text: &str) -> Option<i32> {
     None
 }
 
+fn is_ambiguous_book_alias(alias_lower: &str) -> bool {
+    alias_lower.chars().count() < 3
+        || alias_lower
+            .split_whitespace()
+            .last()
+            .is_some_and(|last| last.chars().count() < 3)
+        || matches!(
+            alias_lower,
+            "act"
+                | "cant"
+                | "col"
+                | "dan"
+                | "est"
+                | "gal"
+                | "gen"
+                | "hag"
+                | "job"
+                | "jon"
+                | "jos"
+                | "lam"
+                | "mal"
+                | "mark"
+                | "mat"
+                | "mic"
+                | "nah"
+                | "phil"
+                | "php"
+                | "pro"
+                | "rom"
+                | "song"
+                | "sos"
+                | "tit"
+        )
+}
+
+fn is_common_word_book_name(name_lower: &str) -> bool {
+    matches!(name_lower, "job" | "mark" | "acts" | "numbers" | "judges")
+}
+
+fn has_book_reference_context_after(haystack: &str, after: usize) -> bool {
+    let rest = haystack.get(after..).unwrap_or("").trim_start();
+    if rest.starts_with(':') {
+        return true;
+    }
+    let Some(first) = rest
+        .split(|c: char| c.is_whitespace() || matches!(c, ':' | '-' | '.' | ','))
+        .find(|token| !token.is_empty())
+    else {
+        return false;
+    };
+    let token = first
+        .trim_matches(|c: char| !c.is_alphanumeric())
+        .to_lowercase();
+    !token.is_empty()
+        && (token.chars().all(|c| c.is_ascii_digit())
+            || crate::direct::parser::is_chapter_keyword(&token)
+            || crate::direct::parser::is_verse_keyword(&token))
+}
+
 /// Extract both chapter and optional verse from patterns like:
 /// - "chapter 3" → (3, None)
 /// - "chapter 3 verse 5" → (3, Some(5))
 /// - "3 verse 5" → (3, Some(5))
-fn book_needle_end(haystack: &str, needle: &str) -> Option<usize> {
+fn book_needle_end(
+    haystack: &str,
+    needle: &str,
+    require_reference_context: bool,
+) -> Option<usize> {
     if needle.is_empty() {
         return None;
     }
+    // `BOOKS` entries are ASCII; `to_ascii_lowercase` preserves UTF-8 char
+    // boundaries and byte offsets into `haystack`.
     let haystack_lower = haystack.to_ascii_lowercase();
     let needle_lower = needle.to_ascii_lowercase();
     let mut last_end = None;
@@ -890,24 +957,47 @@ fn book_needle_end(haystack: &str, needle: &str) -> Option<usize> {
         };
         let start = search_from + rel;
         let end = start + needle_lower.len();
-        let before_ok = start == 0 || !haystack_lower.as_bytes()[start - 1].is_ascii_alphanumeric();
-        let after_ok =
-            end == haystack_lower.len() || !haystack_lower.as_bytes()[end].is_ascii_alphanumeric();
-        if before_ok && after_ok {
+        let before_ok = !haystack_lower[..start]
+            .chars()
+            .next_back()
+            .is_some_and(char::is_alphanumeric);
+        let after_ok = !haystack_lower[end..]
+            .chars()
+            .next()
+            .is_some_and(char::is_alphanumeric);
+        if before_ok
+            && after_ok
+            && (!require_reference_context
+                || has_book_reference_context_after(&haystack_lower, end))
+        {
             last_end = Some(end);
         }
-        search_from = start + 1;
+        let step = haystack_lower[start..]
+            .chars()
+            .next()
+            .map_or(1, char::len_utf8);
+        search_from = start + step;
     }
     last_end
 }
 
-fn last_end_for_book(text: &str, book_number: i32) -> Option<usize> {
+fn last_end_for_book(
+    text: &str,
+    book_number: i32,
+    require_context_for_common_name: bool,
+) -> Option<usize> {
     let book = BOOKS
         .iter()
         .find(|candidate| candidate.number == book_number)?;
-    let mut last = book_needle_end(text, book.name);
+    let name_lower = book.name.to_ascii_lowercase();
+    let require_ctx = require_context_for_common_name && is_common_word_book_name(&name_lower);
+    let mut last = book_needle_end(text, book.name, require_ctx);
     for alias in book.aliases {
-        if let Some(end) = book_needle_end(text, alias) {
+        let alias_lower = alias.to_ascii_lowercase();
+        if alias_lower == name_lower || is_ambiguous_book_alias(&alias_lower) {
+            continue;
+        }
+        if let Some(end) = book_needle_end(text, alias, false) {
             last = Some(last.map_or(end, |existing| existing.max(end)));
         }
     }
@@ -916,12 +1006,12 @@ fn last_end_for_book(text: &str, book_number: i32) -> Option<usize> {
 
 fn utterance_names_other_book(text: &str, current_book_number: i32) -> bool {
     BOOKS.iter().any(|book| {
-        book.number != current_book_number && last_end_for_book(text, book.number).is_some()
+        book.number != current_book_number && last_end_for_book(text, book.number, true).is_some()
     })
 }
 
 fn suffix_after_current_book(text: &str, current_book_number: i32) -> Option<&str> {
-    let end = last_end_for_book(text, current_book_number)?;
+    let end = last_end_for_book(text, current_book_number, false)?;
     Some(text.get(end..).unwrap_or(""))
 }
 
@@ -1921,5 +2011,120 @@ mod tests {
             .expect("same-chapter verse N must still advance");
         assert_eq!(advance.chapter, 3);
         assert_eq!(advance.verse, 16);
+    }
+
+    #[test]
+    fn explicit_verse_reference_reactivates_paused_reading_mode() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 3, 15, genesis_chapter_verses());
+        if let Some(timed_out_at) =
+            Instant::now().checked_sub(std::time::Duration::from_secs(181))
+        {
+            rm.last_match_time = timed_out_at;
+        } else {
+            rm.pause();
+        }
+        rm.out_of_scope_streak_scope = Some((19, 23));
+        rm.out_of_scope_streak = 3;
+
+        // First call observes timeout -> pauses, then sees explicit "verse 18" and re-activates.
+        let advance = rm
+            .check_transcript("verse 18")
+            .expect("explicit verse reference must re-activate timed-out reading mode");
+        assert_eq!(advance.chapter, 3);
+        assert_eq!(advance.verse, 18);
+        assert!(rm.is_active());
+        assert_eq!(rm.out_of_scope_streak, 0);
+
+        // Explicitly paused reading mode must also re-activate on "verse 19".
+        rm.pause();
+        assert!(!rm.is_active());
+        let resumed = rm
+            .check_transcript("verse 19")
+            .expect("explicit verse reference must re-activate manually paused reading mode");
+        assert_eq!(resumed.chapter, 3);
+        assert_eq!(resumed.verse, 19);
+        assert!(rm.is_active());
+    }
+
+    #[test]
+    fn start_and_deactivate_reset_bare_number_context() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 1, 1, genesis_chapter_verses());
+        assert_eq!(rm.check_chapter_command("chapter"), None);
+        assert_eq!(rm.bare_number_context, BareNumberContext::ExpectingChapter);
+
+        // Starting a new passage must clear stale ExpectingChapter state.
+        rm.start(43, "John", 3, 16, genesis_chapter_verses());
+        assert_eq!(rm.bare_number_context, BareNumberContext::None);
+        assert_eq!(rm.check_chapter_command("5"), None);
+
+        // ExpectingChapter before deactivate() must also be cleared so a later
+        // session does not interpret a bare number as a chapter jump.
+        assert_eq!(rm.check_chapter_command("chapter"), None);
+        assert_eq!(rm.bare_number_context, BareNumberContext::ExpectingChapter);
+        rm.deactivate();
+        assert_eq!(rm.bare_number_context, BareNumberContext::None);
+
+        rm.start(43, "John", 4, 1, genesis_chapter_verses());
+        assert_eq!(rm.bare_number_context, BareNumberContext::None);
+        assert_eq!(rm.check_chapter_command("5"), None);
+
+        // ExpectingVerse must also clear on deactivate() and start().
+        assert!(rm.check_chapter_command("John chapter 5").is_some());
+        assert_eq!(rm.bare_number_context, BareNumberContext::ExpectingVerse);
+        rm.deactivate();
+        assert_eq!(rm.bare_number_context, BareNumberContext::None);
+        rm.start(43, "John", 5, 1, genesis_chapter_verses());
+        assert_eq!(rm.bare_number_context, BareNumberContext::None);
+    }
+
+    #[test]
+    fn in_book_chapter_commands_ignore_two_letter_and_common_word_aliases() {
+        let mut rm = ReadingMode::new();
+        rm.start(1, "Genesis", 1, 1, genesis_chapter_verses());
+
+        for command in [
+            "ex leader read Genesis chapter 3",
+            "le text is in Genesis chapter 4",
+            "ac unity brings us to Genesis chapter 5",
+            "in the act of faith open Genesis chapter 6",
+            "sing a song and open Genesis chapter 7",
+            "listen to the pro speaker in Genesis chapter 8",
+            "our job is to read Genesis chapter 9",
+            "let's mark Genesis chapter 10",
+            "caféexodus Genesis chapter 11",
+        ] {
+            let change = rm.check_chapter_command(command);
+            assert!(
+                change.is_some(),
+                "valid in-book chapter command {command:?} was falsely rejected"
+            );
+            assert_eq!(change.expect("chapter change").book_number, 1);
+        }
+
+        // Real references to other books (canonical or unambiguous >=3-char alias)
+        // must still yield None so DirectDetector handles the book switch.
+        assert_eq!(
+            rm.check_chapter_command("from Genesis chapter 3 turn to Exodus chapter 2"),
+            None
+        );
+        assert_eq!(
+            rm.check_chapter_command("from Genesis chapter 3 turn to Rev chapter 1"),
+            None
+        );
+        assert_eq!(
+            rm.check_chapter_command("from Genesis chapter 3 turn to Mark chapter 5"),
+            None
+        );
+        assert_eq!(
+            rm.check_chapter_command("from Genesis chapter 3 turn to Job 2"),
+            None
+        );
+
+        // Unicode word boundaries must not split on non-ASCII letters.
+        assert!(!utterance_names_other_book("exodé genesis chapter 3", 1));
+        assert!(!utterance_names_other_book("revé genesis chapter 3", 1));
+        assert!(utterance_names_other_book("turn to exodus chapter 2", 1));
     }
 }

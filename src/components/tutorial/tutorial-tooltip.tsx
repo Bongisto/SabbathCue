@@ -15,24 +15,18 @@ export function TutorialTooltip({
 }: TooltipRenderProps) {
   const controlsRef = useRef<Controls>(controls)
   const indexRef = useRef(index)
-  const isLastStepRef = useRef(isLastStep)
 
   useEffect(() => {
     controlsRef.current = controls
     indexRef.current = index
-    isLastStepRef.current = isLastStep
-  }, [controls, index, isLastStep])
+  }, [controls, index])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") {
         e.preventDefault()
         e.stopPropagation()
-        if (isLastStepRef.current) {
-          controlsRef.current.skip("button_skip")
-        } else {
-          controlsRef.current.next()
-        }
+        controlsRef.current.next()
       } else if (e.key === "ArrowLeft" && indexRef.current > 0) {
         e.preventDefault()
         e.stopPropagation()

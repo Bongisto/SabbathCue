@@ -58,17 +58,24 @@ export function HymnalPanel() {
     getFavoriteHymns()
   )
   const panelRef = useRef<HTMLDivElement>(null)
+  const selectRequestIdRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+    const requestId = ++selectRequestIdRef.current
     getHymnById("sda-1")
       .then((hymn) => {
-        if (cancelled || !hymn) return
+        if (cancelled || requestId !== selectRequestIdRef.current || !hymn) return
         setSelectedHymn(hymn)
         setSelectedSectionIds(defaultSelectedSectionIds(hymn))
       })
+      .catch((error) => {
+        console.error("[hymnal] initial hymn load failed", error)
+      })
       .finally(() => {
-        if (!cancelled) setIsLoadingHymn(false)
+        if (!cancelled && requestId === selectRequestIdRef.current) {
+          setIsLoadingHymn(false)
+        }
       })
     return () => {
       cancelled = true
@@ -121,15 +128,23 @@ export function HymnalPanel() {
   }
 
   const selectHymn = async (result: HymnSearchResult) => {
+    const requestId = ++selectRequestIdRef.current
     setIsLoadingHymn(true)
-    const hymn = await getHymnById(result.id)
-    setIsLoadingHymn(false)
-    if (!hymn) return
-    setSelectedHymn(hymn)
-    setSelectedSectionIds(defaultSelectedSectionIds(hymn))
-    setActiveScreenIndex(0)
-    addRecentHymn(result.id)
-    setRecentHymnIds(getRecentHymns())
+    try {
+      const hymn = await getHymnById(result.id)
+      if (requestId !== selectRequestIdRef.current || !hymn) return
+      setSelectedHymn(hymn)
+      setSelectedSectionIds(defaultSelectedSectionIds(hymn))
+      setActiveScreenIndex(0)
+      addRecentHymn(result.id)
+      setRecentHymnIds(getRecentHymns())
+    } catch (error) {
+      console.error(`[hymnal] failed to load hymn ${result.id}`, error)
+    } finally {
+      if (requestId === selectRequestIdRef.current) {
+        setIsLoadingHymn(false)
+      }
+    }
   }
 
   const toggleSection = (sectionId: string) => {
@@ -249,6 +264,13 @@ export function HymnalPanel() {
   const selectedHymnIsFavorite = selectedHymn
     ? favoriteHymnIds.includes(selectedHymn.id)
     : false
+  const defaultSectionIds = useMemo(
+    () => (selectedHymn ? defaultSelectedSectionIds(selectedHymn) : []),
+    [selectedHymn]
+  )
+  const isDefaultSelection =
+    selectedSectionIds.length === defaultSectionIds.length &&
+    selectedSectionIds.every((id, index) => id === defaultSectionIds[index])
 
   return (
     <div
@@ -336,7 +358,7 @@ export function HymnalPanel() {
                 key={result.id}
                 onFocus={() => preloadHymnById(result.id)}
                 onMouseEnter={() => preloadHymnById(result.id)}
-                onClick={() => selectHymn(result)}
+                onClick={() => void selectHymn(result)}
                 className={cn(
                   "flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors",
                   selectedHymn?.id === result.id
@@ -456,10 +478,7 @@ export function HymnalPanel() {
                       variant="ghost"
                       className="flex-1 text-[0.625rem]"
                       onClick={restoreAllSections}
-                      disabled={
-                        selectedSectionIds.length ===
-                        selectedHymn.sections.length
-                      }
+                      disabled={isDefaultSelection}
                     >
                       Restore all
                     </Button>
@@ -555,9 +574,9 @@ export function HymnalPanel() {
               {activeScreen ? (
                 <div className="flex min-h-full flex-col gap-3">
                   <div className="flex aspect-video items-center justify-center rounded-md border border-[var(--border-subtle)] bg-black p-8 text-center">
-                    <div className="max-w-[82%] space-y-1.5 text-2xl leading-tight font-semibold text-balance text-foreground">
-                      {activeScreen.lines.map((line) => (
-                        <p key={line}>{line}</p>
+                    <div className="max-w-[82%] space-y-1.5 text-2xl leading-tight font-semibold text-balance text-neutral-50">
+                      {activeScreen.lines.map((line, lineIndex) => (
+                        <p key={`${activeScreen.id}-line-${lineIndex}`}>{line}</p>
                       ))}
                     </div>
                   </div>

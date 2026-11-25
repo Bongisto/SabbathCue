@@ -53,4 +53,20 @@ describe("SongEditor", () => {
     })
     expect(onClose).toHaveBeenCalled()
   })
+
+  it("renders repeated lyric lines without duplicate React key warnings (FU-48)", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(<SongEditor onClose={vi.fn()} />)
+
+    fireEvent.change(screen.getByDisplayValue(/Amazing grace/), {
+      target: { value: "Hallelujah\nHallelujah\nAmen" },
+    })
+
+    expect(screen.getAllByText("Hallelujah")).toHaveLength(2)
+    expect(
+      errorSpy.mock.calls.some((args) =>
+        args.some((arg) => String(arg).includes("same key"))
+      )
+    ).toBe(false)
+  })
 })

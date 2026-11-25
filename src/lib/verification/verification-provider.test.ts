@@ -12,7 +12,16 @@ const mockSetSessionMetadata = vi.fn()
 const mockClearSessionMetadata = vi.fn()
 const mockClearToken = vi.fn()
 const mockVerifyActivationLease = vi.fn()
+const mockGetSession = vi.fn()
 const signedLease = { payload: "lease-payload", signature: "lease-signature" }
+
+vi.mock("@/lib/supabase/client", () => ({
+  getSupabaseClient: () => ({
+    auth: {
+      getSession: (...args: unknown[]) => mockGetSession(...args),
+    },
+  }),
+}))
 
 vi.mock("@/lib/supabase/auth", () => ({
   restoreSession: (...args: unknown[]) => mockRestoreSession(...args),
@@ -59,6 +68,12 @@ describe("verification-provider", () => {
     mockClearSessionMetadata.mockReset()
     mockClearToken.mockReset()
     mockVerifyActivationLease.mockReset()
+    mockGetSession.mockReset()
+
+    mockGetSession.mockResolvedValue({
+      data: { session: { access_token: "access-token" } },
+      error: null,
+    })
 
     mockGetOrCreateInstallationIdentity.mockResolvedValue({
       deviceId: "device-1",
@@ -300,11 +315,12 @@ describe("verification-provider", () => {
     expect(mockSetSessionMetadata).not.toHaveBeenCalled()
   })
 
-  it("loadCachedVerification returns error(trial_expired) when access has ended", async () => {
+  it("loadCachedVerification returns error(trial_expired) with user identity when access has ended", async () => {
     mockGetRefreshToken.mockResolvedValue("stored-token")
     mockRestoreSession.mockResolvedValue({
       ok: true,
       userId: "user-1",
+      email: "user@example.com",
       refreshToken: "rotated-token",
       accessTokenExpiresAt: 1_700_000_000_000,
     })
@@ -322,9 +338,82 @@ describe("verification-provider", () => {
         status: "error",
         errorCode: "trial_expired",
         error: "Your access has ended. Contact the developer to renew.",
+        verifiedUserId: "user-1",
+        verifiedEmail: "user@example.com",
       })
     )
     expect(mockSetSessionMetadata).not.toHaveBeenCalled()
+  })
+
+  it("loadCachedVerification verifies offline lease against local installation deviceId instead of cached verifiedDeviceId", async () => {
+    mockGetRefreshToken.mockResolvedValue("stored-token")
+    mockRestoreSession.mockResolvedValue({
+      ok: false,
+      code: "network",
+      message: "Unable to reach the authentication service.",
+    })
+    mockGetOrCreateInstallationIdentity.mockResolvedValue({
+      deviceId: "local-keychain-device",
+      publicKey: "public-key",
+    })
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "copied-device-from-other-pc",
+      accessTokenExpiresAt: Date.now() - 1000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() + 60_000,
+      activationLease: signedLease,
+    })
+    mockVerifyActivationLease.mockResolvedValue(null)
+
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
+    const result = await loadCachedVerification()
+
+    expect(mockVerifyActivationLease).toHaveBeenCalledWith(
+      signedLease,
+      "user-1",
+      "local-keychain-device",
+      expect.any(Number)
+    )
+    expect(result).toEqual(
+      expect.objectContaining({ status: "error", errorCode: "network" })
+    )
+  })
+
+  it("loadCachedVerification rejects offline grace on registration network error when cached session belongs to another user", async () => {
+    mockGetRefreshToken.mockResolvedValue("stored-token")
+    mockRestoreSession.mockResolvedValue({
+      ok: true,
+      userId: "user-2",
+      email: "other@example.com",
+      refreshToken: "rotated-token",
+      accessTokenExpiresAt: 1_700_000_000_000,
+    })
+    mockRegisterDevice.mockResolvedValue({
+      ok: false,
+      code: "error",
+      message: "Unable to reach the device registration service.",
+    })
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() - 1000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() + 60_000,
+      activationLease: signedLease,
+    })
+
+    const { loadCachedVerification } =
+      await import("@/lib/verification/verification-provider")
+    const result = await loadCachedVerification()
+
+    expect(result).toEqual(
+      expect.objectContaining({ status: "error", errorCode: "network" })
+    )
+    expect(mockVerifyActivationLease).not.toHaveBeenCalled()
   })
 
   it("loadCachedVerification returns verified and persists metadata on success", async () => {
@@ -455,7 +544,17 @@ describe("verification-provider", () => {
     expect(mockClearSessionMetadata).toHaveBeenCalled()
   })
 
-  it("heartbeat returns a trial_expired snapshot and clears metadata when access ends", async () => {
+  it("heartbeat returns a trial_expired snapshot preserving identity and clears metadata when access ends", async () => {
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() + 3_600_000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() + 60_000,
+      accessExpiresAt: Date.now() + 60_000,
+      verifiedEmail: "pastor@church.org",
+      activationLease: signedLease,
+    })
     mockRegisterDevice.mockResolvedValue({ ok: false, code: "trial_expired" })
 
     const { heartbeatDeviceRegistration } =
@@ -463,7 +562,12 @@ describe("verification-provider", () => {
     const result = await heartbeatDeviceRegistration()
 
     expect(result).toEqual(
-      expect.objectContaining({ status: "error", errorCode: "trial_expired" })
+      expect.objectContaining({
+        status: "error",
+        errorCode: "trial_expired",
+        verifiedUserId: "user-1",
+        verifiedEmail: "pastor@church.org",
+      })
     )
     expect(mockClearSessionMetadata).toHaveBeenCalled()
   })
@@ -638,5 +742,156 @@ describe("verification-provider", () => {
     expect(result).toBeNull()
     expect(mockClearSessionMetadata).not.toHaveBeenCalled()
     expect(mockRegisterDevice).not.toHaveBeenCalled()
+  })
+
+  it("heartbeat locks out with trial_expired when offline and cached accessExpiresAt has passed", async () => {
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() + 3_600_000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() - 1_000,
+      accessExpiresAt: Date.now() - 1_000,
+      verifiedEmail: "pastor@church.org",
+      activationLease: signedLease,
+    })
+    mockRegisterDevice.mockResolvedValue({
+      ok: false,
+      code: "error",
+      message: "Unable to reach the device registration service.",
+    })
+
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
+    const result = await heartbeatDeviceRegistration()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "error",
+        errorCode: "trial_expired",
+        verifiedUserId: "user-1",
+        verifiedEmail: "pastor@church.org",
+      })
+    )
+  })
+
+  it("heartbeat locks out with network error when offline and offlineGraceExpiresAt has passed", async () => {
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() - 1_000,
+      lastVerifiedAt: Date.now() - 73 * 60 * 60 * 1000,
+      offlineGraceExpiresAt: Date.now() - 1_000,
+      accessExpiresAt: Date.now() + 1_000_000,
+      verifiedEmail: "pastor@church.org",
+      activationLease: signedLease,
+    })
+    mockRestoreSession.mockResolvedValue({
+      ok: false,
+      code: "network",
+      message: "Unable to reach the authentication service.",
+    })
+
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
+    const result = await heartbeatDeviceRegistration()
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: "error",
+        errorCode: "network",
+      })
+    )
+    expect(mockRegisterDevice).not.toHaveBeenCalled()
+  })
+
+  it("heartbeat restores session immediately on reconnect when in-memory Supabase token is missing", async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    })
+    mockGetSessionMetadata.mockResolvedValue({
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() + 3_000_000,
+      lastVerifiedAt: Date.now() - 60_000,
+      offlineGraceExpiresAt: Date.now() + 1_000_000,
+      accessExpiresAt: Date.now() + 1_000_000,
+      verifiedEmail: "pastor@church.org",
+      activationLease: signedLease,
+    })
+    mockRestoreSession.mockResolvedValue({
+      ok: true,
+      userId: "user-1",
+      email: "pastor@church.org",
+      refreshToken: "rotated",
+      accessTokenExpiresAt: Date.now() + 3_600_000,
+    })
+
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
+    const result = await heartbeatDeviceRegistration()
+
+    expect(mockRestoreSession).toHaveBeenCalledTimes(1)
+    expect(mockRegisterDevice).toHaveBeenCalledTimes(1)
+    expect(result).toBeNull()
+  })
+
+  it("signOut still resolves to required when clearSessionMetadata rejects", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    mockSupabaseSignOut.mockResolvedValue(undefined)
+    mockClearSessionMetadata.mockRejectedValueOnce(new Error("store locked"))
+
+    const { signOut } = await import("@/lib/verification/verification-provider")
+    const result = await signOut()
+
+    expect(result.status).toBe("required")
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it("heartbeat does not overwrite metadata when session switched to another user mid-flight", async () => {
+    let resolveRegister!: (value: unknown) => void
+    mockGetSessionMetadata
+      .mockResolvedValueOnce({
+        verifiedUserId: "user-1",
+        verifiedDeviceId: "device-1",
+        accessTokenExpiresAt: Date.now() + 3_600_000,
+        lastVerifiedAt: Date.now() - 60_000,
+        offlineGraceExpiresAt: Date.now() + 60_000,
+        accessExpiresAt: Date.now() + 60_000,
+        activationLease: signedLease,
+      })
+      .mockResolvedValue({
+        verifiedUserId: "user-2",
+        verifiedDeviceId: "device-1",
+        accessTokenExpiresAt: Date.now() + 3_600_000,
+        lastVerifiedAt: Date.now(),
+        offlineGraceExpiresAt: Date.now() + 60_000,
+        accessExpiresAt: Date.now() + 60_000,
+        activationLease: signedLease,
+      })
+    mockRegisterDevice.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRegister = resolve
+        })
+    )
+
+    const { heartbeatDeviceRegistration } =
+      await import("@/lib/verification/verification-provider")
+    const pending = heartbeatDeviceRegistration()
+    await vi.waitFor(() => expect(mockRegisterDevice).toHaveBeenCalled())
+
+    resolveRegister({
+      ok: true,
+      accessExpiresAt: Date.now() + 999_000,
+      isChurchOrganization: true,
+      churchName: "Other Church",
+      lease: signedLease,
+    })
+
+    await expect(pending).resolves.toBeNull()
+    expect(mockSetSessionMetadata).not.toHaveBeenCalled()
   })
 })

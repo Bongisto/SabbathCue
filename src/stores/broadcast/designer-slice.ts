@@ -86,6 +86,17 @@ function emitDraftToBroadcast(state: BroadcastState): void {
 
 let draftBroadcastFrame: number | null = null
 
+function cancelDraftBroadcast(): void {
+  if (draftBroadcastFrame === null) return
+  if (
+    typeof window !== "undefined" &&
+    typeof window.cancelAnimationFrame === "function"
+  ) {
+    window.cancelAnimationFrame(draftBroadcastFrame)
+  }
+  draftBroadcastFrame = null
+}
+
 function scheduleDraftBroadcast(getState: () => BroadcastState): void {
   if (draftBroadcastFrame !== null) return
 
@@ -136,12 +147,14 @@ export const createDesignerSlice: StateCreator<
 
   setDesignerOpen: (isDesignerOpen) => {
     if (!isDesignerOpen) {
+      cancelDraftBroadcast()
       set({
         isDesignerOpen,
         editingThemeId: null,
         draftTheme: null,
         selectedElement: null,
       })
+      get().syncBroadcastOutput()
     } else {
       set({ isDesignerOpen })
     }
@@ -156,11 +169,13 @@ export const createDesignerSlice: StateCreator<
     })
   },
   stopEditing: () => {
+    cancelDraftBroadcast()
     set({
       editingThemeId: null,
       draftTheme: null,
       selectedElement: null,
     })
+    get().syncBroadcastOutput()
   },
   updateDraft: (updates) => {
     set((s) => ({
@@ -185,6 +200,7 @@ export const createDesignerSlice: StateCreator<
   saveDraft: () => {
     const { draftTheme } = get()
     if (!draftTheme) return
+    cancelDraftBroadcast()
     // If editing a builtin, save as a new custom theme
     if (draftTheme.builtin) {
       const customTheme = {
@@ -200,15 +216,19 @@ export const createDesignerSlice: StateCreator<
         editingThemeId: customTheme.id,
         draftTheme: customTheme,
       }))
+      get().syncBroadcastOutput()
     } else {
       get().saveTheme(draftTheme)
+      get().syncBroadcastOutput()
     }
   },
   discardDraft: () => {
+    cancelDraftBroadcast()
     const { editingThemeId } = get()
     if (editingThemeId) {
       get().startEditing(editingThemeId)
     }
+    get().syncBroadcastOutput()
   },
   setSelectedElement: (selectedElement) => set({ selectedElement }),
   setRenamingTheme: (id) => set({ renamingThemeId: id }),

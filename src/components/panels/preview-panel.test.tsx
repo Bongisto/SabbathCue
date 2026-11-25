@@ -330,4 +330,60 @@ describe("PreviewPanel", () => {
       })
     )
   })
+
+  it("resets video paused state when switching videos or on emptied (FU-41)", async () => {
+    previewItem = {
+      kind: "video",
+      reference: "Intro Video",
+      segments: [{ text: "Intro Video" }],
+      video: {
+        source: "url",
+        videoId: "video-1",
+        title: "Intro Video",
+        url: "https://cdn.example.com/intro.mp4",
+      },
+    }
+
+    await renderPanel()
+
+    const firstVideo = container?.querySelector("video")
+    expect(firstVideo).not.toBeNull()
+    Object.defineProperty(firstVideo!, "paused", { configurable: true, value: false })
+    await act(async () => {
+      fireEvent.play(firstVideo!)
+    })
+    expect(container?.querySelector('button[title="Pause video"]')).not.toBeNull()
+
+    // Emptied resets paused state even on the same video element.
+    await act(async () => {
+      fireEvent(firstVideo!, new Event("emptied"))
+    })
+    expect(container?.querySelector('button[title="Play video"]')).not.toBeNull()
+
+    // Play again then switch to another video — new <video> remounts paused.
+    await act(async () => {
+      fireEvent.play(firstVideo!)
+    })
+    expect(container?.querySelector('button[title="Pause video"]')).not.toBeNull()
+
+    previewItem = {
+      kind: "video",
+      reference: "Sermon Clip",
+      segments: [{ text: "Sermon Clip" }],
+      video: {
+        source: "url",
+        videoId: "video-2",
+        title: "Sermon Clip",
+        url: "https://cdn.example.com/sermon.mp4",
+      },
+    }
+    await act(async () => {
+      root?.render(React.createElement(PreviewPanel))
+    })
+
+    const secondVideo = container?.querySelector("video")
+    expect(secondVideo).not.toBeNull()
+    expect(secondVideo).not.toBe(firstVideo)
+    expect(container?.querySelector('button[title="Play video"]')).not.toBeNull()
+  })
 })

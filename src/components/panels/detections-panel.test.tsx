@@ -367,4 +367,23 @@ describe("DetectionsPanel", () => {
     expect(screen.getByText("Recent trusted detections")).toBeTruthy()
     expect(screen.getByText("Revelation 14:7")).toBeTruthy()
   })
+
+  it("catches hymn detection action rejections without unhandled rejections (FU-52)", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    previewHymnMock.mockRejectedValueOnce(new Error("preview failed"))
+    presentHymnMock.mockRejectedValueOnce(new Error("present failed"))
+    queueHymnMock.mockRejectedValueOnce(new Error("queue failed"))
+
+    detectionsRef.current = [hymnDetection]
+    render(<DetectionsPanel />)
+
+    fireEvent.click(screen.getByRole("button", { name: /preview/i }))
+    fireEvent.click(screen.getByRole("button", { name: /present/i }))
+    fireEvent.click(screen.getByRole("button", { name: /^queue$/i }))
+
+    await waitFor(() => {
+      expect(errSpy).toHaveBeenCalledTimes(3)
+    })
+    errSpy.mockRestore()
+  })
 })

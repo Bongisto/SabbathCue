@@ -928,7 +928,7 @@ export function VerificationScreen() {
                       feedback.message ??
                       "Your access has ended. Subscribe to renew, or contact support."
                     }
-                    accountEmail={verifiedEmail ?? null}
+                    accountEmail={verifiedEmail?.trim() || email.trim() || null}
                     accountUserId={verifiedUserId ?? null}
                     onCheckoutCompleted={() => void refresh()}
                     onRetry={() => void refresh()}

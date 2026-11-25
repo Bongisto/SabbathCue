@@ -245,8 +245,7 @@ impl SonioxClient {
         // frames from the shared crossbeam channel.
         let reader_stop = Arc::new(AtomicBool::new(false));
 
-        let mut audio_reader = {
-            let ws_tx = ws_tx.clone();
+        let audio_reader = {
             let cancelled = cancelled.clone();
             let reader_stop = reader_stop.clone();
             tokio::task::spawn_blocking(move || {
@@ -294,7 +293,7 @@ impl SonioxClient {
 
         let send_err = send_error_flag.clone();
         let send_error_detail = error_detail.clone();
-        let mut ws_writer = tokio::spawn(async move {
+        let ws_writer = tokio::spawn(async move {
             while let Some(cmd) = ws_rx.recv().await {
                 match cmd {
                     WsCommand::Audio(data) => {
@@ -327,7 +326,7 @@ impl SonioxClient {
         // Partial that directly follows the same text; Finals and all other
         // events always pass through.
         let mut last_partial_text = String::new();
-        let mut receiver = tokio::spawn(async move {
+        let receiver = tokio::spawn(async move {
             while let Some(msg_result) = read.next().await {
                 // Do NOT break on cancel here: buffered server messages still
                 // carry the final tokens of the session, and the writer's
@@ -413,38 +412,15 @@ impl SonioxClient {
             }
         });
 
-        let audio_ended_normally = tokio::select! {
-            _ = &mut audio_reader => true,
-            _ = &mut ws_writer => false,
-            _ = &mut receiver => false,
-        };
-
-        // Stop the blocking reader from stealing further frames from the
-        // shared audio channel (abort() cannot stop spawn_blocking tasks).
-        reader_stop.store(true, Ordering::SeqCst);
-
-        // On normal audio end the reader queues WsCommand::Close and the
-        // writer closes the socket; the server flushes remaining tokens.
-        // Aborting the receiver dropped those finals — drain with a bounded
-        // window instead; abort only if the server goes quiet.
-        let drain_window = if audio_ended_normally {
-            CLEAN_SHUTDOWN_DRAIN
-        } else {
-            ERROR_SHUTDOWN_DRAIN
-        };
-        let drained = tokio::time::timeout(drain_window, async {
-            let _ = (&mut audio_reader).await;
-            let _ = (&mut ws_writer).await;
-            let _ = (&mut receiver).await;
-        })
+        drain_connection_tasks(
+            audio_reader,
+            ws_writer,
+            receiver,
+            &reader_stop,
+            CLEAN_SHUTDOWN_DRAIN,
+            ERROR_SHUTDOWN_DRAIN,
+        )
         .await;
-        if drained.is_err() {
-            log::warn!("SonioxClient: shutdown drain timed out; aborting tasks");
-            audio_reader.abort();
-            ws_writer.abort();
-            receiver.abort();
-            let _ = tokio::join!(audio_reader, ws_writer, receiver);
-        }
 
         if fatal_server_error_flag.load(Ordering::SeqCst) {
             let detail = error_detail
@@ -470,6 +446,87 @@ impl SonioxClient {
 
     pub fn stop(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Wait for any connection task to finish, stop the blocking audio reader,
+/// drain remaining tasks within a bounded window, and abort only handles that
+/// have not already completed.
+async fn drain_connection_tasks(
+    mut audio_reader: tokio::task::JoinHandle<()>,
+    mut ws_writer: tokio::task::JoinHandle<()>,
+    mut receiver: tokio::task::JoinHandle<()>,
+    reader_stop: &AtomicBool,
+    clean_drain: Duration,
+    error_drain: Duration,
+) {
+    let mut audio_reader_done = false;
+    let mut ws_writer_done = false;
+    let mut receiver_done = false;
+
+    let audio_ended_normally = tokio::select! {
+        _ = &mut audio_reader => {
+            audio_reader_done = true;
+            true
+        }
+        _ = &mut ws_writer => {
+            ws_writer_done = true;
+            false
+        }
+        _ = &mut receiver => {
+            receiver_done = true;
+            false
+        }
+    };
+
+    // Stop the blocking reader from stealing further frames from the
+    // shared audio channel (abort() cannot stop spawn_blocking tasks).
+    reader_stop.store(true, Ordering::SeqCst);
+
+    // On normal audio end the reader queues WsCommand::Close and the
+    // writer closes the socket; the server flushes remaining tokens.
+    // Aborting the receiver dropped those finals — drain with a bounded
+    // window instead; abort only if the server goes quiet.
+    let drain_window = if audio_ended_normally {
+        clean_drain
+    } else {
+        error_drain
+    };
+    let drained = tokio::time::timeout(drain_window, async {
+        if !audio_reader_done {
+            let _ = (&mut audio_reader).await;
+            audio_reader_done = true;
+        }
+        if !ws_writer_done {
+            let _ = (&mut ws_writer).await;
+            ws_writer_done = true;
+        }
+        if !receiver_done {
+            let _ = (&mut receiver).await;
+            receiver_done = true;
+        }
+    })
+    .await;
+    if drained.is_err() {
+        log::warn!("SonioxClient: shutdown drain timed out; aborting tasks");
+        if !audio_reader_done {
+            audio_reader.abort();
+        }
+        if !ws_writer_done {
+            ws_writer.abort();
+        }
+        if !receiver_done {
+            receiver.abort();
+        }
+        if !audio_reader_done {
+            let _ = audio_reader.await;
+        }
+        if !ws_writer_done {
+            let _ = ws_writer.await;
+        }
+        if !receiver_done {
+            let _ = receiver.await;
+        }
     }
 }
 
@@ -755,5 +812,51 @@ mod tests {
             error.to_string(),
             "parse error: Soniox error 401: invalid API key"
         );
+    }
+
+    #[tokio::test]
+    async fn drain_connection_tasks_does_not_repoll_completed_handles() {
+        let reader_stop = AtomicBool::new(false);
+        let audio_reader = tokio::spawn(async {});
+        let ws_writer = tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        });
+        let receiver = tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        });
+
+        drain_connection_tasks(
+            audio_reader,
+            ws_writer,
+            receiver,
+            &reader_stop,
+            Duration::from_millis(200),
+            Duration::from_millis(200),
+        )
+        .await;
+
+        assert!(reader_stop.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn drain_connection_tasks_aborts_only_unfinished_handles_on_timeout() {
+        let reader_stop = AtomicBool::new(false);
+        let audio_reader = tokio::spawn(async {});
+        let ws_writer = tokio::spawn(async {});
+        let receiver = tokio::spawn(async {
+            std::future::pending::<()>().await;
+        });
+
+        drain_connection_tasks(
+            audio_reader,
+            ws_writer,
+            receiver,
+            &reader_stop,
+            Duration::from_millis(20),
+            Duration::from_millis(20),
+        )
+        .await;
+
+        assert!(reader_stop.load(Ordering::SeqCst));
     }
 }

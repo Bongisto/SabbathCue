@@ -517,7 +517,7 @@ pub const FR_BOOKS: &[BookInfo] = &[
     BookInfo {
         number: 17,
         name: "Esther",
-        abbreviation: "Est",
+        abbreviation: "Esth",
         aliases: &["esther"],
     },
     BookInfo {
@@ -949,8 +949,8 @@ pub const PT_BOOKS: &[BookInfo] = &[
     },
     BookInfo {
         number: 18,
-        name: "Jo",
-        abbreviation: "Jo",
+        name: "Jó",
+        abbreviation: "Jó",
         aliases: &["jo", "jó"],
     },
     BookInfo {

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangleIcon, XIcon } from "lucide-react"
+import { ManageSubscriptionButton } from "@/components/billing/ManageSubscriptionButton"
 import { PaddleSubscribeButton } from "@/components/billing/PaddleSubscribeButton"
 import {
   deriveTrialWarning,
@@ -13,6 +14,10 @@ import { useVerificationStore } from "@/stores/verification-store"
 
 const DISMISS_KEY = "sabbathcue.trial-warning-dismissed"
 
+function dismissStorageKey(userId: string): string {
+  return `${DISMISS_KEY}:${userId}`
+}
+
 /**
  * Local calendar day. Dismissal is keyed by day so clearing the banner silences
  * it until tomorrow rather than for good — someone must not be able to dismiss
@@ -25,9 +30,9 @@ export function dismissalDayKey(now: number): string {
   return `${date.getFullYear()}-${month}-${day}`
 }
 
-function readDismissedDay(): string | null {
+function readDismissedDay(userId: string): string | null {
   try {
-    return localStorage.getItem(DISMISS_KEY)
+    return localStorage.getItem(dismissStorageKey(userId))
   } catch {
     return null
   }
@@ -71,21 +76,50 @@ export function TrialWarningBanner() {
   const status = useVerificationStore((s) => s.status)
   const userId = useVerificationStore((s) => s.verifiedUserId)
   const email = useVerificationStore((s) => s.verifiedEmail)
+
+  if (status !== "verified" || !userId) return null
+
+  return (
+    <TrialWarningBannerContent
+      key={userId}
+      userId={userId}
+      email={email ?? null}
+    />
+  )
+}
+
+function TrialWarningBannerContent({
+  userId,
+  email,
+}: {
+  userId: string
+  email: string | null
+}) {
   const [summary, setSummary] = useState<BillingSummary | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [dismissedDay, setDismissedDay] = useState<string | null>(() =>
-    readDismissedDay()
+    readDismissedDay(userId)
   )
+  const mountedRef = useRef(true)
+  const requestIdRef = useRef(0)
 
   const load = useCallback(async () => {
-    const result = await fetchMyBillingSummary()
-    // A billing lookup must never interrupt a service, so a failure just means
-    // no banner. Settings -> Account still reports the real state.
-    setSummary(result.ok ? result.summary : null)
+    const requestId = ++requestIdRef.current
+    try {
+      const result = await fetchMyBillingSummary()
+      if (!mountedRef.current || requestId !== requestIdRef.current) return
+      // A billing lookup must never interrupt a service, so a failure just means
+      // no banner. Settings -> Account still reports the real state.
+      setSummary(result.ok ? result.summary : null)
+    } catch {
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setSummary(null)
+      }
+    }
   }, [])
 
   useEffect(() => {
-    if (status !== "verified" || !userId) return
+    mountedRef.current = true
     const onFocus = () => {
       setNow(Date.now())
       void load()
@@ -93,9 +127,11 @@ export function TrialWarningBanner() {
     window.addEventListener("focus", onFocus)
     queueMicrotask(onFocus)
     return () => {
+      mountedRef.current = false
+      requestIdRef.current += 1
       window.removeEventListener("focus", onFocus)
     }
-  }, [status, userId, load])
+  }, [load])
 
   useEffect(() => {
     let timeoutId: number
@@ -113,14 +149,17 @@ export function TrialWarningBanner() {
   }, [])
 
   const warning = deriveTrialWarning(summary, now)
-  if (!warning || !userId) return null
+  if (!warning) return null
   if (dismissedDay === dismissalDayKey(now)) return null
+
+  const hasExistingSubscription =
+    warning.kind === "trial_converting" || warning.kind === "payment_failed"
 
   function dismiss() {
     const dismissedAt = Date.now()
     const key = dismissalDayKey(dismissedAt)
     try {
-      localStorage.setItem(DISMISS_KEY, key)
+      localStorage.setItem(dismissStorageKey(userId), key)
     } catch {
       // Private mode / storage disabled: dismiss for this session only.
     }
@@ -138,11 +177,14 @@ export function TrialWarningBanner() {
         className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
       />
       <p className="min-w-0 flex-1 truncate">{trialWarningMessage(warning)}</p>
-      {email ? (
+      {hasExistingSubscription ? (
+        <ManageSubscriptionButton />
+      ) : email ? (
         <PaddleSubscribeButton
           email={email}
           userId={userId}
           label="Subscribe"
+          onCompleted={() => void load()}
         />
       ) : null}
       <button

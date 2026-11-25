@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -128,10 +129,16 @@ export function SongSlidesWorkspace() {
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return
-    const text = await file.text()
-    setTitle(fileNameWithoutExtension(file.name) || "Custom Song")
-    setRawSlides(text)
-    setActiveIndex(0)
+    try {
+      const text = await file.text()
+      setTitle(fileNameWithoutExtension(file.name) || "Custom Song")
+      setRawSlides(text)
+      setActiveIndex(0)
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not read song file."
+      )
+    }
   }
 
   return (
@@ -164,7 +171,11 @@ export function SongSlidesWorkspace() {
                 type="file"
                 accept=".txt,.md,.text"
                 className="hidden"
-                onChange={(event) => void handleUpload(event.target.files?.[0])}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ""
+                  void handleUpload(file)
+                }}
               />
               <Button
                 size="sm"
@@ -249,9 +260,9 @@ export function SongSlidesWorkspace() {
                   <span className="absolute top-3 right-3 rounded bg-[var(--shell-bg-sunken)] px-2 py-0.5 text-[0.625rem] font-semibold text-foreground">
                     {activeSlide.slideIndex + 1} of {activeSlide.slideCount}
                   </span>
-                  <div className="max-w-[80%] space-y-3 text-2xl leading-snug font-semibold text-balance text-foreground">
-                    {activeSlide.segments.map((segment) => (
-                      <p key={segment.text}>{segment.text}</p>
+                  <div className="max-w-[80%] space-y-3 text-2xl leading-snug font-semibold text-balance text-neutral-50">
+                    {activeSlide.segments.map((segment, index) => (
+                      <p key={`${index}-${segment.text}`}>{segment.text}</p>
                     ))}
                   </div>
                 </div>

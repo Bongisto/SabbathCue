@@ -148,7 +148,9 @@ impl DetectionMerger {
                 && cooldown_ok
                 && matches!(detection.source, DetectionSource::DirectReference)
                 && !detection.is_chapter_only
-                && !detection.is_fuzzy_book;
+                && !detection.is_fuzzy_book
+                && !detection.is_ambiguous
+                && !detection.is_context_resolved;
             let auto_queued = eligible && !auto_queue_used;
             if auto_queued {
                 auto_queue_used = true;

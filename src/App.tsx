@@ -14,8 +14,12 @@ import type {
   BroadcastOutputErrorEvent,
   BroadcastOutputIssueKind,
 } from "@/types"
+import { useBroadcastLiveStore } from "@/stores/broadcast/live-store"
 import { useBroadcastOutputIssueStore } from "@/stores/broadcast/output-issue-store"
-import { useApiKeyPromptStore } from "@/lib/api-key-prompt"
+import {
+  formatApiKeyPromptCopy,
+  useApiKeyPromptStore,
+} from "@/lib/api-key-prompt"
 import { isTauriRuntime } from "@/lib/tauri-runtime"
 import { useSettingsStore } from "@/stores/settings-store"
 import { useTutorialStore } from "@/stores/tutorial-store"
@@ -72,6 +76,30 @@ function useBroadcastOutputErrorListener() {
       })
     }
   )
+}
+
+function useBroadcastOutputReadyListener() {
+  const resyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (resyncTimerRef.current !== null) {
+        clearTimeout(resyncTimerRef.current)
+        resyncTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useTauriEvent("broadcast:output-ready", () => {
+    useBroadcastLiveStore.getState().syncBroadcastOutput()
+    if (resyncTimerRef.current !== null) {
+      clearTimeout(resyncTimerRef.current)
+    }
+    resyncTimerRef.current = setTimeout(() => {
+      resyncTimerRef.current = null
+      useBroadcastLiveStore.getState().syncBroadcastOutput()
+    }, 150)
+  })
 }
 
 function useWelcomeToast() {
@@ -141,8 +169,17 @@ function useAppUpdateLauncher() {
         id: updateToastIdRef.current,
       })
       updateToastIdRef.current = null
+      return
     }
-  }, [state.phase])
+    if (state.phase === "error" && updateToastIdRef.current !== null) {
+      toast.error("Update failed", {
+        id: updateToastIdRef.current,
+        description: state.error ?? "Could not install update.",
+        duration: 6000,
+      })
+      updateToastIdRef.current = null
+    }
+  }, [state.phase, state.error])
 }
 
 export function App() {
@@ -150,16 +187,19 @@ export function App() {
   useTranscriptionEventBridge()
   useDetectionSettingsSync()
   useBroadcastOutputErrorListener()
+  useBroadcastOutputReadyListener()
   useWelcomeToast()
   useAnnouncements()
   useAppUpdateLauncher()
   useMonitorWatcher()
   const apiKeyPromptOpen = useApiKeyPromptStore((s) => s.isOpen)
+  const apiKeyPromptProvider = useApiKeyPromptStore((s) => s.provider)
   const setApiKeyPromptOpen = useApiKeyPromptStore((s) => s.setOpen)
   const onboardingComplete = useSettingsStore((s) => s.onboardingComplete)
   const tutorialRunning = useTutorialStore((s) => s.isRunning)
   const colorMode = useColorModeStore((s) => s.mode)
   const shouldMountTutorial = !onboardingComplete || tutorialRunning
+  const apiKeyPromptCopy = formatApiKeyPromptCopy(apiKeyPromptProvider)
 
   return (
     <>
@@ -175,8 +215,8 @@ export function App() {
           <LazyApiKeyPrompt
             open={apiKeyPromptOpen}
             onOpenChange={setApiKeyPromptOpen}
-            service="Deepgram"
-            description="Live transcription needs a Deepgram API key. Add it in settings so the app can start listening."
+            service={apiKeyPromptCopy.service}
+            description={apiKeyPromptCopy.description}
           />
         </Suspense>
       ) : null}

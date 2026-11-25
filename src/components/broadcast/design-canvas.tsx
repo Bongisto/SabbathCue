@@ -27,7 +27,7 @@ export function DesignCanvas() {
   const latestThemeRef = useRef<BroadcastTheme | null>(null)
   const rafIdRef = useRef<number | null>(null)
   const imageCacheRef = useRef<Map<string, HTMLImageElement>>(new Map())
-  const imageRequestsRef = useRef<Map<string, Promise<HTMLImageElement>>>(new Map())
+  const imageRequestsRef = useRef<Map<string, Promise<HTMLImageElement | null>>>(new Map())
   const objectsRef = useRef<{
     workspace: fabric.Rect | null
     referenceRegion: fabric.Rect | null
@@ -61,6 +61,7 @@ export function DesignCanvas() {
 
     const cw = container.offsetWidth
     const ch = container.offsetHeight
+    if (cw <= 0 || ch <= 0) return
     canvas.setDimensions({ width: cw, height: ch })
 
     // Reset viewport
@@ -179,7 +180,7 @@ export function DesignCanvas() {
     fabricRef.current = canvas
 
     // Auto-zoom after a tick (canvas needs to be in DOM)
-    requestAnimationFrame(() => {
+    const initRafId = requestAnimationFrame(() => {
       autoZoom()
     })
 
@@ -189,9 +190,12 @@ export function DesignCanvas() {
 
     return () => {
       observer.disconnect()
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current)
+      cancelAnimationFrame(initRafId)
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = null
-      void canvas.dispose()
+      void canvas.dispose().catch((error) => {
+        console.warn("[design-canvas] failed to dispose canvas", error)
+      })
       fabricRef.current = null
       objectsRef.current = { workspace: null, referenceRegion: null, verseRegion: null }
     }
@@ -282,7 +286,7 @@ export function DesignCanvas() {
               url: image.thumbnail,
               fit: "cover",
               blur: 0,
-              brightness: 1,
+              brightness: 100,
               tint: null,
             },
           },
@@ -344,7 +348,7 @@ export function DesignCanvas() {
         }}
         onDrop={handleLibraryImageDrop}
       >
-        <canvas ref={canvasElRef} />
+        <canvas key={editingThemeId ?? "empty"} ref={canvasElRef} />
         {!draftTheme && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-base,#18181b)]">
             <p className="text-xs text-muted-foreground">Select a theme to begin editing</p>
@@ -382,7 +386,7 @@ async function syncThemeToCanvas(
   }>,
   canvas: fabric.Canvas,
   imageCache: Map<string, HTMLImageElement>,
-  imageRequests: Map<string, Promise<HTMLImageElement>>,
+  imageRequests: Map<string, Promise<HTMLImageElement | null>>,
   onImageReady?: () => void
 ) {
   const ws = objectsRef.current.workspace
@@ -520,7 +524,7 @@ function clamp(value: number, min: number, max: number) {
 function ensureImage(
   url: string,
   cache: Map<string, HTMLImageElement>,
-  pending: Map<string, Promise<HTMLImageElement>>,
+  pending: Map<string, Promise<HTMLImageElement | null>>,
   onReady?: () => void
 ) {
   if (cache.has(url) || pending.has(url)) return
@@ -532,7 +536,7 @@ function ensureImage(
     })
     .catch((error) => {
       console.warn("[theme-designer] failed to load background image", { url: url.slice(0, 100), error })
-      throw error
+      return null
     })
     .finally(() => {
       pending.delete(url)

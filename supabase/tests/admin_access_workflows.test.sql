@@ -485,6 +485,63 @@ END
 $$;
 
 
+-- Revoking the last approved device must allow an existing pending device to
+-- self-promote to approved on its next registration (BW-09).
+DO $$
+DECLARE
+  v_user uuid;
+  v_first jsonb;
+  v_second jsonb;
+  v_promoted jsonb;
+  v_status text;
+  v_approved_at timestamptz;
+BEGIN
+  INSERT INTO auth.users (email) VALUES ('pending.promote@admin-access.test')
+  RETURNING id INTO v_user;
+
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+  v_first := public.register_device_verified(
+    v_user, 'device-promote-a', 'windows', '0.1.9');
+  PERFORM test_assert(v_first->>'status' = 'ok',
+    'first device approves automatically');
+
+  v_second := public.register_device_verified(
+    v_user, 'device-promote-b', 'windows', '0.1.9');
+  PERFORM test_assert(v_second->>'status' = 'device_pending',
+    'second device starts pending');
+
+  PERFORM set_config('request.jwt.claim.role', '', true);
+  PERFORM set_config('request.jwt.claim.sub', v_user::text, true);
+  PERFORM public.deactivate_own_device('device-promote-a');
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+  v_promoted := public.register_device_verified(
+    v_user, 'device-promote-b', 'windows', '0.1.9');
+  PERFORM set_config('request.jwt.claim.role', '', true);
+
+  PERFORM test_assert(v_promoted->>'status' = 'ok',
+    'pending device promotes to ok when zero approved devices remain');
+
+  SELECT status, approved_at
+  INTO v_status, v_approved_at
+  FROM public.devices
+  WHERE user_id = v_user AND device_id = 'device-promote-b';
+
+  PERFORM test_assert(v_status = 'approved' AND v_approved_at IS NOT NULL,
+    'promoted device is persisted as approved with approved_at');
+
+  INSERT INTO test_results VALUES
+    ('pending_device_promotes_when_last_approved_revoked', true, NULL);
+EXCEPTION WHEN others THEN
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claim.role', '', true);
+  INSERT INTO test_results VALUES
+    ('pending_device_promotes_when_last_approved_revoked', false, SQLERRM);
+END
+$$;
+
+
 \echo ''
 SELECT
   CASE WHEN passed THEN 'ok  ' ELSE 'FAIL' END AS result,

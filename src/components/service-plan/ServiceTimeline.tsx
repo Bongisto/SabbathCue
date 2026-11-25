@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -17,19 +17,21 @@ interface ServiceTimelineProps {
   items: ServiceItem[]
   activeItemId: string | null
   performanceMode: boolean
-  onSelect: (itemId: string) => void
+  readOnly?: boolean
+  onSelect?: (itemId: string) => void
   onActivate: (itemId: string) => void
-  onDuplicate: (itemId: string) => void
-  onDelete: (itemId: string) => void
-  onMarkReady: (itemId: string) => void
+  onDuplicate?: (itemId: string) => void
+  onDelete?: (itemId: string) => void
+  onMarkReady?: (itemId: string) => void
   onComplete: (itemId: string) => void
-  onReorder: (fromIndex: number, toIndex: number) => void
+  onReorder?: (fromIndex: number, toIndex: number) => void
 }
 
 export function ServiceTimeline({
   items,
   activeItemId,
   performanceMode,
+  readOnly = false,
   onSelect,
   onActivate,
   onDuplicate,
@@ -40,6 +42,8 @@ export function ServiceTimeline({
 }: ServiceTimelineProps) {
   const ordered = [...items].sort((a, b) => a.order - b.order)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const dragIndexRef = useRef<number | null>(null)
+  const canEdit = !performanceMode && !readOnly
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id))
@@ -67,33 +71,42 @@ export function ServiceTimeline({
               )}
             >
               <div className="flex items-center gap-1.5 px-2 py-1.5">
-                <button
-                  type="button"
-                  className="cursor-pointer text-muted-foreground"
-                  title="Reorder"
-                  draggable={!performanceMode}
-                  onDragStart={() => {
-                    if (performanceMode) return
-                    ;(
-                      window as unknown as { __serviceDragIndex?: number }
-                    ).__serviceDragIndex = index
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    const from = (
-                      window as unknown as { __serviceDragIndex?: number }
-                    ).__serviceDragIndex
-                    if (typeof from === "number" && from !== index)
-                      onReorder(from, index)
-                  }}
-                >
-                  <GripVerticalIcon className="size-3" />
-                </button>
+                {canEdit && onReorder && (
+                  <button
+                    type="button"
+                    className="cursor-pointer text-muted-foreground"
+                    title="Reorder"
+                    draggable
+                    onDragStart={() => {
+                      if (performanceMode || readOnly) return
+                      dragIndexRef.current = index
+                    }}
+                    onDragOver={(event) => {
+                      if (performanceMode || readOnly) return
+                      event.preventDefault()
+                    }}
+                    onDrop={() => {
+                      const from = dragIndexRef.current
+                      dragIndexRef.current = null
+                      if (performanceMode || readOnly) return
+                      if (typeof from === "number" && from !== index) {
+                        onReorder(from, index)
+                      }
+                    }}
+                    onDragEnd={() => {
+                      dragIndexRef.current = null
+                    }}
+                  >
+                    <GripVerticalIcon className="size-3" />
+                  </button>
+                )}
 
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  onClick={() => onSelect(item.id)}
+                  onClick={() =>
+                    onSelect ? onSelect(item.id) : toggleExpand(item.id)
+                  }
                 >
                   <span className="truncate text-xs font-medium">
                     {item.title}
@@ -151,35 +164,41 @@ export function ServiceTimeline({
                       <PlayIcon className="size-3" />
                       <span className="ml-1 text-[0.625rem]">Active</span>
                     </Button>
-                    {!performanceMode && (
+                    {canEdit && (
                       <>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          title="Mark ready"
-                          onClick={() => onMarkReady(item.id)}
-                        >
-                          <CheckIcon className="size-3" />
-                          <span className="ml-1 text-[0.625rem]">Ready</span>
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          title="Duplicate"
-                          onClick={() => onDuplicate(item.id)}
-                        >
-                          <CopyIcon className="size-3" />
-                          <span className="ml-1 text-[0.625rem]">Dup</span>
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          title="Delete"
-                          onClick={() => onDelete(item.id)}
-                        >
-                          <Trash2Icon className="size-3" />
-                          <span className="ml-1 text-[0.625rem]">Del</span>
-                        </Button>
+                        {onMarkReady && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            title="Mark ready"
+                            onClick={() => onMarkReady(item.id)}
+                          >
+                            <CheckIcon className="size-3" />
+                            <span className="ml-1 text-[0.625rem]">Ready</span>
+                          </Button>
+                        )}
+                        {onDuplicate && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            title="Duplicate"
+                            onClick={() => onDuplicate(item.id)}
+                          >
+                            <CopyIcon className="size-3" />
+                            <span className="ml-1 text-[0.625rem]">Dup</span>
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            title="Delete"
+                            onClick={() => onDelete(item.id)}
+                          >
+                            <Trash2Icon className="size-3" />
+                            <span className="ml-1 text-[0.625rem]">Del</span>
+                          </Button>
+                        )}
                       </>
                     )}
                   </div>

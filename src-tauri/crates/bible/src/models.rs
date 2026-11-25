@@ -49,6 +49,17 @@ pub struct SearchVerse {
     pub text: String,
 }
 
+/// Lightweight `(verse_id -> verse coordinates)` row used to hydrate semantic
+/// embedding hits before hybrid merging runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerseRefRecord {
+    pub verse_id: i64,
+    pub book_number: i32,
+    pub book_name: String,
+    pub chapter: i32,
+    pub verse: i32,
+}
+
 /// An Ellen G. White book (e.g. "Patriarchs and Prophets").
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EgwBook {

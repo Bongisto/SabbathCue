@@ -4,6 +4,7 @@ import { useVerificationStore } from "@/stores/verification-store"
 
 function isE2eBypass(): boolean {
   return (
+    (import.meta.env.DEV || import.meta.env.VITE_ENABLE_E2E === "true") &&
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("e2e")
   )

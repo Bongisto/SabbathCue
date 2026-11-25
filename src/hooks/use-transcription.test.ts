@@ -278,6 +278,56 @@ describe("use-transcription", () => {
         "model_missing"
       )
     })
+
+    it("does not clobber an early stop() or error status when start_transcription resolves late", async () => {
+      let resolveStart: () => void = () => {}
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === "start_transcription") {
+          return new Promise<void>((resolve) => {
+            resolveStart = resolve
+          })
+        }
+        return Promise.resolve(undefined)
+      })
+
+      const { useTranscriptStore, transcriptionActions } = await loadModules()
+      const pending = transcriptionActions.start()
+      expect(useTranscriptStore.getState().connectionStatus).toBe("connecting")
+
+      await transcriptionActions.stop()
+      expect(useTranscriptStore.getState().connectionStatus).toBe("disconnected")
+      expect(useTranscriptStore.getState().isTranscribing).toBe(false)
+
+      resolveStart()
+      const started = await pending
+
+      expect(started).toBe(false)
+      expect(useTranscriptStore.getState().isTranscribing).toBe(false)
+      expect(useTranscriptStore.getState().connectionStatus).toBe("disconnected")
+    })
+
+    it("deduplicates concurrent start() calls while connecting", async () => {
+      let resolveStart: () => void = () => {}
+      mockInvoke.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveStart = resolve
+          })
+      )
+
+      const { useTranscriptStore, transcriptionActions } = await loadModules()
+      const first = transcriptionActions.start()
+      const second = transcriptionActions.start()
+
+      expect(mockInvoke).toHaveBeenCalledTimes(1)
+      expect(first).toBe(second)
+
+      resolveStart()
+      const [r1, r2] = await Promise.all([first, second])
+      expect(r1).toBe(true)
+      expect(r2).toBe(true)
+      expect(useTranscriptStore.getState().isTranscribing).toBe(true)
+    })
   })
 
   describe("late transcript events after disconnect", () => {

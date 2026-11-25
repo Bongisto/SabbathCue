@@ -28,17 +28,19 @@ const EFT_PLANS = {
   },
 } as const;
 
-function readEnv(name: string): string {
-  return process.env[name]?.trim() ?? "";
-}
-
+/**
+ * NEXT_PUBLIC_* must be read as static property access so Next.js/Turbopack
+ * can inline them into the client bundle. Dynamic process.env[name] is always
+ * undefined in the browser.
+ */
 export function getEftBankDetails(): EftBankDetails {
   return {
-    accountName: readEnv("NEXT_PUBLIC_EFT_ACCOUNT_NAME") || "BongaNdlovu",
-    bankName: readEnv("NEXT_PUBLIC_EFT_BANK_NAME"),
-    accountNumber: readEnv("NEXT_PUBLIC_EFT_ACCOUNT_NUMBER"),
-    branchCode: readEnv("NEXT_PUBLIC_EFT_BRANCH_CODE"),
-    accountType: readEnv("NEXT_PUBLIC_EFT_ACCOUNT_TYPE") || "Cheque",
+    accountName:
+      process.env.NEXT_PUBLIC_EFT_ACCOUNT_NAME?.trim() || "BongaNdlovu",
+    bankName: process.env.NEXT_PUBLIC_EFT_BANK_NAME?.trim() ?? "",
+    accountNumber: process.env.NEXT_PUBLIC_EFT_ACCOUNT_NUMBER?.trim() ?? "",
+    branchCode: process.env.NEXT_PUBLIC_EFT_BRANCH_CODE?.trim() ?? "",
+    accountType: process.env.NEXT_PUBLIC_EFT_ACCOUNT_TYPE?.trim() || "Cheque",
   };
 }
 

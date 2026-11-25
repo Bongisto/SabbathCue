@@ -25,6 +25,7 @@ import { servicePlanRepository } from "@/lib/service-plan/service-plan-repositor
 import { createPlanFromTemplate } from "@/lib/service-plan/service-plan-templates"
 import {
   findNextServiceItem,
+  isValidServicePlan,
   normalizeItemOrder,
 } from "@/lib/service-plan/service-plan-validation"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
@@ -67,19 +68,22 @@ interface ServicePlanState {
   startPractice: () => Promise<void>
   startLiveService: () => Promise<void>
   completeService: () => Promise<void>
-  enqueuePreparedResources: () => Promise<void>
-  practicePreviewActiveItem: () => Promise<void>
+  enqueuePreparedResources: (itemId?: string) => Promise<void>
+  practicePreviewActiveItem: (itemId?: string) => Promise<void>
   generatePostServiceReport: () => Promise<void>
 }
 
 let hydrationPromise: Promise<void> | null = null
 
 async function persistPlan(plan: ServicePlan): Promise<void> {
+  if (!isValidServicePlan(plan)) return
   useServicePlanStore.setState({ isSaving: true })
   try {
     await servicePlanRepository.savePlan(plan)
     const summaries = await servicePlanRepository.listSummaries()
     useServicePlanStore.setState({ summaries })
+  } catch (error) {
+    console.warn("[service-plan] failed to persist plan", error)
   } finally {
     useServicePlanStore.setState({ isSaving: false })
   }
@@ -118,6 +122,14 @@ function patchActivePlan(
   void autosave.save(next, options)
 }
 
+async function syncCurrentActiveItem(plan: ServicePlan | null): Promise<void> {
+  if (!plan || plan.mode === "planning") return
+  const active = plan.activeItemId
+    ? (plan.items.find((item) => item.id === plan.activeItemId) ?? null)
+    : null
+  await syncActiveServiceItemPresentations(active)
+}
+
 export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
   summaries: [],
   activePlan: null,
@@ -131,8 +143,14 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
   hydrate: async () => {
     if (hydrationPromise) return hydrationPromise
     hydrationPromise = (async () => {
-      const summaries = await servicePlanRepository.listSummaries()
-      set({ summaries, isHydrated: true })
+      try {
+        const summaries = await servicePlanRepository.listSummaries()
+        set({ summaries, isHydrated: true })
+      } catch (error) {
+        console.warn("[service-plan] failed to hydrate service plans", error)
+        set({ isHydrated: true })
+        hydrationPromise = null
+      }
     })()
     return hydrationPromise
   },
@@ -143,6 +161,7 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
   createFromTemplate: async (templateId, title) => {
     const plan = createPlanFromTemplate(templateId, title)
     if (!plan) return
+    await autosave.flush()
     await servicePlanRepository.savePlan(plan)
     const summaries = await servicePlanRepository.listSummaries()
     set({ summaries, plannerOpen: true })
@@ -150,6 +169,7 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
   },
 
   loadPlan: async (id) => {
+    await autosave.flush()
     const plan = await servicePlanRepository.loadPlan(id)
     if (!plan) return
     set({ plannerOpen: true })
@@ -190,13 +210,7 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
     patchActivePlan((plan) => setActiveServiceItem(plan, itemId), {
       immediate: true,
     })
-    const plan = get().activePlan
-    const active = itemId
-      ? (plan?.items.find((item) => item.id === itemId) ?? null)
-      : null
-    if (plan && plan.mode !== "planning" && active) {
-      await syncActiveServiceItemPresentations(active)
-    }
+    await syncCurrentActiveItem(get().activePlan)
   },
 
   markItemReady: (itemId) => {
@@ -211,10 +225,12 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
       immediate: true,
     })
     releaseCompletedItemMedia(completed)
+    await syncCurrentActiveItem(get().activePlan)
   },
 
   skipActiveItem: async () => {
     patchActivePlan((plan) => skipCurrentServiceItem(plan), { immediate: true })
+    await syncCurrentActiveItem(get().activePlan)
   },
 
   goToNextItem: async () => {
@@ -238,8 +254,12 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
     const plan = get().activePlan
     if (plan && !plan.activeItemId) {
       const first = findNextServiceItem(plan.items, null)
-      if (first) await get().setActiveItem(first.id)
+      if (first) {
+        await get().setActiveItem(first.id)
+        return
+      }
     }
+    await syncCurrentActiveItem(get().activePlan)
   },
 
   startLiveService: async () => {
@@ -251,8 +271,12 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
     const plan = get().activePlan
     if (plan && !plan.activeItemId) {
       const first = findNextServiceItem(plan.items, null)
-      if (first) await get().setActiveItem(first.id)
+      if (first) {
+        await get().setActiveItem(first.id)
+        return
+      }
     }
+    await syncCurrentActiveItem(get().activePlan)
   },
 
   completeService: async () => {
@@ -263,20 +287,26 @@ export const useServicePlanStore = create<ServicePlanState>((set, get) => ({
     releaseAllServiceMedia()
   },
 
-  enqueuePreparedResources: async () => {
+  enqueuePreparedResources: async (itemId) => {
     const plan = get().activePlan
-    const active = plan?.items.find((item) => item.id === plan.activeItemId)
-    if (!active) return
+    const targetId = itemId ?? plan?.activeItemId
+    const target = targetId
+      ? plan?.items.find((item) => item.id === targetId)
+      : undefined
+    if (!target) return
     const { enqueuePreparedResourcesForItem } =
       await import("@/lib/service-plan/prepare-queue-resources")
-    await enqueuePreparedResourcesForItem(active)
+    await enqueuePreparedResourcesForItem(target)
   },
 
-  practicePreviewActiveItem: async () => {
+  practicePreviewActiveItem: async (itemId) => {
     const plan = get().activePlan
     if (!plan || plan.mode !== "practice") return
-    const active = plan.items.find((item) => item.id === plan.activeItemId)
-    if (active) await previewFirstContentForItem(active)
+    const targetId = itemId ?? plan.activeItemId
+    const target = targetId
+      ? plan.items.find((item) => item.id === targetId)
+      : undefined
+    if (target) await previewFirstContentForItem(target)
   },
 
   generatePostServiceReport: async () => {

@@ -9,7 +9,7 @@ fn afrikaans_semantic_benchmark_has_johannes_3_16_paraphrase() {
     ];
 
     for (query, book, chapter, verse) in cases {
-        assert!(!query.is_empty());
+        assert_ne!(query, "");
         assert!((1..=66).contains(&book));
         assert!(chapter > 0);
         assert!(verse > 0);

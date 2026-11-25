@@ -404,7 +404,8 @@ function selectPreviewHit(
   )
   const aiConfirmed =
     aiWinner?.source === "semantic" &&
-    aiWinner.confidence >= semanticMinConfidence
+    aiWinner.confidence >= semanticMinConfidence &&
+    mayPreview(aiWinner)
       ? aiWinner
       : null
   if (!strongest) {
@@ -781,7 +782,9 @@ async function handleVerseDetectionsInternal(
     recordAutoSelectionPerformance(previewHit)
     recordDetectionFeedback(previewHit, "auto-selected")
     if (isEgwDetection(previewHit)) {
-      const autoLive = useBroadcastLiveStore.getState().readingModeAutoLive
+      const autoLive =
+        useBroadcastLiveStore.getState().readingModeAutoLive &&
+        mayGoLive(previewHit)
       recordWorkflowTrace("detection.preview.selected", "EGW hit selected", {
         detection: traceDetectionDetails(previewHit),
         autoQueued: previewHit.auto_queued,

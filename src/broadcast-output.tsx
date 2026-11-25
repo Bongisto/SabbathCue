@@ -1,7 +1,10 @@
 import { createRoot } from "react-dom/client"
 import { useCallback, useEffect, useState } from "react"
 import "@/index.css"
-import { useBroadcastVideo } from "@/hooks/use-broadcast-video"
+import {
+  PREFERRED_AUDIO_DEVICE_STORAGE_KEY,
+  useBroadcastVideo,
+} from "@/hooks/use-broadcast-video"
 import {
   useBroadcastYoutube,
   useYoutubeEmbedUrl,
@@ -56,12 +59,21 @@ function videoTransitionClass(type: BroadcastTransitionType | undefined): string
   return ""
 }
 
+function readPreferredAudioSinkId(): string {
+  try {
+    return localStorage.getItem(PREFERRED_AUDIO_DEVICE_STORAGE_KEY) ?? ""
+  } catch {
+    return ""
+  }
+}
+
 function BroadcastCanvas() {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [youtubeFrame, setYoutubeFrame] = useState<HTMLIFrameElement | null>(null)
   const [item, setItem] = useState<PresentationRenderData | null>(null)
   const [videoTransition, setVideoTransition] = useState("")
+  const [preferredSinkId, setPreferredSinkId] = useState(readPreferredAudioSinkId)
   const videoItem = item?.kind === "video" ? item : null
   const youtubeSrc = useYoutubeEmbedUrl(videoItem?.video?.youtubeId)
   const isYoutube = videoItem?.video?.source === "youtube"
@@ -82,7 +94,12 @@ function BroadcastCanvas() {
     outputId,
     onPayloadChange: handlePayloadChange,
   })
-  useBroadcastVideo({ video: videoElement, item: videoItem, outputId })
+  useBroadcastVideo({
+    video: videoElement,
+    item: videoItem,
+    outputId,
+    preferredSinkId,
+  })
   useBroadcastYoutube(youtubeFrame, isYoutube)
 
   useEffect(() => {
@@ -90,6 +107,9 @@ function BroadcastCanvas() {
     const onStorage = (event: StorageEvent) => {
       if (event.key === ACCENT_THEME_STORAGE_KEY) {
         applyAccentThemeToDocument()
+      }
+      if (event.key === PREFERRED_AUDIO_DEVICE_STORAGE_KEY) {
+        setPreferredSinkId(event.newValue ?? "")
       }
     }
     window.addEventListener("storage", onStorage)

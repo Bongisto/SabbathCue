@@ -63,15 +63,16 @@ fn semantic_index_sanity_check(
     }
 }
 
-/// Walk embedding candidates in resolution order; first load that passes the
-/// self-similarity sanity check wins. A stale app-data file must not disable
-/// vector search while a healthy bundled/dev copy exists.
+/// Walk embedding candidates in resolution order; first load that passes both
+/// the composition manifest check and the self-similarity sanity check wins. A
+/// stale app-data file must not disable vector search while a healthy
+/// bundled/dev copy exists.
 fn load_first_healthy_index(
     embedder: &rhema_detection::OnnxEmbedder,
     model_path: &Path,
     tokenizer_path: &Path,
     embedding_candidates: &[(PathBuf, PathBuf)],
-) -> Option<(rhema_detection::HnswVectorIndex, PathBuf)> {
+) -> Option<rhema_detection::HnswVectorIndex> {
     let dim = embedder.dimension();
     for (embeddings_path, ids_path) in embedding_candidates {
         if !asset_paths::semantic_assets_are_compatible(
@@ -87,21 +88,30 @@ fn load_first_healthy_index(
             continue;
         }
         match rhema_detection::HnswVectorIndex::load(embeddings_path, ids_path, dim) {
-            Ok(index) => match semantic_index_sanity_check(embedder, &index) {
-                Ok(similarity) => {
-                    log::info!(
-                        "Resolved embeddings path: {} (sanity check passed, self-similarity {similarity:.3})",
+            Ok(index) => {
+                if !embeddings_manifest_matches(embeddings_path, &index) {
+                    log::warn!(
+                        "Embeddings candidate failed manifest check, trying next: {}",
                         embeddings_path.display()
                     );
-                    return Some((index, embeddings_path.clone()));
+                    continue;
                 }
-                Err(reason) => {
-                    log::error!(
-                        "Embeddings candidate failed sanity check, trying next: {reason} (embeddings={})",
-                        embeddings_path.display()
-                    );
+                match semantic_index_sanity_check(embedder, &index) {
+                    Ok(similarity) => {
+                        log::info!(
+                            "Resolved embeddings path: {} (sanity check passed, self-similarity {similarity:.3})",
+                            embeddings_path.display()
+                        );
+                        return Some(index);
+                    }
+                    Err(reason) => {
+                        log::error!(
+                            "Embeddings candidate failed sanity check, trying next: {reason} (embeddings={})",
+                            embeddings_path.display()
+                        );
+                    }
                 }
-            },
+            }
             Err(e) => {
                 log::warn!(
                     "Failed to load verse embeddings from {}: {e}",
@@ -136,16 +146,16 @@ fn embeddings_manifest_matches(
     index: &rhema_detection::HnswVectorIndex,
 ) -> bool {
     let Some(manifest_dir) = embeddings_path.parent() else {
-        log::error!(
-            "SEMANTIC VECTOR SEARCH DISABLED — embeddings path has no parent directory: {}",
+        log::warn!(
+            "Skipping embeddings candidate — path has no parent directory: {}",
             embeddings_path.display()
         );
         return false;
     };
     let manifest_path = manifest_dir.join("public-minilm-l6-v2.manifest.json");
     if !manifest_path.exists() {
-        log::error!(
-            "SEMANTIC VECTOR SEARCH DISABLED — missing composition manifest {}. \
+        log::warn!(
+            "Skipping embeddings candidate — missing composition manifest {}. \
              Re-run `bun run export:verses` (writes the manifest) then \
              `bun run precompute:embeddings` && `bun run quantize:embeddings` if binaries are stale.",
             manifest_path.display()
@@ -155,8 +165,8 @@ fn embeddings_manifest_matches(
     let manifest_text = match std::fs::read_to_string(&manifest_path) {
         Ok(text) => text,
         Err(e) => {
-            log::error!(
-                "SEMANTIC VECTOR SEARCH DISABLED — could not read manifest {}: {e}",
+            log::warn!(
+                "Skipping embeddings candidate — could not read manifest {}: {e}",
                 manifest_path.display()
             );
             return false;
@@ -165,8 +175,8 @@ fn embeddings_manifest_matches(
     let expected = match manifest_record_count(&manifest_text) {
         Ok(count) => count,
         Err(reason) => {
-            log::error!(
-                "SEMANTIC VECTOR SEARCH DISABLED — {reason}: {}",
+            log::warn!(
+                "Skipping embeddings candidate — {reason}: {}",
                 manifest_path.display()
             );
             return false;
@@ -174,8 +184,8 @@ fn embeddings_manifest_matches(
     };
     let actual = index.len() as u64;
     if actual != expected {
-        log::error!(
-            "SEMANTIC VECTOR SEARCH DISABLED — embeddings count {actual} != \
+        log::warn!(
+            "Skipping embeddings candidate — embeddings count {actual} != \
              manifest record_count {expected} ({}). Regenerate embeddings.",
             manifest_path.display()
         );
@@ -237,7 +247,7 @@ fn load_semantic_assets(app: &tauri::AppHandle) {
         );
     }
 
-    let Some((index, embeddings_path)) = load_first_healthy_index(
+    let Some(index) = load_first_healthy_index(
         &embedder,
         &model_path,
         &tokenizer_path,
@@ -251,17 +261,41 @@ fn load_semantic_assets(app: &tauri::AppHandle) {
         return;
     };
 
-    if !embeddings_manifest_matches(&embeddings_path, &index) {
-        return;
-    }
-
     let semantic_corpus = "public-domain multi-vector corpus";
     log::info!(
         "Verse embeddings loaded ({} vectors, corpus={semantic_corpus}; semantic hits resolve to active translation)",
         index.len(),
     );
 
-    let semantic = rhema_detection::SemanticDetector::new(Box::new(embedder), Box::new(index));
+    let verse_refs = {
+        use rhema_detection::semantic::index::VectorIndex as _;
+        let verse_ids = index.unique_verse_ids();
+        let state_lock = app.state::<Mutex<state::AppState>>();
+        match state_lock.lock() {
+            Ok(app_state) => app_state
+                .bible_db
+                .as_ref()
+                .and_then(|db| db.resolve_verse_refs(&verse_ids).ok())
+                .unwrap_or_default(),
+            Err(_) => Vec::new(),
+        }
+    };
+
+    let mut semantic = rhema_detection::SemanticDetector::new(Box::new(embedder), Box::new(index));
+    if !verse_refs.is_empty() {
+        semantic.set_verse_refs(verse_refs.into_iter().map(|record| {
+            (
+                record.verse_id,
+                rhema_detection::VerseRef {
+                    book_number: record.book_number,
+                    book_name: record.book_name,
+                    chapter: record.chapter,
+                    verse_start: record.verse,
+                    verse_end: None,
+                },
+            )
+        }));
+    }
     let managed_pipeline = app.state::<Mutex<rhema_detection::DetectionPipeline>>();
     match managed_pipeline.lock() {
         Ok(mut pipeline) => pipeline.set_semantic(semantic),
@@ -498,5 +532,31 @@ mod manifest_tests {
     fn reports_unparseable_manifest() {
         assert!(manifest_record_count("not json")
             .is_err_and(|reason| reason.contains("could not parse")));
+    }
+
+    #[test]
+    fn embeddings_manifest_matches_rejects_missing_or_mismatched_and_accepts_exact() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let embeddings_path = dir.path().join("public-minilm-l6-v2-q8.bin");
+        let manifest_path = dir.path().join("public-minilm-l6-v2.manifest.json");
+        let index =
+            rhema_detection::HnswVectorIndex::from_vecs(vec![vec![1.0, 0.0]], vec![1], 2)
+                .expect("build index");
+
+        assert!(
+            !super::embeddings_manifest_matches(&embeddings_path, &index),
+            "missing manifest must reject candidate so fallback can run"
+        );
+
+        std::fs::write(&manifest_path, r#"{"schema_version":1,"record_count":999}"#)
+            .expect("write stale manifest");
+        assert!(
+            !super::embeddings_manifest_matches(&embeddings_path, &index),
+            "mismatched manifest record_count must reject candidate so fallback can run"
+        );
+
+        std::fs::write(&manifest_path, r#"{"schema_version":1,"record_count":1}"#)
+            .expect("write matching manifest");
+        assert!(super::embeddings_manifest_matches(&embeddings_path, &index));
     }
 }

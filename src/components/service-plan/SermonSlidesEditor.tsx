@@ -34,8 +34,21 @@ interface ServiceAttachmentValidation {
 interface SermonSlidesEditorProps {
   attachments: ServiceAttachment[]
   onChange: (attachments: ServiceAttachment[]) => void
+  onAppend?: (
+    buildSlides: (currentSlides: ServiceAttachment[]) => ServiceAttachment[]
+  ) => void
   applyTheme?: boolean
   onApplyThemeChange?: (applyTheme: boolean) => void
+}
+
+function rejectionMessage(reason: unknown): string | null {
+  if (reason instanceof Error) return reason.message.trim() || null
+  if (typeof reason === "string") return reason.trim() || null
+  if (reason && typeof reason === "object" && "message" in reason) {
+    const message = (reason as { message?: unknown }).message
+    if (typeof message === "string" && message.trim()) return message.trim()
+  }
+  return null
 }
 
 function nextOrder(attachments: ServiceAttachment[]): number {
@@ -83,6 +96,7 @@ function orderedSlides(attachments: ServiceAttachment[]): ServiceAttachment[] {
 export function SermonSlidesEditor({
   attachments,
   onChange,
+  onAppend,
   applyTheme,
   onApplyThemeChange,
 }: SermonSlidesEditorProps) {
@@ -101,9 +115,19 @@ export function SermonSlidesEditor({
     : 0
 
   useEffect(() => {
-    void loadServiceAttachmentLimits().then((limits) => {
-      setSlideLimitLabel(formatAttachmentLimit("slide", limits))
-    })
+    let cancelled = false
+    void loadServiceAttachmentLimits()
+      .then((limits) => {
+        if (!cancelled && limits) {
+          setSlideLimitLabel(formatAttachmentLimit("slide", limits))
+        }
+      })
+      .catch((error) => {
+        console.warn("[sermon-slides] could not load attachment limits", error)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const uploadSlides = async () => {
@@ -132,25 +156,50 @@ export function SermonSlidesEditor({
         : []
     if (paths.length === 0) return
 
-    let order = nextOrder(attachments)
     const results = await Promise.allSettled(
-      paths.map((path) => {
-        const currentOrder = order
-        order += 1
-        return createSlideAttachment(path, currentOrder)
-      })
+      paths.map((path, index) => createSlideAttachment(path, index))
     )
     const uploaded = results.flatMap((result) =>
       result.status === "fulfilled" ? [result.value] : []
     )
-    const failedCount = results.length - uploaded.length
+    const rejections = results.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : []
+    )
 
-    if (uploaded.length > 0) onChange([...attachments, ...uploaded])
-    if (failedCount > 0) {
-      const limits = await loadServiceAttachmentLimits()
-      setErrorMessage(
-        attachmentSizeLimitError("slide", limits, failedCount, "image"),
-      )
+    if (uploaded.length > 0) {
+      const buildAppended = (current: ServiceAttachment[]) => {
+        const startOrder = nextOrder(current)
+        return uploaded.map((slide, index) => ({
+          ...slide,
+          order: startOrder + index,
+        }))
+      }
+      if (onAppend) {
+        onAppend(buildAppended)
+      } else {
+        onChange([...attachments, ...buildAppended(attachments)])
+      }
+    }
+    if (rejections.length > 0) {
+      const messages = [
+        ...new Set(
+          rejections
+            .map(rejectionMessage)
+            .filter((msg): msg is string => Boolean(msg))
+        ),
+      ]
+      if (messages.length > 0) {
+        setErrorMessage(
+          rejections.length > 1 && messages.length > 1
+            ? `${rejections.length} images could not be added: ${messages.join("; ")}`
+            : messages.join("; ")
+        )
+      } else {
+        const limits = await loadServiceAttachmentLimits()
+        setErrorMessage(
+          attachmentSizeLimitError("slide", limits, rejections.length, "image")
+        )
+      }
     }
   }
 
@@ -182,8 +231,12 @@ export function SermonSlidesEditor({
         setErrorMessage("No slides were found in that presentation.")
         return
       }
-      const appended = slidesToAttachments(imported, nextOrder(attachments))
-      onChange([...attachments, ...appended])
+      if (onAppend) {
+        onAppend((current) => slidesToAttachments(imported, nextOrder(current)))
+      } else {
+        const appended = slidesToAttachments(imported, nextOrder(attachments))
+        onChange([...attachments, ...appended])
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error

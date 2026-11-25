@@ -1,10 +1,70 @@
-/** Paddle webhook source IPs — fetched from https://api.paddle.com/ips (do not hard-code). */
+/** Paddle webhook source IPs — fetched from Paddle /ips (do not hard-code). */
 
-const PADDLE_IPS_URL = "https://api.paddle.com/ips"
+export type PaddleWebhookEnvironment = "production" | "sandbox"
+
+export interface PaddleWebhookIpOptions {
+  environment?: string | null
+  fetchImpl?: typeof fetch
+}
+
+const PADDLE_IPS_URLS: Record<PaddleWebhookEnvironment, string> = {
+  production: "https://api.paddle.com/ips",
+  sandbox: "https://sandbox-api.paddle.com/ips",
+}
 const CACHE_TTL_MS = 60 * 60 * 1000
 
-let cachedCidrs: string[] | null = null
-let cachedAt = 0
+const cidrCache = new Map<
+  PaddleWebhookEnvironment,
+  { cidrs: string[]; cachedAt: number }
+>()
+
+function readPaddleEnvFromRuntime(): string | undefined {
+  const deno = (
+    globalThis as {
+      Deno?: { env?: { get?: (name: string) => string | undefined } }
+    }
+  ).Deno
+  if (typeof deno?.env?.get === "function") {
+    return deno.env.get("PADDLE_ENV")
+  }
+  const proc = (
+    globalThis as { process?: { env?: Record<string, string | undefined> } }
+  ).process
+  return proc?.env?.PADDLE_ENV
+}
+
+export function resolvePaddleWebhookEnvironment(
+  environment?: string | null
+): PaddleWebhookEnvironment {
+  const raw =
+    environment !== undefined
+      ? environment?.trim()
+      : readPaddleEnvFromRuntime()?.trim()
+  return raw === "sandbox" ? "sandbox" : "production"
+}
+
+export function getPaddleIpsUrl(environment?: string | null): string {
+  return PADDLE_IPS_URLS[resolvePaddleWebhookEnvironment(environment)]
+}
+
+export function clearPaddleWebhookIpCache(): void {
+  cidrCache.clear()
+}
+
+function normalizeOptions(
+  optionsOrFetch?: typeof fetch | PaddleWebhookIpOptions
+): { environment: PaddleWebhookEnvironment; fetchImpl: typeof fetch } {
+  if (typeof optionsOrFetch === "function") {
+    return {
+      environment: resolvePaddleWebhookEnvironment(),
+      fetchImpl: optionsOrFetch,
+    }
+  }
+  return {
+    environment: resolvePaddleWebhookEnvironment(optionsOrFetch?.environment),
+    fetchImpl: optionsOrFetch?.fetchImpl ?? fetch,
+  }
+}
 
 export function ipv4ToInt(ip: string): number | null {
   const parts = ip.trim().split(".")
@@ -36,9 +96,10 @@ export function ipv4MatchesAnyCidr(ip: string, cidrs: string[]): boolean {
 }
 
 export async function fetchPaddleWebhookIpv4Cidrs(
-  fetchImpl: typeof fetch = fetch
+  optionsOrFetch?: typeof fetch | PaddleWebhookIpOptions
 ): Promise<string[]> {
-  const response = await fetchImpl(PADDLE_IPS_URL, {
+  const { environment, fetchImpl } = normalizeOptions(optionsOrFetch)
+  const response = await fetchImpl(getPaddleIpsUrl(environment), {
     headers: { Accept: "application/json" },
   })
   if (!response.ok) {
@@ -56,38 +117,45 @@ export async function fetchPaddleWebhookIpv4Cidrs(
 }
 
 export async function getPaddleWebhookIpv4Cidrs(
-  fetchImpl: typeof fetch = fetch
+  optionsOrFetch?: typeof fetch | PaddleWebhookIpOptions
 ): Promise<string[]> {
+  const { environment, fetchImpl } = normalizeOptions(optionsOrFetch)
   const now = Date.now()
-  if (cachedCidrs && now - cachedAt < CACHE_TTL_MS) {
-    return cachedCidrs
+  const cached = cidrCache.get(environment)
+  if (cached && now - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.cidrs
   }
 
-  cachedCidrs = await fetchPaddleWebhookIpv4Cidrs(fetchImpl)
-  cachedAt = now
-  return cachedCidrs
+  const cidrs = await fetchPaddleWebhookIpv4Cidrs({ environment, fetchImpl })
+  cidrCache.set(environment, { cidrs, cachedAt: Date.now() })
+  return cidrs
 }
 
 /** Best-effort client IP for Supabase Edge (behind proxies). */
 export function clientIpFromRequest(request: Request): string | null {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-  if (forwarded) return forwarded
+  const cfIp = request.headers.get("cf-connecting-ip")?.trim()
+  if (cfIp) return cfIp
   const realIp = request.headers.get("x-real-ip")?.trim()
   if (realIp) return realIp
-  const cfIp = request.headers.get("cf-connecting-ip")?.trim()
-  return cfIp || null
+  const forwardedHeader = request.headers.get("x-forwarded-for")
+  if (!forwardedHeader) return null
+  const hops = forwardedHeader
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+  return hops.at(-1) ?? null
 }
 
 export async function isPaddleWebhookRequestIpAllowed(
   request: Request,
-  fetchImpl: typeof fetch = fetch
+  optionsOrFetch?: typeof fetch | PaddleWebhookIpOptions
 ): Promise<{ allowed: boolean; ip: string | null; cidrs: string[] }> {
   const ip = clientIpFromRequest(request)
   if (!ip) {
     return { allowed: false, ip: null, cidrs: [] }
   }
 
-  const cidrs = await getPaddleWebhookIpv4Cidrs(fetchImpl)
+  const cidrs = await getPaddleWebhookIpv4Cidrs(optionsOrFetch)
   return {
     allowed: ipv4MatchesAnyCidr(ip, cidrs),
     ip,

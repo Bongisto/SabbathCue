@@ -16,9 +16,11 @@ import {
 
 const mockInvoke = vi.fn()
 const mockListen = vi.fn()
+const mockIsTauriRuntime = vi.fn(() => true)
 
 vi.mock("@/lib/tauri-runtime", () => ({
   invokeTauri: (...args: unknown[]) => mockInvoke(...args),
+  isTauriRuntime: () => mockIsTauriRuntime(),
 }))
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -29,6 +31,8 @@ describe("use-remote-control-settings helpers", () => {
   beforeEach(() => {
     mockInvoke.mockReset()
     mockListen.mockReset()
+    mockIsTauriRuntime.mockReset()
+    mockIsTauriRuntime.mockReturnValue(true)
     mockListen.mockResolvedValue(() => {})
   })
 
@@ -197,6 +201,52 @@ describe("use-remote-control-settings helpers", () => {
 
       expect(writeText).toHaveBeenCalledWith("new-token")
       unmount()
+    })
+
+    it("skips Tauri listener setup outside the desktop runtime", async () => {
+      mockIsTauriRuntime.mockReturnValue(false)
+      const { unmount } = renderHook(() => useRemoteControlSettings())
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      expect(mockListen).not.toHaveBeenCalled()
+      unmount()
+    })
+
+    it("cleans up a listener that resolves after unmount mid-setup", async () => {
+      let resolveFirst!: (unlisten: () => void) => void
+      const firstUnlisten = vi.fn()
+      mockListen.mockImplementationOnce(
+        () =>
+          new Promise<() => void>((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+
+      const { unmount } = renderHook(() => useRemoteControlSettings())
+      await vi.waitFor(() => expect(mockListen).toHaveBeenCalledTimes(1))
+
+      unmount()
+      await act(async () => {
+        resolveFirst(firstUnlisten)
+        await Promise.resolve()
+      })
+
+      expect(firstUnlisten).toHaveBeenCalledTimes(1)
+      expect(mockListen).toHaveBeenCalledTimes(1)
+    })
+
+    it("handles listener registration rejection without throwing", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+      mockListen.mockRejectedValueOnce(new Error("ipc unavailable"))
+
+      const { unmount } = renderHook(() => useRemoteControlSettings())
+      await vi.waitFor(() => expect(warnSpy).toHaveBeenCalled())
+
+      unmount()
+      warnSpy.mockRestore()
     })
   })
 

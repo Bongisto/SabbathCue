@@ -1,7 +1,19 @@
 import { APP_DISPLAY_NAME } from "./app-brand";
+import { publicSiteOrigin } from "./site-url";
 import { getWindowsInstallerDownloadConfig } from "./windows-installer-download";
 
 const windowsInstaller = getWindowsInstallerDownloadConfig();
+const REPO_URL = "https://github.com/Bongisto/SabbathCue";
+
+export function publicBasePath(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_BASE_PATH !== undefined
+      ? process.env.NEXT_PUBLIC_BASE_PATH.trim()
+      : "/SabbathCue";
+  const normalized = raw.replace(/\/+$/, "");
+  if (!normalized) return "";
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
+}
 
 export const SITE = {
   name: APP_DISPLAY_NAME,
@@ -11,7 +23,8 @@ export const SITE = {
     "Real-time AI Bible and Ellen G. White verse detection for live sermons. Offline-first, voice-controlled, broadcast-ready via NDI and HDMI projector.",
   description:
     "SabbathCue listens to a live sermon audio feed, transcribes speech in real time (offline with Vosk or via cloud STT), detects Bible and Ellen G. White references with hybrid semantic AI search, and renders them as broadcast-ready overlays via NDI and direct HDMI projector outputs.",
-  url: "https://github.com/Bongisto/SabbathCue",
+  url: publicSiteOrigin(),
+  repoUrl: REPO_URL,
   locale: "en_US",
   twitterHandle: "",
   founded: "2025",
@@ -20,7 +33,7 @@ export const SITE = {
   repo: {
     owner: "Bongisto",
     name: "SabbathCue",
-    url: "https://github.com/Bongisto/SabbathCue",
+    url: REPO_URL,
     releasesLatest: "https://github.com/Bongisto/sabbathcue-releases/releases/latest",
     download: windowsInstaller.url,
     downloadFilename: windowsInstaller.saveAsFilename,
@@ -29,7 +42,7 @@ export const SITE = {
     stars: { fallback: 0 },
   },
   socials: {
-    github: "https://github.com/Bongisto/SabbathCue",
+    github: REPO_URL,
   },
   stats: {
     languages: "5+",

@@ -1,4 +1,3 @@
-use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -18,12 +17,7 @@ pub(crate) fn check_stt_voice_command(app: &AppHandle, transcript: &str) -> bool
     match command {
         Some(rhema_detection::direct::detector::SttVoiceCommand::Stop) => {
             let managed: State<'_, Mutex<AppState>> = app.state();
-            let Ok(app_state) = managed.lock() else {
-                return true;
-            };
-            if app_state.stt_active.load(Ordering::Relaxed) {
-                app_state.stt_active.store(false, Ordering::SeqCst);
-                app_state.audio_active.store(false, Ordering::SeqCst);
+            if super::stop_active_transcription(&managed).unwrap_or(false) {
                 log::info!("[STT] Voice command: stop transcribing");
                 let _ = app.emit("stt_voice_control", "stop");
                 let _ = app.emit("stt_disconnected", ());
@@ -94,5 +88,32 @@ pub(crate) fn check_translation_command(app: &AppHandle, transcript: &str) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::Ordering;
+    use std::sync::Mutex;
+
+    use crate::commands::stt::stop_active_transcription;
+    use crate::state::AppState;
+
+    #[test]
+    fn stop_active_transcription_clears_flags_and_retires_audio_session() {
+        let app_state = AppState::new();
+        app_state.stt_active.store(true, Ordering::SeqCst);
+        app_state.audio_active.store(true, Ordering::SeqCst);
+        let initial_gen = app_state.audio_session_generation.load(Ordering::SeqCst);
+        let state = Mutex::new(app_state);
+
+        assert_eq!(stop_active_transcription(&state), Ok(true));
+        let locked = state.lock().unwrap();
+        assert!(!locked.stt_active.load(Ordering::SeqCst));
+        assert!(!locked.audio_active.load(Ordering::SeqCst));
+        assert!(locked.audio_session_generation.load(Ordering::SeqCst) > initial_gen);
+        drop(locked);
+
+        assert_eq!(stop_active_transcription(&state), Ok(false));
     }
 }

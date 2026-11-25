@@ -265,6 +265,29 @@ describe("hymn voice control", () => {
       expect(await handleHymnVoiceControl("hymn 13")).toBe(true)
       expect(selectPreviewItemMock).toHaveBeenCalledTimes(2)
     })
+
+    it("deduplicates concurrent triggers during async hymn load and rolls back on miss", async () => {
+      let resolveFirst!: (value: typeof sampleHymn | null) => void
+      getHymnByNumberMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      generateHymnScreensMock.mockReturnValue([sampleScreen])
+
+      const first = handleHymnVoiceControl("hymn 12")
+      const second = handleHymnVoiceControl("song 12")
+
+      expect(await second).toBe(false)
+      expect(getHymnByNumberMock).toHaveBeenCalledTimes(1)
+
+      resolveFirst(null)
+      expect(await first).toBe(false)
+
+      getHymnByNumberMock.mockResolvedValueOnce(sampleHymn)
+      expect(await handleHymnVoiceControl("hymn 12")).toBe(true)
+    })
   })
 
   describe("shouldSuppressDuplicateHymnCommand", () => {

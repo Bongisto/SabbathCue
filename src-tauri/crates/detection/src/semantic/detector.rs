@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::cache::EmbeddingCache;
@@ -35,6 +35,9 @@ pub struct SemanticDetector {
     /// When true, uses ensemble search (3 strategies) for better accuracy.
     /// When false, single direct embedding for speed.
     use_synonyms: bool,
+    /// Optional lookup from corpus `verse_id` -> canonical `VerseRef` so
+    /// semantic hits carry real coordinates before hybrid FTS merging runs.
+    verse_refs: HashMap<i64, VerseRef>,
 }
 
 impl SemanticDetector {
@@ -49,6 +52,7 @@ impl SemanticDetector {
             synonym_expander: SynonymExpander::new(),
             ensemble: EnsembleSearcher::new(),
             use_synonyms: true,
+            verse_refs: HashMap::new(),
         }
     }
 
@@ -74,6 +78,25 @@ impl SemanticDetector {
     /// the detector can produce meaningful results.
     pub fn is_ready(&self) -> bool {
         !self.index.is_empty()
+    }
+
+    /// Populate canonical `VerseRef` coordinates keyed by corpus `verse_id` so
+    /// vector detections resolve before hybrid FTS merging runs.
+    pub fn set_verse_refs<I>(&mut self, refs: I)
+    where
+        I: IntoIterator<Item = (i64, VerseRef)>,
+    {
+        self.verse_refs = refs.into_iter().collect();
+    }
+
+    /// Returns `true` when any `verse_id -> VerseRef` coordinates are registered.
+    pub fn has_verse_refs(&self) -> bool {
+        !self.verse_refs.is_empty()
+    }
+
+    /// Distinct verse IDs stored in the backing vector index.
+    pub fn index_verse_ids(&self) -> Vec<i64> {
+        self.index.unique_verse_ids()
     }
 
     /// Detect Bible verses in `text` using semantic similarity.
@@ -129,28 +152,22 @@ impl SemanticDetector {
                                 (result.best_similarity + agreement_bonus).min(1.0),
                             );
                             let entry = best_by_verse.entry(result.verse_id);
-                            match entry {
-                                std::collections::hash_map::Entry::Occupied(mut existing)
-                                    if existing.get().confidence < confidence =>
+                            let detection = match &entry {
+                                std::collections::hash_map::Entry::Occupied(existing)
+                                    if existing.get().confidence >= confidence =>
                                 {
-                                    existing.insert(Self::make_detection(
-                                        result.verse_id,
-                                        confidence,
-                                        result.score,
-                                        chunk,
-                                        now,
-                                    ));
+                                    None
                                 }
-                                std::collections::hash_map::Entry::Vacant(vacant) => {
-                                    vacant.insert(Self::make_detection(
-                                        result.verse_id,
-                                        confidence,
-                                        result.score,
-                                        chunk,
-                                        now,
-                                    ));
-                                }
-                                std::collections::hash_map::Entry::Occupied(_) => {}
+                                _ => Some(self.make_detection(
+                                    result.verse_id,
+                                    confidence,
+                                    result.score,
+                                    chunk,
+                                    now,
+                                )),
+                            };
+                            if let Some(detection) = detection {
+                                best_by_verse.insert(result.verse_id, detection);
                             }
                         }
                     }
@@ -171,14 +188,13 @@ impl SemanticDetector {
 
     fn detect_direct_embedding(&mut self, text: &str) -> Vec<Detection> {
         let now = Self::timestamp_ms();
-        let mut seen_verse_ids = HashSet::new();
         let chunks = self.chunker.chunk(text);
         let search_chunks = if chunks.is_empty() {
             vec![text.to_string()]
         } else {
             chunks
         };
-        let mut detections = Vec::new();
+        let mut best_by_verse: HashMap<i64, Detection> = HashMap::new();
 
         for chunk in search_chunks {
             let results = if let Some((_embedding, results)) = self.cache.get(&chunk) {
@@ -197,27 +213,30 @@ impl SemanticDetector {
             };
 
             for result in &results {
-                if result.similarity >= self.confidence_threshold
-                    && seen_verse_ids.insert(result.verse_id)
-                {
+                if result.similarity >= self.confidence_threshold {
                     let confidence =
                         cap_pastoral_prayer_address_confidence(&chunk, result.similarity);
-                    detections.push(Self::make_detection(
-                        result.verse_id,
-                        confidence,
-                        result.similarity,
-                        &chunk,
-                        now,
-                    ));
+                    if best_by_verse
+                        .get(&result.verse_id)
+                        .is_none_or(|existing| confidence > existing.confidence)
+                    {
+                        best_by_verse.insert(
+                            result.verse_id,
+                            self.make_detection(
+                                result.verse_id,
+                                confidence,
+                                confidence,
+                                &chunk,
+                                now,
+                            ),
+                        );
+                    }
                 }
             }
         }
 
-        detections.sort_by(|a, b| {
-            b.confidence
-                .partial_cmp(&a.confidence)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        let mut detections: Vec<Detection> = best_by_verse.into_values().collect();
+        detections.sort_by(|a, b| b.confidence.total_cmp(&a.confidence));
         detections
     }
 
@@ -267,20 +286,22 @@ impl SemanticDetector {
     }
 
     fn make_detection(
+        &self,
         verse_id: i64,
         confidence: f64,
         rank_score: f64,
         snippet: &str,
         detected_at: u64,
     ) -> Detection {
+        let verse_ref = self.verse_refs.get(&verse_id).cloned().unwrap_or_else(|| VerseRef {
+            book_number: 0,
+            book_name: String::new(),
+            chapter: 0,
+            verse_start: 0,
+            verse_end: None,
+        });
         Detection {
-            verse_ref: VerseRef {
-                book_number: 0,
-                book_name: String::new(),
-                chapter: 0,
-                verse_start: 0,
-                verse_end: None,
-            },
+            verse_ref,
             verse_id: Some(verse_id),
             confidence,
             source: DetectionSource::Semantic {
@@ -688,5 +709,117 @@ mod tests {
 
         assert_eq!(detections.len(), 1);
         assert!(detections[0].confidence >= 0.95);
+    }
+
+    #[test]
+    fn resolve_verse_refs_populates_coordinates_on_semantic_detections() {
+        let mut detector = SemanticDetector::new(
+            Box::new(StubEmbedder::new(128)),
+            Box::new(FakeIndex {
+                results: vec![SearchResult {
+                    verse_id: 43_003_016,
+                    similarity: 0.91,
+                }],
+            }),
+        );
+        detector.set_use_synonyms(false);
+        assert!(!detector.has_verse_refs());
+        detector.set_verse_refs([(
+            43_003_016,
+            VerseRef {
+                book_number: 43,
+                book_name: "John".to_string(),
+                chapter: 3,
+                verse_start: 16,
+                verse_end: None,
+            },
+        )]);
+        assert!(detector.has_verse_refs());
+
+        let detections =
+            detector.detect("for God so loved the world that he gave his only begotten son");
+
+        assert_eq!(detections.len(), 1);
+        assert_eq!(detections[0].verse_id, Some(43_003_016));
+        assert_eq!(detections[0].verse_ref.book_number, 43);
+        assert_eq!(detections[0].verse_ref.book_name, "John");
+        assert_eq!(detections[0].verse_ref.chapter, 3);
+        assert_eq!(detections[0].verse_ref.verse_start, 16);
+    }
+
+    struct SequentialChunkIndex {
+        batches: std::sync::Mutex<std::collections::VecDeque<Vec<SearchResult>>>,
+    }
+
+    impl VectorIndex for SequentialChunkIndex {
+        fn search(&self, _query: &[f32], k: usize) -> Result<Vec<SearchResult>, DetectionError> {
+            let next = self
+                .batches
+                .lock()
+                .expect("sequential index lock")
+                .pop_front()
+                .unwrap_or_default();
+            Ok(next.into_iter().take(k).collect())
+        }
+
+        fn len(&self) -> usize {
+            1
+        }
+    }
+
+    #[test]
+    fn direct_embedding_dedup_keeps_max_confidence_chunk() {
+        let mut detector = SemanticDetector::new(
+            Box::new(StubEmbedder::new(128)),
+            Box::new(SequentialChunkIndex {
+                batches: std::sync::Mutex::new(std::collections::VecDeque::from([
+                    vec![SearchResult {
+                        verse_id: 1001,
+                        similarity: 0.55,
+                    }],
+                    vec![SearchResult {
+                        verse_id: 1001,
+                        similarity: 0.91,
+                    }],
+                ])),
+            }),
+        );
+        detector.set_use_synonyms(false);
+
+        let detections = detector.detect(
+            "Opening commentary sentence before the quote. For God so loved the world that he gave his only begotten son.",
+        );
+
+        assert_eq!(detections.len(), 1);
+        assert_eq!(detections[0].verse_id, Some(1001));
+        assert!((detections[0].confidence - 0.91).abs() < 1e-9);
+        assert!((detections[0].rank_score() - 0.91).abs() < 1e-9);
+        assert!(
+            detections[0].transcript_snippet.contains("For God so loved"),
+            "winning snippet should come from the higher-scoring chunk, got {:?}",
+            detections[0].transcript_snippet
+        );
+    }
+
+    #[test]
+    fn direct_embedding_pastoral_prayer_caps_confidence_and_rank_score() {
+        let mut detector = SemanticDetector::new(
+            Box::new(StubEmbedder::new(128)),
+            Box::new(FakeIndex {
+                results: vec![SearchResult {
+                    verse_id: 1001,
+                    similarity: 0.95,
+                }],
+            }),
+        );
+        detector.set_use_synonyms(false);
+
+        let detections = detector.detect(
+            "And father, I pray that you may convict them, convert them right now on the spot, dear Lord, because you are able to do the impossible, dear father.",
+        );
+
+        assert_eq!(detections.len(), 1);
+        assert!(detections[0].confidence <= 0.89);
+        assert!((detections[0].rank_score() - detections[0].confidence).abs() < 1e-9);
     }
 }

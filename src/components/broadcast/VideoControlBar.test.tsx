@@ -173,4 +173,46 @@ describe("VideoControlBar", () => {
     expect(setVideoLoopMock).toHaveBeenCalledWith(true)
     expect(setAutoAdvanceVideoOnEndMock).toHaveBeenCalledWith(false)
   })
+
+  it("handles listen rejection and late listen resolution after unmount cleanly (FU-52)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { listen } = await import("@tauri-apps/api/event")
+
+    // Case 1: listen() rejects
+    vi.mocked(listen).mockRejectedValueOnce(new Error("event bus unavailable"))
+    await act(async () => {
+      root.render(React.createElement(VideoControlBar, { item: videoItem }))
+    })
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[video-control-bar] failed to listen for timeupdate",
+      expect.any(Error),
+    )
+
+    // Case 2: listen() resolves after unmount — unlisten must be invoked immediately
+    const lateUnlisten = vi.fn()
+    let resolveListen: ((fn: () => void) => void) | null = null
+    vi.mocked(listen).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveListen = resolve
+        }),
+    )
+
+    const secondContainer = document.createElement("div")
+    document.body.appendChild(secondContainer)
+    const secondRoot = createRoot(secondContainer)
+    await act(async () => {
+      secondRoot.render(React.createElement(VideoControlBar, { item: videoItem }))
+    })
+    act(() => {
+      secondRoot.unmount()
+    })
+    secondContainer.remove()
+
+    await act(async () => {
+      resolveListen?.(lateUnlisten)
+    })
+    expect(lateUnlisten).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
 })

@@ -49,6 +49,6 @@ jobs:
       # verify-deployed-site.mjs uses only node: builtins and global fetch,
       # so there is deliberately no install step — this stays a fast check.
       - name: Verify deployed origin
-        run: >-
-          node scripts/verify-deployed-site.mjs
-          "${{ github.event.inputs.origin || 'https://sabbath-cue-two.vercel.app' }}"
+        env:
+          ORIGIN: ${{ github.event.inputs.origin || 'https://sabbath-cue-two.vercel.app' }}
+        run: node scripts/verify-deployed-site.mjs "$ORIGIN"

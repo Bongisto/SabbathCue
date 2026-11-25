@@ -43,11 +43,11 @@ export function useApiKeySettings({
     setKeyVerified(false)
     setValidationMessage(null)
     const result = await save(keyValue)
-    setHasKey(result.hasKey)
     if (result.error) {
       setKeyError(result.error)
       return
     }
+    setHasKey(result.hasKey)
     if (result.hasKey) {
       setKeyValue("")
       setEditingSavedKey(false)

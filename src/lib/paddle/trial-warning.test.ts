@@ -77,6 +77,40 @@ describe("deriveTrialWarning", () => {
     expect(warning?.kind).toBe("access_ending")
   })
 
+  it("warns former subscribers on EFT/comp access even with stale subscriptionId and scheduled pauses (FU-29)", () => {
+    expect(
+      deriveTrialWarning(
+        summary({
+          subscriptionId: "sub_old",
+          subscriptionStatus: "canceled",
+        }),
+        NOW
+      )?.kind
+    ).toBe("access_ending")
+
+    expect(
+      deriveTrialWarning(
+        summary({
+          subscriptionId: "sub_old",
+          subscriptionStatus: "paused",
+        }),
+        NOW
+      )?.kind
+    ).toBe("access_ending")
+
+    expect(
+      deriveTrialWarning(
+        summary({
+          subscriptionId: "sub_1",
+          subscriptionStatus: "active",
+          scheduledChangeAction: "pause",
+          scheduledChange: new Date(NOW + DAY).toISOString(),
+        }),
+        NOW
+      )?.kind
+    ).toBe("access_ending")
+  })
+
   it("prefers payment_failed over a scheduled cancel", () => {
     const warning = deriveTrialWarning(
       summary({

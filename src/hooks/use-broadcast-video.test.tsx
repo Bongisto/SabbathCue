@@ -6,34 +6,40 @@ import { useBroadcastVideo } from "./use-broadcast-video"
 import type { PresentationRenderData } from "@/types"
 import type { VideoTransportCommand } from "@/lib/broadcast-video-control"
 
-const { videoListenerRef } = vi.hoisted(() => ({
+const { videoListenerRef, mockListen, mockEmitTo } = vi.hoisted(() => ({
   videoListenerRef: {
     current: null as
       | ((event: { payload: VideoTransportCommand }) => void)
       | null,
   },
+  mockListen: vi.fn(),
+  mockEmitTo: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({
-    listen: vi.fn(
-      (event: string, callback: typeof videoListenerRef.current) => {
-        if (event === "broadcast:video-control")
-          videoListenerRef.current = callback
-        return Promise.resolve(() => {
-          videoListenerRef.current = null
-        })
-      }
-    ),
+    listen: (event: string, callback: typeof videoListenerRef.current) =>
+      mockListen(event, callback),
   }),
 }))
 
 vi.mock("@tauri-apps/api/event", () => ({
-  emitTo: vi.fn().mockResolvedValue(undefined),
+  emitTo: (...args: unknown[]) => mockEmitTo(...args),
 }))
 
-function TestBroadcastVideo({ video }: { video: HTMLVideoElement }) {
-  useBroadcastVideo({ video, item: null, outputId: "main" })
+function TestBroadcastVideo({
+  video,
+  preferredSinkId,
+}: {
+  video: HTMLVideoElement
+  preferredSinkId?: string
+}) {
+  useBroadcastVideo({
+    video,
+    item: null,
+    outputId: "main",
+    preferredSinkId,
+  })
   return null
 }
 
@@ -66,6 +72,17 @@ describe("useBroadcastVideo", () => {
 
   beforeEach(() => {
     videoListenerRef.current = null
+    mockEmitTo.mockClear()
+    mockListen.mockReset()
+    mockListen.mockImplementation(
+      (event: string, callback: typeof videoListenerRef.current) => {
+        if (event === "broadcast:video-control")
+          videoListenerRef.current = callback
+        return Promise.resolve(() => {
+          videoListenerRef.current = null
+        })
+      }
+    )
     container = document.createElement("div")
     document.body.appendChild(container)
     root = createRoot(container)
@@ -231,5 +248,72 @@ describe("useBroadcastVideo", () => {
     expect(pause).toHaveBeenCalled()
     expect(load).toHaveBeenCalled()
     expect(video.getAttribute("src")).toBeNull()
+  })
+
+  it("preserves preferred sinkId across <video> element remounts without tearing down the transport listener", async () => {
+    const makeVideoEl = () => {
+      const el = document.createElement("video") as HTMLVideoElement & {
+        setSinkId: ReturnType<typeof vi.fn>
+      }
+      el.setSinkId = vi.fn().mockResolvedValue(undefined)
+      Object.defineProperties(el, {
+        load: { value: vi.fn() },
+        pause: { value: vi.fn() },
+        play: { value: vi.fn().mockResolvedValue(undefined) },
+      })
+      return el
+    }
+
+    const video1 = makeVideoEl()
+    const video2 = makeVideoEl()
+
+    await act(async () => {
+      root.render(<TestBroadcastVideo video={video1} />)
+    })
+    await vi.waitFor(() => expect(videoListenerRef.current).not.toBeNull())
+    const initialListener = videoListenerRef.current
+
+    await act(async () => {
+      videoListenerRef.current?.({
+        payload: { type: "setSinkId", sinkId: "speaker-1" },
+      })
+    })
+    expect(video1.setSinkId).toHaveBeenCalledWith("speaker-1")
+
+    await act(async () => {
+      root.render(<TestBroadcastVideo video={video2} />)
+    })
+
+    expect(videoListenerRef.current).toBe(initialListener)
+    expect(video2.setSinkId).toHaveBeenCalledWith("speaker-1")
+  })
+
+  it("emits broadcast:output-error to main when transport listener registration rejects on a broadcast window", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    mockListen.mockRejectedValueOnce(new Error("listen failed"))
+    const video = document.createElement("video")
+    Object.defineProperties(video, {
+      load: { value: vi.fn() },
+      pause: { value: vi.fn() },
+      play: { value: vi.fn().mockResolvedValue(undefined) },
+    })
+
+    await act(async () => {
+      root.render(<TestBroadcastVideo video={video} />)
+      await Promise.resolve()
+    })
+
+    await vi.waitFor(() => {
+      expect(mockEmitTo).toHaveBeenCalledWith(
+        "main",
+        "broadcast:output-error",
+        expect.objectContaining({
+          outputId: "main",
+          kind: "broadcast-sync",
+          title: "Video controls unavailable",
+        }),
+      )
+    })
+    errorSpy.mockRestore()
   })
 })

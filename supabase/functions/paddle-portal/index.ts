@@ -11,6 +11,10 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: corsHeaders })
 }
 
+function escapeIlikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&")
+}
+
 function requireEnv(name: string): string {
   const value = Deno.env.get(name)?.trim()
   if (!value) throw new Error(`${name} is not configured`)
@@ -41,50 +45,94 @@ const authenticated = withSupabase({ auth: "user" }, async (_request, context) =
     return json({ error: "Not authenticated" }, 401)
   }
 
-  // 2. Resolve Paddle customer ID server-side from the session user.
+  // 2. Resolve Paddle customer IDs server-side from the session user.
   //    Never accept a customer_id from the client body.
-  let { data: customerRow, error: customerError } = await context.supabaseAdmin
+  const { data: ownedRows, error: ownedError } = await context.supabaseAdmin
     .from("paddle_customers")
     .select("customer_id")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
-  if (!customerRow && !customerError) {
-    const fallback = await context.supabaseAdmin
-      .from("paddle_customers")
-      .select("customer_id")
-      .ilike("email", email)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    customerRow = fallback.data
-    customerError = fallback.error
+  if (ownedError) {
+    return json({ error: ownedError.message }, 500)
   }
 
-  if (customerError) {
-    return json({ error: customerError.message }, 500)
+  const { data: unlinkedRows, error: unlinkedError } = await context.supabaseAdmin
+    .from("paddle_customers")
+    .select("customer_id, email")
+    .is("user_id", null)
+    .ilike("email", escapeIlikePattern(email))
+    .order("updated_at", { ascending: false })
+
+  if (unlinkedError) {
+    return json({ error: unlinkedError.message }, 500)
   }
-  if (!customerRow?.customer_id) {
+
+  const normalizedEmail = email.toLowerCase()
+  const ownedIds = new Set<string>()
+  const seenCustomerIds = new Set<string>()
+  const customerIds: string[] = []
+
+  for (const row of ownedRows ?? []) {
+    if (typeof row.customer_id === "string" && !seenCustomerIds.has(row.customer_id)) {
+      seenCustomerIds.add(row.customer_id)
+      ownedIds.add(row.customer_id)
+      customerIds.push(row.customer_id)
+    }
+  }
+
+  for (const row of unlinkedRows ?? []) {
+    if (
+      typeof row.customer_id === "string" &&
+      typeof row.email === "string" &&
+      row.email.trim().toLowerCase() === normalizedEmail &&
+      !seenCustomerIds.has(row.customer_id)
+    ) {
+      seenCustomerIds.add(row.customer_id)
+      customerIds.push(row.customer_id)
+    }
+  }
+
+  if (customerIds.length === 0) {
     return json({ error: "No Paddle customer" }, 404)
   }
 
   const { data: subRows, error: subError } = await context.supabaseAdmin
     .from("paddle_subscriptions")
-    .select("subscription_id")
-    .eq("customer_id", customerRow.customer_id)
+    .select("customer_id, subscription_id, subscription_status")
+    .in("customer_id", customerIds)
+    .order("updated_at", { ascending: false })
 
   if (subError) {
     return json({ error: subError.message }, 500)
   }
 
-  const subscriptionIds = (subRows ?? []).map((row) => row.subscription_id)
+  const allSubs = subRows ?? []
+  const statusRank = (status: string | null | undefined): number => {
+    if (status === "active" || status === "trialing") return 2
+    if (status === "past_due") return 1
+    return 0
+  }
+
+  let targetCustomerId = customerIds[0]
+  if (allSubs.length > 0) {
+    const bestSub = [...allSubs].sort((a, b) => {
+      const rankDiff =
+        statusRank(b.subscription_status) - statusRank(a.subscription_status)
+      if (rankDiff !== 0) return rankDiff
+      return (ownedIds.has(b.customer_id) ? 1 : 0) - (ownedIds.has(a.customer_id) ? 1 : 0)
+    })[0]
+    targetCustomerId = bestSub.customer_id
+  }
+
+  const subscriptionIds = allSubs
+    .filter((row) => row.customer_id === targetCustomerId)
+    .map((row) => row.subscription_id)
 
   try {
     const paddle = getPaddle()
     const session = await paddle.customerPortalSessions.create(
-      customerRow.customer_id,
+      targetCustomerId,
       subscriptionIds
     )
     return json({ url: session.urls.general.overview })

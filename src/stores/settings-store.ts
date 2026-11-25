@@ -7,6 +7,34 @@ export type SttProvider = "deepgram" | "soniox" | "speechmatics" | "vosk"
 export type SttLanguage = "en" | "af" | "es" | "fr" | "pt"
 export type AiRankingProvider = "deepseek" | "cerebras"
 
+const SUPPORTED_STT_LANGUAGES: Record<SttProvider, readonly SttLanguage[]> = {
+  vosk: ["en"],
+  deepgram: ["en", "es", "fr", "pt"],
+  soniox: ["en", "af", "es", "fr", "pt"],
+  speechmatics: ["en", "af", "es", "fr", "pt"],
+}
+
+export function normalizeSttLanguageForProvider(
+  provider: SttProvider,
+  language: SttLanguage
+): SttLanguage {
+  return SUPPORTED_STT_LANGUAGES[provider].includes(language) ? language : "en"
+}
+
+function normalizeHydratedSttLanguage(patch: Partial<SettingsState>): void {
+  if (patch.sttProvider === undefined && patch.sttLanguage === undefined) return
+  const currentState = useSettingsStore.getState()
+  const effectiveProvider = patch.sttProvider ?? currentState.sttProvider
+  const currentLanguage = patch.sttLanguage ?? currentState.sttLanguage
+  const normalized = normalizeSttLanguageForProvider(
+    effectiveProvider,
+    currentLanguage
+  )
+  if (patch.sttLanguage !== undefined || normalized !== currentLanguage) {
+    patch.sttLanguage = normalized
+  }
+}
+
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.9
 const DEFAULT_SEMANTIC_CONFIDENCE_THRESHOLD = 0.7
 
@@ -123,8 +151,21 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     set({ semanticConfidenceThreshold }),
   setCooldownMs: (cooldownMs) => set({ cooldownMs }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
-  setSttProvider: (sttProvider) => set({ sttProvider }),
-  setSttLanguage: (sttLanguage) => set({ sttLanguage }),
+  setSttProvider: (sttProvider) =>
+    set((state) => ({
+      sttProvider,
+      sttLanguage: normalizeSttLanguageForProvider(
+        sttProvider,
+        state.sttLanguage
+      ),
+    })),
+  setSttLanguage: (sttLanguage) =>
+    set((state) => ({
+      sttLanguage: normalizeSttLanguageForProvider(
+        state.sttProvider,
+        sttLanguage
+      ),
+    })),
   setLowPowerMode: (lowPowerMode) => set({ lowPowerMode }),
   setActionNotificationsEnabled: (actionNotificationsEnabled) =>
     set({ actionNotificationsEnabled }),
@@ -250,6 +291,7 @@ export function hydrateSettings(): Promise<void> {
       if (patch.aiRankingEnabled !== undefined) {
         patch.deepseekRankingEnabled = patch.aiRankingEnabled
       }
+      normalizeHydratedSttLanguage(patch)
 
       // Resolve keyring-backed secret presence and write only boolean flags.
       // Best-effort and independent: if a command isn't available (web/dev), keep the default.

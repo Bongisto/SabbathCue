@@ -15,10 +15,14 @@ import type {
   VideoPresentationSource,
 } from "@/types"
 
+export const PREFERRED_AUDIO_DEVICE_STORAGE_KEY =
+  "sabbathcue:video:preferred-audio-output-device"
+
 interface UseBroadcastVideoOptions {
   video: HTMLVideoElement | null
   item: PresentationRenderData | null
   outputId: string
+  preferredSinkId?: string
   onEnded?: () => void
   /** Last known transport state to restore instead of autoplaying when the
    * video element (re)mounts with an unchanged live item. */
@@ -57,6 +61,17 @@ function rewindIfEnded(element: HTMLVideoElement): void {
   }
 }
 
+function loadVideo(element: HTMLVideoElement): void {
+  if (
+    import.meta.env.MODE === "test" &&
+    element.load ===
+      element.ownerDocument.defaultView?.HTMLMediaElement?.prototype.load
+  ) {
+    return
+  }
+  element.load()
+}
+
 function loadVideoSource(
   element: HTMLVideoElement,
   source: VideoPresentationSource | null | undefined
@@ -64,14 +79,14 @@ function loadVideoSource(
   const src = source ? resolveNativeVideoSrc(source) : null
   if (!source || !src) {
     element.removeAttribute("src")
-    element.load()
+    loadVideo(element)
     return
   }
   if (element.src !== src) {
     element.src = src
     element.poster = source.poster ?? ""
     element.loop = Boolean(source.loop)
-    element.load()
+    loadVideo(element)
   } else {
     seekToStart(element)
   }
@@ -81,7 +96,7 @@ function loadVideoSource(
 function stopVideo(element: HTMLVideoElement): void {
   element.pause()
   element.removeAttribute("src")
-  element.load()
+  loadVideo(element)
 }
 
 function isJsdomNativeMediaPlay(element: HTMLVideoElement): boolean {
@@ -118,11 +133,27 @@ function reportTransportListenerFailure(outputId: string, error: unknown): void 
     error
   )
   if (!isTauriRuntime()) return
+  const title = "Video controls unavailable"
+  const description = `Could not attach the video transport listener for ${outputId}: ${String(error)}`
+  if (isBroadcastOutputId(outputId)) {
+    void emitTo("main", "broadcast:output-error", {
+      outputId,
+      kind: "broadcast-sync",
+      title,
+      description,
+    }).catch((emitError) => {
+      console.warn(
+        "[broadcast-video] failed to emit transport listener error to main",
+        emitError
+      )
+    })
+    return
+  }
   useBroadcastStore.getState().reportOutputIssue({
     outputId: "global",
     kind: "broadcast-sync",
-    title: "Video controls unavailable",
-    description: `Could not attach the video transport listener for ${outputId}: ${String(error)}`,
+    title,
+    description,
     id: `global:video-transport:${outputId}`,
   })
 }
@@ -134,7 +165,31 @@ function reportAudioSinkFailure(outputId: string, error: unknown): void {
     kind: "video-audio",
     title: "Video audio output failed",
     description: `Could not route video audio to the selected output: ${String(error)}`,
+  }).catch((emitError) => {
+    console.warn(
+      "[broadcast-video] failed to emit audio sink error to main",
+      emitError
+    )
   })
+}
+
+function setElementAudioSink(
+  element: HTMLVideoElement,
+  sinkId: string,
+  outputId: string,
+  onError?: () => void
+): void {
+  if (!("setSinkId" in element)) return
+  void (
+    element as HTMLVideoElement & {
+      setSinkId: (sinkId: string) => Promise<void>
+    }
+  )
+    .setSinkId(sinkId)
+    .catch((error) => {
+      onError?.()
+      reportAudioSinkFailure(outputId, error)
+    })
 }
 
 function applyPlaybackCommand(
@@ -152,14 +207,8 @@ function applyPlaybackCommand(
   if (payload.type === "setVolume") element.volume = payload.volume
   if (payload.type === "setMuted") element.muted = payload.muted
   if (payload.type === "setLoop") element.loop = payload.loop
-  if (payload.type === "setSinkId" && "setSinkId" in element) {
-    void (
-      element as HTMLVideoElement & {
-        setSinkId: (sinkId: string) => Promise<void>
-      }
-    )
-      .setSinkId(payload.sinkId)
-      .catch((error) => reportAudioSinkFailure(outputId, error))
+  if (payload.type === "setSinkId") {
+    setElementAudioSink(element, payload.sinkId, outputId)
   }
   if (payload.type === "stop") stopVideo(element)
 }
@@ -183,7 +232,7 @@ function syncVideoItem(
   element.src = src
   element.poster = source.poster ?? ""
   element.loop = Boolean(source.loop)
-  element.load()
+  loadVideo(element)
   element.muted = false
   const resume = getResumeState?.()
   if (resume) {
@@ -197,11 +246,20 @@ export function useBroadcastVideo({
   video,
   item,
   outputId,
+  preferredSinkId,
   onEnded,
   getResumeState,
 }: UseBroadcastVideoOptions): void {
   const itemRef = useRef<PresentationRenderData | null>(item)
   const videoRef = useRef<HTMLVideoElement | null>(video)
+  const preferredSinkIdRef = useRef<string | null>(
+    preferredSinkId ? preferredSinkId : null
+  )
+  const prevPreferredSinkPropRef = useRef<string | undefined>(preferredSinkId)
+  const lastAppliedSinkRef = useRef<{
+    element: HTMLVideoElement
+    sinkId: string
+  } | null>(null)
   const lastTimeUpdateRef = useRef(0)
   const onEndedRef = useRef(onEnded)
 
@@ -217,16 +275,55 @@ export function useBroadcastVideo({
     onEndedRef.current = onEnded
   }, [onEnded])
 
+  const applySink = useCallback(
+    (element: HTMLVideoElement, sinkId: string, force = false) => {
+      if (
+        !force &&
+        lastAppliedSinkRef.current?.element === element &&
+        lastAppliedSinkRef.current.sinkId === sinkId
+      ) {
+        return
+      }
+      const attempt = { element, sinkId }
+      lastAppliedSinkRef.current = attempt
+      setElementAudioSink(element, sinkId, outputId, () => {
+        if (lastAppliedSinkRef.current === attempt) {
+          lastAppliedSinkRef.current = null
+        }
+      })
+    },
+    [outputId]
+  )
+
+  useEffect(() => {
+    if (preferredSinkId === prevPreferredSinkPropRef.current) return
+    prevPreferredSinkPropRef.current = preferredSinkId
+    if (preferredSinkId === undefined) return
+    preferredSinkIdRef.current = preferredSinkId
+    if (videoRef.current) {
+      applySink(videoRef.current, preferredSinkId)
+    }
+  }, [applySink, preferredSinkId])
+
   const applyCommand = useCallback(
     (command: VideoTransportCommand) => {
+      const payload = buildVideoCommand(command)
+      if (payload.type === "setSinkId") {
+        preferredSinkIdRef.current = payload.sinkId
+        const element = videoRef.current
+        if (element) applySink(element, payload.sinkId, true)
+        return
+      }
       const element = videoRef.current
       if (!element) return
-      const payload = buildVideoCommand(command)
       if (payload.type === "load") {
+        if (preferredSinkIdRef.current !== null) {
+          applySink(element, preferredSinkIdRef.current)
+        }
         loadVideoSource(element, payload.item.video)
         return
       }
-      if (payload.type === "setSinkId" || payload.type === "stop") {
+      if (payload.type === "stop") {
         applyPlaybackCommand(element, payload, outputId)
         return
       }
@@ -234,33 +331,48 @@ export function useBroadcastVideo({
         return
       applyPlaybackCommand(element, payload, outputId)
     },
-    [outputId]
+    [applySink, outputId]
   )
 
   useEffect(() => {
-    const element = videoRef.current
-    if (!element) return
-    syncVideoItem(element, item, getResumeState)
-  }, [getResumeState, item, video])
+    if (!video) return
+    if (preferredSinkIdRef.current !== null) {
+      applySink(video, preferredSinkIdRef.current)
+    }
+    syncVideoItem(video, item, getResumeState)
+  }, [applySink, getResumeState, item, video])
 
   useEffect(() => {
-    if (!video) return
     if (!isTauriRuntime()) return
-    let unlisten: Promise<() => void> | null = null
+    let cancelled = false
+    let unlistenFn: (() => void) | null = null
     try {
       const currentWindow = getCurrentWebviewWindow()
-      unlisten = currentWindow.listen<VideoTransportCommand>(
-        VIDEO_TRANSPORT_EVENT,
-        (event) => applyCommand(event.payload)
-      )
+      void currentWindow
+        .listen<VideoTransportCommand>(VIDEO_TRANSPORT_EVENT, (event) => {
+          if (!cancelled) applyCommand(event.payload)
+        })
+        .then(
+          (fn) => {
+            if (cancelled) {
+              fn()
+            } else {
+              unlistenFn = fn
+            }
+          },
+          (error) => {
+            if (!cancelled) reportTransportListenerFailure(outputId, error)
+          }
+        )
     } catch (error) {
       reportTransportListenerFailure(outputId, error)
       return
     }
     return () => {
-      void unlisten?.then((fn) => fn())
+      cancelled = true
+      unlistenFn?.()
     }
-  }, [applyCommand, outputId, video])
+  }, [applyCommand, outputId])
 
   useEffect(() => {
     if (!video) return

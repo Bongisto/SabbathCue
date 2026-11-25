@@ -95,8 +95,25 @@ export async function handleHymnVoiceControl(text: string): Promise<boolean> {
 
   if (shouldSuppressDuplicateHymnCommand(hymnNumber)) return false
 
-  const loaded = await loadHymn(hymnNumber)
-  if (!loaded) return false
+  const previousHandled = lastHandled
+  const stamped = { hymnNumber, at: Date.now() }
+  lastHandled = stamped
+
+  let loaded: LoadedHymn | null = null
+  try {
+    loaded = await loadHymn(hymnNumber)
+  } catch (error) {
+    if (lastHandled === stamped) {
+      lastHandled = previousHandled
+    }
+    throw error
+  }
+  if (!loaded) {
+    if (lastHandled === stamped) {
+      lastHandled = previousHandled
+    }
+    return false
+  }
 
   useHymnSlideStore.getState().setDeck(loaded.deck, 0)
   if (getBroadcastLiveStore().readingModeAutoLive) {
@@ -106,7 +123,6 @@ export async function handleHymnVoiceControl(text: string): Promise<boolean> {
   }
   useDetectionStore.getState().addDetection(createHymnDetection(loaded.hymn))
   addRecentHymn(loaded.hymn.id)
-  lastHandled = { hymnNumber, at: Date.now() }
   return true
 }
 

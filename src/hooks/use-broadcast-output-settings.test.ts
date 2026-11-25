@@ -219,6 +219,39 @@ describe("use-broadcast-output-settings commands", () => {
       ).toBe(false)
     })
 
+    it("returns false immediately on close reconciliation when the window is already hidden", async () => {
+      vi.useFakeTimers()
+      mockGetAllWindows.mockResolvedValue([])
+
+      const { reconcileBroadcastPreviewState } = await loadCommandModule()
+
+      const startedAt = Date.now()
+      const result = await reconcileBroadcastPreviewState("main", {
+        expectVisible: false,
+      })
+
+      expect(result).toBe(false)
+      expect(Date.now() - startedAt).toBe(0)
+      expect(mockGetAllWindows).toHaveBeenCalledTimes(1)
+    })
+
+    it("polls until a closing window hides when expectVisible is false", async () => {
+      vi.useFakeTimers()
+      mockGetAllWindows
+        .mockResolvedValueOnce([broadcastWindow("broadcast", true)])
+        .mockResolvedValueOnce([broadcastWindow("broadcast", false)])
+
+      const { reconcileBroadcastPreviewState } = await loadCommandModule()
+
+      const pending = reconcileBroadcastPreviewState("main", {
+        expectVisible: false,
+      })
+      await vi.advanceTimersByTimeAsync(125)
+
+      await expect(pending).resolves.toBe(false)
+      expect(mockGetAllWindows).toHaveBeenCalledTimes(2)
+    })
+
     it("waits at least five seconds on the open path before giving up", async () => {
       vi.useFakeTimers()
       mockGetAllWindows.mockResolvedValue([])
@@ -492,6 +525,33 @@ describe("use-broadcast-output-settings commands", () => {
       cleanup()
       vi.useRealTimers()
     }, 10_000)
+
+    it("reconciles external preview opens and closes during polling with retries: 0", async () => {
+      vi.useFakeTimers()
+      let visible = false
+      mockInvoke.mockResolvedValue(null)
+      mockGetAllWindows.mockImplementation(async () =>
+        visible ? [broadcastWindow("broadcast", true)] : [],
+      )
+
+      const { result, cleanup } = await renderHookResult(true)
+      expect(result.current?.isPreviewOpen).toBe(false)
+
+      visible = true
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(750)
+      })
+      expect(result.current?.isPreviewOpen).toBe(true)
+
+      visible = false
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(750)
+      })
+      expect(result.current?.isPreviewOpen).toBe(false)
+
+      cleanup()
+      vi.useRealTimers()
+    })
 
     it("does not start NDI from the hook toggle while inactive", async () => {
       mockInvoke.mockImplementation(async (command: string) => {

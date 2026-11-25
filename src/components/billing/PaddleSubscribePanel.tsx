@@ -39,18 +39,6 @@ export function PaddleSubscribePanel({
   const [interval, setInterval] = useState<BillingInterval>("month")
   const yearlyAvailable = isYearlyCheckoutAvailable()
 
-  useEffect(() => {
-    if (!isPaddleCheckoutConfigured()) return
-    void (async () => {
-      const summary = await fetchMyBillingSummary()
-      if (summary.ok && summary.summary.paddleCustomerId) {
-        setPaddleCustomerIdForInit(summary.summary.paddleCustomerId)
-      }
-      const paddle = await getPaddleInstance()
-      setReady(Boolean(paddle))
-    })()
-  }, [])
-
   const onCompletedRef = useRef(onCompleted)
   useEffect(() => {
     onCompletedRef.current = onCompleted
@@ -60,12 +48,30 @@ export function PaddleSubscribePanel({
     if (!isPaddleCheckoutConfigured()) return
     let cancelled = false
     let unsubscribe: (() => void) | null = null
-    void getPaddleInstance().then((paddle) => {
-      if (cancelled || !paddle) return
-      unsubscribe = onCheckoutCompleted(paddle, () => {
-        onCompletedRef.current?.()
-      })
-    })
+    void (async () => {
+      try {
+        const summary = await fetchMyBillingSummary()
+        if (cancelled) return
+        if (summary.ok && summary.summary.paddleCustomerId) {
+          setPaddleCustomerIdForInit(summary.summary.paddleCustomerId)
+        }
+      } catch {
+        if (cancelled) return
+      }
+
+      try {
+        const paddle = await getPaddleInstance()
+        if (cancelled) return
+        setReady(Boolean(paddle))
+        if (paddle) {
+          unsubscribe = onCheckoutCompleted(paddle, () => {
+            onCompletedRef.current?.()
+          })
+        }
+      } catch {
+        if (!cancelled) setReady(false)
+      }
+    })()
     return () => {
       cancelled = true
       unsubscribe?.()
@@ -76,10 +82,19 @@ export function PaddleSubscribePanel({
 
   async function handleSubscribe() {
     setLoading(true)
-    await ensureFreshAuthSession()
-    const result = await openSubscriptionCheckout({ email, userId, interval })
-    setLoading(false)
-    if (!result.ok) toast.error(result.message)
+    try {
+      try {
+        await ensureFreshAuthSession()
+      } catch {
+        // Proceed to checkout even if session refresh throws.
+      }
+      const result = await openSubscriptionCheckout({ email, userId, interval })
+      if (!result.ok) toast.error(result.message)
+    } catch {
+      toast.error("Could not open checkout.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

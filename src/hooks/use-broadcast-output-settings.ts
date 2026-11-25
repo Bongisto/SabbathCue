@@ -65,26 +65,30 @@ export const OPEN_PREVIEW_RECONCILE_OPTIONS = { retries: 24, delayMs: 250 }
 
 export async function reconcileBroadcastPreviewState(
   outputId: BroadcastOutputId,
-  options?: { retries?: number; delayMs?: number },
+  options?: { retries?: number; delayMs?: number; expectVisible?: boolean },
 ): Promise<boolean> {
   const label = getBroadcastWindowLabel(outputId)
   const retries = options?.retries ?? 8
   const delayMs = options?.delayMs ?? 125
+  const expectVisible = options?.expectVisible ?? true
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const windows = await getAllWindows()
     // Broadcast windows are prewarmed hidden for fast open; only a visible
     // window means the output is actually on.
     const target = windows.find((w) => w.label === label)
-    if (target && (await target.isVisible().catch(() => false))) {
-      return true
+    const isVisible = Boolean(
+      target && (await target.isVisible().catch(() => false)),
+    )
+    if (isVisible === expectVisible) {
+      return isVisible
     }
     if (attempt < retries) {
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
   }
 
-  return false
+  return !expectVisible
 }
 
 async function getBroadcastNdiStatus(
@@ -144,7 +148,9 @@ export async function runToggleBroadcastPreview(
   try {
     if (isPreviewOpen) {
       await deps.invoke("close_broadcast_window", { outputId })
-      deps.onPreviewOpenChange(await reconcileBroadcastPreviewState(outputId))
+      deps.onPreviewOpenChange(
+        await reconcileBroadcastPreviewState(outputId, { expectVisible: false }),
+      )
     } else {
       if (monitors.length === 0) {
         deps.onError(
@@ -274,7 +280,9 @@ export async function runDisableBroadcastOutput(
 
   let previewOpenBefore = isPreviewOpen
   try {
-    previewOpenBefore = isPreviewOpen || (await reconcileBroadcastPreviewState(outputId))
+    previewOpenBefore =
+      isPreviewOpen ||
+      (await reconcileBroadcastPreviewState(outputId, { retries: 0 }))
   } catch {
     previewOpenBefore = isPreviewOpen
   }
@@ -312,7 +320,9 @@ export async function runDisableBroadcastOutput(
     }
   }
 
-  const previewOpen = await reconcileBroadcastPreviewState(outputId)
+  const previewOpen = await reconcileBroadcastPreviewState(outputId, {
+    expectVisible: false,
+  })
   deps.onPreviewOpenChange(previewOpen)
 
   let ndiStillActive = false
@@ -361,9 +371,14 @@ export function useBroadcastOutputSettings(
   const previewPendingRef = useRef(false)
   const ndiPendingRef = useRef(false)
   const enabledPendingRef = useRef(false)
+  const isPreviewOpenRef = useRef(isPreviewOpen)
   const previewPendingPromiseRef = useRef<Promise<void> | null>(null)
   const ndiPendingPromiseRef = useRef<Promise<void> | null>(null)
   const enabledPendingPromiseRef = useRef<Promise<void> | null>(null)
+
+  useEffect(() => {
+    isPreviewOpenRef.current = isPreviewOpen
+  }, [isPreviewOpen])
 
   const enabled = isPreviewOpen || ndiActive
 
@@ -457,34 +472,39 @@ export function useBroadcastOutputSettings(
     if (!open) return
 
     let cancelled = false
+    let inFlight = false
     const intervalId = setInterval(() => {
+      if (inFlight) return
+      inFlight = true
       void Promise.allSettled([
-        isPreviewOpen
-          ? reconcileBroadcastPreviewState(outputId)
-          : Promise.resolve(isPreviewOpen),
+        reconcileBroadcastPreviewState(outputId, { retries: 0 }),
         getBroadcastNdiStatus(invokeTauri, outputId),
-      ]).then(([previewResult, statusResult]) => {
-        if (cancelled) return
-        const previewOpen =
-          previewResult.status === "fulfilled"
-            ? previewResult.value
-            : isPreviewOpen
-        if (isPreviewOpen && previewResult.status === "fulfilled") {
-          setIsPreviewOpen(previewOpen)
-        }
-        if (statusResult.status === "fulfilled") {
-          applyNdiStatus(statusResult.value, previewOpen)
-        } else {
-          setNdiActive(false)
-        }
-      })
+      ])
+        .then(([previewResult, statusResult]) => {
+          if (cancelled) return
+          const previewOpen =
+            previewResult.status === "fulfilled"
+              ? previewResult.value
+              : isPreviewOpenRef.current
+          if (previewResult.status === "fulfilled") {
+            setIsPreviewOpen(previewOpen)
+          }
+          if (statusResult.status === "fulfilled") {
+            applyNdiStatus(statusResult.value, previewOpen)
+          } else {
+            setNdiActive(false)
+          }
+        })
+        .finally(() => {
+          inFlight = false
+        })
     }, 750)
 
     return () => {
       cancelled = true
       clearInterval(intervalId)
     }
-  }, [applyNdiStatus, isPreviewOpen, open, outputId])
+  }, [applyNdiStatus, open, outputId])
 
   const handleThemeChange = useCallback(
     (id: string) => {

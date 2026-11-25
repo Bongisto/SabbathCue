@@ -139,4 +139,25 @@ describe("device-id", () => {
     expect(crypto.randomUUID).toHaveBeenCalledTimes(1)
     expect(mockGet).not.toHaveBeenCalled()
   })
+
+  it("retries getOrCreateInstallationIdentity after a transient failure", async () => {
+    mockGet.mockResolvedValue(null)
+    mockInvoke
+      .mockRejectedValueOnce(new Error("keychain locked"))
+      .mockResolvedValueOnce({
+        deviceId: "recovered-device-id",
+        publicKey: "recovered-key",
+      })
+
+    const { getOrCreateInstallationIdentity } =
+      await import("@/lib/verification/device-id")
+
+    await expect(getOrCreateInstallationIdentity()).rejects.toThrow(
+      "keychain locked"
+    )
+    await expect(getOrCreateInstallationIdentity()).resolves.toEqual({
+      deviceId: "recovered-device-id",
+      publicKey: "recovered-key",
+    })
+  })
 })

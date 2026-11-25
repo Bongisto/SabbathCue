@@ -587,14 +587,13 @@ fn reference_context_follows(text: &str, after: usize) -> bool {
     };
     let token = first
         .trim_matches(|c: char| !c.is_alphanumeric())
-        .to_ascii_lowercase();
+        .to_lowercase();
     if token.is_empty() {
         return false;
     }
     token.chars().all(|c| c.is_ascii_digit())
-        || token == "chapter"
-        || token == "verse"
-        || token == "verses"
+        || parser::is_chapter_keyword(&token)
+        || parser::is_verse_keyword(&token)
         || parser::parse_spoken_number(&token).is_some()
 }
 
@@ -945,6 +944,7 @@ struct IncompleteRef {
     /// complete the verse. When false after an explicit chapter hold, bare
     /// digits must not refine the verse (STT residue after chapter-only).
     expecting_verse_number: bool,
+    is_fuzzy_book: bool,
 }
 
 /// Main orchestrator for direct Bible reference detection.
@@ -1204,8 +1204,8 @@ impl DirectDetector {
             .iter()
             .any(|book_match| text[..book_match.start].trim().is_empty())
             || book_matches.iter().any(|book_match| {
-                let matched_text = text[book_match.start..book_match.end].to_ascii_lowercase();
-                let is_canonical_name = matched_text == book_match.book_name.to_ascii_lowercase();
+                let matched_text = text[book_match.start..book_match.end].to_lowercase();
+                let is_canonical_name = matched_text == book_match.book_name.to_lowercase();
                 let is_usable = is_canonical_name || reference_context_follows(text, book_match.end);
                 is_usable && book_match.book_number != incomplete.verse_ref.book_number
             })
@@ -1225,13 +1225,15 @@ impl DirectDetector {
                 completed.verse_end = verse_end;
                 let mut detections = Vec::new();
                 if is_valid_reference(&completed) {
-                    detections.push(self.make_direct_detection(
+                    let mut detection = self.make_direct_detection(
                         &completed,
                         compute_confidence(&completed, &completed),
                         text,
                         0,
                         text.len(),
-                    ));
+                    );
+                    detection.is_fuzzy_book = incomplete.is_fuzzy_book;
+                    detections.push(detection);
                     self.push_recent(&completed);
                     self.context.update(&completed);
                 }
@@ -1244,13 +1246,15 @@ impl DirectDetector {
                 completed.verse_end = verse_end;
                 let mut detections = Vec::new();
                 if is_valid_reference(&completed) {
-                    detections.push(self.make_direct_detection(
+                    let mut detection = self.make_direct_detection(
                         &completed,
                         compute_confidence(&completed, &completed),
                         text,
                         0,
                         text.len(),
-                    ));
+                    );
+                    detection.is_fuzzy_book = incomplete.is_fuzzy_book;
+                    detections.push(detection);
                     self.push_recent(&completed);
                     self.context.update(&completed);
                 }
@@ -1265,6 +1269,7 @@ impl DirectDetector {
                     timestamp: Instant::now(),
                     chapter_is_default: false,
                     expecting_verse_number: false,
+                    is_fuzzy_book: incomplete.is_fuzzy_book,
                 });
                 self.context.update(&updated);
                 None
@@ -1304,8 +1309,8 @@ impl DirectDetector {
             .min()
             .unwrap_or(text.len());
         let reference_text = &text[..parse_end];
-        let matched_text = text[book_match.start..book_match.end].to_ascii_lowercase();
-        let is_canonical_name = matched_text == book_match.book_name.to_ascii_lowercase();
+        let matched_text = text[book_match.start..book_match.end].to_lowercase();
+        let is_canonical_name = matched_text == book_match.book_name.to_lowercase();
         if !is_canonical_name && !reference_context_follows(text, book_match.end) {
             return;
         }
@@ -1315,13 +1320,16 @@ impl DirectDetector {
             self.incomplete = None;
             for candidate in candidates {
                 if is_valid_reference(&candidate) {
-                    detections.push(self.make_direct_detection(
+                    let mut detection = self.make_direct_detection(
                         &candidate,
                         AMBIGUOUS_REFERENCE_CONFIDENCE,
                         text,
                         book_match.start,
                         book_match.end,
-                    ));
+                    );
+                    detection.is_fuzzy_book = used_fuzzy_book_match;
+                    detection.is_ambiguous = true;
+                    detections.push(detection);
                 }
             }
             return;
@@ -1338,7 +1346,13 @@ impl DirectDetector {
             return;
         }
         if resolved.verse_start == 0 {
-            self.hold_chapter_only_incomplete(text, lower_text, book_match, resolved);
+            self.hold_chapter_only_incomplete(
+                text,
+                lower_text,
+                book_match,
+                resolved,
+                used_fuzzy_book_match,
+            );
             return;
         }
         self.incomplete = None;
@@ -1361,6 +1375,8 @@ impl DirectDetector {
             detected_at: now,
             is_chapter_only: false,
             is_fuzzy_book: used_fuzzy_book_match,
+            is_ambiguous: false,
+            is_context_resolved: false,
             has_lexical_quote: false,
             quote_coverage: 0.0,
             candidate_margin: 1.0,
@@ -1378,10 +1394,14 @@ impl DirectDetector {
         lower_text: &str,
         book_match: &BookMatch,
         mut resolved: VerseRef,
+        used_fuzzy_book_match: bool,
     ) {
         let after_book = text[book_match.end..].trim();
         let after_book_lower = after_book.to_lowercase();
-        let starts_with_verse_keyword = after_book_lower.starts_with("verse");
+        let starts_with_verse_keyword = after_book_lower
+            .split(|c: char| !c.is_alphanumeric())
+            .next()
+            .is_some_and(parser::is_verse_keyword);
         let mut has_explicit_chapter = after_book.starts_with(|c: char| c.is_ascii_digit())
             || matches!(
                 parser::try_extract_continuation(after_book, true, false),
@@ -1402,6 +1422,7 @@ impl DirectDetector {
             timestamp: Instant::now(),
             chapter_is_default: !has_explicit_chapter && !starts_with_verse_keyword,
             expecting_verse_number: starts_with_verse_keyword,
+            is_fuzzy_book: used_fuzzy_book_match,
         });
         self.context.update(&resolved);
         self.save_context_if_requested(lower_text, &resolved);
@@ -1430,6 +1451,8 @@ impl DirectDetector {
             detected_at: now,
             is_chapter_only: false,
             is_fuzzy_book: false,
+            is_ambiguous: false,
+            is_context_resolved: false,
             has_lexical_quote: false,
             quote_coverage: 0.0,
             candidate_margin: 1.0,
@@ -1512,6 +1535,7 @@ impl DirectDetector {
                 timestamp: Instant::now(),
                 chapter_is_default: false,
                 expecting_verse_number: false,
+                is_fuzzy_book: false,
             });
         } else {
             self.incomplete = None;
@@ -1559,8 +1583,9 @@ impl DirectDetector {
             return None;
         }
 
-        let detection =
+        let mut detection =
             self.make_direct_detection(&resolved, CONTEXT_RESOLVED_CONFIDENCE, text, 0, text.len());
+        detection.is_context_resolved = true;
         self.push_recent(&resolved);
         self.context.update(&resolved);
         Some(detection)
@@ -1597,6 +1622,8 @@ impl DirectDetector {
             detected_at: now,
             is_chapter_only: false,
             is_fuzzy_book: false,
+            is_ambiguous: false,
+            is_context_resolved: false,
             has_lexical_quote: false,
             quote_coverage: 0.0,
             candidate_margin: 1.0,
@@ -2046,6 +2073,7 @@ mod tests {
                 .unwrap(),
             chapter_is_default: prev.chapter_is_default,
             expecting_verse_number: prev.expecting_verse_number,
+            is_fuzzy_book: prev.is_fuzzy_book,
         });
 
         // Next detect call should clean up without emitting
@@ -3375,6 +3403,121 @@ mod tests {
                 .all(|detection| !detection.is_complete_citation()),
             "command speech must not emit a complete citation: {:?}",
             refs_of(&results)
+        );
+    }
+
+    #[test]
+    fn turkish_dotted_i_prefix_does_not_panic_or_shift_john_3_16() {
+        let mut detector = DirectDetector::new();
+        let results = detector.detect("İ John 3:16");
+        assert_eq!(refs_of(&results), vec!["John 3:16".to_string()]);
+        assert!(results[0].transcript_snippet.contains("John"));
+        assert!(results[0].is_complete_citation());
+    }
+
+    #[test]
+    fn localized_words_with_accented_substrings_do_not_fabricate_esther() {
+        let mut es_detector = DirectDetector::for_stt_language("es");
+        assert!(es_detector.detect("Dios está aquí 1:1").is_empty());
+
+        let mut fr_detector = DirectDetector::for_stt_language("fr");
+        assert!(fr_detector.detect("sa colère 1:1").is_empty());
+        assert!(fr_detector.detect("c'est un bon passage 1:1").is_empty());
+    }
+
+    #[test]
+    fn localized_chapter_and_verse_keywords_and_portuguese_jo_resolve() {
+        let mut es_detector = DirectDetector::for_stt_language("es");
+        let es_results = es_detector.detect("Rom capítulo 8 versículo 28");
+        assert_eq!(refs_of(&es_results), vec!["Romanos 8:28".to_string()]);
+
+        let mut pt_detector = DirectDetector::for_stt_language("pt");
+        let pt_results = pt_detector.detect("Jó capítulo 1 versículo 1");
+        assert_eq!(refs_of(&pt_results), vec!["Jó 1:1".to_string()]);
+    }
+
+    #[test]
+    fn fuzzy_two_segment_ambiguous_three_number_and_context_resolved_stay_non_auto_live() {
+        let mut merger = crate::merger::DetectionMerger::new();
+
+        // 1. Two-segment fuzzy hold: "Hebrws 11" -> "verse 1"
+        let mut fuzzy_detector = DirectDetector::new();
+        assert!(fuzzy_detector.detect("Hebrws 11").is_empty());
+        let fuzzy_results = fuzzy_detector.detect("verse 1");
+        assert_eq!(refs_of(&fuzzy_results), vec!["Hebrews 11:1".to_string()]);
+        assert!(fuzzy_results[0].is_fuzzy_book);
+        assert!(!fuzzy_results[0].is_complete_citation());
+        assert_eq!(
+            crate::presentation::decide_presentation(&crate::presentation::PresentationEvidence {
+                job: crate::presentation::DetectionJob::Citation,
+                source_is_direct: true,
+                is_chapter_only: fuzzy_results[0].is_chapter_only,
+                is_fuzzy_book: fuzzy_results[0].is_fuzzy_book,
+                is_complete_citation: fuzzy_results[0].is_complete_citation(),
+                is_final_utterance: true,
+                has_lexical_quote: false,
+                quote_coverage: 0.0,
+                candidate_margin: 1.0,
+                independent_final_count: 1,
+                automation_live_enabled: true,
+            })
+            .decision,
+            crate::presentation::PresentationDecision::Reject
+        );
+
+        // 2. Ambiguous three-number reference: "John 1 2 3" -> (1:23, 12:3)
+        let mut amb_detector = DirectDetector::new();
+        let amb_results = amb_detector.detect("John 1 2 3");
+        assert_eq!(amb_results.len(), 2);
+        assert!(amb_results.iter().all(|d| d.is_ambiguous));
+        assert!(amb_results.iter().all(|d| !d.is_complete_citation()));
+        let amb_merged = merger.merge(amb_results.clone(), vec![]);
+        assert!(amb_merged.iter().all(|m| !m.auto_queued));
+        for d in &amb_results {
+            let grant =
+                crate::presentation::decide_presentation(&crate::presentation::PresentationEvidence {
+                    job: crate::presentation::DetectionJob::Citation,
+                    source_is_direct: true,
+                    is_chapter_only: d.is_chapter_only,
+                    is_fuzzy_book: d.is_fuzzy_book,
+                    is_complete_citation: d.is_complete_citation(),
+                    is_final_utterance: true,
+                    has_lexical_quote: false,
+                    quote_coverage: 0.0,
+                    candidate_margin: 1.0,
+                    independent_final_count: 1,
+                    automation_live_enabled: true,
+                });
+            assert_eq!(
+                grant.decision,
+                crate::presentation::PresentationDecision::Suggestion
+            );
+        }
+
+        // 3. Context-resolved "verse 17" after "John 3:16"
+        let mut ctx_detector = DirectDetector::new();
+        let initial = ctx_detector.detect("John 3:16");
+        assert_eq!(refs_of(&initial), vec!["John 3:16".to_string()]);
+        let ctx_results = ctx_detector.detect("verse 17");
+        assert_eq!(refs_of(&ctx_results), vec!["John 3:17".to_string()]);
+        assert!(ctx_results[0].is_context_resolved);
+        assert!(!ctx_results[0].is_complete_citation());
+        assert_eq!(
+            crate::presentation::decide_presentation(&crate::presentation::PresentationEvidence {
+                job: crate::presentation::DetectionJob::Citation,
+                source_is_direct: true,
+                is_chapter_only: ctx_results[0].is_chapter_only,
+                is_fuzzy_book: ctx_results[0].is_fuzzy_book,
+                is_complete_citation: ctx_results[0].is_complete_citation(),
+                is_final_utterance: true,
+                has_lexical_quote: false,
+                quote_coverage: 0.0,
+                candidate_margin: 1.0,
+                independent_final_count: 1,
+                automation_live_enabled: true,
+            })
+            .decision,
+            crate::presentation::PresentationDecision::Suggestion
         );
     }
 }

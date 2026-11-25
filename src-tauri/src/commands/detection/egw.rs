@@ -112,14 +112,22 @@ fn parse_under_hundred(tokens: &[&str], index: usize) -> Option<ParsedNumber> {
 
 fn parse_number_at(tokens: &[&str], index: usize) -> Option<ParsedNumber> {
     let first = parse_under_hundred(tokens, index)?;
-    if tokens.get(first.next_index) != Some(&"hundred") {
+    if !(1..=9).contains(&first.value) || tokens.get(first.next_index) != Some(&"hundred") {
         return Some(first);
     }
 
-    let mut value = first.value * 100;
+    let base = first.value.checked_mul(100)?;
+    let mut value = base;
     let mut next_index = first.next_index + 1;
-    if let Some(remainder) = parse_under_hundred(tokens, next_index) {
-        value += remainder.value;
+    let remainder_index = if tokens.get(next_index) == Some(&"and") {
+        next_index + 1
+    } else {
+        next_index
+    };
+    if let Some(remainder) = parse_under_hundred(tokens, remainder_index)
+        .filter(|parsed| (1..=99).contains(&parsed.value))
+    {
+        value = base.checked_add(remainder.value)?;
         next_index = remainder.next_index;
     }
     Some(ParsedNumber { value, next_index })
@@ -465,6 +473,14 @@ const EGW_SCRIPTURE_ECHO_RESCUE_MIN_RUN: usize = 3;
 /// spoken paragraph while residual John 3:16 text still dominated retrieval.
 const EGW_QUOTE_CANDIDATES: usize = 5;
 
+fn utf16_offset_at_byte(text: &str, byte_offset: usize) -> usize {
+    let mut end = byte_offset.min(text.len());
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].encode_utf16().count()
+}
+
 /// Detect an EGW paragraph being read aloud in the transcript window.
 ///
 /// BM25 nominates; `longest_shared_content_run` verifies. Every candidate is
@@ -508,11 +524,12 @@ pub(crate) fn detect_egw_quotes(
                 }
             );
             let (confidence, auto_queued) = scored?;
+            let match_char_start = utf16_offset_at_byte(&paragraph.text, run.paragraph_byte_start);
             let mut result = egw_to_result(paragraph, confidence, text);
             result.source = "semantic".to_string();
             result.rank_score = confidence;
             result.auto_queued = auto_queued;
-            result.match_char_start = Some(run.paragraph_byte_start);
+            result.match_char_start = Some(match_char_start);
             Some(result)
         })
         .collect()
@@ -1276,5 +1293,55 @@ mod quote_run_tests {
             longest_shared_content_run("completely unrelated speech", "Balaam loved the wages.");
         assert_eq!(run.len, 0);
         assert_eq!(run.paragraph_byte_start, 0);
+    }
+
+    #[test]
+    fn utf16_offset_aligns_after_non_ascii_text() {
+        let paragraph = "Événement clé — déjà vu 🙏. Many flatter themselves that they can depart from strict integrity.";
+        let window = "many flatter themselves that they can depart from strict integrity";
+
+        let run = longest_shared_content_run(window, paragraph);
+        assert!(run.len >= 6);
+        assert!(
+            run.paragraph_byte_start > 0,
+            "expected non-zero byte offset"
+        );
+        let utf16_start = super::utf16_offset_at_byte(paragraph, run.paragraph_byte_start);
+        assert!(
+            utf16_start < run.paragraph_byte_start,
+            "UTF-16 code unit offset ({utf16_start}) must be smaller than UTF-8 byte offset ({}) after multibyte text",
+            run.paragraph_byte_start
+        );
+        let utf16_units: Vec<u16> = paragraph.encode_utf16().collect();
+        let sliced = String::from_utf16(&utf16_units[utf16_start..]).unwrap();
+        assert!(
+            sliced.starts_with("Many flatter themselves"),
+            "UTF-16 slice should align with quoted sentence, got {sliced:?}"
+        );
+    }
+
+    #[test]
+    fn spoken_number_parses_hundred_and_prevents_overflow() {
+        assert_eq!(
+            super::parse_egw_page_paragraph("page two hundred and thirty five paragraph two"),
+            Some((235, 2))
+        );
+        assert_eq!(
+            super::parse_egw_page_paragraph("page two hundred thirty five paragraph 1"),
+            Some((235, 1))
+        );
+        assert_eq!(
+            super::parse_egw_page_paragraph("page two hundred and paragraph three"),
+            Some((200, 3))
+        );
+
+        let huge = ["99999999", "hundred"];
+        assert_eq!(super::parse_number_at(&huge, 0).map(|p| p.value), Some(99_999_999));
+
+        let overflow_rem = ["two", "hundred", "and", "2147483647"];
+        assert_eq!(
+            super::parse_number_at(&overflow_rem, 0).map(|p| p.value),
+            Some(200)
+        );
     }
 }

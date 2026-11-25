@@ -10,6 +10,23 @@ import { cn } from "@/lib/utils"
 
 const KINETIC_PREVIEW_TARGET_FPS = 15
 const KINETIC_PREVIEW_FRAME_INTERVAL_MS = 1000 / KINETIC_PREVIEW_TARGET_FPS
+const MAX_IMAGE_CACHE_ENTRIES = 24
+
+function cacheImage(
+  cache: Map<string, HTMLImageElement>,
+  url: string,
+  img: HTMLImageElement
+) {
+  if (cache.has(url)) {
+    cache.delete(url)
+  }
+  cache.set(url, img)
+  while (cache.size > MAX_IMAGE_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value
+    if (oldestKey === undefined) break
+    cache.delete(oldestKey)
+  }
+}
 
 interface CanvasPresentationProps {
   theme: BroadcastTheme
@@ -138,45 +155,78 @@ export const CanvasPresentation = memo(function CanvasPresentation({
     [theme, item, containerSize, renderKey]
   )
 
+  const drawRef = useRef(draw)
+  useEffect(() => {
+    drawRef.current = draw
+  }, [draw])
+
+  const backgroundImageUrl =
+    theme.background.type === "image" ? (theme.background.image?.url ?? null) : null
+  const slideImageUrl =
+    item?.kind === "slideDeck" ? (item.slideImageUrl ?? null) : null
+
   // Preload background image so the renderer can find it in the cache.
   useEffect(() => {
-    const bg = theme.background
-    if (bg.type !== "image" || !bg.image?.url) return
-    const url = bg.image.url
+    if (!backgroundImageUrl) return
     const cache = imageCacheRef.current
-    if (cache.has(url)) return
+    const cached = cache.get(backgroundImageUrl)
+    if (cached) {
+      cache.delete(backgroundImageUrl)
+      cache.set(backgroundImageUrl, cached)
+      return
+    }
 
+    let cancelled = false
     const img = new Image()
     img.onload = () => {
-      cache.set(url, img)
-      draw(true)
+      if (cancelled) return
+      cacheImage(cache, backgroundImageUrl, img)
+      drawRef.current(true)
     }
     img.onerror = () => {
+      if (cancelled) return
       console.warn("[canvas-verse] failed to load background image", {
-        url: url.slice(0, 100),
+        url: backgroundImageUrl.slice(0, 100),
       })
     }
-    img.src = url
-  }, [theme.background, draw])
+    img.src = backgroundImageUrl
+    return () => {
+      cancelled = true
+      img.onload = null
+      img.onerror = null
+    }
+  }, [backgroundImageUrl])
 
   useEffect(() => {
-    if (item?.kind !== "slideDeck" || !item.slideImageUrl) return
-    const url = item.slideImageUrl
+    if (!slideImageUrl) return
     const cache = imageCacheRef.current
-    if (cache.has(url)) return
+    const cached = cache.get(slideImageUrl)
+    if (cached) {
+      cache.delete(slideImageUrl)
+      cache.set(slideImageUrl, cached)
+      return
+    }
 
+    let cancelled = false
     const img = new Image()
     img.onload = () => {
-      cache.set(url, img)
-      draw(true)
+      if (cancelled) return
+      cacheImage(cache, slideImageUrl, img)
+      drawRef.current(true)
     }
     img.onerror = () => {
+      if (cancelled) return
       console.warn("[canvas-verse] failed to load slide image", {
-        url: url.slice(0, 100),
+        url: slideImageUrl.slice(0, 100),
       })
     }
-    img.src = url
-  }, [item, draw])
+    img.src = slideImageUrl
+    return () => {
+      cancelled = true
+      img.onload = null
+      img.onerror = null
+    }
+  }, [slideImageUrl])
 
   useEffect(() => {
     if (theme.kinetic?.backgroundKind !== "cloth") return

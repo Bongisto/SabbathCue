@@ -51,7 +51,9 @@ export function parseYoutubeId(value: string): string | null {
   try {
     const url = new URL(value.trim())
     if (url.hostname === "youtu.be") {
-      return normalizeYoutubeId(url.pathname.slice(1))
+      return normalizeYoutubeId(
+        url.pathname.split("/").filter(Boolean)[0] ?? "",
+      )
     }
     if (
       url.hostname === "youtube.com" ||
@@ -95,6 +97,8 @@ export function videoAssetToPresentation(asset: LibraryVideoAsset) {
   }
 }
 
+const VIDEO_METADATA_TIMEOUT_MS = 10_000
+
 export async function readVideoMetadata(src: string): Promise<VideoMetadata> {
   if (typeof document === "undefined") return {}
 
@@ -104,24 +108,49 @@ export async function readVideoMetadata(src: string): Promise<VideoMetadata> {
   video.crossOrigin = "anonymous"
 
   return new Promise((resolve) => {
+    let settled = false
+    let partialMetadata: VideoMetadata = {}
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
     const cleanup = () => {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+        timeoutId = undefined
+      }
+      video.onloadedmetadata = null
+      video.onseeked = null
+      video.onerror = null
       video.removeAttribute("src")
       video.load()
     }
 
     const finish = (metadata: VideoMetadata) => {
+      if (settled) return
+      settled = true
       cleanup()
       resolve(metadata)
     }
 
+    timeoutId = setTimeout(
+      () => finish(partialMetadata),
+      VIDEO_METADATA_TIMEOUT_MS,
+    )
+
     video.onloadedmetadata = () => {
-      const durationMs = Number.isFinite(video.duration)
-        ? Math.round(video.duration * 1000)
-        : undefined
+      const duration = video.duration
+      const durationMs =
+        Number.isFinite(duration) && duration >= 0
+          ? Math.round(duration * 1000)
+          : undefined
       const width = video.videoWidth || undefined
       const height = video.videoHeight || undefined
+      partialMetadata = { durationMs, width, height }
 
-      video.currentTime = Math.min(0.1, Number.isFinite(video.duration) ? video.duration : 0)
+      if (!Number.isFinite(duration) || duration <= 0) {
+        finish(partialMetadata)
+        return
+      }
+
       video.onseeked = () => {
         try {
           const canvas = document.createElement("canvas")
@@ -129,7 +158,7 @@ export async function readVideoMetadata(src: string): Promise<VideoMetadata> {
           canvas.height = height ?? 180
           const ctx = canvas.getContext("2d")
           if (!ctx) {
-            finish({ durationMs, width, height })
+            finish(partialMetadata)
             return
           }
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -140,9 +169,10 @@ export async function readVideoMetadata(src: string): Promise<VideoMetadata> {
             thumbnail: canvas.toDataURL("image/jpeg", 0.72),
           })
         } catch {
-          finish({ durationMs, width, height })
+          finish(partialMetadata)
         }
       }
+      video.currentTime = Math.min(0.1, duration)
     }
     video.onerror = () => finish({})
     video.src = src

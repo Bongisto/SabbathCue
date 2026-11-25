@@ -822,8 +822,8 @@ fn translation_in_text(text: &str) -> Option<&'static str> {
     const TRANSLATIONS: &[(&str, &str)] = &[
         ("new international version", "NIV"),
         ("english standard version", "ESV"),
-        ("king james version", "KJV"),
         ("new king james version", "NKJV"),
+        ("king james version", "KJV"),
         ("new living translation", "NLT"),
         ("new english translation", "NET"),
         ("amplified bible", "AMP"),
@@ -831,18 +831,44 @@ fn translation_in_text(text: &str) -> Option<&'static str> {
         ("the message", "MSG"),
         ("spanish", "SPARV"),
         ("afrikaans", "AFR83"),
+        ("nkjv", "NKJV"),
         ("niv", "NIV"),
         ("esv", "ESV"),
         ("kjv", "KJV"),
-        ("nkjv", "NKJV"),
         ("nlt", "NLT"),
         ("net", "NET"),
         ("amp", "AMP"),
         ("msg", "MSG"),
     ];
-    TRANSLATIONS
-        .iter()
-        .find_map(|(name, abbreviation)| text.contains(name).then_some(*abbreviation))
+    let lower = text.to_ascii_lowercase();
+    TRANSLATIONS.iter().find_map(|(name, abbreviation)| {
+        contains_word_phrase(&lower, name).then_some(*abbreviation)
+    })
+}
+
+fn contains_word_phrase(text: &str, phrase: &str) -> bool {
+    if phrase.is_empty() {
+        return false;
+    }
+    let mut search_from = 0;
+    while let Some(rel) = text[search_from..].find(phrase) {
+        let start = search_from + rel;
+        let end = start + phrase.len();
+        let before_ok = !text[..start]
+            .chars()
+            .next_back()
+            .is_some_and(char::is_alphanumeric);
+        let after_ok = !text[end..]
+            .chars()
+            .next()
+            .is_some_and(char::is_alphanumeric);
+        if before_ok && after_ok {
+            return true;
+        }
+        let step = text[start..].chars().next().map_or(1, char::len_utf8);
+        search_from = start + step;
+    }
+    false
 }
 
 fn is_supported_translation(value: &str) -> bool {
@@ -885,6 +911,46 @@ mod tests {
         let prediction = DeterministicCommandClassifier.predict("Could we switch to the NIV?");
 
         assert_eq!(prediction.label, CommandLabel::translation("NIV"));
+    }
+
+    #[test]
+    fn translation_in_text_prefers_nkjv_over_kjv_and_enforces_word_boundaries() {
+        assert_eq!(
+            translation_in_text("use the new king james version"),
+            Some("NKJV")
+        );
+        assert_eq!(translation_in_text("switch to nkjv"), Some("NKJV"));
+        assert_eq!(
+            translation_in_text("switch to the king james version"),
+            Some("KJV")
+        );
+        assert_eq!(translation_in_text("switch to kjv"), Some("KJV"));
+        assert_eq!(translation_in_text("give me an example"), None);
+        assert_eq!(translation_in_text("read in the internet"), None);
+        assert_eq!(translation_in_text("switch to amp"), Some("AMP"));
+        assert_eq!(translation_in_text("switch to net"), Some("NET"));
+
+        assert_eq!(
+            DeterministicCommandClassifier
+                .predict("Switch to the New King James Version")
+                .label,
+            CommandLabel::translation("NKJV")
+        );
+        assert_eq!(
+            DeterministicCommandClassifier
+                .predict("Give me an example")
+                .label
+                .intent,
+            CommandIntent::None
+        );
+        assert_eq!(
+            DeterministicCommandClassifier
+                .predict("Read in the internet")
+                .label
+                .intent,
+            CommandIntent::None
+        );
+        assert!(!is_command_shaped("use an example"));
     }
 
     #[test]

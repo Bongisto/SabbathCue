@@ -13,9 +13,14 @@ vi.mock("@/lib/paddle/config", async (importOriginal) => {
 })
 
 const mockGetPaddleInstance = vi.fn()
+const invalidationListeners = new Set<() => void>()
 
 vi.mock("@/lib/paddle/client", () => ({
   getPaddleInstance: () => mockGetPaddleInstance(),
+  onPaddleInstanceInvalidated: (listener: () => void) => {
+    invalidationListeners.add(listener)
+    return () => invalidationListeners.delete(listener)
+  },
 }))
 
 /**
@@ -99,6 +104,25 @@ describe("onCheckoutCompleted", () => {
     onCheckoutCompleted(fake.paddle, vi.fn())
 
     expect(fake.updateCalls).toHaveLength(1)
+  })
+
+  it("reinstalls the event callback after the Paddle instance is invalidated", async () => {
+    const { onCheckoutCompleted } = await import("@/lib/paddle/checkout")
+    const fake = createFakePaddle()
+    const first = vi.fn()
+    const second = vi.fn()
+
+    onCheckoutCompleted(fake.paddle, first)
+    expect(fake.updateCalls).toHaveLength(1)
+
+    for (const listener of [...invalidationListeners]) listener()
+
+    onCheckoutCompleted(fake.paddle, second)
+    expect(fake.updateCalls).toHaveLength(2)
+    fake.emit("checkout.completed")
+
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -188,6 +212,22 @@ describe("openSubscriptionCheckout", () => {
 
   it("reports a failure when the Paddle SDK cannot load", async () => {
     mockGetPaddleInstance.mockResolvedValue(undefined)
+
+    const { openSubscriptionCheckout } = await import("@/lib/paddle/checkout")
+
+    await expect(
+      openSubscriptionCheckout({
+        email: "buyer@example.com",
+        userId: "11111111-1111-4111-8111-111111111111",
+      })
+    ).resolves.toEqual({
+      ok: false,
+      message: "Could not load the checkout service.",
+    })
+  })
+
+  it("reports a failure when getPaddleInstance rejects", async () => {
+    mockGetPaddleInstance.mockRejectedValue(new Error("network offline"))
 
     const { openSubscriptionCheckout } = await import("@/lib/paddle/checkout")
 

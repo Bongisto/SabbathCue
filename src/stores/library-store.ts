@@ -42,7 +42,12 @@ function persistSoon(): void {
       assets: useLibraryStore.getState().assets,
       collections: useLibraryStore.getState().collections,
     }
-    pendingSave = pendingSave.then(() => saveLibrarySnapshot(snapshot))
+    pendingSave = pendingSave
+      .catch(() => undefined)
+      .then(() => saveLibrarySnapshot(snapshot))
+      .catch((error) => {
+        console.warn("[library] failed to persist library snapshot", error)
+      })
   }, 250)
 }
 

@@ -32,6 +32,7 @@ function hydrateControllerColorMode() {
 hydrateControllerColorMode()
 
 if (
+  (import.meta.env.DEV || import.meta.env.VITE_ENABLE_E2E === "true") &&
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).has("e2e")
 ) {
@@ -64,18 +65,26 @@ resetTranscription
     console.warn("[startup] reset transcription promise failed", error)
   })
   .then(() =>
-    Promise.all([
+    Promise.allSettled([
       hydrateSettings(),
       hydrateBibleStore(),
       hydrateBroadcastThemes(),
       hydrateServicePlans(),
       hydrateLibraryStore(),
-    ]).then(() => {
+    ]).then((results) => {
+      for (const result of results) {
+        if (result.status === "rejected") {
+          console.warn("[startup] store hydration failed", result.reason)
+        }
+      }
       useAccentThemeStore.getState().hydrate()
       useColorModeStore.getState().hydrate()
     })
   )
   .then(() => initBiblePersistence())
+  .catch((error) => {
+    console.warn("[startup] persistence initialization failed", error)
+  })
   .finally(async () => {
     // Dev-only: populate stores for screenshots when `?demo` is present. The
     // dynamic import keeps the seed module out of production builds.

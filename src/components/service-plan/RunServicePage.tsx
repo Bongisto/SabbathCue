@@ -24,11 +24,14 @@ export function RunServicePage() {
   const activePlan = useServicePlanStore((s) => s.activePlan)
   const serviceContext = useServicePlanStore((s) => s.serviceContext)
   const setActiveItem = useServicePlanStore((s) => s.setActiveItem)
+  const completeActiveItem = useServicePlanStore((s) => s.completeActiveItem)
   const deck = useHymnSlideStore((s) => s.deck)
   const hymnActiveIndex = useHymnSlideStore((s) => s.activeIndex)
   const sermonActiveIndex = useSermonSlideStore((s) => s.activeIndex)
   const previewItem = useBroadcastLiveStore((s) => s.previewItem)
   const liveItem = useBroadcastLiveStore((s) => s.isLive ? s.liveItem : null)
+  const previewDeckKind = presentationDeckKind(previewItem)
+  const liveDeckKind = presentationDeckKind(liveItem)
   const orderedItems = useMemo(
     () => [...(activePlan?.items ?? [])].sort((a, b) => a.order - b.order),
     [activePlan?.items],
@@ -174,16 +177,24 @@ export function RunServicePage() {
             </div>
           )}
 
-          {(presentationDeckKind(previewItem) || presentationDeckKind(liveItem)) && (
+          {(previewDeckKind || liveDeckKind) && (
             <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
-              <span className="text-xs text-muted-foreground">Deck navigation</span>
-              {previewItem && presentationDeckKind(previewItem) ? (
+              <span className="text-xs text-muted-foreground">
+                {previewDeckKind ? "Deck navigation" : "Live deck navigation"}
+              </span>
+              {previewDeckKind && previewItem ? (
                 <PresentationDeckControls
                   item={previewItem}
                   onNavigate={(kind, index) => {
                     if (kind === "hymn") previewHymn(index)
-                    else previewSermonSlideAt(index)
+                    else if (kind === "slideDeck") previewSermonSlideAt(index)
                   }}
+                />
+              ) : liveDeckKind && liveItem ? (
+                <PresentationDeckControls
+                  item={liveItem}
+                  isLive
+                  crossQueueBoundaries
                 />
               ) : null}
             </div>
@@ -200,13 +211,9 @@ export function RunServicePage() {
               items={orderedItems}
               activeItemId={activePlan.activeItemId}
               performanceMode={serviceContext.performanceMode}
-              onSelect={() => {}}
+              readOnly
               onActivate={(itemId) => void setActiveItem(itemId)}
-              onDuplicate={() => {}}
-              onDelete={() => {}}
-              onMarkReady={() => {}}
-              onComplete={() => {}}
-              onReorder={() => {}}
+              onComplete={() => void completeActiveItem()}
             />
           </div>
         </section>

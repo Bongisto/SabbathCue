@@ -200,97 +200,107 @@ export function TranscriptPanel({ className }: { className?: string }) {
             Stop transcribing
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" onClick={startTranscription}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={connectionStatus === "connecting"}
+            onClick={startTranscription}
+          >
             <MicIcon className="size-3" />
-            Start transcribing
+            {connectionStatus === "connecting"
+              ? "Connecting…"
+              : "Start transcribing"}
           </Button>
         )}
       </div>
 
-      <div
-        ref={scrollRef}
-        data-slot="transcript-scroll"
-        className="relative min-h-0 flex-1 overflow-y-auto"
-        onScroll={handleTranscriptScroll}
-      >
-        <div className="flex flex-col gap-2 p-3">
-          {/* Faded top gradient */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b from-card to-transparent" />
+      <div className="relative min-h-0 flex-1">
+        {/* Faded top gradient */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-linear-to-b from-card to-transparent" />
 
-          {lastIssue ? (
-            <div
-              aria-live="polite"
-              className="rounded-md border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-900 dark:text-red-100"
-            >
-              <div className="flex items-start gap-2">
-                <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-red-700 dark:text-red-300" />
-                <div className="min-w-0 flex-1">
-                  <p className="leading-snug font-semibold">
-                    {lastIssue.title}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-red-900/80 dark:text-red-100/80">
-                    {lastIssue.description}
-                  </p>
-                  {lastIssue.actionLabel ? (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="xs"
-                      className="mt-3"
-                      onClick={openIssueSettings}
-                    >
-                      {lastIssue.actionLabel}
-                    </Button>
-                  ) : null}
+        <div
+          ref={scrollRef}
+          data-slot="transcript-scroll"
+          className="h-full overflow-y-auto"
+          onScroll={handleTranscriptScroll}
+        >
+          <div className="flex flex-col gap-2 p-3">
+            {lastIssue ? (
+              <div
+                aria-live="polite"
+                className="rounded-md border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-900 dark:text-red-100"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-red-700 dark:text-red-300" />
+                  <div className="min-w-0 flex-1">
+                    <p className="leading-snug font-semibold">
+                      {lastIssue.title}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-red-900/80 dark:text-red-100/80">
+                      {lastIssue.description}
+                    </p>
+                    {lastIssue.actionLabel ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="xs"
+                        className="mt-3"
+                        onClick={openIssueSettings}
+                      >
+                        {lastIssue.actionLabel}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {segments.length === 0 &&
-            !hasPartial &&
-            !isTranscribing &&
-            !lastIssue && (
-              <div className="flex min-h-0 flex-1 items-center justify-center">
-                <PanelEmptyState
-                  icon={<MicOffIcon className="size-8" />}
-                  title="No transcript yet"
-                  description="Click Start transcribing to begin capturing live speech."
-                />
-              </div>
-            )}
+            {segments.length === 0 &&
+              !hasPartial &&
+              !isTranscribing &&
+              !lastIssue && (
+                <div className="flex min-h-0 flex-1 items-center justify-center">
+                  <PanelEmptyState
+                    icon={<MicOffIcon className="size-8" />}
+                    title="No transcript yet"
+                    description="Click Start transcribing to begin capturing live speech."
+                  />
+                </div>
+              )}
 
-          {/* Final segments — recent ones brighter, older ones fade */}
-          {segments.map((seg, idx) => {
-            const distFromEnd = segments.length - 1 - idx
-            const opacity =
-              distFromEnd === 0
-                ? "text-foreground/80"
-                : distFromEnd === 1
-                  ? "text-foreground/60"
-                  : distFromEnd <= 3
-                    ? "text-foreground/40"
-                    : "text-foreground/25"
-            return (
-              <p
-                key={seg.id}
-                className={cn(
-                  "text-sm leading-relaxed transition-[color,border-color] duration-300",
-                  opacity,
-                  distFromEnd === 0 && "border-l-2 border-[var(--accent)] pl-2"
-                )}
-              >
-                {seg.text}
-              </p>
-            )
-          })}
+            {/* Final segments — recent ones brighter, older ones fade */}
+            {segments.map((seg, idx) => {
+              const distFromEnd = segments.length - 1 - idx
+              const opacity =
+                distFromEnd === 0
+                  ? "text-foreground/80"
+                  : distFromEnd === 1
+                    ? "text-foreground/60"
+                    : distFromEnd <= 3
+                      ? "text-foreground/40"
+                      : "text-foreground/25"
+              return (
+                <p
+                  key={seg.id}
+                  className={cn(
+                    "text-sm leading-relaxed transition-[color,border-color] duration-300",
+                    opacity,
+                    distFromEnd === 0 && "border-l-2 border-[var(--accent)] pl-2"
+                  )}
+                >
+                  {seg.text}
+                </p>
+              )
+            })}
 
-          {/* Partial (in-progress) text rendered by leaf subscriber */}
-          <LivePartialLine
-            scrollRef={scrollRef}
-            shouldStickToBottomRef={shouldStickToBottomRef}
-          />
+            {/* Partial (in-progress) text rendered by leaf subscriber */}
+            <LivePartialLine
+              scrollRef={scrollRef}
+              shouldStickToBottomRef={shouldStickToBottomRef}
+            />
+          </div>
         </div>
+
         {showJumpToLatest ? (
           <Button
             type="button"

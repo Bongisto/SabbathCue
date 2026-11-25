@@ -180,6 +180,26 @@ pub fn egw_semantic_status(app: AppHandle) -> Result<EgwSemanticStatus, String> 
     })
 }
 
+struct BuildingGuard<'a> {
+    state: &'a Mutex<EgwSemanticState>,
+}
+
+impl<'a> BuildingGuard<'a> {
+    fn new(state: &'a Mutex<EgwSemanticState>) -> Self {
+        Self { state }
+    }
+}
+
+impl Drop for BuildingGuard<'_> {
+    fn drop(&mut self) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        state.building = false;
+    }
+}
+
 #[tauri::command]
 pub fn egw_build_semantic_index(app: AppHandle) -> Result<(), String> {
     {
@@ -195,18 +215,25 @@ pub fn egw_build_semantic_index(app: AppHandle) -> Result<(), String> {
     }
 
     std::thread::spawn(move || {
-        let result = build_index(&app);
         let egw_state = app.state::<Mutex<EgwSemanticState>>();
+        let _building_guard = BuildingGuard::new(&egw_state);
+        let result = build_index(&app);
         match result {
             Ok(index) => {
-                if let Ok(mut state) = egw_state.lock() {
+                {
+                    let mut state = egw_state
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
                     state.index = Some(index);
                     state.building = false;
                 }
                 let _ = app.emit(EVENT_EGW_SEMANTIC_READY, ());
             }
             Err(error) => {
-                if let Ok(mut state) = egw_state.lock() {
+                {
+                    let mut state = egw_state
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
                     state.building = false;
                 }
                 log::warn!("[EGW-SEMANTIC] index build failed: {error}");
@@ -374,4 +401,31 @@ pub fn egw_semantic_search(
     }
 
     Ok(results)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::panic::AssertUnwindSafe;
+    use std::sync::Mutex;
+
+    use super::{BuildingGuard, EgwSemanticState};
+
+    #[test]
+    fn building_guard_resets_building_flag_on_panic_unwind() {
+        let state = Mutex::new(EgwSemanticState {
+            index: None,
+            building: true,
+        });
+
+        let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            let _guard = BuildingGuard::new(&state);
+            panic!("simulated index build panic");
+        }));
+
+        assert!(result.is_err());
+        let locked = state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(!locked.building);
+    }
 }

@@ -344,6 +344,81 @@ describe("broadcast store sync", () => {
     expect(state.editingThemeId).not.toBe(builtin.id)
     expect(state.draftTheme?.builtin).toBe(false)
     expect(state.themes.some((theme) => !theme.builtin && theme.name === "Edited Builtin (Custom)")).toBe(true)
+    expect(emitToMock).toHaveBeenCalledWith(
+      "broadcast",
+      "broadcast:verse-update",
+      expect.objectContaining({
+        theme: expect.objectContaining({ id: builtin.id }),
+      }),
+    )
+  })
+
+  it("cancels pending draft broadcast and resyncs active theme on discardDraft, stopEditing, and setDesignerOpen(false)", async () => {
+    const rafCallbacks = new Map<number, FrameRequestCallback>()
+    let nextRafId = 1
+    const cancelRafSpy = vi.fn((id: number) => {
+      rafCallbacks.delete(id)
+    })
+    vi.stubGlobal("window", {
+      requestAnimationFrame: (cb: FrameRequestCallback) => {
+        const id = nextRafId++
+        rafCallbacks.set(id, cb)
+        return id
+      },
+      cancelAnimationFrame: cancelRafSpy,
+    })
+
+    try {
+      const { useBroadcastStore } = await import("./broadcast-store")
+      const builtin = useBroadcastStore.getState().themes[0]
+      useBroadcastStore.setState({
+        activeThemeId: builtin.id,
+        isDesignerOpen: true,
+      })
+
+      useBroadcastStore.getState().startEditing(builtin.id)
+      useBroadcastStore.getState().updateDraft({ name: "Unsaved Draft" })
+      expect(rafCallbacks.size).toBe(1)
+
+      emitToMock.mockClear()
+      useBroadcastStore.getState().discardDraft()
+      expect(cancelRafSpy).toHaveBeenCalledTimes(1)
+      expect(rafCallbacks.size).toBe(0)
+      expect(emitToMock).toHaveBeenCalledWith(
+        "broadcast",
+        "broadcast:verse-update",
+        expect.objectContaining({
+          theme: expect.objectContaining({ id: builtin.id, name: builtin.name }),
+        }),
+      )
+
+      useBroadcastStore.getState().updateDraft({ name: "Unsaved Draft 2" })
+      emitToMock.mockClear()
+      useBroadcastStore.getState().stopEditing()
+      expect(cancelRafSpy).toHaveBeenCalledTimes(2)
+      expect(emitToMock).toHaveBeenCalledWith(
+        "broadcast",
+        "broadcast:verse-update",
+        expect.objectContaining({
+          theme: expect.objectContaining({ id: builtin.id, name: builtin.name }),
+        }),
+      )
+
+      useBroadcastStore.getState().startEditing(builtin.id)
+      useBroadcastStore.getState().updateDraft({ name: "Unsaved Draft 3" })
+      emitToMock.mockClear()
+      useBroadcastStore.getState().setDesignerOpen(false)
+      expect(cancelRafSpy).toHaveBeenCalledTimes(3)
+      expect(emitToMock).toHaveBeenCalledWith(
+        "broadcast",
+        "broadcast:verse-update",
+        expect.objectContaining({
+          theme: expect.objectContaining({ id: builtin.id, name: builtin.name }),
+        }),
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it("reports a broadcast sync issue when emitTo rejects", async () => {

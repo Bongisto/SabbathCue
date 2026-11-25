@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, render, waitFor } from "@testing-library/react"
+import { act, cleanup, render, waitFor } from "@testing-library/react"
 import { Dashboard } from "./dashboard"
+import { openSettings } from "@/lib/settings-dialog"
 import { useAccentThemeStore } from "@/stores/accent-theme-store"
 import { useDashboardWorkspaceStore } from "@/stores/dashboard-workspace-store"
 import { useServicePlanStore } from "@/stores/service-plan-store"
@@ -56,6 +57,10 @@ vi.mock("@/components/panels/search-panel", () => ({
 
 vi.mock("@/components/broadcast/KineticThemesPage", () => ({
   KineticThemesPage: () => <div data-slot="kinetic-themes-page" />,
+}))
+
+vi.mock("@/components/settings/SettingsPage", () => ({
+  SettingsPage: () => <div data-slot="settings-page" />,
 }))
 
 beforeEach(() => {
@@ -148,5 +153,23 @@ describe("Dashboard workspace routing", () => {
     expect(
       document.querySelector('[data-slot="latest-detection-bar"]')
     ).toBeNull()
+  })
+
+  it("openSettings closes sticky plannerOpen and stays on settings", async () => {
+    useServicePlanStore.setState({ plannerOpen: true })
+    useDashboardWorkspaceStore.setState({ workspace: "service-plans" })
+    render(<Dashboard />)
+
+    act(() => {
+      openSettings("speech")
+    })
+
+    expect(useServicePlanStore.getState().plannerOpen).toBe(false)
+    expect(useDashboardWorkspaceStore.getState().workspace).toBe("settings")
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-slot="settings-page"]')
+      ).toBeTruthy()
+    )
   })
 })

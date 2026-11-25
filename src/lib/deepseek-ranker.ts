@@ -241,11 +241,11 @@ export function preferSpokenBook(
   detections: DetectionResult[],
   transcript: string
 ): DetectionResult[] {
-  const haystack = transcript.toLowerCase()
+  const haystack = normalizeRankingText(transcript)
   const namedBooks = new Set<number>()
 
   for (const detection of detections) {
-    const book = detection.book_name.trim().toLowerCase()
+    const book = normalizeRankingText(detection.book_name)
     if (!book) continue
     const escaped = book.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     const pattern = new RegExp(`\\b${escaped}\\b`)

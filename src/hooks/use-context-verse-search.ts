@@ -61,6 +61,8 @@ export function useContextVerseSearch(options: {
   const [contextQuery, setContextQuery] = useState("")
   const contextDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contextSearchRequestIdRef = useRef(0)
+  const prevActiveTabRef = useRef(activeTab)
+  const prevActiveTranslationIdRef = useRef(activeTranslationId)
 
   const runContextSearch = useCallback(async (query: string, translationId: number) => {
     const requestId = ++contextSearchRequestIdRef.current
@@ -92,6 +94,12 @@ export function useContextVerseSearch(options: {
   )
 
   useEffect(() => {
+    const tabChanged = prevActiveTabRef.current !== activeTab
+    const translationChanged =
+      prevActiveTranslationIdRef.current !== activeTranslationId
+    prevActiveTabRef.current = activeTab
+    prevActiveTranslationIdRef.current = activeTranslationId
+    if (!tabChanged && !translationChanged) return
     if (activeTab !== "context" || contextQuery.length < CONTEXT_SEARCH_MIN_QUERY_LENGTH) return
     if (contextDebounceRef.current) clearTimeout(contextDebounceRef.current)
     contextDebounceRef.current = setTimeout(() => {
@@ -106,7 +114,13 @@ export function useContextVerseSearch(options: {
   }, [])
 
   const clearContextQuery = useCallback(() => {
+    if (contextDebounceRef.current) {
+      clearTimeout(contextDebounceRef.current)
+      contextDebounceRef.current = null
+    }
+    contextSearchRequestIdRef.current += 1
     setContextQuery("")
+    useBibleStore.getState().setSemanticResults([])
   }, [])
 
   return {

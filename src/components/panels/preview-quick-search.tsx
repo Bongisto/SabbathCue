@@ -84,7 +84,9 @@ export function PreviewQuickSearch() {
 
   useEffect(() => {
     if (books.length > 0) return
-    void bibleActions.loadBooks(activeTranslationId)
+    void bibleActions.loadBooks(activeTranslationId).catch((error) => {
+      console.error("[preview-quick-search] failed to load books", error)
+    })
   }, [activeTranslationId, books.length])
 
   useEffect(() => {
@@ -150,26 +152,33 @@ export function PreviewQuickSearch() {
     ) => {
       const requestId = ++requestIdRef.current
       setFeedback("Previewing verse...")
-      const result = await bibleActions.fetchVerse(
-        bookNumber,
-        chapter,
-        verse,
-        activeTranslationId
-      )
-      if (requestId !== requestIdRef.current) return
-      if (!result) {
-        setFeedback("Verse not found")
-        return
+      try {
+        const result = await bibleActions.fetchVerse(
+          bookNumber,
+          chapter,
+          verse,
+          activeTranslationId
+        )
+        if (requestId !== requestIdRef.current) return
+        if (!result) {
+          setFeedback("Verse not found")
+          return
+        }
+        selectPreviewVerse(result)
+        if (options?.clearQuery) {
+          setQuery("")
+          setFeedback("")
+          return
+        }
+        setFeedback(
+          `Previewed ${result.book_name} ${result.chapter}:${result.verse}`
+        )
+      } catch (error) {
+        console.error("[preview-quick-search] failed to preview verse", error)
+        if (requestId === requestIdRef.current) {
+          setFeedback("Failed to preview verse")
+        }
       }
-      selectPreviewVerse(result)
-      if (options?.clearQuery) {
-        setQuery("")
-        setFeedback("")
-        return
-      }
-      setFeedback(
-        `Previewed ${result.book_name} ${result.chapter}:${result.verse}`
-      )
     },
     [activeTranslationId]
   )
@@ -204,11 +213,21 @@ export function PreviewQuickSearch() {
   const previewHymn = useCallback(async (number: number) => {
     const requestId = ++requestIdRef.current
     setFeedback(`Previewing hymn ${number}...`)
-    const mod = await loadHymnVoiceControl()
-    await mod.previewHymnByNumber(number)
-    if (requestId !== requestIdRef.current) return
-    setQuery("")
-    setFeedback("")
+    try {
+      const mod = await loadHymnVoiceControl()
+      await mod.previewHymnByNumber(number)
+      if (requestId !== requestIdRef.current) return
+      setQuery("")
+      setFeedback("")
+    } catch (error) {
+      console.error(
+        `[preview-quick-search] failed to preview hymn ${number}`,
+        error
+      )
+      if (requestId === requestIdRef.current) {
+        setFeedback(`Failed to preview hymn ${number}`)
+      }
+    }
   }, [])
 
   const previewVerseMatch = useCallback(
@@ -312,6 +331,7 @@ export function PreviewQuickSearch() {
       setQuery("")
       setFeedback("")
       setVerseMatches([])
+      setEgwMatches([])
     }
   }
 
@@ -354,7 +374,7 @@ export function PreviewQuickSearch() {
       />
 
       {showDropdown ? (
-        <div className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[rgba(2,3,7,0.95)] shadow-lg backdrop-blur-md">
+        <div className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-foreground shadow-lg backdrop-blur-md">
           {bibleResult.stage === "complete" &&
           bibleResult.matchedBook &&
           bibleResult.chapter &&

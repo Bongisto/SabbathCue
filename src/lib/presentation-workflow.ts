@@ -378,10 +378,25 @@ export async function refreshLiveTranslation(): Promise<void> {
   const { book_number, chapter, verse } = live.scripture
   if (book_number <= 0 || chapter <= 0 || verse <= 0) return
 
+  const translationId = useBibleStore.getState().activeTranslationId
   const refreshed = await bibleActions.fetchVerse(book_number, chapter, verse)
-  if (refreshed) {
-    commitVerseToLive(refreshed, { makeLive: false })
+  if (!refreshed) return
+
+  const currentBroadcast = getBroadcastLiveStore()
+  const currentLive = currentBroadcast.liveItem
+  if (
+    !currentBroadcast.isLive ||
+    currentLive?.kind !== "scripture" ||
+    !currentLive.scripture ||
+    currentLive.scripture.book_number !== book_number ||
+    currentLive.scripture.chapter !== chapter ||
+    currentLive.scripture.verse !== verse ||
+    useBibleStore.getState().activeTranslationId !== translationId
+  ) {
+    return
   }
+
+  commitVerseToLive(refreshed, { makeLive: false })
 }
 
 function loadEgwDeck(p: EgwParagraph, activeIndex = 0) {

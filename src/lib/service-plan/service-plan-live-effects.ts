@@ -37,11 +37,17 @@ export function releaseAllServiceMedia(): void {
   mediaPreloadManager.releaseAll()
 }
 
-export async function loadHymnDeckForItem(item: ServiceItem): Promise<boolean> {
+let syncGeneration = 0
+
+export async function loadHymnDeckForItem(
+  item: ServiceItem,
+  isStale?: () => boolean,
+): Promise<boolean> {
   for (const hymnRef of item.hymnRefs) {
     if (!hymnRef.hymnNumber) continue
     try {
       const hymn = await getHymnByNumber(hymnRef.hymnNumber)
+      if (isStale?.()) return false
       if (!hymn) continue
       const screens = generateHymnScreens({
         hymn,
@@ -52,6 +58,7 @@ export async function loadHymnDeckForItem(item: ServiceItem): Promise<boolean> {
       useHymnSlideStore.getState().setDeck(deck, 0)
       return true
     } catch {
+      if (isStale?.()) return false
       // Non-fatal when hymn data is unavailable.
     }
   }
@@ -61,6 +68,7 @@ export async function loadHymnDeckForItem(item: ServiceItem): Promise<boolean> {
 export async function syncActiveServiceItemPresentations(
   item: ServiceItem | null,
 ): Promise<void> {
+  const generation = ++syncGeneration
   if (!item) {
     useHymnSlideStore.getState().setDeck([], 0)
     useSermonSlideStore.getState().clear()
@@ -83,9 +91,13 @@ export async function syncActiveServiceItemPresentations(
   }
 
   useSermonSlideStore.getState().clear()
-  if (await loadHymnDeckForItem(item)) {
+  const loaded = await loadHymnDeckForItem(item, () => generation !== syncGeneration)
+  if (generation !== syncGeneration) return
+  if (loaded) {
     const first = useHymnSlideStore.getState().deck[0]
     if (first) selectPreviewItem(first)
+  } else {
+    useHymnSlideStore.getState().setDeck([], 0)
   }
 }
 

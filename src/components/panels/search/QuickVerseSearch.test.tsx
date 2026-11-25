@@ -61,4 +61,24 @@ describe("QuickVerseSearch ghost suggestion", () => {
     )
     expect(screen.queryByTestId("quick-search-ghost")).toBeNull()
   })
+
+  it("uses semantic elevated surface classes for the verse dropdown (FU-44)", () => {
+    const { container } = render(
+      <QuickVerseSearch
+        quickInput="John 1:"
+        quickSuggestion=""
+        quickVersesList={[verse]}
+        shouldShowVerseDropdown={true}
+        quickInputRef={{ current: null }}
+        onQuickInputChange={noop}
+        onQuickKeyDown={noop}
+        onQuickVerseClick={noop}
+      />
+    )
+
+    const dropdown = container.querySelector(".backdrop-blur-md")
+    expect(dropdown?.className).toContain("bg-[var(--bg-elevated)]")
+    expect(dropdown?.className).toContain("text-foreground")
+    expect(dropdown?.className).not.toContain("bg-[rgba(2,3,7,0.95)]")
+  })
 })

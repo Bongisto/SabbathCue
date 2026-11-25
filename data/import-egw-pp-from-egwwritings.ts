@@ -37,11 +37,27 @@ type ChapterLink = {
   url: string
 }
 
+type OutputParagraph = {
+  paragraph: number
+  page: number
+  page_paragraph: number
+  text: string
+}
+
 type OutputChapter = {
   chapter: number
   title: string
-  paragraphs: Array<{ paragraph: number; text: string }>
+  paragraphs: OutputParagraph[]
 }
+
+type PageTrackerState = {
+  currentPage: number
+  hasSeenPageMarker: boolean
+  pageParagraphCounts: Map<number, number>
+}
+
+const PAGE_MARKER_REGEX = /\[p\.\s*(\d+)\]/gi
+const LEADING_PAGE_MARKER_REGEX = /^\s*\[p\.\s*(\d+)\]/i
 
 function normalizeWhitespace(text: string): string {
   return text
@@ -75,11 +91,69 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
 }
 
-function cleanParagraph(text: string): string {
+function normalizeRawParagraph(text: string): string {
   return normalizeWhitespace(decodeHtmlEntities(stripTags(text)))
+}
+
+function stripPageMarkers(text: string): string {
+  return text
     .replace(/\[p\.\s*\d+\]/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
     .replace(/\s+([,.;:!?])/g, "$1")
     .trim()
+}
+
+function cleanParagraph(text: string): string {
+  return stripPageMarkers(normalizeRawParagraph(text))
+}
+
+function extractPageMarkers(rawText: string): number[] {
+  const pages: number[] = []
+  for (const match of rawText.matchAll(PAGE_MARKER_REGEX)) {
+    const page = Number(match[1])
+    if (Number.isInteger(page) && page > 0) {
+      pages.push(page)
+    }
+  }
+  return pages
+}
+
+function assignParagraphPages(rawParagraphs: string[], state: PageTrackerState): OutputParagraph[] {
+  const output: OutputParagraph[] = []
+
+  for (const rawText of rawParagraphs) {
+    const markers = extractPageMarkers(rawText)
+    const leadingMatch = rawText.match(LEADING_PAGE_MARKER_REGEX)
+    const leadingPage = leadingMatch ? Number(leadingMatch[1]) : null
+    const cleaned = stripPageMarkers(rawText)
+
+    if (leadingPage != null && Number.isInteger(leadingPage) && leadingPage > 0) {
+      state.currentPage = leadingPage
+      state.hasSeenPageMarker = true
+    } else if (!state.hasSeenPageMarker && markers.length > 0) {
+      state.currentPage = markers[0]
+      state.hasSeenPageMarker = true
+    }
+
+    if (cleaned.length > 0) {
+      const page = state.hasSeenPageMarker ? state.currentPage : 1
+      const pageParagraph = (state.pageParagraphCounts.get(page) ?? 0) + 1
+      state.pageParagraphCounts.set(page, pageParagraph)
+      output.push({
+        paragraph: output.length + 1,
+        page,
+        page_paragraph: pageParagraph,
+        text: cleaned,
+      })
+    }
+
+    if (markers.length > 0) {
+      state.currentPage = markers[markers.length - 1]
+      state.hasSeenPageMarker = true
+    }
+  }
+
+  return output
 }
 
 async function fetchText(url: string): Promise<string> {
@@ -211,13 +285,15 @@ function extractParagraphsStructurally(html: string, headingHtml: string): strin
       continue
     }
 
-    const text = cleanParagraph(rawBlock)
-    if (!isNoiseParagraph(text)) {
-      paragraphs.push(text)
+    const rawText = normalizeRawParagraph(rawBlock)
+    const cleaned = stripPageMarkers(rawText)
+    const hasMarker = extractPageMarkers(rawText).length > 0
+    if (hasMarker || (cleaned.length > 0 && !isNoiseParagraph(cleaned))) {
+      paragraphs.push(rawText)
     }
   }
 
-  return paragraphs.filter((text) => text.length > 0)
+  return paragraphs
 }
 
 function extractParagraphsFromRenderedText(html: string, chapter: number, title: string): string[] {
@@ -246,20 +322,30 @@ function extractParagraphsFromRenderedText(html: string, chapter: number, title:
 
   return rest
     .split(/\n\s*\n/g)
-    .map((paragraph) => cleanParagraph(paragraph))
-    .filter((paragraph) => paragraph.length > 0 && !isNoiseParagraph(paragraph))
+    .map((paragraph) => normalizeRawParagraph(paragraph))
+    .filter((rawText) => {
+      const cleaned = stripPageMarkers(rawText)
+      return extractPageMarkers(rawText).length > 0 || (cleaned.length > 0 && !isNoiseParagraph(cleaned))
+    })
 }
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-function extractChapterFromHtml(link: ChapterLink, html: string): OutputChapter {
+function extractChapterFromHtml(
+  link: ChapterLink,
+  html: string,
+  pageState: PageTrackerState,
+): OutputChapter {
   const heading = extractChapterHeading(html, link.chapter)
-  const structuralParagraphs = extractParagraphsStructurally(html, heading.headingHtml)
-  const paragraphs = structuralParagraphs.length > 0
-    ? structuralParagraphs
+  const structuralRaw = extractParagraphsStructurally(html, heading.headingHtml)
+  const hasStructuralProse = structuralRaw.some((rawText) => stripPageMarkers(rawText).length > 0)
+  const rawParagraphs = hasStructuralProse
+    ? structuralRaw
     : extractParagraphsFromRenderedText(html, link.chapter, heading.title)
+
+  const paragraphs = assignParagraphPages(rawParagraphs, pageState)
 
   if (paragraphs.length === 0) {
     throw new Error(`No paragraphs extracted for chapter ${link.chapter}`)
@@ -268,10 +354,7 @@ function extractChapterFromHtml(link: ChapterLink, html: string): OutputChapter 
   return {
     chapter: link.chapter,
     title: heading.title,
-    paragraphs: paragraphs.map((text, index) => ({
-      paragraph: index + 1,
-      text,
-    })),
+    paragraphs,
   }
 }
 
@@ -285,11 +368,16 @@ async function main() {
 
   const links = extractChapterLinks(tocHtml)
   const chapters: OutputChapter[] = []
+  const pageState: PageTrackerState = {
+    currentPage: 1,
+    hasSeenPageMarker: false,
+    pageParagraphCounts: new Map<number, number>(),
+  }
 
   for (const link of links) {
     const html = await fetchText(link.url)
     writeFileSync(join(RAW_DIR, `chapter-${link.chapter}.html`), html)
-    chapters.push(extractChapterFromHtml(link, html))
+    chapters.push(extractChapterFromHtml(link, html, pageState))
   }
 
   const output = {

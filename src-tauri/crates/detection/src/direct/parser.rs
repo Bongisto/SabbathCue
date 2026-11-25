@@ -149,14 +149,14 @@ enum Token {
     Dash,
 }
 
-fn is_chapter_keyword(word: &str) -> bool {
+pub(crate) fn is_chapter_keyword(word: &str) -> bool {
     matches!(
         word,
         "chapter" | "hoofstuk" | "capitulo" | "capítulo" | "chapitre"
     )
 }
 
-fn is_verse_keyword(word: &str) -> bool {
+pub(crate) fn is_verse_keyword(word: &str) -> bool {
     matches!(
         word,
         "verse" | "verses" | "vers" | "versiculo" | "versículo" | "verso" | "verset" | "versets"
@@ -233,11 +233,27 @@ fn tokenize(text: &str) -> Vec<Token> {
     tokens
 }
 
-/// Try to parse "N:M" or "N : M" or "N:M-E" patterns.
+fn is_time_preposition(word: &str) -> bool {
+    matches!(
+        word,
+        "at" | "around" | "about" | "until" | "till" | "before" | "after" | "past" | "since" | "by"
+    )
+}
+
+/// Try to parse "N:M" or "N : M" or "N:M-E" patterns close to the book name.
 fn try_colon_pattern(tokens: &[Token], book_match: &BookMatch) -> Option<VerseRef> {
+    // Only match colon references near the book name so distant clock times
+    // ("In the book of Genesis, remember evening service starts at 10:30") stay silent.
+    let scan_limit = tokens.len().min(3);
     // Look for: Number Colon Number [Dash Number]
-    for i in 0..tokens.len() {
+    for i in 0..scan_limit {
         if let Token::Number(chapter) = &tokens[i] {
+            let preceded_by_time_word = i.checked_sub(1).is_some_and(|prev| {
+                matches!(&tokens[prev], Token::Word(word) if is_time_preposition(word))
+            });
+            if preceded_by_time_word {
+                continue;
+            }
             if i + 2 < tokens.len() && matches!(&tokens[i + 1], Token::Colon) {
                 if let Token::Number(verse) = &tokens[i + 2] {
                     let mut verse_end = None;
@@ -626,6 +642,29 @@ fn consume_number(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
     consume_number_at(tokens, start)
 }
 
+fn consume_hundred_remainder(
+    tokens: &[Token],
+    base: i32,
+    after_hundred: usize,
+) -> (i32, usize) {
+    match tokens.get(after_hundred) {
+        Some(Token::Word(w2)) => {
+            // Skip optional connector word ("and", "en", ...)
+            let skip = usize::from(is_number_connector(w2));
+            if let Some((rest, rest_idx)) = consume_number_at(tokens, after_hundred + skip) {
+                if (1..100).contains(&rest) {
+                    return (base + rest, rest_idx);
+                }
+            }
+        }
+        Some(Token::Number(n2)) if (1..100).contains(n2) => {
+            return (base + n2, after_hundred + 1);
+        }
+        _ => {}
+    }
+    (base, after_hundred)
+}
+
 /// Consume a number starting at position `start`.
 /// Handles compound spoken numbers like "thirty two", "one hundred fifty".
 fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
@@ -641,17 +680,16 @@ fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
     // Try to parse spoken number words
     if let Token::Word(w) = &tokens[start] {
         if let Some(n) = parse_spoken_number(w) {
-            // Check if this is "hundred" — if so, look for more
+            // Leading "hundred"/"honderd" may be followed by a < 100 remainder
+            // (e.g. "Psalm hundred nineteen" → 119).
             if w == "hundred" || w == "honderd" {
-                // Shouldn't start with "hundred" alone without context
-                return Some((n, start + 1));
+                return Some(consume_hundred_remainder(tokens, n, start + 1));
             }
 
-            // If n >= 100, it's already compound (e.g., won't happen with single words)
-            // Afrikaans inverted form: "drie en twintig" → 23
-            if (1..=19).contains(&n) && start + 2 < tokens.len() {
+            // Afrikaans inverted form: "drie en twintig" → 23 (units 1..=9 + "en" + tens)
+            if (1..=9).contains(&n) && start + 2 < tokens.len() {
                 if let Token::Word(connector) = &tokens[start + 1] {
-                    if is_number_connector(connector) {
+                    if connector == "en" {
                         if let Token::Word(tens_w) = &tokens[start + 2] {
                             if let Some(tens) = parse_spoken_number(tens_w) {
                                 if (20..=90).contains(&tens) && tens % 10 == 0 {
@@ -697,27 +735,7 @@ fn consume_number_at(tokens: &[Token], start: usize) -> Option<(i32, usize)> {
             if (1..=9).contains(&n) && start + 1 < tokens.len() {
                 if let Token::Word(next_w) = &tokens[start + 1] {
                     if next_w == "hundred" || next_w == "honderd" {
-                        let base = n * 100;
-                        // Look for more after "hundred"
-                        if start + 2 < tokens.len() {
-                            if let Token::Word(w2) = &tokens[start + 2] {
-                                // Skip optional "and"
-                                let skip = usize::from(is_number_connector(w2));
-                                if let Some((rest, rest_idx)) =
-                                    consume_number_at(tokens, start + 2 + skip)
-                                {
-                                    if rest < 100 {
-                                        return Some((base + rest, rest_idx));
-                                    }
-                                }
-                            }
-                            if let Token::Number(n2) = &tokens[start + 2] {
-                                if *n2 < 100 {
-                                    return Some((base + n2, start + 3));
-                                }
-                            }
-                        }
-                        return Some((base, start + 2));
+                        return Some(consume_hundred_remainder(tokens, n * 100, start + 2));
                     }
                 }
             }
@@ -1601,5 +1619,59 @@ mod tests {
                 "{literal} is unreachable: it survives to_lowercase() unchanged only if already lowercase"
             );
         }
+    }
+
+    #[test]
+    fn distant_clock_time_after_book_does_not_fabricate_colon_citation() {
+        let bm = make_book_match("Genesis", 1, 22);
+        let text = "In the book of Genesis, remember evening service starts at 10:30";
+        assert_eq!(parse_reference(text, &bm), None);
+
+        let near_time = make_book_match("Genesis", 1, 7);
+        assert_eq!(parse_reference("Genesis starts at 10:30", &near_time), None);
+        assert_eq!(parse_reference("Genesis at 10:30", &near_time), None);
+
+        let valid = parse_reference("Genesis chapter 10:30", &near_time).expect("valid colon ref");
+        assert_eq!(valid.chapter, 10);
+        assert_eq!(valid.verse_start, 30);
+    }
+
+    #[test]
+    fn english_and_and_teens_do_not_trigger_afrikaans_inverted_tens() {
+        let ten_and_twenty = tokenize("ten and twenty");
+        assert_eq!(consume_number_at(&ten_and_twenty, 0), Some((10, 1)));
+
+        let five_and_twenty = tokenize("five and twenty");
+        assert_eq!(consume_number_at(&five_and_twenty, 0), Some((5, 1)));
+
+        let twelve_and_thirty = tokenize("twelve and thirty");
+        assert_eq!(consume_number_at(&twelve_and_thirty, 0), Some((12, 1)));
+
+        let eleven_en_twenty = tokenize("elf en twintig");
+        assert_eq!(consume_number_at(&eleven_en_twenty, 0), Some((11, 1)));
+
+        let drie_en_twintig = tokenize("drie en twintig");
+        assert_eq!(consume_number_at(&drie_en_twintig, 0), Some((23, 3)));
+    }
+
+    #[test]
+    fn leading_hundred_consumes_optional_remainder() {
+        let bm = make_book_match("Psalms", 19, 5);
+        let hundred_nineteen = parse_reference("Psalm hundred nineteen", &bm).unwrap();
+        assert_eq!(hundred_nineteen.chapter, 119);
+        assert_eq!(hundred_nineteen.verse_start, 0);
+
+        let hundred_and_nineteen = parse_reference("Psalm hundred and nineteen", &bm).unwrap();
+        assert_eq!(hundred_and_nineteen.chapter, 119);
+        assert_eq!(hundred_and_nineteen.verse_start, 0);
+
+        let honderd_en_negentien = parse_reference("Psalm honderd en negentien", &bm).unwrap();
+        assert_eq!(honderd_en_negentien.chapter, 119);
+        assert_eq!(honderd_en_negentien.verse_start, 0);
+
+        let with_verse =
+            parse_reference("Psalm hundred nineteen verse one hundred five", &bm).unwrap();
+        assert_eq!(with_verse.chapter, 119);
+        assert_eq!(with_verse.verse_start, 105);
     }
 }

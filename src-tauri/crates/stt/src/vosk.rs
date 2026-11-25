@@ -179,14 +179,15 @@ impl SttProvider for VoskProvider {
             &writer,
         )
         .await;
+        let was_cancelled = self.cancelled.load(Ordering::SeqCst);
         cancel_on_drop.cancel();
-        worker::stop_writer(VOSK_LABEL, writer).await;
+        let writer_result = worker::stop_writer(VOSK_LABEL, writer).await;
         // Detached stop: joining the reader threads here deadlocked when a
         // reader was blocked sending into a full (or consumer-less) event
         // channel, so `start_transcription` never returned.
         process.stop_detached();
         let _ = event_tx.send(TranscriptEvent::Disconnected).await;
-        run_result
+        run_result.and_then(|()| if was_cancelled { Ok(()) } else { writer_result })
     }
 
     fn stop(&self) {

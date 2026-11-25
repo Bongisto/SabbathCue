@@ -39,10 +39,10 @@ async function prepareTarget(
     broadcastDialog?: boolean
   }
 ): Promise<void> {
+  useServicePlanStore.getState().closePlanner()
   if (options?.settingsSection) {
     openSettings(options.settingsSection)
   } else if (options?.workspace) {
-    useServicePlanStore.getState().closePlanner()
     useDashboardWorkspaceStore.getState().setWorkspace(options.workspace)
   }
   useBroadcastSettingsDialogStore

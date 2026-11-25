@@ -1,24 +1,26 @@
 import { SITE } from "../../_lib/site";
+import { publicSiteOrigin } from "../../_lib/site-url";
 import { FAQS } from "../sections/faq-section.data";
 
-const ORG_ID = `${SITE.url}/#organization`;
-const SITE_ID = `${SITE.url}/#website`;
-const APP_ID = `${SITE.url}/#software`;
-const FAQ_ID = `${SITE.url}/#faq`;
-
 export function StructuredData() {
+  const siteOrigin = publicSiteOrigin();
+  const orgId = `${siteOrigin}/#organization`;
+  const siteId = `${siteOrigin}/#website`;
+  const appId = `${siteOrigin}/#software`;
+  const faqId = `${siteOrigin}/#faq`;
+
   const graph = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "Organization",
-        "@id": ORG_ID,
+        "@id": orgId,
         name: SITE.legalName,
         alternateName: SITE.name,
-        url: SITE.url,
+        url: siteOrigin,
         logo: {
           "@type": "ImageObject",
-          url: `${SITE.url}/sabbathcue-logo.png`,
+          url: `${siteOrigin}/sabbathcue-logo.png`,
           width: 1024,
           height: 1024,
         },
@@ -27,18 +29,18 @@ export function StructuredData() {
       },
       {
         "@type": "WebSite",
-        "@id": SITE_ID,
-        url: SITE.url,
+        "@id": siteId,
+        url: siteOrigin,
         name: SITE.name,
         description: SITE.description,
         inLanguage: "en",
-        publisher: { "@id": ORG_ID },
+        publisher: { "@id": orgId },
       },
       {
         "@type": "SoftwareApplication",
-        "@id": APP_ID,
+        "@id": appId,
         name: SITE.name,
-        url: SITE.url,
+        url: siteOrigin,
         description: SITE.description,
         applicationCategory: "MultimediaApplication",
         operatingSystem: SITE.operatingSystems.join(", "),
@@ -53,7 +55,7 @@ export function StructuredData() {
           priceCurrency: "USD",
           availability: "https://schema.org/InStock",
         },
-        publisher: { "@id": ORG_ID },
+        publisher: { "@id": orgId },
         featureList: [
           "Real-time speech transcription from live sermon audio (offline Vosk or cloud STT)",
           "Automatic Bible verse and Ellen G. White reference detection from citations and quotes",
@@ -69,7 +71,7 @@ export function StructuredData() {
       },
       {
         "@type": "FAQPage",
-        "@id": FAQ_ID,
+        "@id": faqId,
         mainEntity: FAQS.map((f) => ({
           "@type": "Question",
           name: f.question,

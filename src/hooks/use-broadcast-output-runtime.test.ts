@@ -547,4 +547,108 @@ describe("useBroadcastOutputRuntime", () => {
       })
     }
   })
+
+  it("does not re-emit output-ready or reset render key when canvas mounts or changes", async () => {
+    const { useBroadcastOutputRuntime } = await import("./use-broadcast-output-runtime")
+    const canvas = createCanvas()
+    const root = createRoot(document.createElement("div"))
+    const theme = makeTheme()
+    let activeCanvas: HTMLCanvasElement | null = null
+
+    function Probe() {
+      useBroadcastOutputRuntime({ canvas: activeCanvas, outputId: "main" })
+      return null
+    }
+
+    await act(async () => {
+      root.render(React.createElement(Probe))
+      await Promise.resolve()
+    })
+    expect(mockWindowEmitTo).toHaveBeenCalledTimes(1)
+
+    activeCanvas = canvas
+    await act(async () => {
+      root.render(React.createElement(Probe))
+      await Promise.resolve()
+    })
+    expect(mockWindowEmitTo).toHaveBeenCalledTimes(1)
+
+    const payload = {
+      theme,
+      item: { reference: "John 3:16", segments: [{ text: "For God so loved the world." }] },
+      opacity: 1,
+      transition: { ...theme.transition, type: "none" as const, duration: 0 },
+    }
+
+    await act(async () => {
+      listeners.get("broadcast:verse-update")?.({ payload })
+      await Promise.resolve()
+    })
+    const callsAfterFirst = mockRenderPresentation.mock.calls.length
+
+    activeCanvas = createCanvas()
+    await act(async () => {
+      root.render(React.createElement(Probe))
+      await Promise.resolve()
+    })
+    // Remounting canvas repaints latestData once, and sending the identical payload afterward is still deduped.
+    const callsAfterRemount = mockRenderPresentation.mock.calls.length
+    await act(async () => {
+      listeners.get("broadcast:verse-update")?.({ payload })
+      await Promise.resolve()
+    })
+    expect(callsAfterFirst).toBeGreaterThan(0)
+    expect(mockRenderPresentation.mock.calls.length).toBe(callsAfterRemount)
+    expect(mockWindowEmitTo).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it("does not let a stale get_ndi_status response overwrite a newer broadcast:ndi-config event", async () => {
+    let resolveStatus!: (value: unknown) => void
+    mockInvoke.mockImplementation((command: unknown) => {
+      if (command === "get_ndi_status") {
+        return new Promise((resolve) => {
+          resolveStatus = resolve
+        })
+      }
+      return Promise.resolve(undefined)
+    })
+
+    const { useBroadcastOutputRuntime } = await import("./use-broadcast-output-runtime")
+    const canvas = createCanvas()
+    const root = createRoot(document.createElement("div"))
+
+    function Probe() {
+      useBroadcastOutputRuntime({ canvas, outputId: "main" })
+      return null
+    }
+
+    await act(async () => {
+      root.render(React.createElement(Probe))
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      listeners.get("broadcast:ndi-config")?.({
+        payload: { active: false, fps: 24, width: 1920, height: 1080 },
+      })
+      resolveStatus({ active: true, fps: 60, width: 1920, height: 1080 })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000)
+      await Promise.resolve()
+    })
+
+    expect(mockInvoke.mock.calls.filter((call) => call[0] === "push_ndi_frame")).toHaveLength(0)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
 })

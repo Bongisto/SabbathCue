@@ -22,6 +22,7 @@ export function normalizeHymnCueText(text: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/(^|\s)-+(?=\s|$)/g, " ")
     .replace(/\s+/g, " ")
     .trim()
 }

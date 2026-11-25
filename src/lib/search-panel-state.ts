@@ -35,7 +35,14 @@ export function resolveEffectiveVerseId(
   if (!selectedVerseId || currentChapter.length === 0) return null
   if (currentChapter.some((v) => v.id === selectedVerseId)) return selectedVerseId
   if (!selectedVerse) return null
-  return currentChapter.find((v) => v.verse === selectedVerse.verse)?.id ?? null
+  return (
+    currentChapter.find(
+      (v) =>
+        v.book_number === selectedVerse.book_number &&
+        v.chapter === selectedVerse.chapter &&
+        v.verse === selectedVerse.verse,
+    )?.id ?? null
+  )
 }
 
 export async function changeActiveTranslation(translationId: number): Promise<void> {

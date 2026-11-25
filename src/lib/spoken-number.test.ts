@@ -80,6 +80,24 @@ describe("extractSpokenNumberPhrase", () => {
     expect(extractSpokenNumberPhrase("46 and")).toBe("46")
     expect(extractSpokenNumberPhrase("een en")).toBe("een")
     expect(extractSpokenNumberPhrase("and 46")).toBe("46")
+    expect(extractSpokenNumberPhrase("and turn to 302")).toBe("302")
+    expect(extractSpokenNumberPhrase("AND turn to 302")).toBe("302")
+  })
+
+  it("keeps hyphenated compounds inside spoken number phrases", () => {
+    expect(extractSpokenNumberPhrase("twenty-five")).toBe("twenty-five")
+    expect(extractSpokenNumberPhrase("one hundred twenty-five please")).toBe(
+      "one hundred twenty-five"
+    )
+    expect(extractSpokenNumberPhrase("one hundred and twenty-five")).toBe(
+      "one hundred and twenty-five"
+    )
+    expect(parsePositiveSpokenNumber(extractSpokenNumberPhrase("twenty-five"))).toBe(25)
+    expect(
+      parsePositiveSpokenNumber(
+        extractSpokenNumberPhrase("one hundred twenty-five")
+      )
+    ).toBe(125)
   })
 
   it("returns an empty string when no number token is present", () => {

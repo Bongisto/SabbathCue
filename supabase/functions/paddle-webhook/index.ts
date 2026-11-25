@@ -11,7 +11,10 @@ import {
   type TransactionCompletedEvent,
 } from "npm:@paddle/paddle-node-sdk@2.8.0"
 import { createClient } from "npm:@supabase/supabase-js@2.49.1"
-import { isPaddleWebhookRequestIpAllowed } from "../_shared/paddle-webhook-ip.ts"
+import {
+  isPaddleWebhookRequestIpAllowed,
+  type PaddleWebhookEnvironment,
+} from "../_shared/paddle-webhook-ip.ts"
 
 type SubscriptionEvent =
   | SubscriptionCreatedEvent
@@ -24,13 +27,18 @@ function requireEnv(name: string): string {
   return value
 }
 
-function getPaddleEnvironment(): Environment {
+function getPaddleEnvName(): PaddleWebhookEnvironment {
   const raw = requireEnv("PADDLE_ENV")
-  if (raw === "production") return Environment.production
-  if (raw === "sandbox") return Environment.sandbox
+  if (raw === "production" || raw === "sandbox") return raw
   throw new Error(
     `Invalid PADDLE_ENV="${raw}". Expected "sandbox" or "production".`
   )
+}
+
+function getPaddleEnvironment(): Environment {
+  return getPaddleEnvName() === "sandbox"
+    ? Environment.sandbox
+    : Environment.production
 }
 
 function getPaddle(): Paddle {
@@ -191,7 +199,20 @@ export default {
       return new Response("Method not allowed", { status: 405 })
     }
 
-    const ipCheck = await isPaddleWebhookRequestIpAllowed(request)
+    let paddleEnv: PaddleWebhookEnvironment
+    try {
+      paddleEnv = getPaddleEnvName()
+    } catch (error) {
+      console.error("paddle-webhook: invalid PADDLE_ENV", error)
+      return Response.json(
+        { error: "Paddle environment not configured" },
+        { status: 500 }
+      )
+    }
+
+    const ipCheck = await isPaddleWebhookRequestIpAllowed(request, {
+      environment: paddleEnv,
+    })
     if (!ipCheck.allowed) {
       console.error(
         "paddle-webhook: rejected request from non-Paddle IP",

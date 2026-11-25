@@ -51,11 +51,15 @@ export function deckToSongDoc(
 }
 
 export function parseSongText(title: string, text: string): SongDoc {
-  const blocks = text
-    .split(/\n\s*(?:---+|\n)\s*\n/g)
+  const normalized = text
+    .replace(/\r\n?/g, "\n")
+    .replace(/(?:^|\n)[ \t]*---+[ \t]*(?=\n|$)/g, "\n\n")
+
+  const blocks = normalized
+    .split(/\n(?:[ \t]*\n)+/g)
     .map((block) =>
       block
-        .split(/\r?\n/)
+        .split("\n")
         .map((line) => line.trim())
         .filter(Boolean),
     )

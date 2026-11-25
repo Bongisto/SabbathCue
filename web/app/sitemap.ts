@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
-import { SITE } from "./_lib/site";
+import { publicSiteOrigin } from "./_lib/site-url";
 
 export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  const siteOrigin = publicSiteOrigin();
   return [
     {
-      url: `${SITE.url}/`,
+      url: `${siteOrigin}/`,
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1,

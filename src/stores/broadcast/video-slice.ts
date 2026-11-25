@@ -129,10 +129,17 @@ export const createVideoSlice: StateCreator<
   },
   handleVideoEnded: () => {
     const queue = useQueueStore.getState()
+    const liveQueueItemId = get().liveQueueItemId
+    const activeIndex = queue.activeIndex
+    const isLiveFromQueue =
+      liveQueueItemId !== null &&
+      activeIndex !== null &&
+      activeIndex >= 0 &&
+      queue.items[activeIndex]?.id === liveQueueItemId
     const nextIndex =
-      queue.activeIndex === null
-        ? -1
-        : Math.min(queue.activeIndex + 1, queue.items.length - 1)
+      isLiveFromQueue && activeIndex + 1 < queue.items.length
+        ? activeIndex + 1
+        : -1
     const nextItem = nextIndex >= 0 ? queue.items[nextIndex] : null
     const decision = decideVideoEndAction({
       loop: get().videoLoop,
@@ -149,6 +156,7 @@ export const createVideoSlice: StateCreator<
       restorePresentationDeckForQueueItem(nextItem)
       const renderData = getPresentationRenderData(nextItem.presentation)
       get().commitLiveItem(renderData)
+      get().setLiveQueueItemId(nextItem.id)
     }
     return decision
   },

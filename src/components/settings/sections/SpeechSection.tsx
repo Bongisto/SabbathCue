@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -8,6 +9,7 @@ import { useDeepgramKeySettings } from "@/hooks/use-deepgram-key-settings"
 import { useSonioxKeySettings } from "@/hooks/use-soniox-key-settings"
 import { useSpeechmaticsKeySettings } from "@/hooks/use-speechmatics-key-settings"
 import {
+  normalizeSttLanguageForProvider,
   useSettingsStore,
   type SttLanguage,
   type SttProvider,
@@ -423,9 +425,7 @@ function CloudLanguageSelector({
   switchingStt: boolean
 }) {
   const options = CLOUD_LANGUAGE_OPTIONS[provider]
-  const value = options.some((option) => option.value === sttLanguage)
-    ? sttLanguage
-    : "en"
+  const value = normalizeSttLanguageForProvider(provider, sttLanguage)
 
   return (
     <div className="flex flex-col gap-2">
@@ -499,6 +499,16 @@ export function SpeechSection() {
   const sonioxKeySettings = useSonioxKeySettings(handleProviderChange)
   const speechmaticsKeySettings =
     useSpeechmaticsKeySettings(handleProviderChange)
+
+  const normalizedLanguage = normalizeSttLanguageForProvider(
+    sttProvider,
+    sttLanguage
+  )
+  useEffect(() => {
+    if (normalizedLanguage !== sttLanguage) {
+      useSettingsStore.getState().setSttLanguage(normalizedLanguage)
+    }
+  }, [normalizedLanguage, sttLanguage])
 
   const {
     status: assetStatus,

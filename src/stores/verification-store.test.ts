@@ -247,4 +247,106 @@ describe("verification-store", () => {
 
     expect(isAppVerified()).toBe(false)
   })
+
+  it("does not remain stuck on checking when signOut or clear throws", async () => {
+    mockSignOut.mockRejectedValueOnce(new Error("store error"))
+    mockClearVerification.mockRejectedValueOnce(new Error("clear error"))
+
+    const { useVerificationStore, isAppVerified } =
+      await import("./verification-store")
+
+    useVerificationStore.setState({
+      status: "verified",
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      isHydrated: true,
+    })
+
+    await useVerificationStore.getState().signOut()
+    expect(useVerificationStore.getState().status).toBe("error")
+    expect(useVerificationStore.getState().verifiedUserId).toBeNull()
+    expect(isAppVerified()).toBe(false)
+
+    useVerificationStore.setState({
+      status: "verified",
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      isHydrated: true,
+    })
+
+    await useVerificationStore.getState().clear()
+    expect(useVerificationStore.getState().status).toBe("error")
+    expect(useVerificationStore.getState().verifiedUserId).toBeNull()
+    expect(isAppVerified()).toBe(false)
+  })
+
+  it("ignores stale in-flight heartbeat results after signOut", async () => {
+    const focusTarget = new EventTarget()
+    vi.stubGlobal("window", {
+      addEventListener: (type: string, listener: EventListener) =>
+        focusTarget.addEventListener(type, listener),
+      removeEventListener: (type: string, listener: EventListener) =>
+        focusTarget.removeEventListener(type, listener),
+    })
+    vi.stubGlobal("document", {
+      visibilityState: "visible",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })
+
+    let resolveHeartbeat!: (value: unknown) => void
+    mockHeartbeatDeviceRegistration.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveHeartbeat = resolve
+        })
+    )
+    mockSignIn.mockResolvedValue({
+      status: "verified",
+      verifiedUserId: "user-1",
+      verifiedDeviceId: "device-1",
+      accessTokenExpiresAt: Date.now() + 60_000,
+      lastVerifiedAt: Date.now(),
+      offlineGraceExpiresAt: 0,
+      accessExpiresAt: Date.now() + 60_000,
+      error: null,
+      errorCode: null,
+    })
+    mockSignOut.mockResolvedValue({
+      status: "required",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
+      error: null,
+      errorCode: null,
+    })
+
+    const { useVerificationStore } = await import("./verification-store")
+    await useVerificationStore.getState().signIn("user@example.com", "secret")
+
+    focusTarget.dispatchEvent(new Event("focus"))
+    await Promise.resolve()
+
+    await useVerificationStore.getState().signOut()
+    expect(useVerificationStore.getState().status).toBe("required")
+
+    resolveHeartbeat({
+      status: "error",
+      verifiedUserId: null,
+      verifiedDeviceId: null,
+      accessTokenExpiresAt: null,
+      lastVerifiedAt: null,
+      offlineGraceExpiresAt: null,
+      accessExpiresAt: null,
+      error: "Suspended",
+      errorCode: "suspended",
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(useVerificationStore.getState().status).toBe("required")
+  })
 })

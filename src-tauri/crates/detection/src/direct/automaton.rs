@@ -56,27 +56,31 @@ impl BookMatcher {
         let mut pattern_map: Vec<(i32, String)> = Vec::new();
 
         for book in books {
-            let name_lower = book.name.to_ascii_lowercase();
+            let name_lower = book.name.to_lowercase();
+            // Short canonical names like Portuguese "Jó" (2 chars) still allow
+            // equally short variants while keeping 2-letter abbreviations of
+            // longer book names ("Ps", "Re", "Jo" for João) filtered out.
+            let min_len = MIN_PATTERN_LEN.min(name_lower.chars().count());
 
             // Add the canonical name
             patterns.push(name_lower.clone());
             pattern_map.push((book.number, book.name.to_string()));
 
             // Add the abbreviation (if different from name and long enough)
-            let abbr_lower = book.abbreviation.to_ascii_lowercase();
-            if abbr_lower != name_lower && abbr_lower.chars().count() >= MIN_PATTERN_LEN {
+            let abbr_lower = book.abbreviation.to_lowercase();
+            if abbr_lower != name_lower && abbr_lower.chars().count() >= min_len {
                 patterns.push(abbr_lower.clone());
                 pattern_map.push((book.number, book.name.to_string()));
             }
 
             // Add all aliases
             for alias in book.aliases {
-                let alias_lower = alias.to_ascii_lowercase();
+                let alias_lower = alias.to_lowercase();
                 // Avoid duplicates with name and abbreviation, and skip patterns
                 // too short to be a spoken book name.
                 if alias_lower != name_lower
                     && alias_lower != abbr_lower
-                    && alias_lower.chars().count() >= MIN_PATTERN_LEN
+                    && alias_lower.chars().count() >= min_len
                 {
                     patterns.push(alias_lower);
                     pattern_map.push((book.number, book.name.to_string()));
@@ -104,14 +108,14 @@ impl BookMatcher {
 
     /// Find all Bible book name matches in the given text.
     ///
-    /// Results are filtered so that only matches occurring at word boundaries
-    /// are returned, and overlapping matches are resolved in favor of the longest.
+    /// Results are filtered so that only matches occurring at Unicode word
+    /// boundaries are returned, and overlapping matches are resolved in favor
+    /// of the longest. Returned `start`/`end` byte offsets index `text`.
     pub fn find_books(&self, text: &str) -> Vec<BookMatch> {
         let Some(automaton) = &self.automaton else {
             return Vec::new();
         };
-        let text_lower = text.to_lowercase();
-        let text_bytes = text_lower.as_bytes();
+        let (text_lower, offset_map) = lowercase_with_orig_offsets(text);
         let mut raw_matches: Vec<BookMatch> = Vec::new();
 
         // Use overlapping iterator to get ALL possible matches,
@@ -125,29 +129,34 @@ impl BookMatcher {
 
             let idx = mat.pattern().as_usize();
             let (book_number, ref book_name) = self.pattern_map[idx];
-            let start = mat.start();
-            let end = mat.end();
+            let Some(orig_start) = offset_map.get(mat.start()).copied().flatten() else {
+                continue;
+            };
+            let Some(orig_end) = offset_map.get(mat.end()).copied().flatten() else {
+                continue;
+            };
 
-            // Check word boundary at start
-            if start > 0 {
-                let prev = text_bytes[start - 1];
-                if prev.is_ascii_alphanumeric() {
-                    continue;
-                }
+            // Check Unicode word boundary at start and end on original text.
+            if text[..orig_start]
+                .chars()
+                .next_back()
+                .is_some_and(char::is_alphanumeric)
+            {
+                continue;
             }
-            // Check word boundary at end
-            if end < text_bytes.len() {
-                let next = text_bytes[end];
-                if next.is_ascii_alphanumeric() {
-                    continue;
-                }
+            if text[orig_end..]
+                .chars()
+                .next()
+                .is_some_and(char::is_alphanumeric)
+            {
+                continue;
             }
 
             raw_matches.push(BookMatch {
                 book_number,
                 book_name: book_name.clone(),
-                start,
-                end,
+                start: orig_start,
+                end: orig_end,
             });
         }
 
@@ -171,6 +180,28 @@ impl BookMatcher {
 
         result
     }
+}
+
+/// Lowercase `text` while recording a mapping from every original character's
+/// start boundary in the lowered UTF-8 string back to its UTF-8 byte index in
+/// `text`. Entries strictly inside a multi-byte or multi-char expansion (such
+/// as Turkish `'İ'` -> `"i\u{307}"`) are `None`, guaranteeing every mapped
+/// boundary is a valid UTF-8 char boundary in `text`.
+fn lowercase_with_orig_offsets(text: &str) -> (String, Vec<Option<usize>>) {
+    let mut lower = String::with_capacity(text.len());
+    let mut map = Vec::with_capacity(text.len() + 1);
+    for (orig_start, ch) in text.char_indices() {
+        let lower_start = lower.len();
+        for lc in ch.to_lowercase() {
+            lower.push(lc);
+        }
+        if lower.len() > lower_start {
+            map.push(Some(orig_start));
+            map.resize(lower.len(), None);
+        }
+    }
+    map.push(Some(text.len()));
+    (lower, map)
 }
 
 #[cfg(test)]
@@ -239,5 +270,40 @@ mod tests {
                 "expected {book} in {text:?}: {found:?}"
             );
         }
+    }
+
+    #[test]
+    fn unicode_case_expansion_turkish_i_keeps_original_byte_offsets() {
+        let matcher = BookMatcher::new();
+        let text = "İ John 3:16";
+        let found = matcher.find_books(text);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].book_name, "John");
+        assert_eq!(&text[found[0].start..found[0].end], "John");
+    }
+
+    #[test]
+    fn unicode_word_boundary_blocks_accented_substrings() {
+        let es_matcher = BookMatcher::for_stt_language("es");
+        assert!(
+            es_matcher.find_books("Dios está aquí").is_empty(),
+            "trailing accented letter 'á' must count as part of the word 'está'"
+        );
+
+        let fr_matcher = BookMatcher::for_stt_language("fr");
+        assert!(
+            fr_matcher.find_books("sa colère est grande").is_empty(),
+            "leading/trailing non-ASCII word chars and removed 'Est' alias must not match Esther"
+        );
+    }
+
+    #[test]
+    fn portuguese_canonical_jo_is_indexed_with_original_offsets() {
+        let matcher = BookMatcher::for_stt_language("pt");
+        let text = "Leia Jó 1:1";
+        let found = matcher.find_books(text);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].book_name, "Jó");
+        assert_eq!(&text[found[0].start..found[0].end], "Jó");
     }
 }

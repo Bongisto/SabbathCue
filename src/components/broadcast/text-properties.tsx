@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useBroadcastDesignerStore as useBroadcastStore } from "@/stores/broadcast/designer-store"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
@@ -55,24 +56,218 @@ const TEXT_DECORATION_OPTIONS = [
   { value: "line-through", label: "Line Through" },
 ] as const
 
-function parseColorOpacity(color: string): { hex: string; opacity: number } {
-  if (color.length === 9 && color.startsWith("#")) {
-    const alphaHex = color.slice(7, 9)
-    const alpha = parseInt(alphaHex, 16) / 255
-    return { hex: color.slice(0, 7), opacity: Math.round(alpha * 100) }
-  }
-  if (color.length === 7 && color.startsWith("#")) {
-    return { hex: color, opacity: 100 }
-  }
-  return { hex: color || "#ffffff", opacity: 100 }
+const HEX_6_RE = /^#([0-9a-f]{6})$/i
+const HEX_8_RE = /^#([0-9a-f]{6})([0-9a-f]{2})$/i
+const HEX_3_RE = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i
+const HEX_4_RE = /^#([0-9a-f])([0-9a-f])([0-9a-f])([0-9a-f])$/i
+const RGB_RE =
+  /^rgba?\(\s*([+-]?\d*\.?\d+%?)\s*(?:,\s*|\s+)([+-]?\d*\.?\d+%?)\s*(?:,\s*|\s+)([+-]?\d*\.?\d+%?)\s*(?:(?:,|\/)\s*([+-]?\d*\.?\d+%?)\s*)?\)$/i
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }
 
-function buildColorWithOpacity(hex: string, opacity: number): string {
-  if (opacity >= 100) return hex
-  const alphaHex = Math.round((opacity / 100) * 255)
+function toHexByte(value: number): string {
+  return Math.round(clampNumber(value, 0, 255))
+    .toString(16)
+    .padStart(2, "0")
+}
+
+function parseRgbChannel(raw: string): number | null {
+  if (raw.endsWith("%")) {
+    const pct = Number(raw.slice(0, -1))
+    if (!Number.isFinite(pct)) return null
+    return clampNumber((pct / 100) * 255, 0, 255)
+  }
+  const num = Number(raw)
+  if (!Number.isFinite(num)) return null
+  return clampNumber(num, 0, 255)
+}
+
+function parseAlphaChannel(raw: string): number | null {
+  if (raw.endsWith("%")) {
+    const pct = Number(raw.slice(0, -1))
+    if (!Number.isFinite(pct)) return null
+    return Math.round(clampNumber(pct, 0, 100))
+  }
+  const num = Number(raw)
+  if (!Number.isFinite(num)) return null
+  return Math.round(clampNumber(num, 0, 1) * 100)
+}
+
+export function parseColorOpacity(
+  color: string,
+  fallbackHex = "#000000"
+): { hex: string; opacity: number } {
+  const trimmed = color.trim()
+  if (trimmed.toLowerCase() === "transparent") {
+    return { hex: "#000000", opacity: 0 }
+  }
+
+  const hex8 = HEX_8_RE.exec(trimmed)
+  if (hex8) {
+    const alpha = parseInt(hex8[2], 16) / 255
+    return {
+      hex: `#${hex8[1].toLowerCase()}`,
+      opacity: Math.round(clampNumber(alpha, 0, 1) * 100),
+    }
+  }
+
+  const hex6 = HEX_6_RE.exec(trimmed)
+  if (hex6) {
+    return { hex: `#${hex6[1].toLowerCase()}`, opacity: 100 }
+  }
+
+  const hex4 = HEX_4_RE.exec(trimmed)
+  if (hex4) {
+    const hex = `#${hex4[1]}${hex4[1]}${hex4[2]}${hex4[2]}${hex4[3]}${hex4[3]}`.toLowerCase()
+    const alpha = parseInt(`${hex4[4]}${hex4[4]}`, 16) / 255
+    return { hex, opacity: Math.round(clampNumber(alpha, 0, 1) * 100) }
+  }
+
+  const hex3 = HEX_3_RE.exec(trimmed)
+  if (hex3) {
+    const hex = `#${hex3[1]}${hex3[1]}${hex3[2]}${hex3[2]}${hex3[3]}${hex3[3]}`.toLowerCase()
+    return { hex, opacity: 100 }
+  }
+
+  const rgb = RGB_RE.exec(trimmed)
+  if (rgb) {
+    const r = parseRgbChannel(rgb[1])
+    const g = parseRgbChannel(rgb[2])
+    const b = parseRgbChannel(rgb[3])
+    const opacity = rgb[4] !== undefined ? parseAlphaChannel(rgb[4]) : 100
+    if (r !== null && g !== null && b !== null && opacity !== null) {
+      return {
+        hex: `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`,
+        opacity,
+      }
+    }
+  }
+
+  const fallbackMatch = HEX_6_RE.exec(fallbackHex.trim())
+  return {
+    hex: fallbackMatch ? `#${fallbackMatch[1].toLowerCase()}` : "#000000",
+    opacity: 100,
+  }
+}
+
+export function buildColorWithOpacity(color: string, opacity: number): string {
+  const { hex } = parseColorOpacity(color)
+  const clampedOpacity = Math.round(
+    clampNumber(Number.isFinite(opacity) ? opacity : 100, 0, 100)
+  )
+  if (clampedOpacity >= 100) return hex
+  const alphaHex = Math.round((clampedOpacity / 100) * 255)
     .toString(16)
     .padStart(2, "0")
   return `${hex}${alphaHex}`
+}
+
+export function HexColorInput({
+  value,
+  onCommit,
+  className,
+}: {
+  value: string
+  onCommit: (hex: string) => void
+  className?: string
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const [prevValue, setPrevValue] = useState(value)
+
+  if (value !== prevValue) {
+    setPrevValue(value)
+    if (draft !== null && draft.trim().toLowerCase() !== value.toLowerCase()) {
+      setDraft(null)
+    }
+  }
+
+  const displayedValue = draft ?? value
+
+  return (
+    <Input
+      value={displayedValue}
+      onFocus={() => setDraft(value)}
+      onChange={(e) => {
+        const next = e.target.value
+        setDraft(next)
+        const trimmed = next.trim()
+        if (HEX_6_RE.test(trimmed)) {
+          onCommit(trimmed.toLowerCase())
+        }
+      }}
+      onBlur={() => setDraft(null)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation()
+          setDraft(null)
+          e.currentTarget.blur()
+        } else if (e.key === "Enter") {
+          e.currentTarget.blur()
+        }
+      }}
+      className={className}
+    />
+  )
+}
+
+export function BoundedNumberInput({
+  value,
+  min,
+  max,
+  onCommit,
+  className,
+}: {
+  value: number
+  min: number
+  max: number
+  onCommit: (next: number) => void
+  className?: string
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const [prevValue, setPrevValue] = useState(value)
+
+  if (value !== prevValue) {
+    setPrevValue(value)
+    const trimmed = draft?.trim() ?? ""
+    if (draft !== null && (trimmed === "" || Number(trimmed) !== value)) {
+      setDraft(null)
+    }
+  }
+
+  const displayedValue = draft ?? String(value)
+
+  return (
+    <Input
+      type="number"
+      min={min}
+      max={max}
+      value={displayedValue}
+      onFocus={() => setDraft(String(value))}
+      onChange={(e) => {
+        const next = e.target.value
+        setDraft(next)
+        const trimmed = next.trim()
+        if (trimmed === "") return
+        const parsed = Number(trimmed)
+        if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+          onCommit(parsed)
+        }
+      }}
+      onBlur={() => setDraft(null)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation()
+          setDraft(null)
+          e.currentTarget.blur()
+        } else if (e.key === "Enter") {
+          e.currentTarget.blur()
+        }
+      }}
+      className={className}
+    />
+  )
 }
 
 function SectionHeader({ title, description }: { title: string; description: string }) {
@@ -91,7 +286,7 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
   if (!draftTheme) return null
 
   const data = prefix === "verseText" ? draftTheme.verseText : draftTheme.reference
-  const { hex: colorHex, opacity: colorOpacity } = parseColorOpacity(data.color)
+  const { hex: colorHex, opacity: colorOpacity } = parseColorOpacity(data.color, "#ffffff")
   const horizontalAlign = data.horizontalAlign ?? draftTheme.layout.textAlign
   const verticalAlign = data.verticalAlign ?? "top"
   const textTransform = data.textTransform ?? "none"
@@ -182,15 +377,11 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
             onValueChange={([v]) => update(`${prefix}.fontSize`, v)}
             className="flex-1"
           />
-          <Input
-            type="number"
+          <BoundedNumberInput
             min={8}
             max={200}
             value={data.fontSize}
-            onChange={(e) => {
-              const v = Number(e.target.value)
-              if (v >= 8 && v <= 200) update(`${prefix}.fontSize`, v)
-            }}
+            onCommit={(v) => update(`${prefix}.fontSize`, v)}
             className="w-16"
           />
         </div>
@@ -322,14 +513,11 @@ function FontControls({ prefix }: { prefix: "verseText" | "reference" }) {
             }
             className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
           />
-          <Input
+          <HexColorInput
             value={colorHex}
-            onChange={(e) => {
-              const v = e.target.value
-              if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                update(`${prefix}.color`, buildColorWithOpacity(v, colorOpacity))
-              }
-            }}
+            onCommit={(v) =>
+              update(`${prefix}.color`, buildColorWithOpacity(v, colorOpacity))
+            }
             className="w-20 font-mono"
           />
         </div>
@@ -491,17 +679,14 @@ function VerseProperties() {
                   }
                   className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
                 />
-                <Input
+                <HexColorInput
                   value={shadowColor.hex}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                      update(
-                        "verseText.shadow.color",
-                        buildColorWithOpacity(v, shadowColor.opacity)
-                      )
-                    }
-                  }}
+                  onCommit={(v) =>
+                    update(
+                      "verseText.shadow.color",
+                      buildColorWithOpacity(v, shadowColor.opacity)
+                    )
+                  }
                   className="w-20 font-mono"
                 />
               </div>
@@ -571,14 +756,9 @@ function VerseProperties() {
                   onChange={(e) => update("verseText.outline.color", e.target.value)}
                   className="h-7 w-8 cursor-pointer rounded border border-input bg-transparent p-0.5"
                 />
-                <Input
+                <HexColorInput
                   value={outlineColor.hex}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-                      update("verseText.outline.color", v)
-                    }
-                  }}
+                  onCommit={(v) => update("verseText.outline.color", v)}
                   className="w-20 font-mono"
                 />
               </div>

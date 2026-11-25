@@ -19,7 +19,15 @@ pub fn coerce_bool(arg: &OscType) -> Result<bool, CommandError> {
             expected: "bool".into(),
             got: format!("Int({i})"),
         }),
-        OscType::Float(f) => Ok(*f >= 0.5),
+        OscType::Float(f) => {
+            if !f.is_finite() {
+                return Err(CommandError::TypeCoercion {
+                    expected: "finite float for bool".into(),
+                    got: format!("Float({f})"),
+                });
+            }
+            Ok(*f >= 0.5)
+        }
         OscType::String(s) => match s.to_lowercase().as_str() {
             "true" | "1" | "on" => Ok(true),
             "false" | "0" | "off" => Ok(false),
@@ -44,12 +52,35 @@ pub fn coerce_bool(arg: &OscType) -> Result<bool, CommandError> {
 /// - `Long(l)` -> same as Int logic
 pub fn coerce_f32_normalized(arg: &OscType) -> Result<f32, CommandError> {
     match arg {
-        OscType::Float(f) => Ok(f.clamp(0.0, 1.0)),
+        OscType::Float(f) => {
+            if !f.is_finite() {
+                return Err(CommandError::TypeCoercion {
+                    expected: "finite float (0.0-1.0)".into(),
+                    got: format!("Float({f})"),
+                });
+            }
+            Ok(f.clamp(0.0, 1.0))
+        }
         #[expect(
             clippy::cast_possible_truncation,
             reason = "OSC double values are small control values that fit in f32"
         )]
-        OscType::Double(d) => Ok((*d as f32).clamp(0.0, 1.0)),
+        OscType::Double(d) => {
+            if !d.is_finite() {
+                return Err(CommandError::TypeCoercion {
+                    expected: "finite float (0.0-1.0)".into(),
+                    got: format!("Double({d})"),
+                });
+            }
+            let f = *d as f32;
+            if !f.is_finite() {
+                return Err(CommandError::TypeCoercion {
+                    expected: "finite float (0.0-1.0)".into(),
+                    got: format!("Double({d})"),
+                });
+            }
+            Ok(f.clamp(0.0, 1.0))
+        }
         #[expect(
             clippy::cast_precision_loss,
             reason = "OSC int values are small control values that fit in f32"
@@ -243,6 +274,18 @@ mod tests {
     #[test]
     fn coerce_f32_clamps_low() {
         assert_f32_near(coerce_f32_normalized(&OscType::Float(-0.5)).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn coerce_f32_and_bool_reject_non_finite_floats() {
+        assert!(coerce_f32_normalized(&OscType::Float(f32::NAN)).is_err());
+        assert!(coerce_f32_normalized(&OscType::Float(f32::INFINITY)).is_err());
+        assert!(coerce_f32_normalized(&OscType::Float(f32::NEG_INFINITY)).is_err());
+        assert!(coerce_f32_normalized(&OscType::Double(f64::NAN)).is_err());
+        assert!(coerce_f32_normalized(&OscType::Double(f64::INFINITY)).is_err());
+        assert!(coerce_f32_normalized(&OscType::Double(1e40)).is_err());
+        assert!(coerce_bool(&OscType::Float(f32::NAN)).is_err());
+        assert!(coerce_bool(&OscType::Float(f32::INFINITY)).is_err());
     }
 
     // --- coerce_string tests ---

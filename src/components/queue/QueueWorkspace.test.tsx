@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { QueueWorkspace } from "./QueueWorkspace"
+import { computeFallbackInsertAt, QueueWorkspace } from "./QueueWorkspace"
 import { BUILTIN_THEMES } from "@/lib/builtin-themes"
 import { useBroadcastStore } from "@/stores/broadcast-store"
 import { useEmergencySlideStore } from "@/stores/emergency-slide-store"
@@ -170,5 +170,46 @@ describe("QueueWorkspace", () => {
       isLive: true,
       liveItem: expect.objectContaining({ reference: "Sermon - Slide 2" }),
     })
+  })
+
+  it("computes multi-item fallback DnD insertion index without over-shifting (FU-33)", () => {
+    expect(
+      computeFallbackInsertAt(["A", "B", "C", "D"], ["A", "B"], "A", 2)
+    ).toBe(1)
+    expect(
+      computeFallbackInsertAt(["A", "B", "C", "D"], ["A", "B"], "B", 2)
+    ).toBe(1)
+    expect(
+      computeFallbackInsertAt(["A", "B", "C", "D"], ["C", "D"], "D", 1)
+    ).toBe(1)
+    expect(
+      computeFallbackInsertAt(["A", "B", "C", "D"], ["A", "C"], "A", 2)
+    ).toBe(1)
+  })
+
+  it("badges Live only when output is live and matches the card; labels Preview/Selected otherwise (FU-50)", () => {
+    const itemA = queuedSlide("item-a")
+    const itemB = queuedSlide("item-b")
+    seedQueue([itemA, itemB])
+    useBroadcastStore.setState({
+      isLive: false,
+      liveItem: null,
+      liveQueueItemId: null,
+      previewItem: null,
+    })
+    render(<QueueWorkspace />)
+
+    const cardA = within(screen.getByTestId("queue-card-item-a"))
+    const cardB = within(screen.getByTestId("queue-card-item-b"))
+
+    expect(cardA.queryByText("Live")).toBeNull()
+    expect(cardA.getByText("Selected")).toBeTruthy()
+
+    fireEvent.click(cardB.getByRole("button", { name: "Preview Sermon - Slide 2" }))
+    expect(cardB.queryByText("Live")).toBeNull()
+    expect(cardB.getByText("Preview")).toBeTruthy()
+
+    fireEvent.click(cardB.getByRole("button", { name: "Go live Sermon - Slide 2" }))
+    expect(cardB.getByText("Live")).toBeTruthy()
   })
 })

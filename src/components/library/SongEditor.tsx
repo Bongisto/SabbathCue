@@ -70,8 +70,8 @@ export function SongEditor({ onClose }: SongEditorProps) {
         <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-deep)] p-8 text-center">
           {activeSlide ? (
             <div className="max-w-[80%] space-y-3 text-balance text-2xl font-semibold leading-snug text-neutral-50">
-              {activeSlide.segments.map((segment) => (
-                <p key={segment.text}>{segment.text}</p>
+              {activeSlide.segments.map((segment, index) => (
+                <p key={`${index}-${segment.text}`}>{segment.text}</p>
               ))}
             </div>
           ) : (

@@ -73,6 +73,12 @@ try {
   await run(
     isWindows ? "cmd.exe" : "npm",
     isWindows ? ["/c", "npm.cmd", "run", "build"] : ["run", "build"],
+    {
+      env: {
+        ...process.env,
+        VITE_ENABLE_E2E: "true",
+      },
+    },
   )
 
   preview = spawn(

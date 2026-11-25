@@ -48,7 +48,9 @@ function main() {
     return
   }
 
-  const files = readdirSync(EGW_SOURCES_DIR).filter((f) => f.endsWith(".json"))
+  const files = readdirSync(EGW_SOURCES_DIR)
+    .filter((f) => f.endsWith(".json"))
+    .sort()
   if (files.length === 0) {
     console.log("⏭ No EGW JSON sources found. Skipping.")
     return

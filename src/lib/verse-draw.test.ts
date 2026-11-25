@@ -73,6 +73,24 @@ describe("drawVerseText fontStyle", () => {
     computeVerseLayoutMetrics(ctx, theme, verse)
     expect(fonts.some((f) => f.startsWith("italic "))).toBe(true)
   })
+
+  it("uses scaledFontSize instead of unscaled theme fontSize for text decorations", () => {
+    const { ctx } = mockCtx()
+    const base = BUILTIN_THEMES[0]
+    const theme: BroadcastTheme = {
+      ...base,
+      verseText: {
+        ...base.verseText,
+        fontSize: 80,
+        textDecoration: "underline",
+      },
+    }
+
+    drawVerseText(ctx, theme, verse, 0, 800, 100, 30)
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(expect.any(Number), 100 + 30 * 0.92)
+    expect(ctx.lineWidth).toBeCloseTo(30 * 0.06, 5)
+  })
 })
 
 describe("drawHymnSectionLabel", () => {

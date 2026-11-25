@@ -3,8 +3,8 @@ import { platform } from "node:os";
 import { generateFumadocsSource } from "./generate-fumadocs-source.mjs";
 
 const PORT = Number(process.env.PORT ?? 3029);
-const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH?.trim() || "/SabbathCue").replace(
-  /\/$/,
+const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH?.trim() ?? "/SabbathCue").replace(
+  /\/+$/,
   "",
 );
 const URL = `http://localhost:${PORT}${BASE_PATH}/`;
@@ -37,7 +37,7 @@ const openUrl = (url) => {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(URL, { signal: AbortSignal.timeout(500) });
-      if (res.status < 500) {
+      if (res.status >= 200 && res.status < 400) {
         openUrl(URL);
         return;
       }

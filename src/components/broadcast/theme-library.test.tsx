@@ -195,4 +195,93 @@ describe("ThemeLibrary", () => {
     ).filter((card) => card.textContent?.includes(customKinetic.name))
     expect(matchingCards).toHaveLength(1)
   })
+
+  it("keeps inline rename focused when opened from menu and stops Escape/Enter propagation (FU-38)", async () => {
+    const customTheme = {
+      ...initialThemes[0],
+      id: "custom-rename-theme",
+      name: "My Custom Theme",
+      builtin: false,
+      kinetic: undefined,
+    }
+    useBroadcastStore.setState({
+      themes: [...initialThemes, customTheme],
+    })
+
+    const parentKeyDown = vi.fn()
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root?.render(
+        React.createElement("div", { onKeyDown: parentKeyDown }, React.createElement(ThemeLibrary))
+      )
+    })
+
+    const card = getThemeCard("My Custom Theme")
+    const trigger = card.querySelector("button")
+    expect(trigger).toBeTruthy()
+
+    // Open Radix dropdown menu via keyboard and click Rename
+    await act(async () => {
+      trigger!.focus()
+      trigger!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
+      )
+    })
+
+    const renameItem = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find(
+      (item) => item.textContent?.includes("Rename")
+    ) as HTMLElement | undefined
+    expect(renameItem).toBeTruthy()
+
+    await act(async () => {
+      renameItem!.click()
+    })
+    // Allow any Radix async focus-restore timers to flush
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    })
+
+    expect(useBroadcastStore.getState().renamingThemeId).toBe("custom-rename-theme")
+    const input = card.querySelector("input")
+    expect(input).toBeTruthy()
+    expect(document.activeElement).toBe(input)
+
+    // Escape cancels rename without propagating to parent dialog
+    parentKeyDown.mockClear()
+    await act(async () => {
+      input!.value = "Discarded Name"
+      input!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+      )
+    })
+
+    expect(parentKeyDown).not.toHaveBeenCalled()
+    expect(useBroadcastStore.getState().renamingThemeId).toBeNull()
+    expect(
+      useBroadcastStore.getState().themes.find((t) => t.id === "custom-rename-theme")?.name
+    ).toBe("My Custom Theme")
+
+    // Re-open rename and press Enter to commit without bubbling
+    await act(async () => {
+      useBroadcastStore.getState().setRenamingTheme("custom-rename-theme")
+    })
+    const input2 = card.querySelector("input")
+    expect(input2).toBeTruthy()
+
+    parentKeyDown.mockClear()
+    await act(async () => {
+      input2!.value = "Renamed Theme"
+      input2!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
+      )
+    })
+
+    expect(parentKeyDown).not.toHaveBeenCalled()
+    expect(useBroadcastStore.getState().renamingThemeId).toBeNull()
+    expect(
+      useBroadcastStore.getState().themes.find((t) => t.id === "custom-rename-theme")?.name
+    ).toBe("Renamed Theme")
+  })
 })

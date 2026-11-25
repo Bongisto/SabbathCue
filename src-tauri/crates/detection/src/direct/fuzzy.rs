@@ -12,8 +12,8 @@ pub struct FuzzyMatch {
 
 /// Compute the Levenshtein edit distance between two strings.
 fn levenshtein(a: &str, b: &str) -> usize {
-    let a_len = a.len();
-    let b_len = b.len();
+    let a_len = a.chars().count();
+    let b_len = b.chars().count();
 
     if a_len == 0 {
         return b_len;
@@ -74,25 +74,25 @@ fn max_distance_for(name: &str) -> usize {
 /// the edit distance is within the allowed threshold.
 pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
     let mut matches: Vec<FuzzyMatch> = Vec::new();
-    let text_lower = text.to_lowercase();
 
-    // Collect word spans: (start_byte, end_byte, word_lowercase)
+    // Collect word spans in original `text` byte offsets:
+    // (orig_start_byte, orig_end_byte, word_lowercase).
+    // Slicing `text` directly prevents UTF-8 byte-offset drift when
+    // `to_lowercase()` changes byte length (e.g. Turkish 'İ' -> "i\u{307}").
     let words: Vec<(usize, usize, String)> = {
         let mut v = Vec::new();
-        let mut i = 0;
-        let bytes = text_lower.as_bytes();
-        while i < bytes.len() {
-            // Skip whitespace
-            if bytes[i].is_ascii_whitespace() {
-                i += 1;
-                continue;
+        let mut word_start: Option<usize> = None;
+        for (idx, ch) in text.char_indices() {
+            if ch.is_whitespace() {
+                if let Some(start) = word_start.take() {
+                    v.push((start, idx, text[start..idx].to_lowercase()));
+                }
+            } else if word_start.is_none() {
+                word_start = Some(idx);
             }
-            let start = i;
-            while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
-                i += 1;
-            }
-            let word = text_lower[start..i].to_string();
-            v.push((start, i, word));
+        }
+        if let Some(start) = word_start {
+            v.push((start, text.len(), text[start..].to_lowercase()));
         }
         v
     };
@@ -106,7 +106,7 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
             }
             let span_start = words[wi].0;
             let span_end = words[wi + window_size - 1].1;
-            let candidate = &text_lower[span_start..span_end];
+            let candidate = text[span_start..span_end].to_lowercase();
 
             // Skip windows led by a common word that fuzzy-collides with a book
             // (e.g. "like 5" -> Luke, "number 1" -> Numbers). No canonical book
@@ -116,21 +116,18 @@ pub fn fuzzy_find_books(text: &str) -> Vec<FuzzyMatch> {
                 continue;
             }
 
+            let candidate_chars = candidate.chars().count();
             for book in BOOKS {
                 let book_lower = book.name.to_lowercase();
                 let max_dist = max_distance_for(&book_lower);
 
                 // Quick length filter: if lengths differ by more than max_dist, skip
-                let len_diff = if candidate.len() > book_lower.len() {
-                    candidate.len() - book_lower.len()
-                } else {
-                    book_lower.len() - candidate.len()
-                };
+                let len_diff = candidate_chars.abs_diff(book_lower.chars().count());
                 if len_diff > max_dist {
                     continue;
                 }
 
-                let dist = levenshtein(candidate, &book_lower);
+                let dist = levenshtein(&candidate, &book_lower);
                 if dist > 0 && dist <= max_dist {
                     // Avoid overlapping with an already-found match at the same position
                     let dominated = matches
@@ -284,5 +281,14 @@ mod tests {
         let matches = fuzzy_find_books("in Hebrws chapter 11");
         assert!(!matches.is_empty());
         assert_eq!(matches[0].book_name, "Hebrews");
+    }
+
+    #[test]
+    fn unicode_case_expansion_before_fuzzy_match_keeps_original_slices() {
+        let text = "İ Filipians 4:13";
+        let matches = fuzzy_find_books(text);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].book_name, "Philippians");
+        assert_eq!(&text[matches[0].start..matches[0].end], "Filipians");
     }
 }

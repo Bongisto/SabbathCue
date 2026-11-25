@@ -104,9 +104,46 @@ function parseAfrikaansCompoundNumber(token: string): number | null {
   return null
 }
 
+function isHyphenatedSpokenNumberToken(folded: string): boolean {
+  if (!folded.includes("-")) return false
+  const parts = folded.split("-")
+  if (parts.some((part) => !/^[a-z]+$/.test(part))) return false
+  if (parts.length === 2) {
+    if (
+      Object.hasOwn(TENS, parts[0]) &&
+      Object.hasOwn(ONES, parts[1]) &&
+      ONES[parts[1]] >= 1 &&
+      ONES[parts[1]] <= 9
+    ) {
+      return true
+    }
+    if (
+      Object.hasOwn(ONES, parts[0]) &&
+      ONES[parts[0]] >= 1 &&
+      ONES[parts[0]] <= 9 &&
+      HUNDRED_WORDS.has(parts[1])
+    ) {
+      return true
+    }
+    return false
+  }
+  if (
+    parts.length === 3 &&
+    Object.hasOwn(ONES, parts[0]) &&
+    ONES[parts[0]] >= 1 &&
+    ONES[parts[0]] <= 9 &&
+    (parts[1] === "and" || parts[1] === "en") &&
+    Object.hasOwn(TENS, parts[2])
+  ) {
+    return true
+  }
+  return false
+}
+
 /** True for any token `parsePositiveSpokenNumber` accepts inside a number
- *  phrase: digits, English/Afrikaans number words, "hundred", and Afrikaans
- *  inverted compounds ("drieentwintig"). */
+ *  phrase: digits, English/Afrikaans number words, hyphenated compounds
+ *  ("twenty-five"), "hundred", and Afrikaans inverted compounds
+ *  ("drieentwintig"). */
 export function isSpokenNumberToken(token: string): boolean {
   const folded = foldDiacritics(token.toLowerCase())
   return (
@@ -114,14 +151,16 @@ export function isSpokenNumberToken(token: string): boolean {
     Object.hasOwn(ONES, folded) ||
     Object.hasOwn(TENS, folded) ||
     HUNDRED_WORDS.has(folded) ||
-    parseAfrikaansCompoundNumber(folded) !== null
+    parseAfrikaansCompoundNumber(folded) !== null ||
+    isHyphenatedSpokenNumberToken(folded)
   )
 }
 
 /** Connector words ("and"/"en") that may sit inside a number phrase but are
  *  meaningless at its edges ("hymn 46 and then…"). */
 export function isSpokenNumberConnector(token: string): boolean {
-  return token === "and" || token === "en"
+  const lower = token.toLowerCase()
+  return lower === "and" || lower === "en"
 }
 
 /**
@@ -135,7 +174,10 @@ export function isSpokenNumberConnector(token: string): boolean {
 export function extractSpokenNumberPhrase(phrase: string): string {
   const out: string[] = []
   for (const token of phrase.split(/\s+/).filter(Boolean)) {
-    if (isSpokenNumberToken(token) || isSpokenNumberConnector(token)) {
+    if (
+      isSpokenNumberToken(token) ||
+      (out.length > 0 && isSpokenNumberConnector(token))
+    ) {
       out.push(token)
     } else if (out.length > 0) {
       break
@@ -144,9 +186,7 @@ export function extractSpokenNumberPhrase(phrase: string): string {
   while (out.length > 0 && isSpokenNumberConnector(out[out.length - 1])) {
     out.pop()
   }
-  let start = 0
-  while (start < out.length && isSpokenNumberConnector(out[start])) start++
-  return out.slice(start).join(" ")
+  return out.join(" ")
 }
 
 function parseUnderHundred(words: string[]): number | null {

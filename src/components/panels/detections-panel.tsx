@@ -95,7 +95,7 @@ function DetectionQuoteText({ detection }: { detection: DetectionResult }) {
   ) {
     return <>{text}</>
   }
-  // Offset is a UTF-8 byte index from Rust; for BMP/Latin text (EGW) byte===code unit.
+  // `match_char_start` is a UTF-16 code-unit offset emitted by Rust (TC-20) to match JS string `.slice()`.
   const before = text.slice(0, start)
   const rest = text.slice(start)
   const sentenceEnd = rest.search(/[.!?](?:\s|$)/)
@@ -185,24 +185,30 @@ export function getDetectionActions(detection: DetectionResult): {
 
   if (isHymnDetection(detection)) {
     const { number } = detection.hymn
+    const runHymnAction = (
+      label: string,
+      action: (mod: Awaited<ReturnType<typeof loadHymnVoiceControl>>) => Promise<void>
+    ) => {
+      void loadHymnVoiceControl()
+        .then(action)
+        .catch((error) =>
+          console.error(`[detections] hymn ${label} failed`, { number, error })
+        )
+    }
     return {
       preview: () => {
         recordFeedback("previewed")
-        void loadHymnVoiceControl().then((mod) =>
-          mod.previewHymnByNumber(number)
-        )
+        runHymnAction("preview", (mod) => mod.previewHymnByNumber(number))
       },
       present: () => {
         recordFeedback("presented")
         recordCollected()
-        void loadHymnVoiceControl().then((mod) =>
-          mod.presentHymnByNumber(number)
-        )
+        runHymnAction("present", (mod) => mod.presentHymnByNumber(number))
       },
       queue: () => {
         recordFeedback("queued")
         recordCollected()
-        void loadHymnVoiceControl().then((mod) => mod.queueHymnByNumber(number))
+        runHymnAction("queue", (mod) => mod.queueHymnByNumber(number))
       },
     }
   }

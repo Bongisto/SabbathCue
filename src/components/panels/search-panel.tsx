@@ -40,17 +40,14 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
   const [chapter, setChapter] = useState(1)
   const [selectedVerseId, setSelectedVerseId] = useState<number | null>(null)
   const [pinnedVerse, setPinnedVerse] = useState<Verse | null>(null)
+  const [scrollTarget, setScrollTarget] = useState<{ id: number; seq: number } | null>(null)
 
   const panelRef = useRef<HTMLDivElement>(null)
+  const hasSelectionRef = useRef(false)
+  const scrollSeqRef = useRef(0)
+  const lastScrolledSeqRef = useRef(0)
 
-  const {
-    translations,
-    books,
-    currentChapter,
-    semanticResults,
-    activeTranslationId,
-    selectedVerse,
-  } = useBible()
+  const { translations, books, currentChapter, semanticResults, activeTranslationId, selectedVerse } = useBible()
 
   const translationLabel =
     translations.find((t) => t.id === activeTranslationId)?.abbreviation ?? "KJV"
@@ -84,28 +81,19 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
 
   useEffect(() => {
     let cancelled = false
-
     bibleActions.loadTranslations().catch(console.error)
-
     bibleActions
       .loadBooks()
       .then((loadedBooks) => {
-        if (cancelled) return
-
-        const availableBooks =
-          loadedBooks.length > 0 ? loadedBooks : useBibleStore.getState().books
-        const defaultBook =
-          availableBooks.find((book) => book.book_number === 1) ??
-          availableBooks[0] ??
-          null
-
+        if (cancelled || hasSelectionRef.current || useBibleStore.getState().pendingNavigation) return
+        const availableBooks = loadedBooks.length > 0 ? loadedBooks : useBibleStore.getState().books
+        const defaultBook = availableBooks.find((book) => book.book_number === 1) ?? availableBooks[0] ?? null
         if (!defaultBook) return
         setSelectedBook(defaultBook)
         setChapter(1)
         setSelectedVerseId(null)
       })
       .catch(console.error)
-
     return () => {
       cancelled = true
     }
@@ -119,25 +107,30 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
 
   useEffect(() => {
     if (!selectedVerseId || !selectedVerse || currentChapter.length === 0) return
-    const stillExists = currentChapter.some((verse) => verse.id === selectedVerseId)
-    if (!stillExists) {
-      const match = currentChapter.find((verse) => verse.verse === selectedVerse.verse)
-      if (match && match.id !== selectedVerse.id) {
-        selectPreviewVerse(match)
-      }
+    const match = currentChapter.find(
+      (verse) =>
+        verse.book_number === selectedVerse.book_number &&
+        verse.chapter === selectedVerse.chapter &&
+        verse.verse === selectedVerse.verse,
+    )
+    if (match && match.id !== selectedVerse.id) {
+      selectPreviewVerse(match)
     }
   }, [currentChapter, selectedVerseId, selectedVerse])
 
   const applyNavigationSelection = useCallback((book: Book, navChapter: number) => {
+    hasSelectionRef.current = true
     setActiveTab("book")
     setSelectedBook(book)
     setChapter(navChapter)
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     let lastHandledKey: string | null = null
+    let navRequestId = 0
 
-    const unsubscribe = useBibleStore.subscribe((state) => {
+    const handlePendingNavigation = (state: ReturnType<typeof useBibleStore.getState>) => {
       const pendingNavigation = state.pendingNavigation
       if (!pendingNavigation) {
         lastHandledKey = null
@@ -152,37 +145,58 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
       if (!book) return
 
       lastHandledKey = pendingKey
+      const requestId = ++navRequestId
       applyNavigationSelection(book, navChapter)
 
       bibleActions
         .loadChapter(bookNumber, navChapter)
         .then((verses) => {
+          if (cancelled || requestId !== navRequestId) return
           const target = verses.find((verse) => verse.verse === navVerse)
           if (target) {
             setSelectedVerseId(target.id)
             selectPreviewVerse(target)
-            // Scroll only the verse list, never the page — previewing a
-            // detection must not yank the app down to the Bible section.
-            scrollIntoPanelView(document.getElementById(`verse-${target.id}`))
+            setScrollTarget({ id: target.id, seq: ++scrollSeqRef.current })
           }
           panelRef.current?.focus({ preventScroll: true })
         })
         .catch(console.error)
         .finally(() => {
-          useBibleStore.getState().setPendingNavigation(null)
+          if (!cancelled && requestId === navRequestId) {
+            useBibleStore.getState().setPendingNavigation(null)
+          }
         })
-    })
+    }
 
-    return unsubscribe
+    const unsubscribe = useBibleStore.subscribe(handlePendingNavigation)
+    handlePendingNavigation(useBibleStore.getState())
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [applyNavigationSelection])
 
+  useEffect(() => {
+    if (activeTab !== "book" || !scrollTarget) return
+    if (lastScrolledSeqRef.current === scrollTarget.seq) return
+    const element = document.getElementById(`verse-${scrollTarget.id}`)
+    if (!element) return
+    lastScrolledSeqRef.current = scrollTarget.seq
+    // Scroll only the verse list, never the page — previewing a
+    // detection must not yank the app down to the Bible section.
+    scrollIntoPanelView(element)
+  }, [activeTab, currentChapter, scrollTarget])
+
   const handleVerseClick = useCallback((verse: Parameters<typeof selectPreviewVerse>[0]) => {
+    hasSelectionRef.current = true
     setSelectedVerseId(verse.id)
     selectPreviewVerse(verse)
   }, [])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      hasSelectionRef.current = true
       handleBookChapterKeyDown(e, {
         currentChapter,
         effectiveSelectedVerseId,
@@ -196,6 +210,7 @@ export function SearchPanel({ embedded = false }: { embedded?: boolean }) {
   )
 
   const handleChapterChange = useCallback((nextChapter: number) => {
+    hasSelectionRef.current = true
     setChapter(nextChapter)
     setSelectedVerseId(null)
   }, [])

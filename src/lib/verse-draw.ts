@@ -542,7 +542,7 @@ export function drawVerseText(
         textRectX,
         currentY,
         textRectWidth,
-        vt.fontSize,
+        actualFontSize,
         textRectX
       )
     } else {
@@ -559,7 +559,7 @@ export function drawVerseText(
         x,
         currentY,
         lineWidth,
-        vt.fontSize,
+        actualFontSize,
         textRectX
       )
     }

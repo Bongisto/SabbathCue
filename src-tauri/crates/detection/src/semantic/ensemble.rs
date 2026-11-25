@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::cache::EmbeddingCache;
 use super::embedder::TextEmbedder;
-use super::index::VectorIndex;
+use super::index::{SearchResult, VectorIndex};
 use super::synonyms::SynonymExpander;
 use crate::error::DetectionError;
 
@@ -81,7 +81,9 @@ impl EnsembleSearcher {
                 });
                 entry.score += similarity * ORIGINAL_WEIGHT;
                 entry.best_similarity = entry.best_similarity.max(*similarity);
-                entry.sources.push("original".to_string());
+                if !entry.sources.contains(&"original".to_string()) {
+                    entry.sources.push("original".to_string());
+                }
             }
         }
 
@@ -166,7 +168,7 @@ impl EnsembleSearcher {
         }
 
         let embedding = embedder.embed(text)?;
-        let results = index.search(&embedding, k)?;
+        let results = dedup_search_results(index.search(&embedding, k)?);
 
         // Cache the results
         self.cache
@@ -174,6 +176,29 @@ impl EnsembleSearcher {
 
         Ok(results.iter().map(|r| (r.verse_id, r.similarity)).collect())
     }
+}
+
+fn dedup_search_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    let mut best_by_id: HashMap<i64, f64> = HashMap::with_capacity(results.len());
+    for result in results {
+        best_by_id
+            .entry(result.verse_id)
+            .and_modify(|best| *best = (*best).max(result.similarity))
+            .or_insert(result.similarity);
+    }
+    let mut deduped: Vec<SearchResult> = best_by_id
+        .into_iter()
+        .map(|(verse_id, similarity)| SearchResult {
+            verse_id,
+            similarity,
+        })
+        .collect();
+    deduped.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    deduped
 }
 
 /// Cache key for an embedding input. The exact text is part of the key because
@@ -350,5 +375,86 @@ mod tests {
             .unwrap();
 
         assert_ne!(first, reordered, "reordered text must be embedded and searched independently");
+    }
+
+    struct DuplicateCorpusIndex {
+        hits: Vec<SearchResult>,
+    }
+
+    impl VectorIndex for DuplicateCorpusIndex {
+        fn search(&self, _query: &[f32], _k: usize) -> Result<Vec<SearchResult>, DetectionError> {
+            Ok(self.hits.clone())
+        }
+
+        fn len(&self) -> usize {
+            self.hits.len()
+        }
+    }
+
+    #[test]
+    fn multi_translation_duplicate_verse_ids_dedup_keeping_max_per_strategy() {
+        // Five corpus vectors for the same verse_id with 0.50 similarity (< 0.60 bar):
+        // without deduplication, 5 * 0.50 * 0.7 = 1.75 passed ENSEMBLE_THRESHOLD (0.42)
+        // and pushed "original" five times.
+        let mut searcher = EnsembleSearcher::new();
+        let embedder = OrderSensitiveEmbedder;
+        let below_bar_index = DuplicateCorpusIndex {
+            hits: vec![
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.50,
+                },
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.48,
+                },
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.46,
+                },
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.45,
+                },
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.44,
+                },
+            ],
+        };
+
+        let rejected = searcher
+            .search("completely unrelated terms", &embedder, &below_bar_index, 12)
+            .unwrap();
+        assert!(
+            rejected.is_empty(),
+            "sub-threshold multi-translation hits must not sum above ENSEMBLE_THRESHOLD: {rejected:?}"
+        );
+
+        let passing_index = DuplicateCorpusIndex {
+            hits: vec![
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.55,
+                },
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.65,
+                },
+                SearchResult {
+                    verse_id: 42,
+                    similarity: 0.50,
+                },
+            ],
+        };
+        let mut searcher = EnsembleSearcher::new();
+        let passed = searcher
+            .search("unrelated terms here", &embedder, &passing_index, 12)
+            .unwrap();
+        assert_eq!(passed.len(), 1);
+        assert_eq!(passed[0].verse_id, 42);
+        assert!((passed[0].best_similarity - 0.65).abs() < 1e-12);
+        assert!((passed[0].score - 0.65 * ORIGINAL_WEIGHT).abs() < 1e-12);
+        assert_eq!(passed[0].sources, vec!["original".to_string()]);
     }
 }

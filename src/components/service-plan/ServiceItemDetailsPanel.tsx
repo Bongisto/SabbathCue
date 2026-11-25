@@ -1,6 +1,11 @@
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import type { ServiceContext, ServiceItem } from "@/types/service-plan"
+import { useServicePlanStore } from "@/stores/service-plan-store"
+import type {
+  ServiceAttachment,
+  ServiceContext,
+  ServiceItem,
+} from "@/types/service-plan"
 import { ChecklistEditor } from "./ChecklistEditor"
 import { HymnRefsEditor } from "./HymnRefsEditor"
 import { MediaAttachmentsEditor } from "./MediaAttachmentsEditor"
@@ -29,8 +34,8 @@ interface ServiceItemDetailsPanelProps {
   item: ServiceItem | null
   serviceContext: ServiceContext
   onPatchItem: (patch: Partial<ServiceItem>) => void
-  onEnqueuePrepared: () => void
-  onPracticePreview: () => void
+  onEnqueuePrepared: (itemId: string) => void
+  onPracticePreview: (itemId: string) => void
 }
 
 export function ServiceItemDetailsPanel({
@@ -46,6 +51,26 @@ export function ServiceItemDetailsPanel({
         Select a service item to edit details.
       </div>
     )
+  }
+
+  const commitAttachmentUpdate = (
+    mergeAttachments: (
+      latestAttachments: ServiceAttachment[]
+    ) => ServiceAttachment[]
+  ) => {
+    const store = useServicePlanStore.getState()
+    const activePlan = store.activePlan
+    if (activePlan) {
+      const latestItem = activePlan.items.find((entry) => entry.id === item.id)
+      if (!latestItem) return
+      store.updateItem(item.id, {
+        attachments: mergeAttachments(latestItem.attachments),
+      })
+    } else {
+      onPatchItem({
+        attachments: mergeAttachments(item.attachments),
+      })
+    }
   }
 
   return (
@@ -83,13 +108,26 @@ export function ServiceItemDetailsPanel({
             (attachment) => attachment.kind === "slide"
           )}
           onChange={(slides) =>
-            onPatchItem({
-              attachments: [
-                ...slides,
-                ...item.attachments.filter(
-                  (attachment) => attachment.kind !== "slide"
-                ),
-              ],
+            commitAttachmentUpdate((latestAttachments) => [
+              ...slides,
+              ...latestAttachments.filter(
+                (attachment) => attachment.kind !== "slide"
+              ),
+            ])
+          }
+          onAppend={(buildSlides) =>
+            commitAttachmentUpdate((latestAttachments) => {
+              const existingSlides = latestAttachments.filter(
+                (attachment) => attachment.kind === "slide"
+              )
+              const existingDocs = latestAttachments.filter(
+                (attachment) => attachment.kind !== "slide"
+              )
+              return [
+                ...existingSlides,
+                ...buildSlides(existingSlides),
+                ...existingDocs,
+              ]
             })
           }
           applyTheme={item.slidesApplyTheme}
@@ -105,13 +143,26 @@ export function ServiceItemDetailsPanel({
             (attachment) => attachment.kind !== "slide"
           )}
           onChange={(documents) =>
-            onPatchItem({
-              attachments: [
-                ...item.attachments.filter(
-                  (attachment) => attachment.kind === "slide"
-                ),
-                ...documents,
-              ],
+            commitAttachmentUpdate((latestAttachments) => [
+              ...latestAttachments.filter(
+                (attachment) => attachment.kind === "slide"
+              ),
+              ...documents,
+            ])
+          }
+          onAppend={(buildDocs) =>
+            commitAttachmentUpdate((latestAttachments) => {
+              const existingSlides = latestAttachments.filter(
+                (attachment) => attachment.kind === "slide"
+              )
+              const existingDocs = latestAttachments.filter(
+                (attachment) => attachment.kind !== "slide"
+              )
+              return [
+                ...existingSlides,
+                ...existingDocs,
+                ...buildDocs(existingDocs),
+              ]
             })
           }
         />
@@ -125,11 +176,19 @@ export function ServiceItemDetailsPanel({
       </EditorSection>
 
       <div className="mt-auto flex flex-wrap gap-3 border-t border-[var(--border-subtle)] pt-4">
-        <Button size="sm" variant="outline" onClick={onEnqueuePrepared}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onEnqueuePrepared(item.id)}
+        >
           Queue prepared resources
         </Button>
         {serviceContext.mode === "practice" && (
-          <Button size="sm" variant="secondary" onClick={onPracticePreview}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => onPracticePreview(item.id)}
+          >
             Practice preview
           </Button>
         )}

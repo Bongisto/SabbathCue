@@ -126,7 +126,10 @@ async function loadPdfjs(): Promise<typeof import("pdfjs-dist")> {
       { type: "module" }
     )
     return pdfjs
-  })()
+  })().catch((error) => {
+    pdfjsPromise = null
+    throw error
+  })
   return pdfjsPromise
 }
 

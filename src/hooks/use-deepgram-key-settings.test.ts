@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const mockInvoke = vi.fn()
@@ -146,6 +148,62 @@ describe("use-deepgram-key-settings", () => {
       expect(mockStop).toHaveBeenCalledTimes(1)
       expect(mockStart).toHaveBeenCalledTimes(1)
       vi.useRealTimers()
+    })
+  })
+
+  describe("useDeepgramKeySettings onSaved", () => {
+    it("restarts active transcription when saving a Deepgram key while Deepgram is selected", async () => {
+      vi.useFakeTimers()
+      vi.resetModules()
+      const settingsMod = await import("@/stores/settings-store")
+      const transcriptMod = await import("@/stores/transcript-store")
+      const { useDeepgramKeySettings } = await import("./use-deepgram-key-settings")
+
+      settingsMod.useSettingsStore.setState({ sttProvider: "deepgram", hasDeepgramApiKey: false })
+      transcriptMod.useTranscriptStore.setState({ isTranscribing: true })
+      mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(true)
+
+      const { result, unmount } = renderHook(() => useDeepgramKeySettings())
+
+      act(() => {
+        result.current.setKeyValue("new-dg-key")
+      })
+
+      await act(async () => {
+        const promise = result.current.handleKeyAction()
+        await vi.advanceTimersByTimeAsync(400)
+        await promise
+      })
+
+      expect(mockStop).toHaveBeenCalledTimes(1)
+      expect(mockStart).toHaveBeenCalledTimes(1)
+      unmount()
+      vi.useRealTimers()
+    })
+
+    it("does not restart active transcription when another STT provider is active", async () => {
+      vi.resetModules()
+      const settingsMod = await import("@/stores/settings-store")
+      const transcriptMod = await import("@/stores/transcript-store")
+      const { useDeepgramKeySettings } = await import("./use-deepgram-key-settings")
+
+      settingsMod.useSettingsStore.setState({ sttProvider: "soniox", hasDeepgramApiKey: false })
+      transcriptMod.useTranscriptStore.setState({ isTranscribing: true })
+      mockInvoke.mockResolvedValueOnce(undefined).mockResolvedValueOnce(true)
+
+      const { result, unmount } = renderHook(() => useDeepgramKeySettings())
+
+      act(() => {
+        result.current.setKeyValue("new-dg-key")
+      })
+
+      await act(async () => {
+        await result.current.handleKeyAction()
+      })
+
+      expect(mockStop).not.toHaveBeenCalled()
+      expect(mockStart).not.toHaveBeenCalled()
+      unmount()
     })
   })
 })

@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn leaves_unknown_and_existing_kjv_terms_unchanged() {
-        assert!(kjv_variants("shepherd").is_empty());
-        assert!(kjv_variants("Noe").is_empty());
+        assert_eq!(kjv_variants("shepherd"), [] as [&str; 0]);
+        assert_eq!(kjv_variants("Noe"), [] as [&str; 0]);
     }
 }
