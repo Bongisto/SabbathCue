@@ -127,8 +127,11 @@ if ($ExpectedSha256) {
   Write-Warning "No pinned checksum is configured for $($SelectedModel["Archive"]). The archive was downloaded over HTTPS from alphacephei.com."
 }
 
-Remove-Item -LiteralPath $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
-Expand-Archive -LiteralPath $ArchivePath -DestinationPath $ExtractRoot -Force
+if (Test-Path -LiteralPath $ExtractRoot) {
+  Remove-Item -LiteralPath $ExtractRoot -Recurse -Force
+}
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::ExtractToDirectory($ArchivePath, $ExtractRoot)
 
 $ResolvedExtractedDir = Resolve-VoskModelDir -Path $ExtractedDir -KnownDirectories $KnownModelDirectories
 if (-not $ResolvedExtractedDir) {

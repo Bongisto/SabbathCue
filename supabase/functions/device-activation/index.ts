@@ -3,9 +3,69 @@ import { withSupabase } from "npm:@supabase/server"
 const encoder = new TextEncoder()
 const MAX_CHALLENGE_AGE_MS = 5 * 60 * 1000
 const DEFAULT_OFFLINE_LEASE_HOURS = 72
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+const ALLOWED_CORS_ORIGINS = new Set([
+  "https://sabbath-cue-two.vercel.app",
+  "https://bongisto.github.io",
+  "tauri://localhost",
+  "http://tauri.localhost",
+  "https://tauri.localhost",
+])
+const LOCAL_DEV_ORIGIN_RE = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/
+const CORS_ALLOW_HEADERS = "authorization, apikey, content-type, x-client-info"
+const CORS_ALLOW_METHODS = "POST, OPTIONS"
+
+function extraAllowedOrigins(): string[] {
+  const raw =
+    typeof Deno !== "undefined" ? (Deno.env.get("ALLOWED_CORS_ORIGINS") ?? "") : ""
+  return raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0 && origin !== "*")
+}
+
+function isAllowedCorsOrigin(origin: string): boolean {
+  return (
+    ALLOWED_CORS_ORIGINS.has(origin) ||
+    LOCAL_DEV_ORIGIN_RE.test(origin) ||
+    extraAllowedOrigins().includes(origin)
+  )
+}
+
+function corsHeadersForRequest(request: Request): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+    "Access-Control-Allow-Methods": CORS_ALLOW_METHODS,
+    Vary: "Origin",
+  }
+  const origin = request.headers.get("origin")?.trim()
+  if (origin && isAllowedCorsOrigin(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin
+  }
+  return headers
+}
+
+function withCors(request: Request, response: Response): Response {
+  const headers = new Headers(response.headers)
+  headers.delete("Access-Control-Allow-Origin")
+  for (const [key, value] of Object.entries(corsHeadersForRequest(request))) {
+    headers.set(key, value)
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
+function preflightResponse(request: Request): Response {
+  const headers = corsHeadersForRequest(request)
+  if (
+    request.headers.get("origin") !== null &&
+    !headers["Access-Control-Allow-Origin"]
+  ) {
+    return new Response("Forbidden", { status: 403, headers })
+  }
+  return new Response("ok", { headers })
 }
 
 interface ActivationRequest {
@@ -85,7 +145,7 @@ async function signLease(payload: string): Promise<string> {
 }
 
 function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status, headers: corsHeaders })
+  return Response.json(body, { status })
 }
 
 type RpcError = { message: string } | null
@@ -205,8 +265,8 @@ const authenticated = withSupabase({ auth: "user" }, async (request, context) =>
 })
 
 export default {
-  fetch(request: Request): Promise<Response> | Response {
-    if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders })
-    return authenticated(request)
+  async fetch(request: Request): Promise<Response> {
+    if (request.method === "OPTIONS") return preflightResponse(request)
+    return withCors(request, await authenticated(request))
   },
 }
