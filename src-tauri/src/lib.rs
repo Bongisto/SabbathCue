@@ -271,7 +271,8 @@ fn load_semantic_assets(app: &tauri::AppHandle) {
         use rhema_detection::semantic::index::VectorIndex as _;
         let verse_ids = index.unique_verse_ids();
         let state_lock = app.state::<Mutex<state::AppState>>();
-        match state_lock.lock() {
+        let guard = state_lock.lock();
+        match guard {
             Ok(app_state) => app_state
                 .bible_db
                 .as_ref()

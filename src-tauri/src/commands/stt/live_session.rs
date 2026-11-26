@@ -1176,12 +1176,11 @@ fn emit_semantic_batch(
 
 fn missing_semantic_verse_ids(app: &AppHandle) -> Option<Vec<i64>> {
     let pipeline_state: State<'_, Mutex<rhema_detection::DetectionPipeline>> = app.state();
-    match pipeline_state.lock() {
-        Ok(pipeline) if pipeline.has_semantic() && !pipeline.has_semantic_verse_refs() => {
-            Some(pipeline.semantic_verse_ids())
-        }
-        _ => None,
-    }
+    let Ok(pipeline) = pipeline_state.lock() else {
+        return None;
+    };
+    (pipeline.has_semantic() && !pipeline.has_semantic_verse_refs())
+        .then(|| pipeline.semantic_verse_ids())
 }
 
 fn apply_resolved_semantic_refs(
