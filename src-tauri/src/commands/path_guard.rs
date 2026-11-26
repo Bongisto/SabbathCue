@@ -301,7 +301,7 @@ mod tests {
     fn handles_multibyte_utf8_with_verbatim_prefix_without_panicking() {
         assert!(!is_blocked_system_path(r"\\?\a😀\theme.json"));
         assert!(!is_blocked_system_path(r"\\.\😀\theme.json"));
-        assert!(is_blocked_system_path(r"\\?\a😀\..\Windows\win.ini"));
+        assert!(is_blocked_system_path(r"\\?\C:\a😀\..\Windows\win.ini"));
         assert!(!is_blocked_system_path(r"\\?\UNC\server\share\theme.json"));
     }
 }
