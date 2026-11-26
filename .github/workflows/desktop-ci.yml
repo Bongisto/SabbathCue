@@ -99,7 +99,7 @@ jobs:
           bun-version: latest
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.98.1
 
       - name: Setup Python for Vosk sidecar
         uses: actions/setup-python@v5
@@ -174,11 +174,15 @@ jobs:
           key: minilm-l6-v2-embeddings-${{ hashFiles('data/download-model.ts', 'data/export-minilm-onnx.py') }}
 
       - name: Prepare MiniLM semantic assets
+        shell: pwsh
         run: |
-          bun run download:model
-          bun run export:verses
-          bun run precompute:embeddings
-          bun run quantize:embeddings
+          $ErrorActionPreference = "Stop"
+          foreach ($script in @("download:model", "export:verses", "precompute:embeddings", "quantize:embeddings")) {
+            bun run $script
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
 
       - name: Compare f32 and q8 vector retrieval
         run: bun run compare:embeddings
@@ -205,7 +209,7 @@ jobs:
         shell: pwsh
         run: |
           for ($attempt = 1; $attempt -le 3; $attempt++) {
-            cargo +stable install cargo-deny --locked
+            cargo install cargo-deny --locked
             if ($LASTEXITCODE -eq 0) {
               exit 0
             }

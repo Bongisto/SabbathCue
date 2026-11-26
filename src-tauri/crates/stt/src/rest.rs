@@ -104,81 +104,87 @@ impl DeepgramRestClient {
             started.elapsed()
         );
 
-        // Parse the REST response into TranscriptEvents.
-        // REST response wraps everything in "results.channels[0].alternatives[0]"
-        let mut events = Vec::new();
+        Ok(parse_rest_transcript_events(&json))
+    }
+}
 
-        let channels = json
-            .get("results")
-            .and_then(|r| r.get("channels"))
-            .and_then(|c| c.as_array());
+fn parse_rest_transcript_events(json: &serde_json::Value) -> Vec<TranscriptEvent> {
+    // REST response wraps everything in "results.channels[0].alternatives[0]"
+    let mut events = Vec::new();
 
-        if let Some(channels) = channels {
-            for channel in channels {
-                let alternatives = channel.get("alternatives").and_then(|a| a.as_array());
+    let Some(channels) = json
+        .get("results")
+        .and_then(|r| r.get("channels"))
+        .and_then(|c| c.as_array())
+    else {
+        return events;
+    };
 
-                if let Some(alts) = alternatives {
-                    if let Some(first) = alts.first() {
-                        let transcript = first
-                            .get("transcript")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("")
-                            .to_string();
+    for channel in channels {
+        let Some(first) = channel
+            .get("alternatives")
+            .and_then(|a| a.as_array())
+            .and_then(|alts| alts.first())
+        else {
+            continue;
+        };
 
-                        let confidence = first
-                            .get("confidence")
-                            .and_then(serde_json::Value::as_f64)
-                            .unwrap_or(0.0);
-
-                        let words = first
-                            .get("words")
-                            .and_then(|w| w.as_array())
-                            .map(|arr| {
-                                arr.iter()
-                                    .filter_map(|w| {
-                                        // Keep words whose optional fields are
-                                        // missing; dropping the whole word
-                                        // desynchronized the confidence timeline.
-                                        let text = w.get("word")?.as_str()?.to_string();
-                                        Some(Word {
-                                            text,
-                                            start: w
-                                                .get("start")
-                                                .and_then(serde_json::Value::as_f64)
-                                                .unwrap_or(0.0),
-                                            end: w
-                                                .get("end")
-                                                .and_then(serde_json::Value::as_f64)
-                                                .unwrap_or(0.0),
-                                            confidence: w
-                                                .get("confidence")
-                                                .and_then(serde_json::Value::as_f64)
-                                                .unwrap_or(0.0),
-                                            punctuated_word: w
-                                                .get("punctuated_word")
-                                                .and_then(|p| p.as_str())
-                                                .map(ToString::to_string),
-                                        })
-                                    })
-                                    .collect::<Vec<Word>>()
-                            })
-                            .unwrap_or_default();
-
-                        if !transcript.is_empty() {
-                            events.push(TranscriptEvent::Final {
-                                transcript,
-                                words,
-                                confidence,
-                                speech_final: true,
-                            });
-                        }
-                    }
-                }
-            }
+        let transcript = first
+            .get("transcript")
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string();
+        if transcript.is_empty() {
+            continue;
         }
 
-        Ok(events)
+        let confidence = first
+            .get("confidence")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(0.0);
+
+        let words = first
+            .get("words")
+            .and_then(|w| w.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|w| {
+                        // Keep words whose optional fields are missing;
+                        // dropping the whole word desynchronized the confidence timeline.
+                        let text = w.get("word")?.as_str()?.to_string();
+                        Some(Word {
+                            text,
+                            start: w
+                                .get("start")
+                                .and_then(serde_json::Value::as_f64)
+                                .unwrap_or(0.0),
+                            end: w
+                                .get("end")
+                                .and_then(serde_json::Value::as_f64)
+                                .unwrap_or(0.0),
+                            confidence: w
+                                .get("confidence")
+                                .and_then(serde_json::Value::as_f64)
+                                .unwrap_or(0.0),
+                            punctuated_word: w
+                                .get("punctuated_word")
+                                .and_then(|p| p.as_str())
+                                .map(ToString::to_string),
+                        })
+                    })
+                    .collect::<Vec<Word>>()
+            })
+            .unwrap_or_default();
+
+        events.push(TranscriptEvent::Final {
+            transcript,
+            words,
+            confidence,
+            speech_final: true,
+        });
     }
+
+    events
 }
 
 pub(crate) fn build_rest_url(config: &SttConfig) -> Result<url::Url, SttError> {

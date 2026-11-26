@@ -187,7 +187,7 @@ impl SttProvider for VoskProvider {
         // channel, so `start_transcription` never returned.
         process.stop_detached();
         let _ = event_tx.send(TranscriptEvent::Disconnected).await;
-        run_result.and_then(|()| if was_cancelled { Ok(()) } else { writer_result })
+        run_result.and(if was_cancelled { Ok(()) } else { writer_result })
     }
 
     fn stop(&self) {

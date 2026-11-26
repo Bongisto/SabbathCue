@@ -1580,7 +1580,7 @@ mod bible_mode_tests {
         use rhema_detection::{DetectionJob, PresentationDecision};
 
         // 1. Explicit EGW direct ref: final+auto -> LiveAuthorized; partial -> PreviewAuthorized.
-        let mut final_direct = vec![egw_direct_result(29, 2, true)];
+        let mut final_direct = [egw_direct_result(29, 2, true)];
         authorize_egw_results(&mut final_direct, true, Some(7), true);
         assert_eq!(
             final_direct[0].authorization,
@@ -1589,7 +1589,7 @@ mod bible_mode_tests {
         assert_eq!(final_direct[0].job, DetectionJob::Citation);
         assert!(final_direct[0].auto_queued);
 
-        let mut partial_direct = vec![egw_direct_result(29, 2, true)];
+        let mut partial_direct = [egw_direct_result(29, 2, true)];
         authorize_egw_results(&mut partial_direct, false, Some(7), true);
         assert_eq!(
             partial_direct[0].authorization,

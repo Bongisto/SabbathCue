@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn rank_orders_nan_and_non_finite_scores_with_strict_weak_ordering() {
-        let mut scores = vec![
+        let mut scores = [
             (0, f32::NAN),
             (1, 0.75),
             (2, f32::INFINITY),
@@ -778,7 +778,7 @@ mod tests {
         scores[..3].sort_unstable_by(rank);
         scores[3..].sort_unstable_by(rank);
 
-        let mut full_sorted = vec![
+        let mut full_sorted = [
             (0, f32::NAN),
             (1, 0.75),
             (2, f32::INFINITY),
