@@ -338,13 +338,22 @@ pub async fn get_http_status(state: State<'_, Mutex<HttpRuntime>>) -> Result<Htt
     })
 }
 
-fn deserialize_optional_nullable_string<'de, D>(
+#[derive(Debug, Default)]
+enum NullableStringUpdate {
+    #[default]
+    Unchanged,
+    Clear,
+    Set(String),
+}
+
+fn deserialize_nullable_string_update<'de, D>(
     deserializer: D,
-) -> Result<Option<Option<String>>, D::Error>
+) -> Result<NullableStringUpdate, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    serde::Deserialize::deserialize(deserializer).map(Some)
+    Ok(Option::<String>::deserialize(deserializer)?
+        .map_or(NullableStringUpdate::Clear, NullableStringUpdate::Set))
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -355,19 +364,38 @@ struct RemoteStatusUpdate {
     #[serde(
         default,
         alias = "active_theme",
-        deserialize_with = "deserialize_optional_nullable_string"
+        deserialize_with = "deserialize_nullable_string_update"
     )]
-    active_theme: Option<Option<String>>,
+    active_theme: NullableStringUpdate,
     #[serde(
         default,
         alias = "live_verse",
-        deserialize_with = "deserialize_optional_nullable_string"
+        deserialize_with = "deserialize_nullable_string_update"
     )]
-    live_verse: Option<Option<String>>,
+    live_verse: NullableStringUpdate,
     #[serde(default, alias = "queue_length")]
     queue_length: Option<usize>,
     #[serde(default, alias = "confidence_threshold")]
     confidence_threshold: Option<f32>,
+}
+
+fn apply_nullable_string_update(
+    target: &mut Option<String>,
+    update: NullableStringUpdate,
+    field: &str,
+) -> Result<(), String> {
+    match update {
+        NullableStringUpdate::Unchanged => Ok(()),
+        NullableStringUpdate::Clear => {
+            *target = None;
+            Ok(())
+        }
+        NullableStringUpdate::Set(value) => {
+            bounded_text(&value, field, MAX_STATUS_TEXT_BYTES)?;
+            *target = Some(value);
+            Ok(())
+        }
+    }
 }
 
 fn apply_remote_status_update(
@@ -377,24 +405,12 @@ fn apply_remote_status_update(
     if let Some(v) = update.on_air {
         snapshot.on_air = v;
     }
-    if let Some(v) = update.active_theme {
-        match v {
-            Some(theme) => {
-                bounded_text(&theme, "active_theme", MAX_STATUS_TEXT_BYTES)?;
-                snapshot.active_theme = Some(theme);
-            }
-            None => snapshot.active_theme = None,
-        }
-    }
-    if let Some(v) = update.live_verse {
-        match v {
-            Some(verse) => {
-                bounded_text(&verse, "live_verse", MAX_STATUS_TEXT_BYTES)?;
-                snapshot.live_verse = Some(verse);
-            }
-            None => snapshot.live_verse = None,
-        }
-    }
+    apply_nullable_string_update(
+        &mut snapshot.active_theme,
+        update.active_theme,
+        "active_theme",
+    )?;
+    apply_nullable_string_update(&mut snapshot.live_verse, update.live_verse, "live_verse")?;
     if let Some(v) = update.queue_length {
         if v > MAX_QUEUE_LENGTH {
             return Err(format!("queue_length must be <= {MAX_QUEUE_LENGTH}"));

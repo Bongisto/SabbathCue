@@ -1,8 +1,3 @@
-#![expect(
-    clippy::needless_pass_by_value,
-    reason = "Tauri command extractors require pass-by-value"
-)]
-
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
