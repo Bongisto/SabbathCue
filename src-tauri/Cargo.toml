@@ -34,7 +34,7 @@ authors = ["BongaNdlovu"]
 license = "MIT"
 repository = "https://github.com/Bongisto/SabbathCue"
 edition = "2021"
-rust-version = "1.87"
+rust-version = "1.90"
 
 [lib]
 name = "rhema_lib"
@@ -45,14 +45,14 @@ name = "SabbathCue"
 path = "src/main.rs"
 
 [build-dependencies]
-tauri-build = { version = "2.5.6", features = [] }
+tauri-build = { version = "2.7.6", features = [] }
 
 [dependencies]
 serde_json.workspace = true
 serde.workspace = true
 log.workspace = true
 tokio.workspace = true
-tauri = { version = "2.10.3", features = ["protocol-asset"] }
+tauri = { version = "2.12.7", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-store = "2"
 rhema-audio = { path = "crates/audio" }
@@ -70,19 +70,19 @@ sysinfo = { version = "0.36", default-features = false, features = ["system"] }
 tauri-plugin-dialog = "2"
 keyring = { version = "3", features = ["windows-native"] }
 rand = "0.9"
-p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+p256 = { version = "0.14", features = ["ecdsa", "getrandom", "pkcs8"] }
 sha2 = "0.10"
 tempfile = "3"
 
 [dev-dependencies]
-rusqlite = { version = "0.34", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 
 [lints]
 workspace = true
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
-tauri-plugin-updater = "2"
+tauri-plugin-updater = "2.14.1"
 tauri-plugin-process = "2"
 
 # Cargo's default release profile leaves LTO off and splits into 16 codegen

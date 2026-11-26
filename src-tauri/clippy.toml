@@ -1,4 +1,6 @@
 # Keep MSRV-aware clippy lints honest: matches the newest std API used in the
 # workspace (usize::is_multiple_of, Rust 1.87). slice::as_chunks (1.88) is off
 # limits, which keeps chunks_exact idioms lint-clean.
+# Cargo.toml's rust-version is higher (1.90) only because dependencies require it
+# (tauri-plugin-updater 2.14, rusqlite 0.43); clippy warns about the mismatch, harmlessly.
 msrv = "1.87"

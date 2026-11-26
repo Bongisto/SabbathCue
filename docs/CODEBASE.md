@@ -25,10 +25,10 @@ SabbathCue listens to live sermon audio, transcribes it, detects scripture/EGW/h
 | ---------------- | ------------------------------------ | -------------- | --------------------------------- |
 | Frontend         | React                                | 19.2.7         | package.json:83                   |
 | Frontend build   | Vite                                 | 8.1.3          | package.json:7, package.json:127  |
-| Desktop shell    | Tauri                                | 2.10.3         | src-tauri/Cargo.toml:55           |
-| Backend language | Rust                                 | 1.77.2 minimum | src-tauri/Cargo.toml:37           |
+| Desktop shell    | Tauri                                | 2.12.7         | src-tauri/Cargo.toml:55           |
+| Backend language | Rust                                 | 1.90 minimum   | src-tauri/Cargo.toml:37           |
 | Testing          | Vitest                               | 4.1.8          | package.json:16, package.json:128 |
-| Data             | SQLite via rusqlite                  | 0.34           | src-tauri/Cargo.toml:75           |
+| Data             | SQLite via rusqlite                  | 0.43           | src-tauri/crates/bible/Cargo.toml:15 |
 | STT              | Vosk, Deepgram, Soniox, Speechmatics | internal crate | src-tauri/crates/stt/src/lib.rs:3 |
 
 ## 3 - Architecture overview

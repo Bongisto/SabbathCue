@@ -2,7 +2,7 @@ use std::fmt::Write as _;
 
 use base64::Engine as _;
 use p256::ecdsa::{signature::Signer, Signature, SigningKey};
-use p256::elliptic_curve::rand_core::OsRng;
+use p256::elliptic_curve::Generate as _;
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -40,7 +40,9 @@ fn load_or_create_signing_key(store: &dyn KeychainStore) -> Result<SigningKey, S
     match store.get_password(PRIVATE_KEY_ENTRY) {
         Ok(value) => decode_private_key(&value),
         Err(keyring::Error::NoEntry) => {
-            let key = SigningKey::random(&mut OsRng);
+            let key = SigningKey::try_generate().map_err(|error| {
+                format!("Could not generate installation identity: {error}")
+            })?;
             let encoded = encode_private_key(&key)?;
             store
                 .set_password(PRIVATE_KEY_ENTRY, &encoded)
