@@ -8,8 +8,8 @@ export const WINDOWS_INSTALLER_R2_OBJECT_KEY =
 
 export const WINDOWS_INSTALLER_SAVE_AS = "SabbathCue-Setup.exe" as const;
 
-/** Measured via R2 HEAD on 2026-09-12. */
-export const WINDOWS_INSTALLER_EXPECTED_BYTES = 262401748;
+/** Measured via R2 HEAD on 2026-11-27. */
+export const WINDOWS_INSTALLER_EXPECTED_BYTES = 263713588;
 
 export const WINDOWS_INSTALLER_MIN_BYTES = 200 * 1024 * 1024;
 
