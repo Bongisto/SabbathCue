@@ -57,51 +57,51 @@ deny = []
 skip = [
     # getrandom / rand_core generations: ring + ahash/jobserver/tauri lag behind the
     # RustCrypto 0.14 line (p256 / elliptic-curve / crypto-bigint use rand_core 0.10).
-    { crate = "getrandom@=0.2.17", reason = "ring (transitive)" },
-    { crate = "getrandom@=0.3.4", reason = "ahash / jobserver / tauri (transitive)" },
-    { crate = "rand_core@=0.9.5", reason = "rand 0.9 vs rand_core 0.10 (p256 0.14 / crypto-bigint 0.7)" },
+    { crate = "getrandom@0.2.17", reason = "ring (transitive)" },
+    { crate = "getrandom@0.3.4", reason = "ahash / jobserver / tauri (transitive)" },
+    { crate = "rand_core@0.9.5", reason = "rand 0.9 vs rand_core 0.10 (p256 0.14 / crypto-bigint 0.7)" },
 
     # RustCrypto digest 0.10 line (our sha2 0.10, sha1 0.10 via tungstenite) vs the 0.11 line
     # that p256 0.14 / ecdsa 0.17 pull in for the installation-identity signing key.
-    { crate = "sha2@=0.10.9", reason = "sha2 0.10 (ours) vs sha2 0.11 (p256 0.14)" },
-    { crate = "digest@=0.10.7", reason = "sha1 / sha2 0.10 vs digest 0.11 (p256 0.14)" },
-    { crate = "block-buffer@=0.10.4", reason = "digest 0.10 (transitive)" },
-    { crate = "crypto-common@=0.1.7", reason = "digest 0.10 (transitive)" },
-    { crate = "cpufeatures@=0.2.17", reason = "sha1 / sha2 0.10 (transitive)" },
+    { crate = "sha2@0.10.9", reason = "sha2 0.10 (ours) vs sha2 0.11 (p256 0.14)" },
+    { crate = "digest@0.10.7", reason = "sha1 / sha2 0.10 vs digest 0.11 (p256 0.14)" },
+    { crate = "block-buffer@0.10.4", reason = "digest 0.10 (transitive)" },
+    { crate = "crypto-common@0.1.7", reason = "digest 0.10 (transitive)" },
+    { crate = "cpufeatures@0.2.17", reason = "sha1 / sha2 0.10 (transitive)" },
 
     # base64: HuggingFace tokenizers (0.13) and reqwest / hyper-util / plist (0.22) vs
     # tauri-codegen / tauri-plugin-updater (0.23).
-    { crate = "base64@=0.13.1", reason = "spm_precompiled -> tokenizers (rhema-detection)" },
-    { crate = "base64@=0.22.1", reason = "ours + reqwest / hyper-util / plist vs 0.23 (tauri-codegen, updater)" },
+    { crate = "base64@0.13.1", reason = "spm_precompiled -> tokenizers (rhema-detection)" },
+    { crate = "base64@0.22.1", reason = "ours + reqwest / hyper-util / plist vs 0.23 (tauri-codegen, updater)" },
 
     # windows-rs binding generations: cpal / keyring / global-hotkey / Tauri plugins each
     # pin a different major of the windows-sys / windows bindings (newest line kept).
-    { crate = "windows-sys@=0.59.0", reason = "global-hotkey / window-vibrancy / winreg (transitive)" },
-    { crate = "windows-sys@=0.60.2", reason = "keyring / muda / rfd / tauri-plugin-updater (transitive)" },
-    { crate = "windows-targets@=0.52.6", reason = "windows-sys 0.59 (transitive)" },
-    { crate = "windows_x86_64_msvc@=0.52.6", reason = "windows-targets 0.52 (transitive)" },
-    { crate = "windows-link@=0.1.3", reason = "windows-core 0.61 (windows crate, transitive)" },
-    { crate = "windows-result@=0.3.4", reason = "windows-core 0.61 (windows crate, transitive)" },
-    { crate = "windows-strings@=0.4.2", reason = "windows-core 0.61 (windows crate, transitive)" },
-    { crate = "windows@=0.61.3", reason = "sysinfo 0.36 vs windows 0.62 (tauri / wry / cpal)" },
-    { crate = "windows-core@=0.61.2", reason = "windows 0.61 (sysinfo, transitive)" },
-    { crate = "windows-collections@=0.2.0", reason = "windows 0.61 (sysinfo, transitive)" },
-    { crate = "windows-future@=0.2.1", reason = "windows 0.61 (sysinfo, transitive)" },
-    { crate = "windows-numerics@=0.2.0", reason = "windows 0.61 (sysinfo, transitive)" },
-    { crate = "windows-threading@=0.1.0", reason = "windows 0.61 (sysinfo, transitive)" },
-    { crate = "keyboard-types@=0.7.0", reason = "global-hotkey 0.7 vs keyboard-types 0.8 (muda / tao)" },
+    { crate = "windows-sys@0.59.0", reason = "global-hotkey / window-vibrancy / winreg (transitive)" },
+    { crate = "windows-sys@0.60.2", reason = "keyring / muda / rfd / tauri-plugin-updater (transitive)" },
+    { crate = "windows-targets@0.52.6", reason = "windows-sys 0.59 (transitive)" },
+    { crate = "windows_x86_64_msvc@0.52.6", reason = "windows-targets 0.52 (transitive)" },
+    { crate = "windows-link@0.1.3", reason = "windows-core 0.61 (windows crate, transitive)" },
+    { crate = "windows-result@0.3.4", reason = "windows-core 0.61 (windows crate, transitive)" },
+    { crate = "windows-strings@0.4.2", reason = "windows-core 0.61 (windows crate, transitive)" },
+    { crate = "windows@0.61.3", reason = "sysinfo 0.36 vs windows 0.62 (tauri / wry / cpal)" },
+    { crate = "windows-core@0.61.2", reason = "windows 0.61 (sysinfo, transitive)" },
+    { crate = "windows-collections@0.2.0", reason = "windows 0.61 (sysinfo, transitive)" },
+    { crate = "windows-future@0.2.1", reason = "windows 0.61 (sysinfo, transitive)" },
+    { crate = "windows-numerics@0.2.0", reason = "windows 0.61 (sysinfo, transitive)" },
+    { crate = "windows-threading@0.1.0", reason = "windows 0.61 (sysinfo, transitive)" },
+    { crate = "keyboard-types@0.7.0", reason = "global-hotkey 0.7 vs keyboard-types 0.8 (muda / tao)" },
 
     # Assorted proc-macro / codegen / collection skew across the build graph.
-    { crate = "syn@=2.0.117", reason = "most proc-macros vs syn 3 (cssparser-macros / thiserror-impl / tokio-macros)" },
-    { crate = "toml@=0.9.12", reason = "tauri-winres / embed-resource (Windows build) vs toml 1.x (tauri-utils)" },
-    { crate = "toml_datetime@=0.7.5", reason = "toml 0.9 (transitive build dep)" },
-    { crate = "darling@=0.20.11", reason = "derive_builder_core (transitive build dep)" },
-    { crate = "darling_core@=0.20.11", reason = "derive_builder_core (transitive build dep)" },
-    { crate = "darling_macro@=0.20.11", reason = "derive_builder_core (transitive build dep)" },
-    { crate = "indexmap@=1.9.3", reason = "schemars (tauri-utils, transitive)" },
-    { crate = "hashbrown@=0.12.3", reason = "indexmap 1 (schemars, transitive)" },
-    { crate = "hashbrown@=0.16.1", reason = "indexmap 2 (h2 / tauri-utils / zip, transitive)" },
-    { crate = "winnow@=0.7.15", reason = "toml 0.9 (tauri-winres build, transitive)" },
+    { crate = "syn@2.0.117", reason = "most proc-macros vs syn 3 (cssparser-macros / thiserror-impl / tokio-macros)" },
+    { crate = "toml@0.9.12", reason = "tauri-winres / embed-resource (Windows build) vs toml 1.x (tauri-utils)" },
+    { crate = "toml_datetime@0.7.5", reason = "toml 0.9 (transitive build dep)" },
+    { crate = "darling@0.20.11", reason = "derive_builder_core (transitive build dep)" },
+    { crate = "darling_core@0.20.11", reason = "derive_builder_core (transitive build dep)" },
+    { crate = "darling_macro@0.20.11", reason = "derive_builder_core (transitive build dep)" },
+    { crate = "indexmap@1.9.3", reason = "schemars (tauri-utils, transitive)" },
+    { crate = "hashbrown@0.12.3", reason = "indexmap 1 (schemars, transitive)" },
+    { crate = "hashbrown@0.16.1", reason = "indexmap 2 (h2 / tauri-utils / zip, transitive)" },
+    { crate = "winnow@0.7.15", reason = "toml 0.9 (tauri-winres build, transitive)" },
 ]
 
 [sources]
